@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, Menu, User, Settings } from "lucide-react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
-import { API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -35,7 +35,7 @@ const TechnicianHeader = () => {
 
   const toggleAvailability = async (checked: boolean) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/technicians/me/status`, {
+      const response = await fetch(apiUrl("/api/technicians/me/status"), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

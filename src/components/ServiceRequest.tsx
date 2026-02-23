@@ -12,7 +12,7 @@ import LocationStep from "./service-request/LocationStep";
 import TechnicianSelection from "./TechnicianSelection";
 import PaymentStep, { PaymentData } from "./service-request/PaymentStep";
 import ConfirmationStep from "./service-request/ConfirmationStep";
-import { API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 import { getServicePriceForVehicle } from "@/config/serviceCatalog";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 
@@ -307,7 +307,7 @@ const ServiceRequest = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/service-requests`, {
+      const response = await fetch(apiUrl("/api/service-requests"), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

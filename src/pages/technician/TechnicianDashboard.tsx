@@ -11,7 +11,7 @@ import { Link, Navigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
-import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { apiFetch, apiUrl, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
@@ -22,7 +22,7 @@ import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsC
 import TechnicianReviews from "@/components/technician/TechnicianReviews"; // Ensure this matches file name
 import TechnicianNotifications from "@/components/technician/TechnicianNotifications"; // Ensure this matches file name
 
-const SOCKET_URL = API_BASE_URL;
+const SOCKET_URL = getRequiredApiBaseUrl();
 
 const TechnicianDashboard = () => {
   const { technician, isOnline, setIsOnline, isLoading } = useTechnicianAuth();
@@ -191,7 +191,7 @@ const TechnicianDashboard = () => {
     if (!technician?.id) return;
 
     // Connect Socket
-    const socket = io(SOCKET_URL || window.location.origin, {
+    const socket = io(SOCKET_URL, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
       auth: { token: localStorage.getItem("resqnow_technician_token") || undefined }
@@ -427,7 +427,7 @@ const TechnicianDashboard = () => {
 
   const toggleAvailability = async (checked: boolean) => {
     try {
-      const res = await fetch(`${SOCKET_URL}/api/technicians/me/status`, {
+      const res = await fetch(apiUrl("/api/technicians/me/status"), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -469,8 +469,8 @@ const TechnicianDashboard = () => {
 
       const useAcceptEndpoint = status === "accepted" && !!options?.useAcceptEndpoint;
       const endpoint = useAcceptEndpoint
-        ? `${SOCKET_URL}/api/service-requests/${normalizedJobId}/accept`
-        : `${SOCKET_URL}/api/service-requests/${normalizedJobId}/technician-status`;
+        ? apiUrl(`/api/service-requests/${normalizedJobId}/accept`)
+        : apiUrl(`/api/service-requests/${normalizedJobId}/technician-status`);
 
       const method = useAcceptEndpoint ? 'POST' : 'PATCH';
       const body = useAcceptEndpoint ? null : { status };
@@ -1158,4 +1158,3 @@ const TechnicianDashboard = () => {
 };
 
 export default TechnicianDashboard;
-

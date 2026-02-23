@@ -26,6 +26,7 @@ import {
     normalizeSpecialtiesForApi,
     normalizeVehicleTypesForApi,
 } from "@/config/technicianNormalization";
+import { apiUrl } from "@/lib/api";
 
 // --- Zod Schema ---
 
@@ -154,7 +155,7 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
         formData.append("file", file);
 
         try {
-            const res = await fetch("/api/upload", {
+            const res = await fetch(apiUrl("/api/upload"), {
                 method: "POST",
                 body: formData,
             });

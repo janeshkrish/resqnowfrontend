@@ -12,6 +12,7 @@ import { LogIn, Mail, Lock, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { apiUrl } from "@/lib/api";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -121,8 +122,7 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || "";
-      const response = await fetch(`${API_URL}/api/auth/google/url`);
+      const response = await fetch(apiUrl("/api/auth/google/url"));
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;

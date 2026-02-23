@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 
 // Fix Leaflet's default icon issue with Webpack/Vite
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -126,7 +126,7 @@ const Map = () => {
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`${API_BASE_URL}/api/technicians/nearby?lat=${lat}&lng=${lng}`, { headers });
+      const response = await fetch(apiUrl(`/api/technicians/nearby?lat=${lat}&lng=${lng}`), { headers });
 
       if (response.status === 401) {
         setTechnicians([]);

@@ -6,7 +6,7 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { toast } from 'sonner';
 import ActiveJobMap from '@/components/technician/ActiveJobMap';
-import { API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 import { normalizeTechnicianStatus, formatTechnicianStatus } from "@/utils/technicianStatus";
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 
@@ -36,7 +36,7 @@ const ActiveJob = () => {
     // 2. Pay Dues Handler
     const handlePayDues = async () => {
         try {
-            const orderRes = await fetch(`${API_BASE_URL}/api/technicians/me/pay-dues/order`, {
+            const orderRes = await fetch(apiUrl("/api/technicians/me/pay-dues/order"), {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -60,7 +60,7 @@ const ActiveJob = () => {
                 order_id: order.id,
                 handler: async (response: any) => {
                     try {
-                        const verifyRes = await fetch(`${API_BASE_URL}/api/technicians/me/pay-dues/verify`, {
+                        const verifyRes = await fetch(apiUrl("/api/technicians/me/pay-dues/verify"), {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ const ActiveJob = () => {
                     setCurrentLocation({ lat: latitude, lng: longitude });
 
                     // Update location on server
-                    fetch(`${API_BASE_URL}/api/technicians/me/location`, {
+                    fetch(apiUrl("/api/technicians/me/location"), {
                         method: 'PATCH',
                         headers: {
                             'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ const ActiveJob = () => {
         try {
             // STRICT: use requestId
             const idToUse = job.requestId || job.id;
-            const response = await fetch(`${API_BASE_URL}/api/service-requests/${idToUse}/technician-status`, {
+            const response = await fetch(apiUrl(`/api/service-requests/${idToUse}/technician-status`), {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',

@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { apiUrl } from "@/lib/api";
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -91,7 +92,7 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
 
     const geocodePosition = async (lat: number, lng: number) => {
         try {
-            const res = await fetch(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`);
+            const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`));
             const data = await res.json();
 
             if (data && data.address) {

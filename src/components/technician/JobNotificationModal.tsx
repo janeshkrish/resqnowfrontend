@@ -6,7 +6,7 @@ import { Navigation, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '@/lib/api';
+import { apiUrl } from '@/lib/api';
 
 interface JobRequest {
   id: string;
@@ -61,7 +61,7 @@ const JobNotificationModal = () => {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(`${API_BASE_URL}/api/service-requests/${requestId}/accept`, {
+      const response = await fetch(apiUrl(`/api/service-requests/${requestId}/accept`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

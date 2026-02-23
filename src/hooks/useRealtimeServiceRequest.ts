@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch, API_BASE_URL } from '@/lib/api';
+import { apiFetch, getRequiredApiBaseUrl } from '@/lib/api';
 import { toast } from 'sonner';
 import { io, Socket } from 'socket.io-client';
 
@@ -98,7 +98,8 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
     fetchRequest();
 
     // Initialize Socket.IO
-    const socket = io(API_BASE_URL);
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket = io(socketBaseUrl);
     socketRef.current = socket;
 
     socket.on("connect", () => {

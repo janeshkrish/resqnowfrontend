@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL } from '@/lib/api';
+import { getRequiredApiBaseUrl } from '@/lib/api';
 import { useTechnicianAuth } from './TechnicianAuthContext';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -35,7 +35,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Initialize socket
-    const socketInstance = io(API_BASE_URL, {
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socketInstance = io(socketBaseUrl, {
       path: '/socket.io',
       transports: ['websocket', 'polling'], // optimize for mobile
       withCredentials: true,

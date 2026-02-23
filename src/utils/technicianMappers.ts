@@ -1,8 +1,8 @@
 import { Technician } from "@/types/technician";
-import { API_BASE_URL } from "@/lib/api";
+import { getRequiredApiBaseUrl } from "@/lib/api";
 
 // Helper function to map database/API fields to our Technician type
-const BASE_URL = API_BASE_URL;
+const BASE_URL = getRequiredApiBaseUrl();
 
 const resolveUrl = (path: string) => {
   if (!path) return null;

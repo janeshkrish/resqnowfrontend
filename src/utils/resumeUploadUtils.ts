@@ -1,4 +1,5 @@
 import { toast } from "@/components/ui/sonner";
+import { apiUrl } from "@/lib/api";
 
 export const validateResumeFile = (file: File): boolean => {
   // Check if file is PDF or document
@@ -27,7 +28,7 @@ export const uploadResume = async (technicianId: string, resumeFile: File): Prom
     // Actually, Multer doesn't support "folders" dynamically easily without configuration.
     // We'll rely on the backend generating a unique filename.
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/upload`, {
+    const response = await fetch(apiUrl("/api/upload"), {
       method: "POST",
       body: formData,
       // No Content-Type header needed for FormData, browser sets it with boundary

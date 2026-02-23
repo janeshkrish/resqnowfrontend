@@ -15,6 +15,7 @@ import LocationDetector from "@/components/technician/LocationDetector";
 import { technicianAdminService } from "@/services/technicianAdminService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { apiUrl } from "@/lib/api";
 import {
     Loader2, Check, Car, User, Wrench, CreditCard,
     Upload, Clock, FileText, Fuel, Key, AlertTriangle, Truck, Zap,
@@ -151,7 +152,7 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
         const formData = new FormData();
         formData.append("file", file);
         try {
-            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            const res = await fetch(apiUrl("/api/upload"), { method: "POST", body: formData });
             if (!res.ok) throw new Error("Upload failed");
             const data = await res.json();
             onChange(data.url);

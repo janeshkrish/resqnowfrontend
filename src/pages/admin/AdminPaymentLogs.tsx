@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
-import { API_BASE_URL, getAdminToken } from "@/lib/api";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 
 type PaymentRecord = {
   payment_id: number;
@@ -84,7 +84,8 @@ const AdminPaymentLogs = () => {
 
   useEffect(() => {
     fetchOverview();
-    const socket: Socket = io(API_BASE_URL || window.location.origin, {
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket: Socket = io(socketBaseUrl, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
       withCredentials: true,

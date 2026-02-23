@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 
 const AuthSuccess = () => {
     const [searchParams] = useSearchParams();
@@ -32,7 +32,7 @@ const AuthSuccess = () => {
                 localStorage.setItem("isAuthenticated", "true"); // For non-React guards
 
                 // Verify token and get user details
-                const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+                const response = await fetch(apiUrl("/api/auth/verify"), {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }

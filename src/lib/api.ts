@@ -1,20 +1,25 @@
-
-// Dynamic Base URL Logic
-// If VITE_API_URL is set (prod), use it.
-// In development, return empty string to let Vite proxy handle the rewrite to backend
-const getBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (import.meta.env.DEV) {
-    return "";
-  }
-  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
-    return envUrl;
-  }
-  return "";
+const normalizeBaseUrl = (value: string | undefined): string => {
+  const trimmed = (value ?? "").trim();
+  const unquoted = trimmed.replace(/^["']|["']$/g, "");
+  return unquoted.replace(/\/+$/, "");
 };
 
-export const API_BASE_URL = getBaseUrl();
-const BASE = API_BASE_URL;
+export const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+
+export function getRequiredApiBaseUrl(): string {
+  if (!API_BASE_URL) {
+    throw new Error(
+      "Missing VITE_API_URL. Set it in your root .env (e.g. VITE_API_URL=https://resqnowbackend.onrender.com)."
+    );
+  }
+  return API_BASE_URL;
+}
+
+export function apiUrl(path: string): string {
+  const base = getRequiredApiBaseUrl();
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+}
 
 export function getTechnicianToken(): string | null {
   return localStorage.getItem("resqnow_technician_token");
@@ -43,7 +48,7 @@ export async function apiFetch(
     const t = getUserToken();
     if (t) h.set("Authorization", `Bearer ${t}`);
   }
-  return fetch(`${BASE}${path}`, { ...rest, headers: h });
+  return fetch(apiUrl(path), { ...rest, headers: h });
 }
 
 export function setTechnicianToken(token: string | null) {

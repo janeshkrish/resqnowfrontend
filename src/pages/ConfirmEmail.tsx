@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const BASE = import.meta.env.VITE_API_URL || "";
+import { apiUrl } from "@/lib/api";
 
 /**
  * Handles email confirmation when user lands on /confirm-email?token=... (e.g. old link or manual).
@@ -29,7 +28,7 @@ const ConfirmEmail = () => {
 
     const run = async () => {
       try {
-        const res = await fetch(`${BASE}/api/users/confirm-email?token=${encodeURIComponent(token)}`, {
+        const res = await fetch(apiUrl(`/api/users/confirm-email?token=${encodeURIComponent(token)}`), {
           method: "GET",
           headers: { Accept: "application/json" },
         });

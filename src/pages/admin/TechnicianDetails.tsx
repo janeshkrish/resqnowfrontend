@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Technician } from "@/types/technician";
 import { mapTechnicianData } from "@/utils/technicianMappers";
 import { io } from "socket.io-client";
-import { API_BASE_URL, getAdminToken } from "@/lib/api";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianReviews from "@/components/rating/TechnicianReviews";
 import {
   User,
@@ -75,7 +75,8 @@ const TechnicianDetails = () => {
 
   useEffect(() => {
     if (!technicianId) return;
-    const socket = io(API_BASE_URL || window.location.origin, {
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket = io(socketBaseUrl, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
       withCredentials: true,

@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Shield
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -54,7 +54,7 @@ const AdminDashboardLayout = () => {
     fetchUnreadCount();
 
     // SSE Connection
-    const eventSource = new EventSource("/api/admin/notifications/stream");
+    const eventSource = new EventSource(apiUrl("/api/admin/notifications/stream"));
 
     eventSource.onmessage = (event) => {
       try {

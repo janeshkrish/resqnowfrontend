@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiUrl } from '@/lib/api';
 
 export interface GeolocationCoordinates {
   lat: number;
@@ -28,7 +29,7 @@ export function useGeolocation(): UseGeolocationReturn {
   const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
     try {
       const response = await fetch(
-        `/api/public/reverse-geocode?lat=${lat}&lng=${lng}`
+        apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`)
       );
 
       if (!response.ok) {

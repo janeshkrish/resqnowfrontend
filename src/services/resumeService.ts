@@ -1,5 +1,5 @@
 import { toast } from "@/components/ui/sonner";
-import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 
 export const resumeService = {
   /**
@@ -11,7 +11,7 @@ export const resumeService = {
       formData.append("file", file);
 
       // We'll trust the server to handle naming effectively, or assume standard resumes logic
-      const response = await fetch(`${API_BASE_URL}/api/upload`, {
+      const response = await fetch(apiUrl("/api/upload"), {
         method: "POST",
         body: formData,
         headers: {

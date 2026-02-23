@@ -1,0 +1,1161 @@
+import React, { useEffect, useState, useRef } from "react";
+import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
+import { toast } from "sonner";
+import { Loader2, MapPin, DollarSign, Briefcase, Navigation, PhoneCall, User, Car, AlertCircle, TrendingUp, Star, CreditCard } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
+import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
+import io, { Socket } from "socket.io-client";
+import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
+import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
+import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
+import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
+
+// Restored imports for widgets
+import TechnicianJobHistory from "@/components/technician/TechnicianJobHistory";
+import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsChart"; // Ensure this matches file name
+import TechnicianReviews from "@/components/technician/TechnicianReviews"; // Ensure this matches file name
+import TechnicianNotifications from "@/components/technician/TechnicianNotifications"; // Ensure this matches file name
+
+const SOCKET_URL = API_BASE_URL;
+
+const TechnicianDashboard = () => {
+  const { technician, isOnline, setIsOnline, isLoading } = useTechnicianAuth();
+  const [stats, setStats] = useState({ jobs: 0, earnings: 0, today: 0 });
+  const [incomingJob, setIncomingJob] = useState<JobRequest | null>(null);
+
+  // Modals & Completion
+  const [showJobModal, setShowJobModal] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [lastEarned, setLastEarned] = useState(0);
+  const [isJobActionLoading, setIsJobActionLoading] = useState(false);
+
+  const [jobHistory, setJobHistory] = useState<any[]>([]);
+  const [earningsHistory, setEarningsHistory] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
+  const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
+
+  const socketRef = useRef<Socket | null>(null);
+  const trackingInterval = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isOnlineRef = useRef(false);
+  const activeJobIdRef = useRef<string | null>(null);
+
+  const stopAlertSound = () => {
+    if (!audioRef.current) return;
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    try {
+      delete (window as any).currentSiren;
+    } catch {
+      // no-op
+    }
+  };
+
+  const normalizeIncomingAssignedJob = (payload: any) => {
+    const raw = payload?.request || payload || {};
+    const amountRaw = raw.amount ?? raw.service_charge ?? raw.serviceCharge ?? incomingJob?.amount ?? activeJob?.amount ?? null;
+    const amount = amountRaw != null && !Number.isNaN(Number(amountRaw)) ? Number(amountRaw) : null;
+    const lat = raw.location?.lat ?? raw.location_lat ?? raw.locationLat ?? incomingJob?.location?.lat ?? null;
+    const lng = raw.location?.lng ?? raw.location_lng ?? raw.locationLng ?? incomingJob?.location?.lng ?? null;
+    const address = raw.location?.address ?? raw.address ?? incomingJob?.location?.address ?? activeJob?.address ?? "";
+
+    return {
+      ...raw,
+      id: String(raw.id ?? raw.requestId ?? incomingJob?.id ?? activeJob?.id ?? ""),
+      status: normalizeTechnicianStatus(raw.status ?? raw.current_status ?? raw.job_status),
+      service_type: raw.service_type ?? raw.serviceType ?? incomingJob?.serviceType ?? activeJob?.service_type,
+      vehicle_type: raw.vehicle_type ?? raw.vehicleType ?? incomingJob?.vehicleType ?? activeJob?.vehicle_type,
+      contact_name: raw.contact_name ?? raw.customerName ?? incomingJob?.customerName ?? activeJob?.contact_name,
+      amount,
+      distance: raw.distance ?? incomingJob?.distance ?? activeJob?.distance ?? null,
+      eta: raw.eta ?? incomingJob?.eta ?? activeJob?.eta ?? null,
+      location: { lat, lng, address },
+      location_lat: lat,
+      location_lng: lng,
+      address,
+    };
+  };
+
+  useEffect(() => {
+    // Initialize audio ref once
+    audioRef.current = new Audio("https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3");
+    audioRef.current.loop = true;
+    audioRef.current.volume = 1.0;
+
+    return () => {
+      if (audioRef.current) {
+        stopAlertSound();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  useEffect(() => {
+    activeJobIdRef.current = activeJob?.id ? String(activeJob.id) : null;
+  }, [activeJob?.id]);
+
+  useEffect(() => {
+    if (activeJob) {
+      startLocationTracking();
+      return;
+    }
+    if (!isOnline) {
+      stopLocationTracking();
+    }
+  }, [activeJob, isOnline]);
+
+  // Initialize Socket and Status
+  useEffect(() => {
+    if (!technician) return;
+
+    // Fetch initial status, active job and stats
+    const fetchData = async () => {
+      try {
+        const [meRes, statsRes, historyRes, earningsRes, reviewsRes, notificationsRes, financialsRes] = await Promise.all([
+          apiFetch("/api/technicians/me", { technician: true }),
+          apiFetch("/api/technicians/dashboard-stats", { technician: true }),
+          apiFetch("/api/technicians/requests", { technician: true }),
+          apiFetch("/api/technicians/earnings-history", { technician: true }),
+          apiFetch("/api/technicians/me/reviews", { technician: true }),
+          apiFetch("/api/technicians/me/notifications", { technician: true }),
+          apiFetch("/api/technicians/me/financials", { technician: true })
+        ]);
+
+        let meData = null;
+        if (meRes.ok) {
+          meData = await meRes.json();
+          setIsOnline(!!meData.is_active);
+          if (meData.latitude && meData.longitude) {
+            setCurrentLocation({ lat: meData.latitude, lng: meData.longitude });
+          }
+        }
+
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats({
+            jobs: statsData.completedJobs || 0,
+            earnings: statsData.totalEarnings || 0,
+            today: statsData.todayEarnings || 0
+          });
+        }
+
+        if (historyRes.ok) {
+          const data = await historyRes.json();
+          setJobHistory(Array.isArray(data) ? data : []);
+        }
+
+        if (earningsRes.ok) {
+          const data = await earningsRes.json();
+          setEarningsHistory(Array.isArray(data) ? data : []);
+        }
+
+        if (reviewsRes.ok) {
+          const data = await reviewsRes.json();
+          setReviews(Array.isArray(data) ? data : []);
+        }
+
+        if (notificationsRes.ok) {
+          const data = await notificationsRes.json();
+          setNotifications(Array.isArray(data) ? data : []);
+        }
+
+        if (financialsRes && financialsRes.ok) {
+          const data = await financialsRes.json();
+          setFinancials(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data", err);
+      }
+    };
+
+    fetchData();
+    const refreshInterval = setInterval(fetchData, 15000);
+    return () => clearInterval(refreshInterval);
+  }, [technician]); // Close fetch effect
+
+  // Socket Effect
+  useEffect(() => { // Start socket effect
+    if (!technician?.id) return;
+
+    // Connect Socket
+    const socket = io(SOCKET_URL || window.location.origin, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      auth: { token: localStorage.getItem("resqnow_technician_token") || undefined }
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("Socket connected");
+      if (technician?.id) {
+        // Correct event name to join room
+        socket.emit("join_technician_room", technician.id);
+      }
+    });
+
+
+
+    const handleAssignedJob = (jobData: any) => {
+      console.log("Job assigned directly!", jobData);
+      stopAlertSound();
+      setIncomingJob(null); // Clear offer if any
+      const normalized = normalizeIncomingAssignedJob(jobData);
+      setActiveJob(normalized);
+      setShowJobModal(false);
+    };
+
+    socket.on("job:assigned", handleAssignedJob);
+    socket.on("job_assigned", handleAssignedJob);
+
+
+
+    // New: Listen for Broadcast Offers
+    socket.on("job_offer", (offerData) => {
+      console.log("New Job Offer Received!", offerData);
+      const rawRequestId = offerData?.requestId ?? offerData?.id;
+      const requestId = rawRequestId != null ? String(rawRequestId).trim() : "";
+      if (!requestId || requestId === "undefined") {
+        console.warn("Skipping malformed job_offer payload: missing requestId", offerData);
+        return;
+      }
+      // Map offer payload to JobRequest interface expected by Modal
+      const jobRequest: JobRequest = {
+        id: requestId,
+        customerName: offerData.customerName,
+        serviceType: offerData.serviceType,
+        vehicleType: offerData.vehicleType,
+        location: {
+          lat: offerData.location.lat,
+          lng: offerData.location.lng,
+          address: offerData.address
+        },
+        distance: parseFloat(offerData.distance) || 0, // Ensure number
+        amount: offerData.amount != null && !Number.isNaN(Number(offerData.amount)) ? Number(offerData.amount) : 0
+      };
+      (jobRequest as any).eta = offerData.eta ?? null;
+      setIncomingJob(jobRequest);
+      setShowJobModal(true);
+
+      // Play Siren - Use the loud siren ref defined earlier
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(e => console.error("Siren play failed", e));
+        (window as any).currentSiren = audioRef.current;
+      }
+    });
+
+    // New: Listen for Revocations (Job Taken)
+    socket.on("job:revoked", (data) => {
+      console.log("Job Offer Revoked/Taken", data);
+      setIncomingJob((prev) => (prev && prev.id === data.requestId ? null : prev));
+      stopAlertSound();
+      toast.info("Job was taken by another technician.");
+    });
+
+    // ... (rest of listeners)
+
+    // ...
+
+    // handleAcceptJob moved to outer scope
+
+    socket.on('dashboard:stats_update', (data: any) => {
+      console.log('Received real-time stats update:', data);
+      setStats(prev => ({
+        ...prev,
+        earnings: data.totalEarnings,
+        jobs: data.completedJobs,
+        today: data.todayEarnings
+      }));
+
+      // Also update financials optimistically
+      setFinancials(prev => ({
+        ...prev,
+        total_earnings: data.totalEarnings
+      }));
+
+      if (data?.newJobAmount != null && !Number.isNaN(Number(data.newJobAmount))) {
+        toast.success("New earnings recorded!", {
+          description: `Rs ${parseFloat(data.newJobAmount).toFixed(2)} added to your wallet.`
+        });
+      }
+    });
+
+    socket.on('technician:financials_update', (data: any) => {
+      if (!data) return;
+      setFinancials((prev) => ({
+        ...prev,
+        total_earnings: Number(data.total_earnings ?? prev.total_earnings ?? 0),
+        pending_dues: Number(data.pending_dues ?? prev.pending_dues ?? 0)
+      }));
+    });
+
+    // Listen for new reviews
+    socket.on('technician:new_review', (review: any) => {
+      setReviews(prev => [review, ...prev]);
+      toast("New Review Received!", {
+        description: `${review.rating} Stars`
+      });
+    });
+
+    // Listen for real-time job list updates
+    socket.on('job:list_update', async (data: any) => {
+      console.log('Real-time job list update received:', data);
+
+      // Fetch updated job list
+      try {
+        const jobListRes = await apiFetch("/api/technicians/requests", { technician: true });
+        if (jobListRes.ok) {
+          const updatedJobs = await jobListRes.json();
+          if (Array.isArray(updatedJobs)) {
+            setJobHistory(prev => {
+              const prevSig = JSON.stringify((prev || []).map((j: any) => `${j.id}:${j.status}:${j.updated_at || j.created_at}`));
+              const nextSig = JSON.stringify((updatedJobs || []).map((j: any) => `${j.id}:${j.status}:${j.updated_at || j.created_at}`));
+              if (prevSig !== nextSig) {
+                const prevIds = new Set((prev || []).map((j: any) => String(j.id)));
+                const newJobs = updatedJobs.filter((j: any) => !prevIds.has(String(j.id)));
+                if (newJobs.length > 0) {
+                  toast.info(`${newJobs.length} new request(s) available!`);
+                }
+                return updatedJobs;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch updated job list:', err);
+      }
+    });
+
+    socket.on('job:status_update', async (data: any) => {
+      const requestId = String(data?.requestId || data?.id || "");
+      if (!requestId) return;
+
+      if (activeJobIdRef.current && requestId === activeJobIdRef.current && data?.status) {
+        setActiveJob((prev: any) => prev ? { ...prev, status: normalizeTechnicianStatus(data.status) } : prev);
+      }
+
+      if (['paid', 'completed', 'cancelled'].includes(String(data?.status || ''))) {
+        try {
+          const [activeJobRes, statsRes, historyRes, financialsRes] = await Promise.all([
+            apiFetch("/api/technicians/me/active-job", { technician: true }),
+            apiFetch("/api/technicians/dashboard-stats", { technician: true }),
+            apiFetch("/api/technicians/requests", { technician: true }),
+            apiFetch("/api/technicians/me/financials", { technician: true }),
+          ]);
+
+          if (activeJobRes.ok) {
+            const latestActiveJob = await activeJobRes.json();
+            setActiveJob(latestActiveJob || null);
+            refreshActiveJob();
+          }
+          if (statsRes.ok) {
+            const statsData = await statsRes.json();
+            setStats({
+              jobs: statsData.completedJobs || 0,
+              earnings: statsData.totalEarnings || 0,
+              today: statsData.todayEarnings || 0,
+            });
+          }
+          if (historyRes.ok) {
+            const historyData = await historyRes.json();
+            setJobHistory(Array.isArray(historyData) ? historyData : []);
+          }
+          if (financialsRes.ok) {
+            const finData = await financialsRes.json();
+            setFinancials(finData);
+          }
+        } catch (err) {
+          console.warn("Failed to sync dashboard after status update:", err);
+        }
+      }
+    });
+
+    // Polling fallback: Check for new jobs every 10 seconds if socket is not reliable
+    const pollInterval = setInterval(async () => {
+      if (isOnlineRef.current || !!activeJobIdRef.current) {
+        try {
+          const jobListRes = await apiFetch("/api/technicians/requests", { technician: true });
+          if (jobListRes.ok) {
+            const updatedJobs = await jobListRes.json();
+            if (Array.isArray(updatedJobs)) {
+              setJobHistory(prev => {
+                const prevSig = JSON.stringify((prev || []).map((j: any) => `${j.id}:${j.status}:${j.updated_at || j.created_at}`));
+                const nextSig = JSON.stringify((updatedJobs || []).map((j: any) => `${j.id}:${j.status}:${j.updated_at || j.created_at}`));
+                if (prevSig !== nextSig) {
+                  return updatedJobs;
+                }
+                return prev;
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('Polling failed:', err);
+        }
+      }
+    }, 10000); // Poll every 10 seconds
+
+    return () => {
+      socket.off("job:assigned", handleAssignedJob);
+      socket.off("job_assigned", handleAssignedJob);
+      socket.off("job:status_update");
+      socket.off("job:list_update");
+      socket.off("dashboard:stats_update");
+      socket.off("technician:financials_update");
+      socket.off("technician:new_review");
+      stopAlertSound();
+      socket.disconnect();
+      stopLocationTracking();
+      clearInterval(pollInterval);
+    };
+  }, [technician?.id]); // Close socket effect
+
+
+
+  const toggleAvailability = async (checked: boolean) => {
+    try {
+      const res = await fetch(`${SOCKET_URL}/api/technicians/me/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("resqnow_technician_token")}`
+        },
+        body: JSON.stringify({ active: checked })
+      });
+
+      if (res.ok) {
+        setIsOnline(checked);
+        if (checked) {
+          socketRef.current?.emit("technician:online", technician?.id);
+          toast.success("You are now Online");
+          // Start tracking location
+          startLocationTracking();
+        } else {
+          socketRef.current?.emit("technician:offline", technician?.id);
+          toast.success("You are now Offline");
+          stopLocationTracking();
+        }
+      } else {
+        toast.error("Failed to update status");
+      }
+    } catch (e) {
+      toast.error("Error updating status");
+    }
+  };
+
+  const updateJobStatus = async (
+    status: string,
+    jobId: string,
+    options?: { useAcceptEndpoint?: boolean }
+  ) => {
+    try {
+      const normalizedJobId = String(jobId || "").trim();
+      if (!normalizedJobId || normalizedJobId === "undefined") {
+        throw new Error("Invalid job id");
+      }
+
+      const useAcceptEndpoint = status === "accepted" && !!options?.useAcceptEndpoint;
+      const endpoint = useAcceptEndpoint
+        ? `${SOCKET_URL}/api/service-requests/${normalizedJobId}/accept`
+        : `${SOCKET_URL}/api/service-requests/${normalizedJobId}/technician-status`;
+
+      const method = useAcceptEndpoint ? 'POST' : 'PATCH';
+      const body = useAcceptEndpoint ? null : { status };
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("resqnow_technician_token")}`
+        },
+        ...(body ? { body: JSON.stringify(body) } : {})
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed");
+      }
+      const data = await res.json();
+
+      if (status === 'completed') {
+        const earned = Number(data?.request?.amount ?? activeJob?.amount ?? 0);
+        setLastEarned(Number.isNaN(earned) ? 0 : earned);
+        setShowCompletionModal(true);
+      }
+      return data;
+    } catch (e: any) {
+      toast.error(`Failed: ${e.message || "Unknown error"}`);
+      throw e;
+    }
+  };
+
+  const handleAcceptJob = async (jobId: string) => {
+    if (isJobActionLoading) return;
+    const normalizedJobId = String(jobId || "").trim();
+    if (!normalizedJobId || normalizedJobId === "undefined") {
+      toast.error("Invalid job request id");
+      return;
+    }
+
+    try {
+      setIsJobActionLoading(true);
+      stopAlertSound();
+      const isOfferAccept = !!(incomingJob && String(incomingJob.id) === normalizedJobId);
+      await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: isOfferAccept });
+      toast.success("Job Accepted!");
+      setIncomingJob(null);
+
+      // Fix: Update activeJob state reliably even if incomingJob is null
+      setActiveJob((prev: any) => {
+        if (prev && String(prev.id) === normalizedJobId) {
+          return { ...prev, status: 'accepted' };
+        }
+        if (!incomingJob) return prev;
+        return {
+          id: incomingJob.id,
+          status: 'accepted',
+          service_type: incomingJob.serviceType,
+          vehicle_type: incomingJob.vehicleType,
+          contact_name: incomingJob.customerName,
+          amount: incomingJob.amount != null && !Number.isNaN(Number(incomingJob.amount)) ? Number(incomingJob.amount) : null,
+          distance: incomingJob.distance ?? null,
+          location: incomingJob.location,
+          address: incomingJob.location?.address || "",
+        };
+      });
+
+      startLocationTracking();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsJobActionLoading(false);
+    }
+  };
+
+  const handleRejectJob = async (jobId: string) => {
+    if (isJobActionLoading) return;
+    const normalizedJobId = String(jobId || "").trim();
+    if (!normalizedJobId || normalizedJobId === "undefined") {
+      toast.error("Invalid job request id");
+      return;
+    }
+
+    try {
+      setIsJobActionLoading(true);
+      stopAlertSound();
+      await updateJobStatus("rejected", normalizedJobId);
+      setIncomingJob(null);
+      toast.info("Job Rejected");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsJobActionLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!activeJob) return;
+    try {
+      await updateJobStatus(newStatus, activeJob.id);
+      if (newStatus === 'completed') {
+        toast.success("Job Completed! Great work.");
+        setActiveJob(null);
+        setStats(prev => ({ ...prev, jobs: prev.jobs + 1 }));
+        stopLocationTracking();
+        if (isOnline) startLocationTracking();
+      } else {
+        setActiveJob(prev => ({ ...prev, status: newStatus }));
+        toast.success(`Status updated to: ${newStatus}`);
+      }
+    } catch (e) { }
+  };
+
+
+  // Location Tracking Simulation
+
+  const handlePayDues = async () => {
+    try {
+      const orderRes = await apiFetch("/api/technicians/me/pay-dues/order", {
+        method: "POST",
+        technician: true
+      });
+
+      if (!orderRes.ok) {
+        const err = await orderRes.json();
+        if (orderRes.status === 400 && err.error === "No pending dues") {
+          toast.success("All dues are already cleared!");
+          setFinancials(prev => ({ ...prev, pending_dues: 0 }));
+          return;
+        }
+        throw new Error(err.error || "Failed to create order");
+      }
+
+      const orderData = await orderRes.json();
+
+      if (!(window as any).Razorpay) {
+        toast.error("Payment gateway not loaded", { description: "Please check your internet connection." });
+        return;
+      }
+
+      const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!keyId) {
+        toast.error("Payment Configuration Error", { description: "Razorpay Key ID is missing." });
+        console.error("VITE_RAZORPAY_KEY_ID is missing");
+        return;
+      }
+
+      const options = {
+        key: keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "ResQNow Platform Fee",
+        description: "Settlement of pending dues",
+        order_id: orderData.id,
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await apiFetch("/api/technicians/me/pay-dues/verify", {
+              method: "POST",
+              technician: true,
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            if (verifyRes.ok) {
+              const verifyData = await verifyRes.json().catch(() => null);
+              toast.success("Dues paid successfully!");
+              if (verifyData?.financials) {
+                setFinancials(verifyData.financials);
+              } else {
+                const financialsRes = await apiFetch("/api/technicians/me/financials", { technician: true });
+                if (financialsRes.ok) {
+                  const freshFinancials = await financialsRes.json();
+                  setFinancials(freshFinancials);
+                } else {
+                  setFinancials(prev => ({ ...prev, pending_dues: 0 }));
+                }
+              }
+            } else {
+              const errData = await verifyRes.json().catch(() => ({}));
+              toast.error("Verification failed", { description: errData.error || "Please contact support." });
+            }
+          } catch (e) {
+            console.error(e);
+            toast.error("Payment verification error");
+          }
+        },
+        theme: { color: "#2563eb" },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment Cancelled");
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        toast.error("Payment Failed", { description: response.error.description });
+      });
+      rzp.open();
+
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Payment initialization failed");
+    }
+  };
+
+  const startLocationTracking = () => {
+    if (navigator.geolocation && !trackingInterval.current) {
+      trackingInterval.current = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setCurrentLocation({ lat: latitude, lng: longitude });
+            socketRef.current?.emit("technician:location_update", {
+              technicianId: technician?.id,
+              lat: latitude,
+              lng: longitude
+            });
+            apiFetch('/api/technicians/me/location', {
+              method: 'PATCH',
+              technician: true,
+              body: JSON.stringify({ latitude, longitude })
+            }).catch(console.error);
+          },
+          (err) => console.error(err),
+          { enableHighAccuracy: true }
+        );
+      }, 5000); // Every 5s
+    }
+  };
+
+  const stopLocationTracking = () => {
+    if (trackingInterval.current) {
+      clearInterval(trackingInterval.current);
+      trackingInterval.current = null;
+    }
+  };
+
+  // Compute best available amount for a job using job fields and technician pricing
+  const computeJobAmount = (job: any, tech: any) => {
+    if (!job) return null;
+    // Prefer explicit amount fields
+    const a = job.amount ?? job.service_charge ?? job.serviceCharge;
+    if (a && Number(a) > 0) return Number(a);
+
+    // Try technician pricing structures
+    // Try technician pricing structures
+    const pricing = (tech?.pricing ?? tech?.pricing_config) || tech?.pricing || null; // Simplified logic, assuming redundancies were unintentional
+    const serviceCosts = (tech?.service_costs ?? tech?.service_costs) || tech?.serviceCosts || null;
+
+    const svcKey = (job.service_type || job.serviceType || '').toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+    let computed = null;
+
+    try {
+      if (pricing && typeof pricing === 'object') {
+        const flat = pricing[job.service_type] ?? pricing[svcKey];
+        if (typeof flat === 'number') computed = flat;
+        else if (flat && typeof flat === 'object' && job.vehicle_type) {
+          const vehicleKey = job.vehicle_type.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+          const nested = flat[job.vehicle_type] ?? flat[vehicleKey] ?? flat[vehicleKey + '_vehicle'];
+          if (nested && (nested.baseCharge || nested.base_charge || nested.price || nested.amount)) {
+            computed = nested.baseCharge ?? nested.base_charge ?? nested.price ?? nested.amount;
+          } else if (typeof flat.baseCharge === 'number') {
+            computed = flat.baseCharge;
+          }
+        }
+      }
+
+      if (computed == null && serviceCosts) {
+        if (Array.isArray(serviceCosts)) {
+          for (const sc of serviceCosts) {
+            const key = (sc.service_key || sc.service || '').toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+            if (key && (key === svcKey || key.includes(svcKey))) {
+              if (job.vehicle_type && sc.vehicle_prices) {
+                const vp = sc.vehicle_prices[job.vehicle_type] ?? sc.vehicle_prices[job.vehicle_type?.toLowerCase?.().replace(/\s+/g, '_')];
+                if (vp && (vp.baseCharge || vp.price || vp.amount)) {
+                  computed = vp.baseCharge ?? vp.price ?? vp.amount;
+                  break;
+                }
+              }
+              if (sc.price || sc.baseCharge || sc.amount) {
+                computed = sc.price ?? sc.baseCharge ?? sc.amount;
+                break;
+              }
+            }
+          }
+        } else if (typeof serviceCosts === 'object') {
+          const scEntry = serviceCosts[job.service_type] ?? serviceCosts[svcKey];
+          if (scEntry) {
+            if (job.vehicle_type && scEntry[job.vehicle_type]) {
+              computed = scEntry[job.vehicle_type].baseCharge ?? scEntry[job.vehicle_type].price ?? scEntry[job.vehicle_type].amount;
+            } else {
+              computed = scEntry.price ?? scEntry.baseCharge ?? scEntry.amount;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to compute job amount', e);
+    }
+
+    return computed != null ? Number(computed) : null;
+  };
+
+  const openNavigation = () => {
+    // Safely read coordinates — activeJob or its location may be null.
+    const lat = activeJob?.location?.lat ?? activeJob?.location_lat ?? null;
+    const lng = activeJob?.location?.lng ?? activeJob?.location_lng ?? null;
+    const address = activeJob?.location?.address || activeJob?.address || "";
+
+    if ((lat !== null && lng !== null) && (Number(lat) !== 0 || Number(lng) !== 0)) {
+      // Use precise coordinates if available
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+    } else if (address) {
+      // Fallback to address string
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`, '_blank');
+    } else {
+      toast.error('No location details available for navigation.');
+    }
+  };
+
+  // Calculate Distance and ETA
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const jobLat = Number(activeJob?.location?.lat ?? activeJob?.location_lat);
+  const jobLng = Number(activeJob?.location?.lng ?? activeJob?.location_lng);
+
+  const jobDistance = currentLocation && Number.isFinite(jobLat) && Number.isFinite(jobLng) && (jobLat !== 0 || jobLng !== 0)
+    ? calculateDistance(currentLocation.lat, currentLocation.lng, jobLat, jobLng)
+    : (activeJob?.distance != null ? Number(activeJob.distance) : null);
+
+  // Assume avg speed 30km/h for city driving
+  // Assume avg speed 30km/h for city driving
+  const etaMinutes = jobDistance !== null ? Math.ceil((jobDistance / 30) * 60) : null;
+  const activeAmountDisplay = activeJob && (activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge) != null
+    ? (Number.isNaN(Number(activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge))
+      ? null
+      : Number(activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge))
+    : null;
+
+  if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
+  if (!technician) return <Navigate to="/technician/login" replace />;
+  if (technician?.verification_status !== "verified") {
+    return <Navigate to="/technician/verification" replace />;
+  }
+
+  const handleCancelJob = async () => {
+    if (!activeJob) return;
+    if (!confirm("Are you sure you want to cancel this job? This logic will be recorded.")) return;
+    try {
+      await updateJobStatus("cancelled", activeJob.id);
+      toast.info("Job Cancelled");
+      setActiveJob(null);
+      stopLocationTracking();
+      if (isOnline) startLocationTracking();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Derived state for "Busy"
+  const isBusy = activeJob && activeJob.status !== 'completed' && activeJob.status !== 'cancelled' && activeJob.status !== 'rejected';
+
+  // Enhanced Toggle Handler
+  const handleToggleAvailability = (checked: boolean) => {
+    if (isBusy && !checked) {
+      toast.error("Cannot go offline while on an active job.", {
+        description: "Please complete your current job first."
+      });
+      return;
+    }
+    toggleAvailability(checked);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f3f4f6] pb-24 md:pb-8 selection:bg-primary/20 relative">
+      <div className="container max-w-md mx-auto px-4 pt-6 pb-24 space-y-5">
+
+        {/* Offline Warning Banner */}
+        {!isOnline && !isBusy && (
+          <div onClick={() => handleToggleAvailability(true)} className="bg-white rounded-3xl p-4 flex items-center justify-between shadow-sm border border-slate-100 cursor-pointer active:scale-[0.98] transition-all">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                <AlertCircle className="w-6 h-6 text-slate-400" />
+              </div>
+              <div className="flex flex-col">
+                <p className="font-bold text-slate-800 leading-tight mb-0.5">You are Offline</p>
+                <p className="text-[11px] text-slate-500 leading-snug">Tap to go online and get jobs</p>
+              </div>
+            </div>
+            <div className="h-8 px-4 bg-green-50 text-green-700 rounded-full flex items-center justify-center font-bold text-xs uppercase tracking-wide border border-green-200">
+              Go Online
+            </div>
+          </div>
+        )}
+
+        {/* 1. MAP SECTION (NOW AT THE TOP) */}
+        {!activeJob && (
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden relative">
+            {/* Map Placeholder when no active job */}
+            <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-[400]">
+              <div className="bg-white/90 backdrop-blur pb-1 pt-1.5 px-4 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="font-black text-slate-900 text-sm tracking-tight uppercase">Live Map</h3>
+              </div>
+              {isOnline ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50/90 backdrop-blur rounded-full border border-green-100 shadow-sm">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">Active</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur rounded-full border border-slate-200 shadow-sm">
+                  <span className="w-2 h-2 bg-slate-300 rounded-full" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Paused</span>
+                </div>
+              )}
+            </div>
+            <div className="h-[300px] w-full relative">
+              <TechnicianJobMap
+                techLocation={currentLocation}
+                jobLocation={null}
+              />
+              {!isOnline && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[400] flex items-center justify-center">
+                  <div className="bg-white shadow-xl px-6 py-3 rounded-full border border-slate-200 font-bold text-sm text-slate-800 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-slate-400" /> Map Paused
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 2. QUICK MENU GRID SECTION */}
+        {!activeJob && (
+          <div className="grid grid-cols-2 gap-3">
+            <Link to="/technician/earnings" className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
+              <div className="h-10 w-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-3 group-hover:scale-110 transition-transform">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Today</p>
+                <p className="text-xl font-black text-slate-800 leading-none">₹{stats.today}</p>
+              </div>
+            </Link>
+
+            <Link to="/technician/history" className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
+              <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-3 group-hover:scale-110 transition-transform">
+                <Briefcase className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Total Jobs</p>
+                <p className="text-xl font-black text-slate-800 leading-none">{stats.jobs}</p>
+              </div>
+            </Link>
+
+            <Link to="/technician/reviews" className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
+              <div className="h-10 w-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-3 group-hover:scale-110 transition-transform">
+                <Star className="w-5 h-5 fill-amber-500" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Rating</p>
+                <p className="text-xl font-black text-slate-800 leading-none">
+                  {Array.isArray(reviews) && reviews.length > 0 ? (reviews.reduce((acc, r) => acc + (r.rating || 0), 0) / reviews.length).toFixed(1) : "5.0"}
+                </p>
+              </div>
+            </Link>
+
+            {financials.pending_dues > 0 ? (
+              <div onClick={handlePayDues} className="bg-red-50 p-4 rounded-[1.5rem] border border-red-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform cursor-pointer group">
+                <div className="h-10 w-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-3 group-hover:scale-110 transition-transform">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-red-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Pending Dues</p>
+                  <p className="text-xl font-black text-red-700 leading-none">₹{financials.pending_dues}</p>
+                  <span className="text-[9px] font-bold text-red-600 mt-1 block">Pay Now</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between opacity-70">
+                <div className="h-10 w-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mb-3">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Dues</p>
+                  <p className="text-xl font-black text-slate-300 leading-none">₹0</p>
+                  <span className="text-[9px] font-bold text-green-500 mt-1 block">All clear</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. BUSINESS ANALYTICS GRAPH (NEW POSITION) */}
+        {!activeJob && Array.isArray(earningsHistory) && earningsHistory.length > 0 && (
+          <div className="mb-4">
+            <TechnicianEarningsChart data={earningsHistory} />
+          </div>
+        )}
+
+        {/* ACTIVE JOB HERO CARD */}
+        {activeJob ? (
+          <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-slate-100 relative mb-4">
+
+            {/* Live Map Header */}
+            <div className="h-[220px] w-full relative bg-slate-100">
+              <TechnicianJobMap
+                techLocation={currentLocation}
+                jobLocation={activeJob?.location && activeJob.location.lat != null && activeJob.location.lng != null ? { lat: Number(activeJob.location.lat), lng: Number(activeJob.location.lng) } : null}
+                showRoute={true}
+              />
+
+              {/* Floating Status Badge */}
+              <div className="absolute top-4 left-4 z-[400]">
+                <div className="bg-white/95 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg border border-slate-100 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                  <span className="text-xs font-black tracking-widest text-slate-800 uppercase">
+                    {formatTechnicianStatus(activeJob.status)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="absolute top-4 right-4 z-[400] bg-zinc-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-lg flex flex-col items-center">
+                <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mb-0.5">Pmt</span>
+                <span className="text-sm font-black text-white leading-none tracking-tight">
+                  ₹{activeAmountDisplay != null ? activeAmountDisplay.toFixed(0) : "---"}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6">
+                <h2 className="text-2xl font-black text-slate-900 mb-1 leading-tight tracking-tight">
+                  {activeJob.service_type?.replace(/-/g, " ")}
+                </h2>
+                <div className="flex items-start gap-2 text-slate-500 mt-2">
+                  <div className="mt-0.5 bg-slate-100 p-1 rounded-full text-slate-400">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <p className="text-sm font-medium leading-snug line-clamp-2">
+                    {activeJob.address}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                    <Navigation className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Dist</p>
+                    <p className="text-sm font-black text-slate-800 leading-none">{jobDistance !== null ? jobDistance.toFixed(1) : "--"} <span className="text-[10px] text-slate-500 font-semibold">km</span></p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                    <span className="text-xs font-black text-indigo-600">ETA</span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Time</p>
+                    <p className="text-sm font-black text-slate-800 leading-none">{etaMinutes !== null ? etaMinutes : "--"} <span className="text-[10px] text-slate-500 font-semibold">min</span></p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-6 border-t border-slate-100 pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 border border-slate-200">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Client</p>
+                    <p className="font-bold text-slate-900 text-sm truncate">{activeJob.contact_name || "Guest"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 border border-slate-200">
+                    <Car className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Vehicle</p>
+                    <p className="font-bold text-slate-900 text-sm truncate">{activeJob.vehicle_model || activeJob.vehicle_type}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons with Bottom Sheet flow feel */}
+              <div className="space-y-3">
+                {activeJob.status !== 'assigned' && activeJob.status !== 'paid' && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-white border-slate-200 text-slate-700 shadow-sm active:scale-95" asChild>
+                      <a href={`tel:${activeJob.contact_phone}`}><PhoneCall className="w-4 h-4 mr-2" /> <span className="font-bold">Call</span></a>
+                    </Button>
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-white border-slate-200 text-slate-700 shadow-sm active:scale-95" onClick={openNavigation}>
+                      <Navigation className="w-4 h-4 mr-2" /> <span className="font-bold">Nav</span>
+                    </Button>
+                  </div>
+                )}
+
+                {activeJob.status === 'assigned' && (
+                  <div className="flex gap-2">
+                    <Button
+                      disabled={isJobActionLoading}
+                      onClick={() => handleRejectJob(activeJob.id)}
+                      variant="outline"
+                      className="h-14 px-4 rounded-2xl border-red-200 text-red-600 bg-red-50 hover:bg-red-100 active:scale-95"
+                    >
+                      X
+                    </Button>
+                    <Button
+                      disabled={isJobActionLoading}
+                      onClick={() => handleAcceptJob(activeJob.id)}
+                      className="flex-1 h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide"
+                    >
+                      {isJobActionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "ACCEPT JOB"}
+                    </Button>
+                  </div>
+                )}
+
+                {activeJob.status === 'accepted' && (
+                  <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
+                    START JOURNEY
+                  </Button>
+                )}
+
+                {activeJob.status === 'en-route' && (
+                  <Button className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('in-progress')}>
+                    ARRIVED
+                  </Button>
+                )}
+
+                {activeJob.status === 'in-progress' && (
+                  <Button className="w-full h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('payment_pending')}>
+                    COMPLETE WORK
+                  </Button>
+                )}
+
+                {activeJob.status === 'payment_pending' && (
+                  <div className="w-full h-14 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-3">
+                    <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                    <span className="font-bold text-orange-700">Waiting for payment...</span>
+                  </div>
+                )}
+
+                {activeJob.status === 'paid' && (
+                  <Button className="w-full h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/20 active:scale-95 text-lg font-black tracking-wide flex items-center justify-center gap-2" onClick={() => handleStatusChange('completed')}>
+                    <DollarSign className="w-5 h-5" /> FINISH JOB
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <TechnicianJobModal
+          isOpen={!!incomingJob}
+          job={incomingJob}
+          isProcessing={isJobActionLoading}
+          onAccept={handleAcceptJob}
+          onReject={handleRejectJob}
+        />
+      </div>
+
+      <TechnicianBottomNav />
+      {/* Completion Modal */}
+      {showCompletionModal && (
+        <TechnicianJobCompletion
+          amount={lastEarned}
+          onClose={() => setShowCompletionModal(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default TechnicianDashboard;
+

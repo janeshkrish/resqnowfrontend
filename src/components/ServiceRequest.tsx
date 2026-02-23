@@ -389,6 +389,7 @@ const ServiceRequest = () => {
     );
   };
 
+  return (
   <div className="min-h-screen app-bg pb-32">
     <div className="container max-w-3xl py-4 md:py-12 px-0 md:px-4">
       <div className="border-none md:border overflow-hidden md:shadow-2xl bg-white md:rounded-xl">

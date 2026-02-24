@@ -627,6 +627,7 @@ const TechnicianDashboard = () => {
           try {
             const verifyRes = await apiFetch("/api/technicians/me/pay-dues/verify", {
               method: "POST",
+              cache: "no-store",
               technician: true,
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,

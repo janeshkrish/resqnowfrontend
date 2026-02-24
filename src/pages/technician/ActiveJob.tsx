@@ -62,6 +62,7 @@ const ActiveJob = () => {
                     try {
                         const verifyRes = await fetch(apiUrl("/api/technicians/me/pay-dues/verify"), {
                             method: 'POST',
+                            cache: 'no-store',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${token}`

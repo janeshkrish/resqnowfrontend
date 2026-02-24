@@ -109,6 +109,7 @@ const Subscription = () => {
           try {
             const verifyRes = await apiFetch("/api/payments/verify-subscription-payment", {
               method: "POST",
+              cache: "no-store",
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,

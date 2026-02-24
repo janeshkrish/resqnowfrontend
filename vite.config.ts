@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
   const apiRuntimePattern = escapedApiBaseUrl
     ? new RegExp(`^${escapedApiBaseUrl}/api/.*`)
     : /$a/;
+  const paymentNoCacheRuntimePattern = escapedApiBaseUrl
+    ? new RegExp(
+      `^${escapedApiBaseUrl}/api/(payments/(confirm|verify|confirm-status|verify-subscription-payment|verify-service-payment|verify-registration-payment)|technicians/me/(verify-dues|pay-dues/verify))(?:$|[/?].*)`,
+      "i"
+    )
+    : /$a/;
+  const razorpayScriptRuntimePattern = /^https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js(?:\?.*)?$/i;
   const cloudflareSpaFallback = {
     name: "cloudflare-spa-404-fallback",
     apply: "build" as const,
@@ -89,6 +96,21 @@ export default defineConfig(({ mode }) => {
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
             {
+              urlPattern: paymentNoCacheRuntimePattern,
+              handler: "NetworkOnly",
+              method: "GET",
+            },
+            {
+              urlPattern: paymentNoCacheRuntimePattern,
+              handler: "NetworkOnly",
+              method: "POST",
+            },
+            {
+              urlPattern: razorpayScriptRuntimePattern,
+              handler: "NetworkOnly",
+              method: "GET",
+            },
+            {
               urlPattern: apiRuntimePattern,
               handler: "NetworkFirst",
               options: {
@@ -115,10 +137,12 @@ export default defineConfig(({ mode }) => {
               },
             },
             {
-              urlPattern: ({ request }) =>
-                request.destination === "script" ||
-                request.destination === "style" ||
-                request.destination === "worker",
+              urlPattern: ({ request, url }) =>
+                (request.destination === "script" ||
+                  request.destination === "style" ||
+                  request.destination === "worker") &&
+                url.hostname !== "checkout.razorpay.com" &&
+                url.hostname !== "api.razorpay.com",
               handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "resqnow-static-cache",

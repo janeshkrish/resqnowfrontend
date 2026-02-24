@@ -175,6 +175,33 @@ const RequestTracking = () => {
     if (!request) return;
     setIsProcessingPayment(true);
 
+    const pollPaymentStatus = async (targetRequestId: string) => {
+      const maxAttempts = 40;
+      const pollIntervalMs = 3000;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+          const statusRes = await apiFetch(`/api/service-requests/${targetRequestId}`, {
+            method: "GET",
+            cache: "no-store",
+          });
+          const statusBody = await statusRes.json().catch(() => ({}));
+          const latestPaymentStatus = String(statusBody?.payment_status || "").toLowerCase();
+          const latestRequestStatus = String(statusBody?.status || "").toLowerCase();
+
+          if (latestPaymentStatus === "completed" || latestRequestStatus === "paid" || latestRequestStatus === "completed") {
+            return true;
+          }
+        } catch (pollError) {
+          console.error("Payment status polling error:", pollError);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      }
+
+      return false;
+    };
+
     try {
       // 1. Create Order via central payments API
       const orderRes = await apiFetch(`/api/payments/create-order`, {
@@ -210,6 +237,7 @@ const RequestTracking = () => {
           try {
             const verifyRes = await apiFetch(`/api/payments/confirm`, {
               method: 'POST',
+              cache: "no-store",
               body: JSON.stringify({
                 requestId: request.id,
                 razorpay_order_id: response.razorpay_order_id,
@@ -221,15 +249,29 @@ const RequestTracking = () => {
             const verifyBody = await verifyRes.json().catch(() => ({}));
 
             if (verifyRes.ok) {
-              toast.success("Payment Successful!", {
-                description: `Paid ${currency} ${orderData.total_amount || (orderData.amount / 100)}`
-              });
-              setShowPayment(false);
-              setShowPaymentSummary(false);
-              if (verifyBody?.request) {
+              const requestStatus = String(verifyBody?.request?.status || "").toLowerCase();
+              const paymentStatus = String(verifyBody?.request?.payment_status || "").toLowerCase();
+              const isImmediatelyConfirmed =
+                verifyBody?.success === true ||
+                verifyBody?.alreadyPaid === true ||
+                requestStatus === "paid" ||
+                paymentStatus === "completed";
+
+              if (!isImmediatelyConfirmed) {
+                toast.info("Payment received. Verifying final status...");
+              }
+
+              const isConfirmed = isImmediatelyConfirmed || await pollPaymentStatus(String(request.id));
+
+              if (isConfirmed) {
+                toast.success("Payment Successful!", {
+                  description: `Paid ${currency} ${orderData.total_amount || (orderData.amount / 100)}`
+                });
+                setShowPayment(false);
+                setShowPaymentSummary(false);
                 refresh();
               } else {
-                refresh();
+                toast.warning("Payment is processing. Please wait a few seconds and refresh.");
               }
             } else {
               console.error('Payment confirmation failed:', verifyBody);

@@ -213,6 +213,7 @@ const TechnicianEarningsPage = () => {
                         // Verify using CORRECT existing endpoint
                         const verifyRes = await apiFetch("/api/technicians/me/verify-dues", {
                             method: "POST",
+                            cache: "no-store",
                             body: JSON.stringify({
                                 razorpay_order_id: response.razorpay_order_id,
                                 razorpay_payment_id: response.razorpay_payment_id,

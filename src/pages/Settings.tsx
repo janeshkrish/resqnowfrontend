@@ -10,7 +10,8 @@ import {
   LogOut,
   Loader2,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  Briefcase
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -336,6 +337,24 @@ const SettingsPage = () => {
                   </div>
                 )
               })}
+            </div>
+
+            <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+              <button
+                onClick={() => navigate('/technician/login')}
+                className="w-full text-left p-4 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                    <Briefcase className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">Partner with Us</h3>
+                    <p className="text-[11px] font-medium text-slate-500">Earn with ResQNow</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-300" />
+              </button>
             </div>
 
             <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">

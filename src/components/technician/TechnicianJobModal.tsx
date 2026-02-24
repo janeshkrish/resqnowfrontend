@@ -63,29 +63,33 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
             <DialogContent className="fixed top-auto bottom-0 left-0 right-0 w-full sm:max-w-md mx-auto translate-y-0 translate-x-0 data-[state=closed]:translate-y-full data-[state=open]:translate-y-0 rounded-t-3xl rounded-b-none p-0 overflow-hidden border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-transform duration-300" autoFocus={false} onPointerDownOutside={(e) => e.preventDefault()}>
 
                 {/* Header with Visual Timer */}
-                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 text-white text-center relative overflow-hidden">
+                <div className="bg-red-600 p-6 text-white text-center relative overflow-hidden">
                     <div className="relative z-10">
-                        <h2 className="text-xl font-black tracking-wide uppercase mb-1">New Job Request</h2>
-                        <div className="flex items-center justify-center gap-2 text-white/90">
-                            <Clock className="w-4 h-4" />
-                            <span className="font-bold">Expires in <span className="text-yellow-300 text-lg">{timeLeft}s</span></span>
+                        <div className="inline-flex items-center gap-1.5 bg-red-700/50 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 backdrop-blur-md border border-red-500/50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> Live Request
+                        </div>
+                        <h2 className="text-3xl font-black tracking-tight mb-2 drop-shadow-sm leading-none">New Job!</h2>
+                        <div className="flex items-center justify-center gap-1.5 text-red-100 font-medium">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Auto-rejects in <span className="text-white font-black text-lg">{timeLeft}s</span></span>
                         </div>
                     </div>
                     {/* Background Ping Effect */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
                 </div>
 
                 <div className="p-6 bg-white space-y-6">
                     {/* Price & Service Banner */}
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex justify-between items-center shadow-sm">
-                        <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Service Required</p>
-                            <p className="font-black text-slate-800 text-lg capitalize leading-none">{job.serviceType}</p>
-                            <span className="text-xs font-bold text-indigo-600 mt-1 block">{job.vehicleType}</span>
+                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500" />
+                        <div className="pl-2">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">Service Required</p>
+                            <p className="font-black text-slate-900 text-xl capitalize leading-none mb-1">{job.serviceType}</p>
+                            <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block">{job.vehicleType}</span>
                         </div>
-                        <div className="text-right bg-green-50 px-4 py-2 rounded-xl border border-green-100">
-                            <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest leading-none mb-1">Est. Payout</p>
-                            <p className="font-black text-green-700 text-2xl leading-none">₹{job.amount}</p>
+                        <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Est. Payout</p>
+                            <p className="font-black text-emerald-600 text-3xl leading-none tracking-tight">₹{job.amount}</p>
                         </div>
                     </div>
 
@@ -124,15 +128,15 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
 
                 <div className="p-4 pt-0 bg-white flex gap-3 pb-6">
                     <Button
-                        variant="outline"
-                        className="flex-1 h-14 rounded-2xl border-red-200 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 active:scale-95 text-lg font-bold"
+                        variant="ghost"
+                        className="flex-1 h-14 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 text-lg font-bold transition-all"
                         disabled={isProcessing}
                         onClick={() => onReject(job.id)}
                     >
-                        Reject
+                        Decline
                     </Button>
                     <Button
-                        className="flex-[2] h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-xl font-black tracking-wide"
+                        className="flex-[2] h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-[0_8px_20px_rgba(220,38,38,0.3)] active:scale-95 text-xl font-black tracking-wide transition-all"
                         disabled={isProcessing}
                         onClick={() => onAccept(job.id)}
                     >

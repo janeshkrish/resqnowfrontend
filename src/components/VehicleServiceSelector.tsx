@@ -86,82 +86,79 @@ const VehicleServiceSelector = () => {
 
   return (
     <div className={cn(
-      "min-h-screen bg-gradient-to-b from-background to-accent/10",
-      isMobile ? "py-3 pb-safe" : "py-4 md:py-8 pb-20 md:pb-8"
+      "min-h-screen bg-slate-50",
+      isMobile ? "pt-6 pb-safe" : "bg-gradient-to-b from-background to-accent/10 py-4 md:py-8 pb-20 md:pb-8"
     )}>
-      <div className={cn("container max-w-4xl", isMobile ? "px-3" : "px-3 md:px-4")}>
+      <div className={cn("container max-w-4xl", isMobile ? "px-0" : "px-3 md:px-4")}>
         <div className={cn(
-          isMobile ? "text-left mb-5" : "text-center mb-6 md:mb-8"
+          isMobile ? "text-left mb-6 px-5" : "text-center mb-6 md:mb-8"
         )}>
           <h1 className={cn(
-            "font-bold mb-2",
-            isMobile ? "text-xl" : "text-2xl md:text-4xl mb-3 md:mb-4"
+            "font-black tracking-tight text-slate-900 mb-1",
+            isMobile ? "text-2xl" : "text-2xl md:text-4xl mb-3 md:mb-4"
           )}>
             {isMobile ? "Choose Vehicle" : "Select Your Vehicle Type"}
           </h1>
           <p className={cn(
-            "text-muted-foreground mb-1",
-            isMobile ? "text-sm" : "text-lg md:text-xl mb-2"
+            "text-slate-500 font-medium",
+            isMobile ? "text-sm" : "text-lg md:text-xl md:mb-2"
           )}>
-            For <span className="text-primary font-semibold">{service.name}</span>
+            For <span className="text-primary font-bold">{service.name}</span>
           </p>
-          <p className={cn(
-            "text-muted-foreground",
-            isMobile ? "text-xs" : "text-sm md:text-base"
-          )}>
-            {service.description}
-          </p>
+          {!isMobile && (
+            <p className="text-muted-foreground text-sm md:text-base mt-2">
+              {service.description}
+            </p>
+          )}
         </div>
 
         <div className={cn(
           isMobile
-            ? "flex flex-col gap-3 mb-5"
+            ? "flex flex-col bg-white border-y border-slate-100/60 shadow-sm"
             : "grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8"
         )}>
-          {vehicleCategories.map((category) => (
+          {vehicleCategories.map((category, idx) => (
             isMobile ? (
-              // Swiggy/Zomato style card for mobile
+              // Premium MNC List Row for Mobile
               <div
                 key={category.id}
                 className={cn(
-                  "relative bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)] border cursor-pointer active:scale-95 transition-all duration-200",
-                  selectedVehicle === category.id
-                    ? 'border-primary ring-1 ring-primary'
-                    : 'border-gray-100/50'
+                  "relative flex items-center p-5 cursor-pointer active:bg-slate-50 transition-colors duration-200",
+                  idx !== vehicleCategories.length - 1 && "border-b border-slate-100/60"
                 )}
                 onClick={() => handleVehicleSelect(category.id)}
               >
-                {/* Selected Check Mark */}
-                {selectedVehicle === category.id && (
-                  <div className="absolute top-3 right-3 w-6 h-6 bg-primary rounded-full flex items-center justify-center animate-in zoom-in">
-                    <Check className="h-4 w-4 text-white" />
+                <div className="flex items-center gap-4 flex-1">
+                  {/* Icon with soft tinted background */}
+                  <div className={cn(
+                    "flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-transform",
+                    selectedVehicle === category.id ? category.color : "bg-slate-100 text-slate-500"
+                  )}>
+                    <category.icon className={cn("h-6 w-6", selectedVehicle === category.id ? "text-white" : "text-slate-600")} />
                   </div>
-                )}
 
-                <div className="flex items-center gap-4">
-                  <div className={`flex-shrink-0 p-3 rounded-xl ${category.color}`}>
-                    <category.icon className="h-7 w-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-gray-800 text-base mb-1">
+                  <div className="flex-1 pr-6">
+                    <h3 className={cn(
+                      "font-bold text-[15px] leading-tight mb-1 transition-colors",
+                      selectedVehicle === category.id ? "text-slate-900" : "text-slate-700"
+                    )}>
                       {category.name}
                     </h3>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[12px] text-slate-500 font-medium leading-snug line-clamp-1">
                       {category.description}
                     </p>
                   </div>
                 </div>
 
-                {/* Subtypes Pills */}
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {category.subtypes.slice(0, 3).map((subtype) => (
-                    <span
-                      key={subtype}
-                      className="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-600 font-medium"
-                    >
-                      {subtype}
-                    </span>
-                  ))}
+                {/* Selection indicator / Chevron */}
+                <div className="absolute right-5">
+                  {selectedVehicle === category.id ? (
+                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center animate-in zoom-in spin-in-12 duration-300">
+                      <Check className="h-4 w-4 text-white" />
+                    </div>
+                  ) : (
+                    <ArrowRight className="h-5 w-5 text-slate-300" />
+                  )}
                 </div>
               </div>
             ) : (

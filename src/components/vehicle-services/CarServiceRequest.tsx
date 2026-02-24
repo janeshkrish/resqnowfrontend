@@ -78,7 +78,7 @@ const CarServiceRequest = () => {
   };
 
   return (
-    <div className={cn("min-h-screen bg-background", isMobile ? "pb-32" : "py-8 pb-8")}>
+    <div className={cn("min-h-screen bg-background", isMobile ? "pb-16" : "py-8 pb-8")}>
       <div className={cn("mx-auto transition-all duration-300", isMobile ? "w-full px-0" : "container px-4 max-w-4xl")}>
         <div className={cn("bg-card transition-all duration-300", isMobile ? "min-h-screen shadow-none rounded-none" : "rounded-3xl shadow-xl border border-border p-8")}>
           <div className={cn(isMobile ? "sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border" : "")}>

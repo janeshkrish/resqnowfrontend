@@ -5,12 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-import { useToast } from "@/components/ui/use-toast"; // Assuming this is the correct hook usage based on shadcn/ui patterns
+import { toast } from "sonner";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 const Contact = () => {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -35,8 +34,7 @@ const Contact = () => {
       const result = await res.json();
 
       if (res.ok) {
-        toast({
-          title: "Message Sent",
+        toast.success("Message Sent", {
           description: "We've received your message and will get back to you shortly.",
         });
         (e.target as HTMLFormElement).reset();
@@ -44,10 +42,8 @@ const Contact = () => {
         throw new Error(result.error || "Failed to send message");
       }
     } catch (error) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
-        variant: "destructive",
       });
     } finally {
       setLoading(false);

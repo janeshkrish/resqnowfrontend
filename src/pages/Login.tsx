@@ -139,18 +139,14 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
-            ResQNow
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
+            Welcome Back
           </h1>
-          <p className="text-muted-foreground">Your trusted roadside assistance</p>
+          <p className="text-slate-500 font-medium text-sm">Sign in to your ResQNow account</p>
         </div>
 
-        <Card className="border-2 shadow-2xl backdrop-blur">
-          <CardHeader className="space-y-2 pb-4">
-            <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
-            <CardDescription className="text-center">Sign in to your account</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 relative overflow-hidden border border-slate-100/60">
+          <div className="space-y-6">
             {error && (
               <Alert variant="destructive" className="animate-in fade-in-50">
                 <AlertCircle className="h-4 w-4" />
@@ -161,11 +157,11 @@ const Login = () => {
             <Button
               type="button"
               variant="outline"
-              className="w-full h-12 text-base"
+              className="w-full h-14 bg-white border-2 border-slate-100 hover:bg-slate-50 hover:border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm transition-all active:scale-95"
               onClick={handleGoogleLogin}
               disabled={isLoading}
             >
-              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+              <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   fill="#4285F4"
@@ -191,7 +187,7 @@ const Login = () => {
                 <Separator />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
+                <span className="bg-white px-2 text-slate-500 font-bold tracking-wider">Or continue with email</span>
               </div>
             </div>
 
@@ -202,13 +198,13 @@ const Login = () => {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel className="text-xs uppercase tracking-widest text-slate-500 font-bold">Email</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                        <div className="relative mt-1">
+                          <Mail className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                           <Input
                             placeholder="you@example.com"
-                            className="pl-10 h-12"
+                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold"
                             {...field}
                           />
                         </div>
@@ -223,14 +219,14 @@ const Login = () => {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel className="text-xs uppercase tracking-widest text-slate-500 font-bold">Password</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                        <div className="relative mt-1">
+                          <Lock className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                           <Input
                             type="password"
                             placeholder="••••••••"
-                            className="pl-10 h-12"
+                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold tracking-widest"
                             {...field}
                           />
                         </div>
@@ -242,7 +238,7 @@ const Login = () => {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300"
+                  className="w-full h-14 mt-6 text-base font-bold rounded-xl shadow-[0_8px_20px_rgba(225,29,72,0.25)] bg-slate-900 hover:bg-slate-800 hover:shadow-lg transition-all active:scale-95 text-white"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -254,36 +250,22 @@ const Login = () => {
                       Signing in...
                     </span>
                   ) : (
-                    <span className="flex items-center justify-center">
-                      <LogIn className="mr-2 h-5 w-5" /> Sign In
-                    </span>
+                    "Sign In"
                   )}
                 </Button>
               </form>
             </Form>
 
             <div className="text-center pt-2 space-y-2">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm font-medium text-slate-500">
                 Don't have an account?{" "}
-                <Link to="/register" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+                <Link to="/register" className="text-primary hover:text-primary/80 font-bold transition-colors">
                   Sign up
                 </Link>
               </p>
-              <p className="text-sm text-muted-foreground">
-                Technician?{" "}
-                <Link to="/technician/login" className="text-accent hover:text-accent/80 font-semibold transition-colors">
-                  Technician Login
-                </Link>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Admin?{" "}
-                <Link to="/admin/login" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
-                  Admin Login
-                </Link>
-              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

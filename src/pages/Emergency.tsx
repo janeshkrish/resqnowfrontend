@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, MapPin, AlertTriangle, Loader } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 const Emergency = () => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
@@ -14,12 +14,11 @@ const Emergency = () => {
   const [currentLocation, setCurrentLocation] = useState<string | null>(null);
   const [progress, setProgress] = useState(10);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
     // Auto-detect location when component mounts
     detectLocation();
-    
+
     // Simulate progress
     const interval = setInterval(() => {
       setProgress((prevProgress) => {
@@ -52,15 +51,14 @@ const Emergency = () => {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
           );
-          
+
           if (!response.ok) throw new Error("Failed to fetch location data");
-          
+
           const data = await response.json();
           const address = data.display_name || "Unknown location";
-          
+
           setCurrentLocation(address);
-          toast({
-            title: "Location detected",
+          toast.success("Location detected", {
             description: "We've found your location in Tamil Nadu automatically.",
           });
         } catch (error) {
@@ -84,11 +82,11 @@ const Emergency = () => {
   };
 
   const handleContinue = () => {
-    navigate(`/request-service/emergency`, { 
-      state: { 
+    navigate(`/request-service/emergency`, {
+      state: {
         location: currentLocation,
         isEmergency: true
-      } 
+      }
     });
   };
 
@@ -138,10 +136,10 @@ const Emergency = () => {
                 )}
 
                 {locationError && (
-                  <Button 
-                    onClick={detectLocation} 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    onClick={detectLocation}
+                    variant="outline"
+                    size="sm"
                     className="mt-3 text-xs"
                   >
                     Try Again
@@ -149,7 +147,7 @@ const Emergency = () => {
                 )}
               </div>
 
-              <Button 
+              <Button
                 onClick={handleContinue}
                 className="w-full bg-red-600 hover:bg-red-700"
                 disabled={isLoadingLocation && !currentLocation && !locationError}

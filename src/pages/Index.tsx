@@ -7,7 +7,7 @@ import TechnicianCTA from "@/components/TechnicianCTA";
 import Map from "@/components/Map";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
-import { MapPin, Search, ArrowRight, Bell } from "lucide-react";
+import { MapPin, Search, ArrowRight, Bell, Briefcase } from "lucide-react";
 
 const MobileDashboard = () => {
   return (
@@ -53,11 +53,23 @@ const MobileDashboard = () => {
             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white blur-[50px] opacity-25 rounded-full"></div>
 
             <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">NEW USER</span>
-            <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Get 20% Off<br />First Tow</h2>
-            <p className="text-blue-100 text-xs mb-6 font-medium max-w-[200px]">Use code RESQ20 at checkout for instant savings.</p>
+            <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">10% Off Any<br />Two Services</h2>
+            <p className="text-blue-100 text-xs mb-6 font-medium max-w-[200px]">Use code RESQ10 at checkout for instant savings.</p>
 
             <Link to="/services" className="inline-flex items-center bg-white text-blue-600 px-5 py-2.5 rounded-full text-sm font-bold hover:scale-105 active:scale-95 transition-all shadow-[0_8px_16px_rgba(0,0,0,0.1)]">
               Explore Services
+            </Link>
+          </div>
+
+          <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-indigo-700 to-purple-600 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(79,70,229,0.5)] relative overflow-hidden isolate">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white blur-[40px] opacity-20 rounded-full"></div>
+
+            <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">PARTNER WITH US</span>
+            <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Join As A<br />Technician</h2>
+            <p className="text-indigo-100 text-xs mb-6 font-medium max-w-[200px]">Earn reliable income. Work flexibly on your schedule.</p>
+
+            <Link to="/technician/register" className="inline-flex items-center bg-white text-indigo-700 px-5 py-2.5 rounded-full text-sm font-bold hover:scale-105 active:scale-95 transition-all shadow-[0_8px_16px_rgba(0,0,0,0.1)]">
+              Apply Now <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -117,6 +129,35 @@ const MobileDashboard = () => {
           <h3 className="font-black text-[1.35rem] text-slate-900 mb-4 px-1 tracking-tight">Recent Reviews</h3>
           <div className="-mx-4 px-4 overflow-hidden">
             <Testimonials />
+          </div>
+        </div>
+
+        {/* Technician Promo (Mobile Partner Integration) */}
+        <div className="pt-2 pb-6">
+          <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-[0_12px_30px_rgba(15,23,42,0.3)] relative overflow-hidden isolate">
+            <div className="absolute -top-12 -right-8 w-40 h-40 bg-blue-500 blur-[60px] opacity-40 rounded-full"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primary blur-[50px] opacity-30 rounded-full"></div>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
+                <Briefcase className="h-6 w-6 text-blue-400" />
+              </div>
+              <span className="font-bold text-xs uppercase tracking-widest text-blue-300">Partner Program</span>
+            </div>
+
+            <h3 className="font-black text-2xl mb-2 leading-tight">Earn with<br />ResQNow</h3>
+            <p className="text-slate-400 text-sm font-medium mb-6 max-w-[240px]">
+              Join our network of elite professional mechanics and tow operators.
+            </p>
+
+            <div className="flex items-center gap-3">
+              <Link to="/technician/login" className="flex-1 bg-white text-slate-900 text-center py-3.5 rounded-xl font-bold text-sm hover:scale-[1.02] active:scale-95 transition-transform flex items-center justify-center gap-2">
+                Tech Login
+              </Link>
+              <Link to="/technician/register" className="flex-[1.5] bg-blue-600 border mx-auto border-blue-500 text-white text-center py-3.5 rounded-xl font-bold text-sm hover:scale-[1.02] active:scale-95 transition-transform flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(37,99,235,0.4)]">
+                Apply Now <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -28,7 +28,7 @@ import {
   User,
   ShieldCheck,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { apiUrl } from "@/lib/api";
 
@@ -94,7 +94,6 @@ function MapUpdater({ center }: { center: [number, number] | null }) {
 }
 
 const Map = () => {
-  const { toast } = useToast();
   const navigate = useNavigate();
   const { coordinates, address, loading: loadingLocation, error: locationError, requestLocation } = useGeolocation();
 
@@ -140,7 +139,7 @@ const Map = () => {
 
     } catch (error) {
       console.error('Error fetching technicians:', error);
-      toast({ title: "Error", description: "Failed to load technicians.", variant: "destructive" });
+      toast.error("Error", { description: "Failed to load technicians." });
 
       if (import.meta.env.DEV) {
         // Mock data

@@ -12,8 +12,6 @@ import { Loader2, Bike, ArrowLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { getServiceCatalogItem, getServicePriceForVehicle } from "@/config/serviceCatalog";
-import { usePricingConfig } from "@/hooks/usePricingConfig";
 
 const BikeServiceRequest = () => {
   const { serviceId } = useParams();
@@ -78,44 +76,24 @@ const BikeServiceRequest = () => {
     setFormData((prev: ServiceRequestFormData) => ({ ...prev, vehicleType: type, vehicleSubtype: "", vehicleModel: "" }));
   };
 
-  const serviceInfo = getServiceCatalogItem(serviceId);
-  const { data: pricingConfig } = usePricingConfig();
-  const servicePrice = getServicePriceForVehicle(
-    serviceId,
-    "bike",
-    pricingConfig?.service_base_prices,
-    pricingConfig?.currency || "INR"
-  );
-
   return (
-    <div className={cn("min-h-screen bg-gradient-to-br from-orange-50 to-amber-50", isMobile ? "py-3 pb-safe" : "py-4 md:py-8 pb-24 md:pb-8")}>
-      <div className={cn("container mx-auto max-w-4xl", isMobile ? "px-3" : "px-3 md:px-4")}>
-        <Button variant="ghost" onClick={() => navigate("/")} className={cn("mb-4", isMobile && "px-2")}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
-        </Button>
-
-        <div className={cn("bg-white border border-orange-100", isMobile ? "rounded-2xl shadow-lg p-4" : "rounded-3xl shadow-2xl p-4 md:p-12")}>
-          <div className={cn(isMobile ? "text-left mb-5" : "text-center mb-8")}>
-            <div className={cn("inline-flex items-center justify-center p-3 bg-orange-100 rounded-full", isMobile ? "mb-3" : "mb-4")}>
-              <Bike className={cn(isMobile ? "h-6 w-6" : "h-8 w-8", "text-orange-600")} />
-            </div>
-            <h1 className={cn(isMobile ? "text-xl" : "text-2xl md:text-3xl", "font-bold text-gray-800")}>{serviceInfo.name}</h1>
-            <p className={cn("text-gray-500 mt-2", isMobile && "text-sm")}>Est. Price: {servicePrice}</p>
+    <div className={cn("min-h-screen bg-background", isMobile ? "pb-16" : "py-8 pb-8")}>
+      <div className={cn("mx-auto transition-all duration-300", isMobile ? "w-full px-0" : "container px-4 max-w-4xl")}>
+        <div className={cn("bg-card transition-all duration-300", isMobile ? "min-h-screen shadow-none rounded-none" : "rounded-3xl shadow-xl border border-border p-8")}>
+          <div className={cn(isMobile ? "sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border" : "")}>
+            <ProgressStepper currentStep={currentStep} steps={steps} />
           </div>
 
-          <ProgressStepper currentStep={currentStep} steps={steps} />
-
-          <>
+          <div className={cn(isMobile ? "px-4 pt-4 pb-8" : "mt-6")}>
             {currentStep === 1 && (
-              <div className="space-y-6 animate-fade-in">
-                <VehicleInfoStep
-                  formData={formData}
-                  onInputChange={handleInputChange}
-                  onVehicleTypeSelect={handleVehicleTypeSelect}
-                  onVehicleSubtypeSelect={handleVehicleSubtypeSelect}
-                  hideCategorySelection={true}
-                />
-              </div>
+              <VehicleInfoStep
+                formData={formData}
+                onInputChange={handleInputChange}
+                onVehicleTypeSelect={handleVehicleTypeSelect}
+                onVehicleSubtypeSelect={handleVehicleSubtypeSelect}
+                onGarageVehicleSelected={handleNext}
+                hideCategorySelection={true}
+              />
             )}
 
             {currentStep === 2 && (
@@ -130,13 +108,27 @@ const BikeServiceRequest = () => {
             )}
 
             {currentStep === 3 && (
-              <PersonalInfoStep formData={formData} onInputChange={handleInputChange} />
+              <PersonalInfoStep
+                formData={formData}
+                onInputChange={handleInputChange}
+              />
             )}
+          </div>
 
-            {currentStep <= 3 && (
-              <div className={cn("mt-8", isMobile ? "sticky bottom-3 z-20 bg-white/95 backdrop-blur rounded-xl border border-orange-100 p-3 shadow-lg space-y-2" : "flex gap-3")}>
+          {currentStep <= 3 && (
+            <div className={cn(
+              "fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 z-[100] transition-transform duration-300 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] pb-[max(1rem,env(safe-area-inset-bottom))]",
+              isMobile ? "translate-y-0 text-center" : "md:relative md:border-none md:shadow-none md:p-0 md:mt-8 md:translate-y-0"
+            )}>
+              <div className="flex gap-3 max-w-4xl mx-auto">
                 {currentStep > 1 && (
-                  <Button type="button" variant="outline" onClick={handleBack} className={cn("flex-1 py-6 text-base font-semibold", isMobile && "w-full py-3")}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleBack}
+                    className="flex-1 py-6 text-base font-semibold rounded-xl border-2"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
                     Back
                   </Button>
                 )}
@@ -153,7 +145,11 @@ const BikeServiceRequest = () => {
                     else handleNext();
                   }}
                   disabled={isSubmitting}
-                  className={cn("flex-1 py-6 text-base font-semibold bg-orange-600 hover:bg-orange-700 text-white", isMobile && "w-full py-3")}
+                  className={cn(
+                    "flex-1 py-6 text-base font-bold rounded-xl shadow-lg shadow-primary/25",
+                    "bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all",
+                    currentStep === 1 ? "w-full" : ""
+                  )}
                 >
                   {isSubmitting ? (
                     <>
@@ -161,7 +157,7 @@ const BikeServiceRequest = () => {
                       Submitting...
                     </>
                   ) : currentStep === 3 ? (
-                    "Request Service"
+                    "Find Technician"
                   ) : (
                     <>
                       Continue <ChevronRight className="w-4 h-4 ml-2" />
@@ -169,8 +165,8 @@ const BikeServiceRequest = () => {
                   )}
                 </Button>
               </div>
-            )}
-          </>
+            </div>
+          )}
         </div>
       </div>
     </div>

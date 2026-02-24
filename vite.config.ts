@@ -1,9 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import fs from "node:fs";
 import { componentTagger } from "lovable-tagger";
-import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
@@ -21,19 +19,6 @@ export default defineConfig(({ mode }) => {
     )
     : /$a/;
   const razorpayScriptRuntimePattern = /^https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js(?:\?.*)?$/i;
-  const cloudflareSpaFallback = {
-    name: "cloudflare-spa-404-fallback",
-    apply: "build" as const,
-    closeBundle() {
-      const distDir = path.resolve(__dirname, "dist");
-      const indexFile = path.join(distDir, "index.html");
-      const fallbackFile = path.join(distDir, "404.html");
-
-      if (fs.existsSync(indexFile)) {
-        fs.copyFileSync(indexFile, fallbackFile);
-      }
-    },
-  };
 
   return {
     build: {
@@ -45,7 +30,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      basicSsl(),
       mode === "development" && componentTagger(),
       VitePWA({
         registerType: "autoUpdate",
@@ -173,7 +157,6 @@ export default defineConfig(({ mode }) => {
           suppressWarnings: true,
         },
       }),
-      cloudflareSpaFallback,
     ].filter(Boolean),
     resolve: {
       alias: {

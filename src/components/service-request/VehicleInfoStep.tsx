@@ -200,26 +200,26 @@ const VehicleInfoStep = ({
                   className={cn(
                     "group relative flex flex-col items-center justify-center gap-3 p-5 transition-all duration-300 active:scale-95 border",
                     formData.vehicleType === type.id
-                      ? "bg-blue-50/50 border-blue-600 shadow-md shadow-blue-600/10 rounded-[1.5rem]"
-                      : "bg-white border-slate-100 shadow-sm hover:border-blue-200 hover:shadow-md rounded-[1.5rem]"
+                      ? "bg-slate-900 border-slate-900 shadow-[0_8px_16px_rgba(0,0,0,0.15)] rounded-[1.5rem]"
+                      : "bg-white border-slate-100/80 shadow-sm hover:border-slate-200 hover:shadow-md rounded-[1.5rem]"
                   )}
                   onClick={() => handleVehicleTypeChange(type.id)}
                 >
                   <div className={cn(
                     "p-3.5 rounded-2xl transition-all duration-300",
-                    formData.vehicleType === type.id ? "bg-blue-600 text-white shadow-md shadow-blue-600/20" : "bg-slate-50 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
+                    formData.vehicleType === type.id ? "bg-white/10 text-white shadow-inner" : "bg-slate-50 text-slate-400 group-hover:bg-slate-100 group-hover:text-slate-900"
                   )}>
                     <type.icon className="h-7 w-7" strokeWidth={formData.vehicleType === type.id ? 2.5 : 2} />
                   </div>
                   <span className={cn(
                     "text-xs md:text-sm font-bold text-center transition-colors duration-300",
-                    formData.vehicleType === type.id ? "text-blue-700" : "text-slate-600"
+                    formData.vehicleType === type.id ? "text-white" : "text-slate-600 group-hover:text-slate-900"
                   )}>
                     {type.name}
                   </span>
                   {formData.vehicleType === type.id && (
-                    <div className="absolute top-3 right-3 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center ring-4 ring-white shadow-sm">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    <div className="absolute top-3 right-3 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
+                      <div className="w-1.5 h-1.5 bg-slate-900 rounded-full"></div>
                     </div>
                   )}
                 </button>
@@ -239,8 +239,8 @@ const VehicleInfoStep = ({
                     className={cn(
                       "flex items-center justify-center p-3.5 rounded-2xl border transition-all duration-300 active:scale-95",
                       formData.vehicleSubtype === subtype
-                        ? "border-blue-600 bg-blue-50/50 shadow-sm text-blue-700 font-bold"
-                        : "border-slate-100 bg-white shadow-sm hover:border-blue-200 text-slate-600 font-semibold"
+                        ? "border-slate-900 bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.1)] text-white font-bold"
+                        : "border-slate-100/80 bg-white shadow-sm hover:border-slate-200 text-slate-600 font-semibold"
                     )}
                     onClick={() => onVehicleSubtypeSelect(subtype)}
                   >
@@ -253,55 +253,58 @@ const VehicleInfoStep = ({
             </div>
             {formData.vehicleSubtype && (
               <div className="space-y-4 animate-in fade-in-50 duration-500">
-                <div className="p-5 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm space-y-4">
-                  <div className="space-y-3">
-                    <Label className="text-xs uppercase font-bold tracking-widest text-slate-400">Make & Model</Label>
-                    <div className="grid grid-cols-1 gap-4">
-                      {/* Brand Selection */}
-                      <div className="relative">
-                        <Select onValueChange={handleBrandChange} value={selectedBrand}>
-                          <SelectTrigger className="h-14 rounded-2xl border-slate-200 hover:border-blue-300 focus:border-blue-500 bg-slate-50/50 pl-4 font-bold text-slate-800 shadow-sm">
-                            <SelectValue placeholder="Select Brand (e.g. Toyota)" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl border-slate-200 shadow-xl max-h-[300px]">
-                            {availableBrands.map((brand) => (
-                              <SelectItem key={brand.id} value={brand.id} className="py-3 px-4 focus:bg-slate-50 cursor-pointer">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-slate-100 shadow-sm">
-                                    <img
-                                      src={getBrandLogoSrc(brand.logo)}
-                                      alt={brand.name}
-                                      className="w-5 h-5 object-contain"
-                                      onError={handleBrandLogoError}
-                                    />
-                                  </div>
-                                  <span className="font-bold text-slate-700">{brand.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                <div className="bg-white rounded-[1.5rem] border border-slate-100/80 shadow-sm overflow-hidden flex flex-col">
 
-                      {/* Model Selection */}
-                      {selectedBrand && (
-                        <div className="relative animate-in slide-in-from-top-2 duration-300">
-                          <Select onValueChange={handleModelChange} value={formData.vehicleModel}>
-                            <SelectTrigger className="h-14 rounded-2xl border-slate-200 hover:border-blue-300 focus:border-blue-500 bg-slate-50/50 pl-4 font-bold text-slate-800 shadow-sm">
-                              <SelectValue placeholder="Select Model (e.g. Fortuner)" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl border-slate-200 shadow-xl max-h-[300px]">
-                              {availableModels.map((model) => (
-                                <SelectItem key={model} value={model} className="py-3 px-4 focus:bg-slate-50 cursor-pointer">
-                                  <span className="font-bold text-slate-700 text-base">{model}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
+                  {/* Brand Selection */}
+                  <div className="p-4 border-b border-slate-100/60 relative">
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <Label className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Make</Label>
                     </div>
+                    <Select onValueChange={handleBrandChange} value={selectedBrand}>
+                      <SelectTrigger className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent font-bold text-slate-900 shadow-none hover:bg-transparent data-[state=open]:bg-transparent">
+                        <SelectValue placeholder="Select Brand (e.g. Toyota)" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
+                        {availableBrands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.id} className="py-3 px-4 focus:bg-slate-50 cursor-pointer">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-slate-100 shadow-sm">
+                                <img
+                                  src={getBrandLogoSrc(brand.logo)}
+                                  alt={brand.name}
+                                  className="w-5 h-5 object-contain"
+                                  onError={handleBrandLogoError}
+                                />
+                              </div>
+                              <span className="font-bold text-slate-700">{brand.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {/* Model Selection */}
+                  {selectedBrand && (
+                    <div className="p-4 bg-slate-50/30 relative animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center gap-2.5 mb-2">
+                        <Label className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Model</Label>
+                      </div>
+                      <Select onValueChange={handleModelChange} value={formData.vehicleModel}>
+                        <SelectTrigger className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent font-bold text-slate-900 shadow-none hover:bg-transparent data-[state=open]:bg-transparent">
+                          <SelectValue placeholder="Select Model (e.g. Fortuner)" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
+                          {availableModels.map((model) => (
+                            <SelectItem key={model} value={model} className="py-3 px-4 focus:bg-slate-50 cursor-pointer">
+                              <span className="font-bold text-slate-700 text-base">{model}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                 </div>
               </div>
             )}

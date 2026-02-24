@@ -126,16 +126,16 @@ const LocationStep = ({
   };
 
   return (
-    <div className="space-y-4 md:space-y-6 animate-in fade-in-50 duration-500">
-      <div className="mb-4 md:mb-6">
-        <h3 className="text-xl md:text-2xl font-bold text-foreground mb-1 md:mb-2">Location Details</h3>
-        <p className="text-sm text-muted-foreground">Pinpoint your location or describe it below.</p>
+    <div className="space-y-6 animate-in fade-in-50 duration-500">
+      <div className="mb-4 px-1">
+        <h3 className="text-2xl font-black tracking-tight text-slate-900 mb-2">Service Location</h3>
+        <p className="text-sm font-medium text-slate-500">Pinpoint your exact location for fastest arrival.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* Map Section - Mobile Optimized Height */}
-        <Card className="p-0 border-border/50 bg-accent/20 overflow-hidden shadow-md flex-1 md:flex-[1.5]">
-          <div className="h-[35vh] md:h-[400px] w-full relative z-0">
+      <div className="flex flex-col md:flex-row gap-5">
+        {/* Modern Map Container */}
+        <div className="flex-[1.2] bg-white rounded-[1.5rem] overflow-hidden border border-slate-100 shadow-sm relative shadow-sm">
+          <div className="h-[250px] md:h-[400px] w-full relative z-0">
             <MapContainer
               center={markerPosition || [12.9716, 77.5946]}
               zoom={15}
@@ -148,72 +148,81 @@ const LocationStep = ({
               <LocationMarker position={markerPosition} onDragEnd={handleMarkerDragEnd} />
             </MapContainer>
 
-            <div className="absolute top-2 right-2 bg-white/90 p-2 rounded-lg shadow-sm text-xs z-[400] pointer-events-none max-w-[200px] border">
-              Drag marker to refine location
+            {/* Premium Floating Badge */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] text-[10px] font-bold tracking-widest uppercase text-white z-[400] pointer-events-none flex items-center gap-2 border border-white/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Drag to refine location
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* Address Input Section - Scrollable if needed */}
-        <div className="flex-1 space-y-4">
-          <Card className="p-4 md:p-6 border-border/50 bg-accent/20 hover:bg-accent/30 transition-colors">
-            <div className="space-y-3 md:space-y-4">
-              <div className="flex items-center justify-between mb-1 md:mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <MapPin className="h-4 w-4 text-primary" />
-                  </div>
-                  <Label className="text-base font-semibold">Address Details</Label>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 text-xs h-8 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary"
-                  onClick={onGetCurrentLocation}
-                  disabled={isGettingLocation}
-                >
-                  {isGettingLocation ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
-                  {isGettingLocation ? "Locating..." : "Auto Detect"}
-                </Button>
+        {/* Address & Details Unified Container */}
+        <div className="flex-1 space-y-5">
+          <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+
+            {/* Action Bar */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <MapPin className="h-4 w-4 text-slate-400" />
+                <Label className="text-[11px] uppercase font-bold tracking-widest text-slate-500">Address Details</Label>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors shadow-none text-xs font-bold px-3"
+                onClick={onGetCurrentLocation}
+                disabled={isGettingLocation}
+              >
+                {isGettingLocation ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
+                {isGettingLocation ? "Locating" : "Auto Detect"}
+              </Button>
+            </div>
 
-              {currentLocation && (
-                <div className="p-2 md:p-3 bg-primary/5 rounded-lg border border-primary/20 mb-2 md:mb-3">
-                  <p className="text-xs font-medium text-primary mb-0.5">📍 GPS Reference:</p>
-                  <p className="text-xs md:text-sm text-foreground truncate">{currentLocation}</p>
+            {/* GPS Reference (if available) */}
+            {currentLocation && (
+              <div className="px-4 py-3 bg-blue-50/50 border-b border-blue-100/50">
+                <div className="flex gap-2 items-start">
+                  <div className="mt-0.5 text-blue-600">🎯</div>
+                  <p className="text-[11px] font-semibold text-blue-900 leading-tight pr-2">
+                    {currentLocation}
+                  </p>
                 </div>
-              )}
+              </div>
+            )}
 
+            {/* Address Textarea */}
+            <div className="p-4 border-b border-slate-100">
               <Textarea
                 id="location"
                 name="location"
                 value={formData.location}
                 onChange={handleTextareaChange}
-                placeholder="Type your address here..."
-                className="min-h-[80px] md:min-h-[100px] text-sm md:text-base border-2 focus:border-primary resize-none rounded-xl"
+                placeholder="Enter complete address..."
+                className="min-h-[80px] border-0 px-0 focus-visible:ring-0 text-base font-bold text-slate-900 resize-none rounded-none shadow-none placeholder:text-slate-300"
                 required
               />
-              <p className="text-[10px] md:text-xs text-muted-foreground">
-                💡 Include landmarks for faster service
+              <p className="text-[11px] text-slate-400 font-medium mt-1">
+                Include landmarks (e.g., "Opposite to City Mall")
               </p>
             </div>
-          </Card>
 
-          <Card className="p-4 md:p-6 border-border/50 bg-accent/20 hover:bg-accent/30 transition-colors">
-            <div className="space-y-2 md:space-y-3">
-              <Label htmlFor="details" className="text-sm md:text-base font-semibold">Additional Details (Optional)</Label>
-              <Textarea
+            {/* Additional Details */}
+            <div className="p-4 bg-slate-50/30">
+              <div className="flex items-center gap-2.5 mb-2">
+                <Label htmlFor="details" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Extra Note (Optional)</Label>
+              </div>
+              <Input
                 id="details"
                 name="details"
-                placeholder="Gate code, etc..."
+                placeholder="Gate code, parking spot..."
                 value={formData.details}
-                onChange={handleTextareaChange}
-                rows={2}
-                className="text-sm md:text-base border-2 focus:border-primary resize-none rounded-xl"
+                onChange={handleTextareaChange as any}
+                className="h-10 text-sm border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-semibold text-slate-700 shadow-none"
               />
             </div>
-          </Card>
+
+          </div>
         </div>
       </div>
     </div>

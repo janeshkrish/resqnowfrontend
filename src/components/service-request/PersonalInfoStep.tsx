@@ -1,11 +1,9 @@
-
 import { useState } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
-import { Card } from "../ui/card";
 import { ServiceRequestFormData } from "./types";
-import { User, Phone } from "lucide-react";
+import { User, Phone, Mail } from "lucide-react";
 
 interface PersonalInfoStepProps {
   formData: ServiceRequestFormData;
@@ -15,48 +13,38 @@ interface PersonalInfoStepProps {
 const PersonalInfoStep = ({ formData, onInputChange }: PersonalInfoStepProps) => {
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
-      <div className="mb-6">
-        <h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">Personal Information</h3>
-        <p className="text-sm text-muted-foreground">We'll use this to contact you about your service</p>
+      <div className="mb-6 px-1">
+        <h3 className="text-2xl font-black tracking-tight text-slate-900 mb-2">Personal Details</h3>
+        <p className="text-sm font-medium text-slate-500">We'll use this to coordinate your service</p>
       </div>
 
-      <Card className="p-4 md:p-6 border-border/50 bg-accent/20 hover:bg-accent/30 transition-colors">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <User className="h-4 w-4 text-primary" />
-            </div>
-            <Label htmlFor="name" className="text-base font-semibold">Full Name</Label>
+      <div className="bg-white rounded-[1.5rem] border border-slate-100/60 shadow-sm overflow-hidden">
+
+        {/* Full Name */}
+        <div className="p-4 border-b border-slate-100/60">
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <User className="h-4 w-4 text-slate-400" />
+            <Label htmlFor="name" className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Full Name</Label>
           </div>
           <Input
             id="name"
             name="name"
-            placeholder="Enter your full name"
+            placeholder="e.g. John Doe"
             value={formData.name}
             onChange={onInputChange}
             required
-            className="h-12 text-base border-2 focus:border-primary"
+            className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-bold text-slate-900 shadow-none"
           />
         </div>
-      </Card>
 
-      <Card className="p-4 md:p-6 border-border/50 bg-accent/20 hover:bg-accent/30 transition-colors">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Phone className="h-4 w-4 text-primary" />
-            </div>
-            <Label htmlFor="phone" className="text-base font-semibold">Phone Number</Label>
+        {/* Phone Number */}
+        <div className="p-4 border-b border-slate-100/60">
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <Phone className="h-4 w-4 text-slate-400" />
+            <Label htmlFor="phone" className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Phone Number</Label>
           </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="px-4 h-12 text-base font-medium pointer-events-none"
-              disabled
-            >
-              +91
-            </Button>
+          <div className="flex items-center gap-3">
+            <span className="text-slate-900 font-bold text-base bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">+91</span>
             <Input
               id="phone"
               name="phone"
@@ -65,36 +53,34 @@ const PersonalInfoStep = ({ formData, onInputChange }: PersonalInfoStepProps) =>
               value={formData.phone}
               onChange={onInputChange}
               required
-              className="h-12 text-base border-2 focus:border-primary flex-1"
               maxLength={10}
+              className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-bold text-slate-900 shadow-none flex-1 tracking-wider"
             />
           </div>
         </div>
-      </Card>
 
-      <Card className="p-4 md:p-6 border-border/50 bg-accent/20 hover:bg-accent/30 transition-colors">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <User className="h-4 w-4 text-primary" />
-            </div>
-            <Label htmlFor="email" className="text-base font-semibold">Email Address</Label>
+        {/* Email Address */}
+        <div className="p-4 bg-slate-50/30">
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <Mail className="h-4 w-4 text-slate-400" />
+            <Label htmlFor="email" className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Email Address</Label>
           </div>
           <Input
             id="email"
             name="email"
             type="email"
-            placeholder="your@email.com"
+            placeholder="mail@example.com"
             value={formData.email || ""}
             onChange={onInputChange}
             required
-            className="h-12 text-base border-2 focus:border-primary"
+            className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-bold text-slate-900 shadow-none"
           />
-          <p className="text-xs text-muted-foreground bg-background/50 p-2 rounded border">
-            📧 We'll send you real-time updates and receipt to this email
+          <p className="text-[11px] text-slate-500 font-medium mt-3 flex items-start gap-1.5">
+            <span className="text-emerald-500 shrink-0">✓</span> Real-time updates & receipts will be sent here
           </p>
         </div>
-      </Card>
+
+      </div>
     </div>
   );
 };

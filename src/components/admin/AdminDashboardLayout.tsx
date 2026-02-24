@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Shield
 } from "lucide-react";
-import { apiFetch, apiUrl } from "@/lib/api";
+import { apiFetch, apiUrl, FRONTEND_ONLY_MODE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -52,6 +52,8 @@ const AdminDashboardLayout = () => {
   useEffect(() => {
     fetchNotifications(0, true);
     fetchUnreadCount();
+
+    if (FRONTEND_ONLY_MODE) return;
 
     // SSE Connection
     const eventSource = new EventSource(apiUrl("/api/admin/notifications/stream"));
@@ -416,3 +418,5 @@ const AdminDashboardLayout = () => {
 };
 
 export default AdminDashboardLayout;
+
+

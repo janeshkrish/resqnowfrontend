@@ -8,6 +8,15 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiBaseUrl = (env.VITE_API_URL || "").replace(/\/+$/, "");
+  const frontendOnlyEnv = String(env.VITE_FRONTEND_ONLY || "").trim().toLowerCase();
+  const frontendOnlyMode = frontendOnlyEnv === "true" || frontendOnlyEnv === "1";
+
+  if (mode === "production" && !frontendOnlyMode && !apiBaseUrl) {
+    throw new Error(
+      "Missing VITE_API_URL for production build. Set it in Netlify environment variables."
+    );
+  }
+
   const escapedApiBaseUrl = apiBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const apiRuntimePattern = escapedApiBaseUrl
     ? new RegExp(`^${escapedApiBaseUrl}/api/.*`)

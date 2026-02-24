@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch, getRequiredApiBaseUrl } from '@/lib/api';
+import { apiFetch, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
 import { toast } from 'sonner';
 import { io, Socket } from 'socket.io-client';
 
@@ -96,6 +96,11 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
   useEffect(() => {
     fetchRequest();
+
+    if (FRONTEND_ONLY_MODE) {
+      setIsConnected(false);
+      return;
+    }
 
     // Initialize Socket.IO
     const socketBaseUrl = getRequiredApiBaseUrl();

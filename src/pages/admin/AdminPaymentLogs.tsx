@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
-import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
+import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 
 type PaymentRecord = {
   payment_id: number;
@@ -84,6 +84,11 @@ const AdminPaymentLogs = () => {
 
   useEffect(() => {
     fetchOverview();
+    if (FRONTEND_ONLY_MODE) {
+      const id = window.setInterval(() => fetchOverview(true), 60000);
+      return () => window.clearInterval(id);
+    }
+
     const socketBaseUrl = getRequiredApiBaseUrl();
     const socket: Socket = io(socketBaseUrl, {
       path: "/socket.io",

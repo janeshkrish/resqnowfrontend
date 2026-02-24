@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { getRequiredApiBaseUrl } from '@/lib/api';
+import { FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
 import { useTechnicianAuth } from './TechnicianAuthContext';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -24,6 +24,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { user, isAuthenticated: isUserAuth } = useAuth();
 
   useEffect(() => {
+    if (FRONTEND_ONLY_MODE) {
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+      setIsConnected(false);
+      return;
+    }
+
     // Only connect if either technician or user is authenticated
     if (!isTechAuth && !isUserAuth) {
       if (socket) {

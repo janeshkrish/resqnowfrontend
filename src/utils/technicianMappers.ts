@@ -1,16 +1,16 @@
 import { Technician } from "@/types/technician";
-import { getRequiredApiBaseUrl } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/api";
 
 // Helper function to map database/API fields to our Technician type
-const BASE_URL = getRequiredApiBaseUrl();
-
 const resolveUrl = (path: string) => {
   if (!path) return null;
   if (path.startsWith("http")) return path;
-  // If path starts with /, remove it to avoid double slashes if BASE_URL ends with /
-  const cleanPath = path.startsWith("/") ? path.substring(1) : path;
-  const cleanBase = BASE_URL.endsWith("/") ? BASE_URL.substring(0, BASE_URL.length - 1) : BASE_URL;
-  return `${cleanBase}/${cleanPath}`;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  if (!API_BASE_URL) return cleanPath;
+  const cleanBase = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.substring(0, API_BASE_URL.length - 1)
+    : API_BASE_URL;
+  return `${cleanBase}${cleanPath}`;
 };
 
 export const mapTechnicianData = (data: any): Technician => {

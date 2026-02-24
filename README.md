@@ -121,9 +121,21 @@ Build output directory: dist
 Set these environment variables in Netlify:
 
 ```txt
-VITE_API_URL=https://resqnowbackend.onrender.com
+VITE_API_URL=https://your-render-backend.onrender.com
 VITE_RAZORPAY_KEY_ID=your_live_or_test_key
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
 ```
+
+You can copy the same keys from `.env.example` and set production values in Netlify UI.
+
+Frontend-only demo mode (no backend, optional):
+
+```txt
+VITE_FRONTEND_ONLY=true
+```
+
+When `VITE_FRONTEND_ONLY=true`, the app runs with in-browser mock API responses so UI flows work without a backend.
+Do not set `VITE_FRONTEND_ONLY` for production backend-connected deployments.
 
 Notes:
 - SPA routing is handled by `netlify.toml` redirects.

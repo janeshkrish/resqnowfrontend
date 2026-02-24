@@ -11,7 +11,7 @@ import { Link, Navigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
-import { apiFetch, apiUrl, getRequiredApiBaseUrl } from "@/lib/api";
+import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
@@ -21,8 +21,6 @@ import TechnicianJobHistory from "@/components/technician/TechnicianJobHistory";
 import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsChart"; // Ensure this matches file name
 import TechnicianReviews from "@/components/technician/TechnicianReviews"; // Ensure this matches file name
 import TechnicianNotifications from "@/components/technician/TechnicianNotifications"; // Ensure this matches file name
-
-const SOCKET_URL = getRequiredApiBaseUrl();
 
 const TechnicianDashboard = () => {
   const { technician, isOnline, setIsOnline, isLoading } = useTechnicianAuth();
@@ -188,10 +186,11 @@ const TechnicianDashboard = () => {
 
   // Socket Effect
   useEffect(() => { // Start socket effect
-    if (!technician?.id) return;
+    if (!technician?.id || FRONTEND_ONLY_MODE) return;
+    const socketUrl = getRequiredApiBaseUrl();
 
     // Connect Socket
-    const socket = io(SOCKET_URL, {
+    const socket = io(socketUrl, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
       auth: { token: localStorage.getItem("resqnow_technician_token") || undefined }

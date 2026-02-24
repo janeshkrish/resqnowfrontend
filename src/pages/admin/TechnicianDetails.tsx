@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Technician } from "@/types/technician";
 import { mapTechnicianData } from "@/utils/technicianMappers";
 import { io } from "socket.io-client";
-import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
+import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianReviews from "@/components/rating/TechnicianReviews";
 import {
   User,
@@ -75,6 +75,8 @@ const TechnicianDetails = () => {
 
   useEffect(() => {
     if (!technicianId) return;
+    if (FRONTEND_ONLY_MODE) return;
+
     const socketBaseUrl = getRequiredApiBaseUrl();
     const socket = io(socketBaseUrl, {
       path: "/socket.io",

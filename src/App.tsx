@@ -12,6 +12,7 @@ import { SocketProvider } from "@/contexts/SocketContext";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 // Technician pages
 import TechnicianLayout from "./components/technician/TechnicianLayout";
@@ -106,6 +107,7 @@ const App = () => (
                 <SocketProvider>
                   <TooltipProvider>
                     <Sonner />
+                    <PWAInstallPrompt />
                     <LoadingAnimation />
                     <Routes>
                       {/* Auth routes */}

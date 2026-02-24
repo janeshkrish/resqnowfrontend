@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import Hero from "@/components/Hero";
 import Services from "@/components/Services";
 import HowItWorks from "@/components/HowItWorks";
@@ -7,9 +8,58 @@ import TechnicianCTA from "@/components/TechnicianCTA";
 import Map from "@/components/Map";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
-import { MapPin, Search, ArrowRight, Bell, Briefcase } from "lucide-react";
+import { MapPin, Search, ArrowRight, Bell, Briefcase, Download } from "lucide-react";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
 
 const MobileDashboard = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setIsStandalone(true);
+    };
+
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone === true;
+    setIsStandalone(standalone);
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const canInstallApp = Boolean(deferredPrompt) && !isStandalone;
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+
+    try {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        setDeferredPrompt(null);
+      }
+    } catch (error) {
+      console.error("App install prompt failed:", error);
+    }
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen pb-20 animate-fade-in">
       {/* Sticky Top App Bar */}
@@ -60,6 +110,25 @@ const MobileDashboard = () => {
               Explore Services
             </Link>
           </div>
+
+          {canInstallApp && (
+            <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-emerald-700 to-teal-500 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(5,150,105,0.5)] relative overflow-hidden isolate">
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white blur-[50px] opacity-20 rounded-full"></div>
+
+              <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">APP INSTALL</span>
+              <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Install<br />ResQNow</h2>
+              <p className="text-emerald-100 text-xs mb-6 font-medium max-w-[220px]">Get faster access and a smoother experience from your home screen.</p>
+
+              <button
+                type="button"
+                onClick={handleInstallApp}
+                className="inline-flex items-center bg-white text-emerald-700 px-5 py-2.5 rounded-full text-sm font-bold hover:scale-105 active:scale-95 transition-all shadow-[0_8px_16px_rgba(0,0,0,0.1)]"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Install App
+              </button>
+            </div>
+          )}
 
           <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-indigo-700 to-purple-600 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(79,70,229,0.5)] relative overflow-hidden isolate">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white blur-[40px] opacity-20 rounded-full"></div>

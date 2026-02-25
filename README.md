@@ -127,7 +127,7 @@ VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
 ```
 
 You can copy the same keys from `.env.example` and set production values in Netlify UI.
-`
+
 Frontend-only demo mode (no backend, optional):
 
 ```txt

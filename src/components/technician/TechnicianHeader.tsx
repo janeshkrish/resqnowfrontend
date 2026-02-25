@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, Menu, User, Settings } from "lucide-react";
+import { LogOut, User, Settings } from "lucide-react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { apiUrl } from "@/lib/api";
 
@@ -23,7 +23,6 @@ const TechnicianHeader = () => {
   const { technician, isAuthenticated, logout, token, isOnline, setIsOnline } = useTechnicianAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Use effect to fetch current status if needed, or just assume offline on load
   //Ideally we should fetch this from backend
@@ -72,22 +71,26 @@ const TechnicianHeader = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background border-b">
-      <div className="container flex h-16 items-center justify-between">
+    <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm">
+      <div className="container flex h-16 items-center justify-between px-4">
+
+        {/* Logo / Brand */}
         <div className="flex items-center">
           <Link to="/technician/dashboard" className="flex items-center">
-            <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-800">
-              ResQNow Technician
+            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-900 drop-shadow-sm">
+              ResQNow <span className="text-blue-600 ml-1 hidden sm:inline">Technician</span>
             </span>
           </Link>
+
+          {/* Desktop Nav Links */}
           <nav className="ml-10 hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
-                className={`font-medium transition-colors ${isActive(link.path)
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-primary"
+                className={`font-bold transition-colors text-sm ${isActive(link.path)
+                  ? "text-blue-700"
+                  : "text-slate-500 hover:text-blue-600"
                   }`}
               >
                 {link.label}
@@ -96,111 +99,77 @@ const TechnicianHeader = () => {
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Right Side Actions */}
+        <div className="flex items-center gap-3">
           {isAuthenticated ? (
             <>
-              <div className="flex items-center gap-2 mr-2">
-                <span className={`text-sm font-medium ${isOnline ? "text-green-600" : "text-slate-500"}`}>
+              {/* Online/Offline Toggle Pillar */}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${isOnline ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'} transition-colors`}>
+                <span className={`text-[11px] uppercase tracking-widest font-black ${isOnline ? "text-green-700" : "text-slate-500"}`}>
                   {isOnline ? "Online" : "Offline"}
                 </span>
                 <Switch
                   checked={isOnline}
                   onCheckedChange={toggleAvailability}
+                  className="scale-90 data-[state=checked]:bg-green-600"
                 />
               </div>
 
+              {/* Profile Avatar Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                    <Avatar className="h-10 w-10 border-2 border-muted">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {technician ? getInitials(technician.name) : "?"}
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 border-2 border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <Avatar className="h-full w-full">
+                      <AvatarFallback className="bg-blue-50 text-blue-700 font-bold">
+                        {technician ? getInitials(technician.name) : <User className="h-5 w-5" />}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
-                  <DropdownMenuLabel className="font-normal">
+                <DropdownMenuContent className="w-56 mt-2 rounded-2xl shadow-xl border-slate-100 p-2" align="end">
+                  <DropdownMenuLabel className="font-normal px-2 py-1.5">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{technician?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
+                      <p className="text-sm font-bold leading-none text-slate-900">{technician?.name || "Technician"}</p>
+                      <p className="text-xs font-medium text-slate-500">
                         {technician?.email}
                       </p>
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/technician/profile" className="cursor-pointer flex w-full items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
+                  <DropdownMenuSeparator className="my-2 bg-slate-100" />
+                  <DropdownMenuItem asChild className="rounded-xl focus:bg-slate-50 cursor-pointer">
+                    <Link to="/technician/profile" className="flex w-full items-center px-2 py-2">
+                      <User className="mr-3 h-4 w-4 text-slate-400" />
+                      <span className="font-semibold text-slate-700">Profile</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/technician/settings" className="cursor-pointer flex w-full items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
+                  <DropdownMenuItem asChild className="rounded-xl focus:bg-slate-50 cursor-pointer">
+                    <Link to="/technician/settings" className="flex w-full items-center px-2 py-2">
+                      <Settings className="mr-3 h-4 w-4 text-slate-400" />
+                      <span className="font-semibold text-slate-700">Settings</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                  <DropdownMenuSeparator className="my-2 bg-slate-100" />
+                  <DropdownMenuItem onClick={handleLogout} className="rounded-xl focus:bg-red-50 focus:text-red-700 cursor-pointer px-2 py-2">
+                    <LogOut className="mr-3 h-4 w-4 text-red-500" />
+                    <span className="font-bold text-red-600">Log out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button className="md:hidden text-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                <Menu size={24} />
-              </button>
+
+              {/* Removed the mobile hamburger menu button as we rely on TechnicianBottomNav */}
             </>
           ) : (
-            <div className="flex items-center gap-4">
-              <Button variant="outline" asChild>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" className="font-bold text-slate-600 hover:text-slate-900 focus:bg-transparent" asChild>
                 <Link to="/technician/login">Log in</Link>
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full px-6 shadow-md shadow-blue-600/20" asChild>
                 <Link to="/technician/register">Sign up</Link>
               </Button>
             </div>
           )}
         </div>
       </div>
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden absolute top-16 left-0 right-0 bg-background border-b shadow-lg animate-fade-in">
-          <div className="container py-4 flex flex-col gap-4">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`font-medium py-2 transition-colors ${isActive(link.path)
-                  ? "text-primary"
-                  : "text-muted-foreground"
-                  }`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <div className="flex items-center gap-2 py-2">
-              <span className={`text-sm font-medium ${isOnline ? "text-green-600" : "text-slate-500"}`}>
-                {isOnline ? "Online" : "Offline"}
-              </span>
-              <Switch
-                checked={isOnline}
-                onCheckedChange={toggleAvailability}
-              />
-            </div>
-            <Button
-              variant="ghost"
-              className="flex justify-start pl-0"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </Button>
-          </div>
-        </div>
-      )}
     </header>
   );
 };

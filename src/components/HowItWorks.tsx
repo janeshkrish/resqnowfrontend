@@ -76,7 +76,7 @@ const HowItWorks = () => {
                   {step.id}
                 </div>
                 
-                <div className={`rounded-2xl bg-white p-6 md:p-8 border border-gray-100 shadow-sm w-full ${activeStep === step.id ? 'transform -translate-y-2 shadow-md' : ''} transition-all duration-300`}>
+                <div className={`rounded-2xl bg-card dark:bg-slate-900 p-6 md:p-8 border border-gray-100 shadow-sm w-full ${activeStep === step.id ? 'transform -translate-y-2 shadow-md' : ''} transition-all duration-300`}>
                   <h3 className="text-lg md:text-xl font-semibold mb-3">{step.title}</h3>
                   <p className="text-gray-600 text-sm md:text-base leading-relaxed">{step.description}</p>
                 </div>

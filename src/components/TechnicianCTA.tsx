@@ -7,7 +7,7 @@ import { Shield, Star, Clock, DollarSign } from "lucide-react";
 
 const TechnicianCTA = () => {
   return (
-    <section className="py-20 bg-slate-50">
+    <section className="py-20 bg-muted">
       <div className="container px-4 md:px-6">
         <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
           <div className="space-y-4">

@@ -26,7 +26,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                         initial={{ opacity: 1 }}
                         exit={{ opacity: 0, scale: 1.05 }}
                         transition={{ duration: 0.8, ease: [0.76, 0, 0.24, 1] }}
-                        className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center overflow-hidden"
+                        className="fixed inset-0 z-[9999] bg-card dark:bg-slate-900 flex flex-col items-center justify-center overflow-hidden"
                     >
 
                         {/* Background Route Line with Pulse (Subtle Tailored Tech Element) */}
@@ -68,7 +68,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                     initial={{ width: 0, opacity: 0 }}
                                     animate={{ width: "auto", opacity: 1 }}
                                     transition={{ duration: 0.8, delay: 1.4, ease: [0.16, 1, 0.3, 1] }}
-                                    className="overflow-hidden whitespace-nowrap text-slate-900 flex justify-end"
+                                    className="overflow-hidden whitespace-nowrap text-foreground flex justify-end"
                                 >
                                     <span className="shrink-0 pr-[1px]">Res</span>
                                 </motion.div>
@@ -114,7 +114,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                     initial={{ width: 0, opacity: 0 }}
                                     animate={{ width: "auto", opacity: 1 }}
                                     transition={{ duration: 0.8, delay: 1.4, ease: [0.16, 1, 0.3, 1] }}
-                                    className="overflow-hidden whitespace-nowrap text-slate-900 flex justify-start"
+                                    className="overflow-hidden whitespace-nowrap text-foreground flex justify-start"
                                 >
                                     <span className="shrink-0 pl-[1px]">Now</span>
                                 </motion.div>
@@ -128,7 +128,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                 transition={{ duration: 1, delay: 2.2, ease: [0.16, 1, 0.3, 1] }}
                                 className="absolute top-1/2 mt-12 z-20"
                             >
-                                <p className="text-[10px] md:text-xs font-bold text-slate-500 tracking-[0.4em] uppercase text-center bg-white/90 backdrop-blur-xl px-5 py-2 rounded-full border border-slate-200 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)]">
+                                <p className="text-[10px] md:text-xs font-bold text-muted-foreground/80 tracking-[0.4em] uppercase text-center bg-card dark:bg-slate-900/90 backdrop-blur-xl px-5 py-2 rounded-full border border-border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)]">
                                     When the road stops, we start.
                                 </p>
                             </motion.div>
@@ -136,7 +136,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                         </div>
 
                         {/* Premium Loading Beam Indicator */}
-                        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-48 h-[2px] bg-slate-100 rounded-full overflow-hidden">
+                        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-48 h-[2px] bg-muted/50 rounded-full overflow-hidden">
                             <motion.div
                                 initial={{ x: "-100%" }}
                                 animate={{ x: "100%" }}

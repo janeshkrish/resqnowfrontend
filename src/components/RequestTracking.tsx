@@ -396,7 +396,7 @@ const RequestTracking = () => {
 
         {/* 2. Top Floating Status Bar */}
         <div className="absolute top-safe left-4 right-4 z-20 flex justify-between items-center mt-4">
-          <Button variant="secondary" size="icon" onClick={() => navigate('/')} className="rounded-full h-10 w-10 shadow-lg bg-white/95 backdrop-blur text-gray-800 hover:bg-white">
+          <Button variant="secondary" size="icon" onClick={() => navigate('/')} className="rounded-full h-10 w-10 shadow-lg bg-card dark:bg-slate-900/95 backdrop-blur text-gray-800 hover:bg-card dark:bg-slate-900">
             <ArrowRight className="h-5 w-5 rotate-180" />
           </Button>
 
@@ -460,7 +460,7 @@ const RequestTracking = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="outline" className="rounded-full w-10 h-10 border-gray-200 bg-white text-gray-600 hover:bg-gray-50" asChild>
+                  <Button size="icon" variant="outline" className="rounded-full w-10 h-10 border-gray-200 bg-card dark:bg-slate-900 text-gray-600 hover:bg-gray-50" asChild>
                     <a href={`sms:${technician.phone || ""}`}><MessageSquare className="h-5 w-5" /></a>
                   </Button>
                   <Button size="icon" className="rounded-full bg-green-600 hover:bg-green-700 shadow-md transform active:scale-95 transition-all w-10 h-10" asChild>
@@ -480,16 +480,16 @@ const RequestTracking = () => {
             {showPayment && !paymentCompleted && (
               <div className="mt-2 mb-6">
                 <Card className="border-0 shadow-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white overflow-hidden relative rounded-2xl">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-2xl" />
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-card dark:bg-slate-900/5 rounded-full -mr-10 -mt-10 blur-2xl" />
                   <CardContent className="p-6 relative">
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <p className="text-sm text-slate-300 mb-1 font-medium">Total Amount Due</p>
                         <h3 className="text-3xl font-bold tracking-tight">{currency} {request.amount}</h3>
                       </div>
-                      <Badge variant="outline" className="border-white/20 text-white bg-white/10 backdrop-blur py-1 px-3">Pending</Badge>
+                      <Badge variant="outline" className="border-white/20 text-white bg-card dark:bg-slate-900/10 backdrop-blur py-1 px-3">Pending</Badge>
                     </div>
-                    <Button onClick={handleOnlinePaymentClick} className="w-full bg-white text-slate-900 hover:bg-slate-100 font-bold h-12 rounded-xl text-base shadow-lg cursor-pointer active:scale-[0.98] transition-all">
+                    <Button onClick={handleOnlinePaymentClick} className="w-full bg-card dark:bg-slate-900 text-foreground hover:bg-muted/50 font-bold h-12 rounded-xl text-base shadow-lg cursor-pointer active:scale-[0.98] transition-all">
                       Pay Now securely
                     </Button>
                     <button onClick={handleCashPaymentClick} className="w-full text-center text-xs text-slate-400 mt-4 underline decoration-slate-600 underline-offset-4">
@@ -584,7 +584,7 @@ const RequestTracking = () => {
   // Desktop Return (Simple container wrapper for now, user mainly cares about mobile)
   return (
     <div className="container max-w-3xl py-12">
-      <div className="bg-white shadow-md rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-card dark:bg-slate-900 shadow-md rounded-xl border border-gray-200 overflow-hidden">
         <div className="p-8 text-center min-h-[400px] flex flex-col items-center justify-center">
           <h2 className="text-2xl font-bold mb-4">Desktop View Not Optimized</h2>
           <p className="text-gray-500 mb-6">Please view this page on a mobile device for the best tracking experience.</p>

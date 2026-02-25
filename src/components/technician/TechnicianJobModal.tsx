@@ -60,7 +60,7 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
 
     return (
         <Dialog open={isOpen} onOpenChange={() => { }}>
-            <DialogContent className="fixed top-auto bottom-0 left-0 right-0 w-full sm:max-w-md mx-auto translate-y-0 translate-x-0 data-[state=closed]:translate-y-full data-[state=open]:translate-y-0 rounded-t-3xl rounded-b-none p-0 overflow-hidden border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-transform duration-300" autoFocus={false} onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogContent className="fixed top-auto bottom-0 left-0 right-0 w-full sm:max-w-md mx-auto translate-y-0 translate-x-0 data-[state=closed]:translate-y-full data-[state=open]:translate-y-0 rounded-t-3xl rounded-b-none p-0 overflow-hidden border-t border-border shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-transform duration-300" autoFocus={false} onPointerDownOutside={(e) => e.preventDefault()}>
 
                 {/* Header with Visual Timer */}
                 <div className="bg-red-600 p-6 text-white text-center relative overflow-hidden">
@@ -75,16 +75,16 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
                         </div>
                     </div>
                     {/* Background Ping Effect */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-card dark:bg-slate-900/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
                 </div>
 
-                <div className="p-6 bg-white space-y-6">
+                <div className="p-6 bg-card dark:bg-slate-900 space-y-6">
                     {/* Price & Service Banner */}
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
+                    <div className="bg-muted border border-border rounded-2xl p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500" />
                         <div className="pl-2">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">Service Required</p>
-                            <p className="font-black text-slate-900 text-xl capitalize leading-none mb-1">{job.serviceType}</p>
+                            <p className="font-black text-foreground text-xl capitalize leading-none mb-1">{job.serviceType}</p>
                             <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block">{job.vehicleType}</span>
                         </div>
                         <div className="text-right">
@@ -95,28 +95,28 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex items-start gap-3">
-                            <div className="mt-1 h-8 w-8 bg-slate-100 rounded-full flex items-center justify-center shrink-0">
-                                <MapPin className="h-4 w-4 text-slate-600" />
+                            <div className="mt-1 h-8 w-8 bg-muted/50 rounded-full flex items-center justify-center shrink-0">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Location</p>
-                                <p className="font-bold text-slate-800 text-sm leading-snug line-clamp-2">{job.location.address}</p>
+                                <p className="font-bold text-foreground text-sm leading-snug line-clamp-2">{job.location.address}</p>
                             </div>
                         </div>
-                        <div className="flex flex-col gap-3 border-l border-slate-100 pl-4">
+                        <div className="flex flex-col gap-3 border-l border-border pl-4">
                             <div>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Route Distance</p>
-                                <p className="font-bold text-slate-800 text-sm">{job.distance.toFixed(1)} km</p>
+                                <p className="font-bold text-foreground text-sm">{job.distance.toFixed(1)} km</p>
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Customer ETA</p>
-                                <p className="font-bold text-slate-800 text-sm">~{(job.distance * 2 + 5).toFixed(0)} min</p>
+                                <p className="font-bold text-foreground text-sm">~{(job.distance * 2 + 5).toFixed(0)} min</p>
                             </div>
                         </div>
                     </div>
 
                     {/* Map Preview */}
-                    <div className="h-32 rounded-2xl border border-slate-200 overflow-hidden relative shadow-inner">
+                    <div className="h-32 rounded-2xl border border-border overflow-hidden relative shadow-inner">
                         <LiveTrackingMap
                             userLocation={{ lat: job.location.lat, lng: job.location.lng }}
                             techLocation={null} // tech is current user, we can pass it if we have it, or just show user loc
@@ -126,10 +126,10 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
                     </div>
                 </div>
 
-                <div className="p-4 pt-0 bg-white flex gap-3 pb-6">
+                <div className="p-4 pt-0 bg-card dark:bg-slate-900 flex gap-3 pb-6">
                     <Button
                         variant="ghost"
-                        className="flex-1 h-14 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 text-lg font-bold transition-all"
+                        className="flex-1 h-14 rounded-2xl text-muted-foreground/80 hover:bg-muted hover:text-muted-foreground active:scale-95 text-lg font-bold transition-all"
                         disabled={isProcessing}
                         onClick={() => onReject(job.id)}
                     >

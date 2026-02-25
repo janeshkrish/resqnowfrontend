@@ -53,7 +53,7 @@
 
     /* Enhanced animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    
+
     /* Mobile app-specific */
     --mobile-padding: 1rem;
     --mobile-border-radius: 0.75rem;
@@ -61,11 +61,11 @@
     --app-surface: hsl(var(--card));
     --safe-area-inset-top: env(safe-area-inset-top);
     --safe-area-inset-bottom: env(safe-area-inset-bottom);
-    
+
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(0 84% 60%), hsl(25 95% 53%));
     --gradient-hero: linear-gradient(135deg, hsl(0 84% 60%) 0%, hsl(25 95% 53%) 100%);
-    
+
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(0 84% 60% / 0.2);
     --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -74,23 +74,29 @@
 
   .dark {
     /* Deep Slate / Zinc Palette - Corporate MNC Standard */
-    --background: 222 47% 11%; /* Slate 900 */
-    --foreground: 210 40% 98%; /* Slate 50 */
+    --background: 222 47% 11%;
+    /* Slate 900 */
+    --foreground: 210 40% 98%;
+    /* Slate 50 */
 
-    --card: 222 47% 13%; /* Slightly lighter than bg */
+    --card: 222 47% 13%;
+    /* Slightly lighter than bg */
     --card-foreground: 210 40% 98%;
 
     --popover: 222 47% 13%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%; /* Keep Blue but ensure it pops against slate */
+    --primary: 217 91% 60%;
+    /* Keep Blue but ensure it pops against slate */
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 217 32% 17%; /* Slate 800 */
+    --secondary: 217 32% 17%;
+    /* Slate 800 */
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%; /* Slate 400 */
+    --muted-foreground: 215 20% 65%;
+    /* Slate 400 */
 
     --accent: 217 32% 17%;
     --accent-foreground: 210 40% 98%;
@@ -98,11 +104,13 @@
     --destructive: 0 62% 30%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 32% 17%; /* Subtle border */
+    --border: 217 32% 17%;
+    /* Subtle border */
     --input: 217 32% 17%;
     --ring: 224 76% 48%;
-    
-    --sidebar-background: 222 47% 10%; /* Darker sidebar */
+
+    --sidebar-background: 222 47% 10%;
+    /* Darker sidebar */
     --sidebar-foreground: 215 20% 65%;
     --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 210 40% 98%;
@@ -133,16 +141,16 @@
   .mobile-compact {
     @apply py-8 space-y-6;
   }
-  
+
   .mobile-hero {
     @apply py-12 px-4;
     min-height: 70vh;
   }
-  
+
   .mobile-section {
     @apply py-8 px-4;
   }
-  
+
   .mobile-grid {
     @apply grid-cols-2 gap-3;
   }
@@ -171,24 +179,24 @@
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
   }
-  
+
   body {
     overscroll-behavior-y: none;
   }
-  
+
   .fixed.bottom-0 {
     backdrop-filter: blur(10px);
     background: hsl(var(--background) / 0.95);
   }
-  
+
   .mobile-card {
     @apply p-4 rounded-xl;
   }
-  
+
   .mobile-button {
     @apply h-12 px-6 text-base font-semibold rounded-xl;
   }
-  
+
   .mobile-fab {
     position: fixed;
     bottom: calc(1rem + var(--mobile-safe-area-bottom));
@@ -197,7 +205,7 @@
     @apply bg-primary text-primary-foreground rounded-full shadow-2xl w-16 h-16 flex items-center justify-center;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
   }
-  
+
   .mobile-bottom-nav {
     position: fixed;
     bottom: 0;
@@ -216,6 +224,7 @@
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -224,11 +233,13 @@
 .animate-shimmer {
   animation: shimmer 2s linear infinite;
 }
+
 @keyframes slideUp {
   from {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -240,6 +251,7 @@
     opacity: 0;
     transform: scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -251,12 +263,15 @@
     opacity: 0;
     transform: scale(0.3);
   }
+
   50% {
     transform: scale(1.05);
   }
+
   70% {
     transform: scale(0.9);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
@@ -281,21 +296,21 @@
 }
 
 .mobile-service-card {
-  @apply bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 active:scale-95;
+  @apply bg-card text-card-foreground rounded-2xl p-4 shadow-sm border border-border hover:shadow-md transition-all duration-300 active:scale-95;
   min-height: 120px;
 }
 
 /* Swiggy/Zomato specific card styles */
 .zomato-card {
-  @apply bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-gray-100/50 p-4 transition-transform active:scale-[0.98];
+  @apply bg-white rounded-2xl shadow-[0_2px_12px_rgba(0, 0, 0, 0.06)] border border-gray-100/50 p-4 transition-transform active:scale-[0.98];
 }
 
 .zomato-bottom-sheet {
-  @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-8px_24px_rgba(0,0,0,0.08)] z-50 p-5 transform transition-transform;
+  @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-8px_24px_rgba(0, 0, 0, 0.08)] z-50 p-5 transform transition-transform;
 }
 
 .zomato-action-bar {
-  @apply fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.04)];
+  @apply fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 z-40 shadow-[0_-4px_16px_rgba(0, 0, 0, 0.04)];
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
@@ -325,11 +340,10 @@
 
 /* Professional mobile theme */
 .mobile-gradient-bg {
-  background: linear-gradient(135deg, 
-    hsl(221 83% 53%) 0%, 
-    hsl(199 89% 48%) 30%, 
-    hsl(221 83% 53%) 100%
-  );
+  background: linear-gradient(135deg,
+      hsl(221 83% 53%) 0%,
+      hsl(199 89% 48%) 30%,
+      hsl(221 83% 53%) 100%);
 }
 
 .mobile-glass-card {
@@ -402,9 +416,11 @@
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -425,6 +441,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -439,9 +456,11 @@
   0% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-10px);
   }
+
   100% {
     transform: translateY(0px);
   }
@@ -455,9 +474,11 @@
   0% {
     box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
   }
+
   70% {
     box-shadow: 0 0 0 8px rgba(107, 114, 128, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(107, 114, 128, 0);
   }
@@ -469,10 +490,11 @@
 
 @keyframes glow {
   0% {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
+
   100% {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
 }
 
@@ -588,26 +610,26 @@
 .vehicle-brand-dropdown {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease-in-out;
 }
 
 .vehicle-brand-dropdown:hover {
   border-color: hsl(var(--primary) / 0.3);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .vehicle-selection-card {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease-in-out;
 }
 
 .vehicle-selection-card.selected {
   background: hsl(var(--accent));
   border-color: hsl(var(--primary));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
 }
 
@@ -619,7 +641,7 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 @keyframes slideDown {
@@ -627,6 +649,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -648,6 +671,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -663,9 +687,11 @@
   0% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-10px);
   }
+
   100% {
     transform: translateY(0px);
   }
@@ -679,9 +705,11 @@
   0% {
     box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
   }
+
   70% {
     box-shadow: 0 0 0 8px rgba(107, 114, 128, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(107, 114, 128, 0);
   }
@@ -693,12 +721,14 @@
 
 @keyframes glow {
   0% {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
+
   100% {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
 }
+
 .animate-glow {
   animation: glow 2s ease-in-out infinite alternate;
 }
@@ -819,26 +849,26 @@
 .vehicle-brand-dropdown {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease-in-out;
 }
 
 .vehicle-brand-dropdown:hover {
   border-color: hsl(var(--primary) / 0.3);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .vehicle-selection-card {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease-in-out;
 }
 
 .vehicle-selection-card.selected {
   background: hsl(var(--accent));
   border-color: hsl(var(--primary));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
 }
 
@@ -850,7 +880,7 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Enhanced dropdown animations */
@@ -859,6 +889,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -928,7 +959,7 @@
     backdrop-filter: blur(20px);
     border-bottom: 1px solid hsl(var(--border));
   }
-  
+
   .container {
     padding-left: var(--mobile-padding);
     padding-right: var(--mobile-padding);
@@ -940,41 +971,42 @@
   .active\:scale-98:active {
     transform: scale(0.98);
   }
-  
+
   .active\:scale-95:active {
     transform: scale(0.95);
   }
-  
+
   /* App-like mobile styles */
   .mobile-compact {
     @apply bg-background min-h-screen;
   }
-  
+
   .mobile-section {
     @apply bg-white lg:bg-transparent;
   }
-  
+
   /* Smooth tap animations */
   .tap-highlight-none {
     -webkit-tap-highlight-color: transparent;
   }
-  
+
   /* Bottom sheet style */
   .bottom-sheet-enter {
     animation: slideUpFade 0.3s ease-out;
   }
-  
+
   @keyframes slideUpFade {
     from {
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  
+
   /* Card press effect */
   .card-press:active {
     transform: scale(0.98);
@@ -983,23 +1015,56 @@
 
   /* PWA Splash Screen Animations */
   @keyframes splashFadeInScale {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
+
   @keyframes splashFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
+
   @keyframes splashFadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
+
   @keyframes splashFillRoad {
-    0% { width: 0%; }
-    100% { width: 100%; }
+    0% {
+      width: 0%;
+    }
+
+    100% {
+      width: 100%;
+    }
   }
+
   @keyframes splashDriveCar {
-    0% { left: -24px; }
-    100% { left: 100%; }
+    0% {
+      left: -24px;
+    }
+
+    100% {
+      left: 100%;
+    }
   }
 }

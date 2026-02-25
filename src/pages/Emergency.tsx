@@ -93,7 +93,7 @@ const Emergency = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-red-50 to-white py-12">
       <div className="container max-w-md mx-auto px-4">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-red-100">
+        <div className="bg-card dark:bg-slate-900 rounded-xl shadow-lg overflow-hidden border border-red-100">
           <div className="bg-gradient-to-r from-red-600 to-red-700 p-6 text-white">
             <h1 className="text-2xl font-bold mb-2">Emergency Assistance</h1>
             <p className="opacity-90">We're locating you to send help anywhere in Tamil Nadu</p>

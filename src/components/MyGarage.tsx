@@ -145,7 +145,7 @@ const MyGarage = () => {
         if (normalized === "inactive") {
             return {
                 label: "Inactive",
-                className: "text-slate-500"
+                className: "text-muted-foreground/80"
             };
         }
         return {
@@ -158,12 +158,12 @@ const MyGarage = () => {
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header Section */}
             {!isAdding && (
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-border">
                     <div>
-                        <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
+                        <h2 className="text-3xl font-extrabold tracking-tight text-foreground">
                             My Collection
                         </h2>
-                        <p className="text-slate-500 flex items-center gap-2 mt-1">
+                        <p className="text-muted-foreground/80 flex items-center gap-2 mt-1">
                             <Trophy className="h-4 w-4 text-amber-500" />
                             {vehicles.length} {vehicles.length === 1 ? 'Machine' : 'Machines'} in Garage
                         </p>
@@ -173,7 +173,7 @@ const MyGarage = () => {
 
             {isAdding ? (
                 // Add Vehicle Wizard (Enhanced UI)
-                <Card className="border border-slate-200 shadow-xl overflow-hidden max-w-3xl mx-auto">
+                <Card className="border border-border shadow-xl overflow-hidden max-w-3xl mx-auto">
                     <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <Button
@@ -183,7 +183,7 @@ const MyGarage = () => {
                                     if (step > 1) setStep(step - 1);
                                     else setIsAdding(false);
                                 }}
-                                className="text-slate-300 hover:text-white hover:bg-white/10"
+                                className="text-slate-300 hover:text-white hover:bg-card dark:bg-slate-900/10"
                             >
                                 <ArrowLeft className="h-4 w-4 mr-2" /> Back
                             </Button>
@@ -210,29 +210,29 @@ const MyGarage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-center">
                                 <button
                                     onClick={() => handleTypeSelect("car")}
-                                    className="group relative h-64 overflow-hidden rounded-2xl border-2 border-slate-100 hover:border-primary transition-all shadow-sm hover:shadow-xl"
+                                    className="group relative h-64 overflow-hidden rounded-2xl border-2 border-border hover:border-primary transition-all shadow-sm hover:shadow-xl"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 opacity-50 group-hover:opacity-100 transition-opacity" />
                                     <div className="relative z-10 flex flex-col items-center justify-center h-full p-6">
-                                        <div className="bg-white p-6 rounded-full shadow-lg mb-6 group-hover:scale-110 transition-transform duration-300">
+                                        <div className="bg-card dark:bg-slate-900 p-6 rounded-full shadow-lg mb-6 group-hover:scale-110 transition-transform duration-300">
                                             <Car className="h-12 w-12 text-blue-600" />
                                         </div>
-                                        <h4 className="text-2xl font-bold text-slate-800">4-Wheeler</h4>
-                                        <p className="text-slate-500 mt-2">Cars, SUVs, & Trucks</p>
+                                        <h4 className="text-2xl font-bold text-foreground">4-Wheeler</h4>
+                                        <p className="text-muted-foreground/80 mt-2">Cars, SUVs, & Trucks</p>
                                     </div>
                                 </button>
 
                                 <button
                                     onClick={() => handleTypeSelect("bike")}
-                                    className="group relative h-64 overflow-hidden rounded-2xl border-2 border-slate-100 hover:border-primary transition-all shadow-sm hover:shadow-xl"
+                                    className="group relative h-64 overflow-hidden rounded-2xl border-2 border-border hover:border-primary transition-all shadow-sm hover:shadow-xl"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-red-100 opacity-50 group-hover:opacity-100 transition-opacity" />
                                     <div className="relative z-10 flex flex-col items-center justify-center h-full p-6">
-                                        <div className="bg-white p-6 rounded-full shadow-lg mb-6 group-hover:scale-110 transition-transform duration-300">
+                                        <div className="bg-card dark:bg-slate-900 p-6 rounded-full shadow-lg mb-6 group-hover:scale-110 transition-transform duration-300">
                                             <Bike className="h-12 w-12 text-orange-600" />
                                         </div>
-                                        <h4 className="text-2xl font-bold text-slate-800">2-Wheeler</h4>
-                                        <p className="text-slate-500 mt-2">Motorcycles & Scooters</p>
+                                        <h4 className="text-2xl font-bold text-foreground">2-Wheeler</h4>
+                                        <p className="text-muted-foreground/80 mt-2">Motorcycles & Scooters</p>
                                     </div>
                                 </button>
                             </div>
@@ -241,13 +241,13 @@ const MyGarage = () => {
                         {/* Step 2: Brand Selection */}
                         {step === 2 && (
                             <div className="space-y-4">
-                                <h4 className="text-xl font-bold text-slate-800 mb-6">Select Manufacturer</h4>
+                                <h4 className="text-xl font-bold text-foreground mb-6">Select Manufacturer</h4>
                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                                     {getBrands().map((brand) => (
                                         <button
                                             key={brand.id}
                                             onClick={() => handleBrandSelect(brand.name)}
-                                            className="flex flex-col items-center p-4 border rounded-xl hover:border-primary hover:shadow-lg transition-all bg-white aspect-square justify-center gap-3 group"
+                                            className="flex flex-col items-center p-4 border rounded-xl hover:border-primary hover:shadow-lg transition-all bg-card dark:bg-slate-900 aspect-square justify-center gap-3 group"
                                         >
                                             <img
                                                 src={getBrandLogoSrc(brand.logo)}
@@ -256,7 +256,7 @@ const MyGarage = () => {
                                                 loading="lazy"
                                                 onError={handleBrandLogoError}
                                             />
-                                            <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{brand.name}</span>
+                                            <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground">{brand.name}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -266,23 +266,23 @@ const MyGarage = () => {
                         {/* Step 3: Model Selection */}
                         {step === 3 && (
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <div className="flex items-center justify-between bg-muted p-4 rounded-xl border border-border">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-slate-500">Manufacturer:</span>
-                                        <span className="font-bold text-xl text-slate-900">{newVehicle.make}</span>
+                                        <span className="text-muted-foreground/80">Manufacturer:</span>
+                                        <span className="font-bold text-xl text-foreground">{newVehicle.make}</span>
                                     </div>
                                     <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
                                         Change
                                     </Button>
                                 </div>
 
-                                <h4 className="text-lg font-semibold text-slate-800">Select Model</h4>
+                                <h4 className="text-lg font-semibold text-foreground">Select Model</h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2">
                                     {getModels().map((model) => (
                                         <button
                                             key={model}
                                             onClick={() => handleModelSelect(model)}
-                                            className="text-left px-5 py-4 border rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-colors text-sm font-semibold text-slate-700 shadow-sm"
+                                            className="text-left px-5 py-4 border rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-colors text-sm font-semibold text-muted-foreground shadow-sm"
                                         >
                                             {model}
                                         </button>
@@ -298,29 +298,29 @@ const MyGarage = () => {
                                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-600 mb-4">
                                         <Car className="h-8 w-8" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-slate-900">Almost There!</h3>
-                                    <p className="text-slate-500">Confirm details to add to your garage.</p>
+                                    <h3 className="text-2xl font-bold text-foreground">Almost There!</h3>
+                                    <p className="text-muted-foreground/80">Confirm details to add to your garage.</p>
                                 </div>
 
-                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                <div className="bg-muted p-6 rounded-2xl border border-border">
                                     <div className="grid grid-cols-2 gap-4 mb-6">
                                         <div>
-                                            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Make</p>
-                                            <p className="text-lg font-bold text-slate-900">{newVehicle.make}</p>
+                                            <p className="text-xs text-muted-foreground/80 uppercase font-bold tracking-wider">Make</p>
+                                            <p className="text-lg font-bold text-foreground">{newVehicle.make}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Model</p>
-                                            <p className="text-lg font-bold text-slate-900">{newVehicle.model}</p>
+                                            <p className="text-xs text-muted-foreground/80 uppercase font-bold tracking-wider">Model</p>
+                                            <p className="text-lg font-bold text-foreground">{newVehicle.model}</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label className="uppercase text-xs font-bold text-slate-500 tracking-wider">License Plate (Optional)</Label>
+                                        <Label className="uppercase text-xs font-bold text-muted-foreground/80 tracking-wider">License Plate (Optional)</Label>
                                         <Input
                                             value={newVehicle.license_plate}
                                             onChange={(e) => setNewVehicle({ ...newVehicle, license_plate: e.target.value })}
                                             placeholder="IND-555"
-                                            className="text-center text-2xl uppercase tracking-[0.2em] font-mono h-14 bg-white border-2 border-slate-200 focus:border-primary"
+                                            className="text-center text-2xl uppercase tracking-[0.2em] font-mono h-14 bg-card dark:bg-slate-900 border-2 border-border focus:border-primary"
                                         />
                                     </div>
                                 </div>
@@ -342,7 +342,7 @@ const MyGarage = () => {
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                            <p className="text-slate-500 font-medium">Valet retrieving vehicles...</p>
+                            <p className="text-muted-foreground/80 font-medium">Valet retrieving vehicles...</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -351,10 +351,10 @@ const MyGarage = () => {
                                 onClick={() => setIsAdding(true)}
                                 className="group relative border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center p-8 hover:border-primary hover:bg-primary/5 transition-all duration-300 min-h-[300px]"
                             >
-                                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-white group-hover:scale-110 transition-transform shadow-sm group-hover:shadow-md mb-4">
+                                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-card dark:bg-slate-900 group-hover:scale-110 transition-transform shadow-sm group-hover:shadow-md mb-4">
                                     <Plus className="h-8 w-8 text-slate-400 group-hover:text-primary transition-colors" />
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-600 group-hover:text-primary transition-colors">Empty Bay</h3>
+                                <h3 className="text-lg font-bold text-muted-foreground group-hover:text-primary transition-colors">Empty Bay</h3>
                                 <p className="text-sm text-slate-400 group-hover:text-primary/70">Park a new vehicle here</p>
                             </button>
 
@@ -365,7 +365,7 @@ const MyGarage = () => {
                                 const statusMeta = getStatusMeta(v.status);
 
                                 return (
-                                    <div key={v.id} className="group relative bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
+                                    <div key={v.id} className="group relative bg-card dark:bg-slate-900 rounded-2xl border border-border shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col">
                                         {/* Brand Header */}
                                         <div className="relative h-32 bg-slate-900 overflow-hidden">
                                             <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-black opacity-80" />
@@ -374,7 +374,7 @@ const MyGarage = () => {
 
                                             <div className="absolute top-4 right-4 z-10">
                                                 {brand?.logo && (
-                                                    <div className="bg-white/10 backdrop-blur-md p-2 rounded-lg border border-white/20">
+                                                    <div className="bg-card dark:bg-slate-900/10 backdrop-blur-md p-2 rounded-lg border border-white/20">
                                                         <img
                                                             src={getBrandLogoSrc(brand.logo)}
                                                             alt={brand.name}
@@ -401,21 +401,21 @@ const MyGarage = () => {
                                         <div className="p-6 flex-1 flex flex-col">
                                             <div className="mb-6">
                                                 <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Model Spec</p>
-                                                <h4 className="text-xl font-bold text-slate-800">{v.model}</h4>
+                                                <h4 className="text-xl font-bold text-foreground">{v.model}</h4>
                                             </div>
 
                                             {/* Spec Grid */}
                                             <div className="grid grid-cols-2 gap-4 mb-6">
-                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                <div className="bg-muted p-3 rounded-lg border border-border">
                                                     <div className="flex items-center gap-2 text-slate-400 mb-1">
                                                         <Gauge className="h-3 w-3" />
                                                         <span className="text-[10px] uppercase font-bold">Registration</span>
                                                     </div>
-                                                    <p className="font-mono font-bold text-slate-700 text-sm">
+                                                    <p className="font-mono font-bold text-muted-foreground text-sm">
                                                         {v.license_plate || "N/A"}
                                                     </p>
                                                 </div>
-                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                <div className="bg-muted p-3 rounded-lg border border-border">
                                                     <div className="flex items-center gap-2 text-slate-400 mb-1">
                                                         <Fuel className="h-3 w-3" />
                                                         <span className="text-[10px] uppercase font-bold">Status</span>

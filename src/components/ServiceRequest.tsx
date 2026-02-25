@@ -392,8 +392,8 @@ const ServiceRequest = () => {
   return (
   <div className="min-h-screen app-bg pb-32">
     <div className="container max-w-3xl py-4 md:py-12 px-0 md:px-4">
-      <div className="border-none md:border overflow-hidden md:shadow-2xl bg-white md:rounded-xl">
-        <div className="bg-white text-gray-900 p-4 border-b border-gray-100">
+      <div className="border-none md:border overflow-hidden md:shadow-2xl bg-card dark:bg-slate-900 md:rounded-xl">
+        <div className="bg-card dark:bg-slate-900 text-gray-900 p-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl text-primary">
               {(serviceId === "towing") && <MapPin className="h-6 w-6" />}
@@ -418,7 +418,7 @@ const ServiceRequest = () => {
 
           <form onSubmit={handleSubmit} className="pb-8">
             {/* Stepper Content */}
-            <div className="zomato-card bg-white p-5">
+            <div className="zomato-card bg-card dark:bg-slate-900 p-5">
               {step === 1 && (
                 <PersonalInfoStep
                   formData={formData}

@@ -61,7 +61,7 @@ const ProfileSettings = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header Section - Zomato Style Banner */}
-      <div className="flex flex-col items-center justify-center py-6 text-center space-y-4 bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-gray-100/50 mb-6">
+      <div className="flex flex-col items-center justify-center py-6 text-center space-y-4 bg-card dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-gray-100/50 mb-6">
         <div className="relative group cursor-pointer">
           <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
             <AvatarImage src={formData.avatar} />

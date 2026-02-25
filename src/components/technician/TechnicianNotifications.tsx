@@ -23,7 +23,7 @@ const TechnicianNotifications: React.FC<TechnicianNotificationsProps> = ({ notif
             case "info": return <Info className="h-4 w-4 text-blue-500" />;
             case "warning": return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
             case "success": return <CheckCircle className="h-4 w-4 text-green-500" />;
-            default: return <Bell className="h-4 w-4 text-slate-500" />;
+            default: return <Bell className="h-4 w-4 text-muted-foreground/80" />;
         }
     };
 
@@ -49,8 +49,8 @@ const TechnicianNotifications: React.FC<TechnicianNotificationsProps> = ({ notif
                             <div key={notif.id} className={`flex gap-3 pb-3 border-b last:border-0 last:pb-0 ${!notif.is_read ? "opacity-100" : "opacity-70"}`}>
                                 <div className="mt-0.5">{getIcon(notif.type)}</div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-900 leading-none mb-1">{notif.title}</p>
-                                    <p className="text-xs text-slate-500 line-clamp-2">{notif.message}</p>
+                                    <p className="text-sm font-semibold text-foreground leading-none mb-1">{notif.title}</p>
+                                    <p className="text-xs text-muted-foreground/80 line-clamp-2">{notif.message}</p>
                                     <p className="text-[10px] text-muted-foreground mt-1">
                                         {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
                                     </p>

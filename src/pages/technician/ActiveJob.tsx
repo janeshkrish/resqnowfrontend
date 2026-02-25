@@ -237,7 +237,7 @@ const ActiveJob = () => {
                 </div>
 
                 {/* Overlay stats */}
-                <div className="absolute top-4 left-4 right-4 bg-white/90 backdrop-blur p-4 rounded-lg shadow-md border flex justify-between items-center">
+                <div className="absolute top-4 left-4 right-4 bg-card dark:bg-slate-900/90 backdrop-blur p-4 rounded-lg shadow-md border flex justify-between items-center">
                     <div>
                         <p className="text-xs text-muted-foreground">EST. EARNINGS</p>
                         <p className="font-bold text-lg">₹{displayAmount}</p>
@@ -254,7 +254,7 @@ const ActiveJob = () => {
                 </div>
             </div>
 
-            <div className="bg-white border-t rounded-t-xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] p-6 space-y-6 z-10">
+            <div className="bg-card dark:bg-slate-900 border-t rounded-t-xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] p-6 space-y-6 z-10">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                         <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">

@@ -77,7 +77,7 @@ const ModernVehicleSelector = ({ onVehicleSelect, selectedVehicle }: ModernVehic
                   "w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left relative overflow-hidden group",
                   isSelected
                     ? "border-red-400 bg-red-50 shadow-lg"
-                    : "border-gray-200 bg-white hover:border-red-200 hover:shadow-md"
+                    : "border-gray-200 bg-card dark:bg-slate-900 hover:border-red-200 hover:shadow-md"
                 )}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

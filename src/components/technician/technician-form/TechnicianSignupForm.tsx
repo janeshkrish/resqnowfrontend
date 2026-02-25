@@ -49,7 +49,7 @@ export function TechnicianSignupForm({ onSubmit, isSubmitting }: TechnicianSignu
   };
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6 max-w-md mx-auto p-6 border rounded-lg shadow-sm bg-white">
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6 max-w-md mx-auto p-6 border rounded-lg shadow-sm bg-card dark:bg-slate-900">
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Technician Registration</h2>
 

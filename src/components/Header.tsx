@@ -37,8 +37,8 @@ const Header = () => {
   return (
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${isScrolled
-          ? "bg-white/95 backdrop-blur-md shadow-md border-b border-gray-100"
-          : "bg-white border-b border-gray-200"
+          ? "bg-card dark:bg-slate-900/95 backdrop-blur-md shadow-md border-b border-gray-100"
+          : "bg-card dark:bg-slate-900 border-b border-gray-200"
         }`}
     >
       <div className="container flex h-16 lg:h-20 items-center justify-between px-4">
@@ -131,7 +131,7 @@ const Header = () => {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-xl animate-fade-in">
+        <div className="lg:hidden absolute top-16 left-0 right-0 bg-card dark:bg-slate-900 border-b border-gray-200 shadow-xl animate-fade-in">
           <div className="container py-6 px-4 flex flex-col gap-2">
             <Link
               to="/"

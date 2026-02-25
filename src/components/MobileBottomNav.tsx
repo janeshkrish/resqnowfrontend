@@ -25,7 +25,7 @@ const MobileBottomNav = () => {
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:hidden pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card dark:bg-slate-900 border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:hidden pb-safe">
             <div className="grid grid-cols-5 h-16">
                 {navItems.map((item) => {
                     const active = isActive(item.path);

@@ -85,16 +85,16 @@ const TechnicianHistoryPage = () => {
                 <Button variant="ghost" size="icon" asChild>
                     <Link to="/technician/dashboard"><ArrowLeft className="w-5 h-5" /></Link>
                 </Button>
-                <h1 className="text-2xl font-bold text-slate-800">Job History</h1>
+                <h1 className="text-2xl font-bold text-foreground">Job History</h1>
             </div>
 
             <div className="flex items-center justify-between">
-                <div className="bg-slate-100 p-1 rounded-lg inline-flex items-center gap-1">
+                <div className="bg-muted/50 p-1 rounded-lg inline-flex items-center gap-1">
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setFilter('all')}
-                        className={`h-8 rounded-md text-xs font-medium ${filter === 'all' ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-800"}`}
+                        className={`h-8 rounded-md text-xs font-medium ${filter === 'all' ? "bg-card dark:bg-slate-900 shadow-sm text-foreground" : "text-muted-foreground/80 hover:text-foreground"}`}
                     >
                         All Jobs
                     </Button>
@@ -102,7 +102,7 @@ const TechnicianHistoryPage = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => setFilter('completed')}
-                        className={`h-8 rounded-md text-xs font-medium ${filter === 'completed' ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-800"}`}
+                        className={`h-8 rounded-md text-xs font-medium ${filter === 'completed' ? "bg-card dark:bg-slate-900 shadow-sm text-foreground" : "text-muted-foreground/80 hover:text-foreground"}`}
                     >
                         Completed
                     </Button>
@@ -110,7 +110,7 @@ const TechnicianHistoryPage = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => setFilter('cancelled')}
-                        className={`h-8 rounded-md text-xs font-medium ${filter === 'cancelled' ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-800"}`}
+                        className={`h-8 rounded-md text-xs font-medium ${filter === 'cancelled' ? "bg-card dark:bg-slate-900 shadow-sm text-foreground" : "text-muted-foreground/80 hover:text-foreground"}`}
                     >
                         Cancelled
                     </Button>

@@ -154,7 +154,7 @@ const ConfirmationStep = ({
               {paymentData.razorpayOrderId && (
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Transaction ID:</span>
-                  <span className="text-xs font-mono bg-white px-2 py-1 rounded border">
+                  <span className="text-xs font-mono bg-card dark:bg-slate-900 px-2 py-1 rounded border">
                     {paymentData.razorpayOrderId.slice(0, 20)}...
                   </span>
                 </div>

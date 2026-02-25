@@ -161,7 +161,7 @@ const UserManagement = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card dark:bg-slate-900 divide-y divide-gray-200">
                   {filteredUsers.map((user) => (
                     <tr key={user.id}>
                       <td className="px-6 py-4 whitespace-nowrap">{user.full_name}</td>

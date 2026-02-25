@@ -135,9 +135,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ techLocation, userLoc
         return (
             <div className={cn("relative w-full h-full", className)}>
                 {eta && (
-                    <div className="absolute top-24 right-4 z-[400] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-slate-100 flex items-center gap-2">
+                    <div className="absolute top-24 right-4 z-[400] bg-card dark:bg-slate-900/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-border flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                        <span className="text-sm font-bold text-slate-800">{eta}</span>
+                        <span className="text-sm font-bold text-foreground">{eta}</span>
                     </div>
                 )}
                 {renderMap()}
@@ -149,9 +149,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ techLocation, userLoc
         <Card className={cn("overflow-hidden border-0 shadow-lg mb-6 ring-1 ring-slate-900/5", className)}>
             <CardContent className="p-0 relative h-[300px]">
                 {eta && (
-                    <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-slate-100 flex items-center gap-2">
+                    <div className="absolute top-4 right-4 z-[400] bg-card dark:bg-slate-900/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-border flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                        <span className="text-sm font-bold text-slate-800">{eta}</span>
+                        <span className="text-sm font-bold text-foreground">{eta}</span>
                     </div>
                 )}
                 {renderMap()}

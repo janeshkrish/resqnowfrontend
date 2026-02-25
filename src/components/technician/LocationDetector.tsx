@@ -206,7 +206,7 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
                 </Alert>
             )}
 
-            <div className="rounded-md border overflow-hidden mt-4 bg-slate-50 relative z-0">
+            <div className="rounded-md border overflow-hidden mt-4 bg-muted relative z-0">
                 <div className="h-[300px] w-full">
                     <MapContainer
                         center={markerPosition || [20.5937, 78.9629]}

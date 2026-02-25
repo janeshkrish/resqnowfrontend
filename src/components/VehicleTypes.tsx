@@ -37,7 +37,7 @@ const VehicleTypes = () => {
 
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 bg-card dark:bg-slate-900">
       <div className="container px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
@@ -56,7 +56,7 @@ const VehicleTypes = () => {
             <div
               key={type.id}
               className={cn(
-                "bg-white transition-all duration-300",
+                "bg-card dark:bg-slate-900 transition-all duration-300",
                 isMobile
                   ? "flex flex-col items-center text-center p-2 rounded-xl border border-gray-100 shadow-sm"
                   : "rounded-3xl border-2 border-gray-100 overflow-hidden shadow-sm hover:shadow-2xl hover:border-primary/20 hover:-translate-y-2"

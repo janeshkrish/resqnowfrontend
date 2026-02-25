@@ -46,7 +46,7 @@ const TechnicianJobHistory: React.FC<TechnicianJobHistoryProps> = ({ jobs, compa
                     jobs.map((job) => (
                         <div key={job.id} className="flex items-center justify-between p-2 border-b last:border-0">
                             <div>
-                                <p className="font-medium text-sm text-slate-700 capitalize">{job.service_type.replace(/-/g, ' ')}</p>
+                                <p className="font-medium text-sm text-muted-foreground capitalize">{job.service_type.replace(/-/g, ' ')}</p>
                                 <p className="text-xs text-slate-400">{format(new Date(job.created_at), "MMM d, h:mm a")}</p>
                             </div>
                             <div className="text-right">

@@ -128,13 +128,13 @@ const LocationStep = ({
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="mb-4 px-1">
-        <h3 className="text-2xl font-black tracking-tight text-slate-900 mb-2">Service Location</h3>
-        <p className="text-sm font-medium text-slate-500">Pinpoint your exact location for fastest arrival.</p>
+        <h3 className="text-2xl font-black tracking-tight text-foreground mb-2">Service Location</h3>
+        <p className="text-sm font-medium text-muted-foreground/80">Pinpoint your exact location for fastest arrival.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* Modern Map Container */}
-        <div className="flex-[1.2] bg-white rounded-[1.5rem] overflow-hidden border border-slate-100 shadow-sm relative shadow-sm">
+        <div className="flex-[1.2] bg-card dark:bg-slate-900 rounded-[1.5rem] overflow-hidden border border-border shadow-sm relative shadow-sm">
           <div className="h-[250px] md:h-[400px] w-full relative z-0">
             <MapContainer
               center={markerPosition || [12.9716, 77.5946]}
@@ -158,13 +158,13 @@ const LocationStep = ({
 
         {/* Address & Details Unified Container */}
         <div className="flex-1 space-y-5">
-          <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] border border-border shadow-sm overflow-hidden flex flex-col">
 
             {/* Action Bar */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="p-4 border-b border-border bg-muted/50 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <MapPin className="h-4 w-4 text-slate-400" />
-                <Label className="text-[11px] uppercase font-bold tracking-widest text-slate-500">Address Details</Label>
+                <Label className="text-[11px] uppercase font-bold tracking-widest text-muted-foreground/80">Address Details</Label>
               </div>
               <Button
                 type="button"
@@ -192,14 +192,14 @@ const LocationStep = ({
             )}
 
             {/* Address Textarea */}
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b border-border">
               <Textarea
                 id="location"
                 name="location"
                 value={formData.location}
                 onChange={handleTextareaChange}
                 placeholder="Enter complete address..."
-                className="min-h-[80px] border-0 px-0 focus-visible:ring-0 text-base font-bold text-slate-900 resize-none rounded-none shadow-none placeholder:text-slate-300"
+                className="min-h-[80px] border-0 px-0 focus-visible:ring-0 text-base font-bold text-foreground resize-none rounded-none shadow-none placeholder:text-slate-300"
                 required
               />
               <p className="text-[11px] text-slate-400 font-medium mt-1">
@@ -208,7 +208,7 @@ const LocationStep = ({
             </div>
 
             {/* Additional Details */}
-            <div className="p-4 bg-slate-50/30">
+            <div className="p-4 bg-muted/30">
               <div className="flex items-center gap-2.5 mb-2">
                 <Label htmlFor="details" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Extra Note (Optional)</Label>
               </div>
@@ -218,7 +218,7 @@ const LocationStep = ({
                 placeholder="Gate code, parking spot..."
                 value={formData.details}
                 onChange={handleTextareaChange as any}
-                className="h-10 text-sm border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-semibold text-slate-700 shadow-none"
+                className="h-10 text-sm border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-semibold text-muted-foreground shadow-none"
               />
             </div>
 

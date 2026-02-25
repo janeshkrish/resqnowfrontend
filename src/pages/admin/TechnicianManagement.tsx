@@ -242,7 +242,7 @@ const TechnicianManagement = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card dark:bg-slate-900 divide-y divide-gray-200">
                   {filteredTechnicians.map((technician) => (
                     <tr key={technician.id}>
                       <td className="px-6 py-4 whitespace-nowrap">

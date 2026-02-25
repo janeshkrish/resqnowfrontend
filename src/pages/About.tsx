@@ -81,28 +81,28 @@ const About = () => {
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-10">Platform Impact</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-card dark:bg-slate-900 p-6 rounded-lg shadow-sm border border-gray-100 text-center">
               <User className="h-10 w-10 text-red-600 mx-auto mb-4" />
               <p className="text-4xl font-bold text-gray-900 mb-2">
                 <AnimatedCounter end={stats.users} suffix="+" duration={2000} />
               </p>
               <p className="text-gray-600">Registered Users</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-card dark:bg-slate-900 p-6 rounded-lg shadow-sm border border-gray-100 text-center">
               <Users className="h-10 w-10 text-red-600 mx-auto mb-4" />
               <p className="text-4xl font-bold text-gray-900 mb-2">
                 <AnimatedCounter end={stats.technicians} suffix="+" duration={2000} />
               </p>
               <p className="text-gray-600">Verified Technicians</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-card dark:bg-slate-900 p-6 rounded-lg shadow-sm border border-gray-100 text-center">
               <Car className="h-10 w-10 text-red-600 mx-auto mb-4" />
               <p className="text-4xl font-bold text-gray-900 mb-2">
                 <AnimatedCounter end={stats.completedServices} suffix="+" duration={2000} />
               </p>
               <p className="text-gray-600">Services Completed</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-card dark:bg-slate-900 p-6 rounded-lg shadow-sm border border-gray-100 text-center">
               <Award className="h-10 w-10 text-red-600 mx-auto mb-4" />
               <p className="text-4xl font-bold text-gray-900 mb-2">
                 <AnimatedCounter end={24} suffix="/7" duration={1000} />

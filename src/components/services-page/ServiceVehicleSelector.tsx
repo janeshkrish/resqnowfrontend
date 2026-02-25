@@ -98,7 +98,7 @@ const ServiceVehicleSelector = ({
                     "hover:shadow-lg hover:-translate-y-1",
                     selectedVehicleType === category.id
                       ? "border-red-400 bg-gradient-to-br from-red-50 to-red-100 shadow-lg scale-105"
-                      : "border-gray-200 bg-white hover:border-red-200 hover:bg-red-50/50"
+                      : "border-gray-200 bg-card dark:bg-slate-900 hover:border-red-200 hover:bg-red-50/50"
                   )}
                   onClick={() => onVehicleTypeSelect(category.id)}
                 >
@@ -122,7 +122,7 @@ const ServiceVehicleSelector = ({
                   {/* Selection indicator */}
                   {selectedVehicleType === category.id && (
                     <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                      <div className="w-2 h-2 bg-card dark:bg-slate-900 rounded-full"></div>
                     </div>
                   )}
                 </div>
@@ -136,10 +136,10 @@ const ServiceVehicleSelector = ({
                 Vehicle Subtype
               </label>
               <Select onValueChange={onVehicleSubtypeSelect}>
-                <SelectTrigger className="h-14 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400 bg-white shadow-sm text-base">
+                <SelectTrigger className="h-14 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400 bg-card dark:bg-slate-900 shadow-sm text-base">
                   <SelectValue placeholder="Select your specific vehicle type" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-2 border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm">
+                <SelectContent className="rounded-xl border-2 border-gray-200 shadow-xl bg-card dark:bg-slate-900/95 backdrop-blur-sm">
                   {vehicleSubtypes.map((subtype) => (
                     <SelectItem
                       key={subtype}
@@ -157,7 +157,7 @@ const ServiceVehicleSelector = ({
           {selectedVehicleSubtype && (
             <form className="space-y-6 animate-fade-in">
               {/* Location Section */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-sm">
+              <div className="bg-card dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-sm">
                 <h5 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-red-500" />
                   Location Details
@@ -201,7 +201,7 @@ const ServiceVehicleSelector = ({
               </div>
 
               {/* Contact & Details Section */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-sm">
+              <div className="bg-card dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-sm">
                 <h5 className="text-lg font-semibold text-gray-800 mb-4">Contact & Additional Information</h5>
 
                 <div className="space-y-4">

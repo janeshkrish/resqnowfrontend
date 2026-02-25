@@ -163,15 +163,15 @@ const VehicleInfoStep = ({
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="mb-6">
-        <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-1 tracking-tight">Vehicle Details</h3>
-        <p className="text-sm font-medium text-slate-500">Tell us about your vehicle for personalized service</p>
+        <h3 className="text-xl md:text-2xl font-black text-foreground mb-1 tracking-tight">Vehicle Details</h3>
+        <p className="text-sm font-medium text-muted-foreground/80">Tell us about your vehicle for personalized service</p>
       </div>
 
       {garageVehicles.length > 0 && (
-        <Card className="p-4 border-slate-200 bg-white shadow-sm rounded-2xl mb-6">
+        <Card className="p-4 border-border bg-card dark:bg-slate-900 shadow-sm rounded-2xl mb-6">
           <Label className="text-xs uppercase font-bold tracking-widest text-slate-400 mb-2 block">Quick Select from Garage</Label>
           <Select onValueChange={handleGarageSelect}>
-            <SelectTrigger className="bg-white border-primary/20">
+            <SelectTrigger className="bg-card dark:bg-slate-900 border-primary/20">
               <SelectValue placeholder="Choose a saved vehicle..." />
             </SelectTrigger>
             <SelectContent>
@@ -201,24 +201,24 @@ const VehicleInfoStep = ({
                     "group relative flex flex-col items-center justify-center gap-3 p-5 transition-all duration-300 active:scale-95 border",
                     formData.vehicleType === type.id
                       ? "bg-slate-900 border-slate-900 shadow-[0_8px_16px_rgba(0,0,0,0.15)] rounded-[1.5rem]"
-                      : "bg-white border-slate-100/80 shadow-sm hover:border-slate-200 hover:shadow-md rounded-[1.5rem]"
+                      : "bg-card dark:bg-slate-900 border-border/80 shadow-sm hover:border-border hover:shadow-md rounded-[1.5rem]"
                   )}
                   onClick={() => handleVehicleTypeChange(type.id)}
                 >
                   <div className={cn(
                     "p-3.5 rounded-2xl transition-all duration-300",
-                    formData.vehicleType === type.id ? "bg-white/10 text-white shadow-inner" : "bg-slate-50 text-slate-400 group-hover:bg-slate-100 group-hover:text-slate-900"
+                    formData.vehicleType === type.id ? "bg-card dark:bg-slate-900/10 text-white shadow-inner" : "bg-muted text-slate-400 group-hover:bg-muted/50 group-hover:text-foreground"
                   )}>
                     <type.icon className="h-7 w-7" strokeWidth={formData.vehicleType === type.id ? 2.5 : 2} />
                   </div>
                   <span className={cn(
                     "text-xs md:text-sm font-bold text-center transition-colors duration-300",
-                    formData.vehicleType === type.id ? "text-white" : "text-slate-600 group-hover:text-slate-900"
+                    formData.vehicleType === type.id ? "text-white" : "text-muted-foreground group-hover:text-foreground"
                   )}>
                     {type.name}
                   </span>
                   {formData.vehicleType === type.id && (
-                    <div className="absolute top-3 right-3 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
+                    <div className="absolute top-3 right-3 w-4 h-4 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
                       <div className="w-1.5 h-1.5 bg-slate-900 rounded-full"></div>
                     </div>
                   )}
@@ -240,7 +240,7 @@ const VehicleInfoStep = ({
                       "flex items-center justify-center p-3.5 rounded-2xl border transition-all duration-300 active:scale-95",
                       formData.vehicleSubtype === subtype
                         ? "border-slate-900 bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.1)] text-white font-bold"
-                        : "border-slate-100/80 bg-white shadow-sm hover:border-slate-200 text-slate-600 font-semibold"
+                        : "border-border/80 bg-card dark:bg-slate-900 shadow-sm hover:border-border text-muted-foreground font-semibold"
                     )}
                     onClick={() => onVehicleSubtypeSelect(subtype)}
                   >
@@ -253,22 +253,22 @@ const VehicleInfoStep = ({
             </div>
             {formData.vehicleSubtype && (
               <div className="space-y-4 animate-in fade-in-50 duration-500">
-                <div className="bg-white rounded-[1.5rem] border border-slate-100/80 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] border border-border/80 shadow-sm overflow-hidden flex flex-col">
 
                   {/* Brand Selection */}
-                  <div className="p-4 border-b border-slate-100/60 relative">
+                  <div className="p-4 border-b border-border/60 relative">
                     <div className="flex items-center gap-2.5 mb-2">
                       <Label className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Make</Label>
                     </div>
                     <Select onValueChange={handleBrandChange} value={selectedBrand}>
-                      <SelectTrigger className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent font-bold text-slate-900 shadow-none hover:bg-transparent data-[state=open]:bg-transparent">
+                      <SelectTrigger className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent font-bold text-foreground shadow-none hover:bg-transparent data-[state=open]:bg-transparent">
                         <SelectValue placeholder="Select Brand (e.g. Toyota)" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
+                      <SelectContent className="rounded-2xl border-border shadow-xl max-h-[300px]">
                         {availableBrands.map((brand) => (
-                          <SelectItem key={brand.id} value={brand.id} className="py-3 px-4 focus:bg-slate-50 cursor-pointer">
+                          <SelectItem key={brand.id} value={brand.id} className="py-3 px-4 focus:bg-muted cursor-pointer">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-slate-100 shadow-sm">
+                              <div className="w-8 h-8 rounded-lg bg-card dark:bg-slate-900 flex items-center justify-center border border-border shadow-sm">
                                 <img
                                   src={getBrandLogoSrc(brand.logo)}
                                   alt={brand.name}
@@ -276,7 +276,7 @@ const VehicleInfoStep = ({
                                   onError={handleBrandLogoError}
                                 />
                               </div>
-                              <span className="font-bold text-slate-700">{brand.name}</span>
+                              <span className="font-bold text-muted-foreground">{brand.name}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -286,18 +286,18 @@ const VehicleInfoStep = ({
 
                   {/* Model Selection */}
                   {selectedBrand && (
-                    <div className="p-4 bg-slate-50/30 relative animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="p-4 bg-muted/30 relative animate-in fade-in slide-in-from-top-2 duration-300">
                       <div className="flex items-center gap-2.5 mb-2">
                         <Label className="text-[11px] uppercase font-bold tracking-widest text-slate-400">Model</Label>
                       </div>
                       <Select onValueChange={handleModelChange} value={formData.vehicleModel}>
-                        <SelectTrigger className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent font-bold text-slate-900 shadow-none hover:bg-transparent data-[state=open]:bg-transparent">
+                        <SelectTrigger className="h-10 text-base border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent font-bold text-foreground shadow-none hover:bg-transparent data-[state=open]:bg-transparent">
                           <SelectValue placeholder="Select Model (e.g. Fortuner)" />
                         </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-slate-100 shadow-xl max-h-[300px]">
+                        <SelectContent className="rounded-2xl border-border shadow-xl max-h-[300px]">
                           {availableModels.map((model) => (
-                            <SelectItem key={model} value={model} className="py-3 px-4 focus:bg-slate-50 cursor-pointer">
-                              <span className="font-bold text-slate-700 text-base">{model}</span>
+                            <SelectItem key={model} value={model} className="py-3 px-4 focus:bg-muted cursor-pointer">
+                              <span className="font-bold text-muted-foreground text-base">{model}</span>
                             </SelectItem>
                           ))}
                         </SelectContent>

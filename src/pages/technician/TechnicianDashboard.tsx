@@ -861,14 +861,14 @@ const TechnicianDashboard = () => {
 
         {/* Offline Warning Banner */}
         {!isOnline && !isBusy && (
-          <div onClick={() => handleToggleAvailability(true)} className="bg-white rounded-3xl p-4 flex items-center justify-between shadow-sm border border-slate-100 cursor-pointer active:scale-[0.98] transition-all">
+          <div onClick={() => handleToggleAvailability(true)} className="bg-card dark:bg-slate-900 rounded-3xl p-4 flex items-center justify-between shadow-sm border border-border cursor-pointer active:scale-[0.98] transition-all">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center border border-border">
                 <AlertCircle className="w-6 h-6 text-slate-400" />
               </div>
               <div className="flex flex-col">
-                <p className="font-bold text-slate-800 leading-tight mb-0.5">You are Offline</p>
-                <p className="text-[11px] text-slate-500 leading-snug">Tap to go online and get jobs</p>
+                <p className="font-bold text-foreground leading-tight mb-0.5">You are Offline</p>
+                <p className="text-[11px] text-muted-foreground/80 leading-snug">Tap to go online and get jobs</p>
               </div>
             </div>
             <div className="h-8 px-4 bg-green-50 text-green-700 rounded-full flex items-center justify-center font-bold text-xs uppercase tracking-wide border border-green-200">
@@ -879,11 +879,11 @@ const TechnicianDashboard = () => {
 
         {/* 1. MAP SECTION (NOW AT THE TOP) */}
         {!activeJob && (
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden relative">
+          <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-sm border border-border overflow-hidden relative">
             {/* Map Placeholder when no active job */}
             <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-[400]">
-              <div className="bg-white/90 backdrop-blur pb-1 pt-1.5 px-4 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-black text-slate-900 text-sm tracking-tight uppercase">Live Map</h3>
+              <div className="bg-card dark:bg-slate-900/90 backdrop-blur pb-1 pt-1.5 px-4 rounded-2xl shadow-sm border border-border">
+                <h3 className="font-black text-foreground text-sm tracking-tight uppercase">Live Map</h3>
               </div>
               {isOnline ? (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50/90 backdrop-blur rounded-full border border-green-100 shadow-sm">
@@ -891,9 +891,9 @@ const TechnicianDashboard = () => {
                   <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">Active</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur rounded-full border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-card dark:bg-slate-900/90 backdrop-blur rounded-full border border-border shadow-sm">
                   <span className="w-2 h-2 bg-slate-300 rounded-full" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Paused</span>
+                  <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest">Paused</span>
                 </div>
               )}
             </div>
@@ -903,8 +903,8 @@ const TechnicianDashboard = () => {
                 jobLocation={null}
               />
               {!isOnline && (
-                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[400] flex items-center justify-center">
-                  <div className="bg-white shadow-xl px-6 py-3 rounded-full border border-slate-200 font-bold text-sm text-slate-800 flex items-center gap-2">
+                <div className="absolute inset-0 bg-card dark:bg-slate-900/60 backdrop-blur-[2px] z-[400] flex items-center justify-center">
+                  <div className="bg-card dark:bg-slate-900 shadow-xl px-6 py-3 rounded-full border border-border font-bold text-sm text-foreground flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-slate-400" /> Map Paused
                   </div>
                 </div>
@@ -916,33 +916,33 @@ const TechnicianDashboard = () => {
         {/* 2. QUICK MENU GRID SECTION */}
         {!activeJob && (
           <div className="grid grid-cols-2 gap-3">
-            <Link to="/technician/earnings" className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
+            <Link to="/technician/earnings" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
               <div className="h-10 w-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-3 group-hover:scale-110 transition-transform">
                 <DollarSign className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Today</p>
-                <p className="text-xl font-black text-slate-800 leading-none">₹{stats.today}</p>
+                <p className="text-xl font-black text-foreground leading-none">₹{stats.today}</p>
               </div>
             </Link>
 
-            <Link to="/technician/history" className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
+            <Link to="/technician/history" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
               <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-3 group-hover:scale-110 transition-transform">
                 <Briefcase className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Total Jobs</p>
-                <p className="text-xl font-black text-slate-800 leading-none">{stats.jobs}</p>
+                <p className="text-xl font-black text-foreground leading-none">{stats.jobs}</p>
               </div>
             </Link>
 
-            <Link to="/technician/reviews" className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
+            <Link to="/technician/reviews" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
               <div className="h-10 w-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-3 group-hover:scale-110 transition-transform">
                 <Star className="w-5 h-5 fill-amber-500" />
               </div>
               <div>
                 <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Rating</p>
-                <p className="text-xl font-black text-slate-800 leading-none">
+                <p className="text-xl font-black text-foreground leading-none">
                   {Array.isArray(reviews) && reviews.length > 0 ? (reviews.reduce((acc, r) => acc + (r.rating || 0), 0) / reviews.length).toFixed(1) : "5.0"}
                 </p>
               </div>
@@ -960,8 +960,8 @@ const TechnicianDashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col justify-between opacity-70">
-                <div className="h-10 w-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mb-3">
+              <div className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between opacity-70">
+                <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center text-slate-400 mb-3">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
@@ -983,10 +983,10 @@ const TechnicianDashboard = () => {
 
         {/* ACTIVE JOB HERO CARD */}
         {activeJob ? (
-          <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-slate-100 relative mb-4">
+          <div className="bg-card dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-border relative mb-4">
 
             {/* Live Map Header */}
-            <div className="h-[220px] w-full relative bg-slate-100">
+            <div className="h-[220px] w-full relative bg-muted/50">
               <TechnicianJobMap
                 techLocation={currentLocation}
                 jobLocation={activeJob?.location && activeJob.location.lat != null && activeJob.location.lng != null ? { lat: Number(activeJob.location.lat), lng: Number(activeJob.location.lng) } : null}
@@ -995,9 +995,9 @@ const TechnicianDashboard = () => {
 
               {/* Floating Status Badge */}
               <div className="absolute top-4 left-4 z-[400]">
-                <div className="bg-white/95 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg border border-slate-100 flex items-center gap-2">
+                <div className="bg-card dark:bg-slate-900/95 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg border border-border flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-                  <span className="text-xs font-black tracking-widest text-slate-800 uppercase">
+                  <span className="text-xs font-black tracking-widest text-foreground uppercase">
                     {formatTechnicianStatus(activeJob.status)}
                   </span>
                 </div>
@@ -1013,11 +1013,11 @@ const TechnicianDashboard = () => {
 
             <div className="p-6">
               <div className="mb-6">
-                <h2 className="text-2xl font-black text-slate-900 mb-1 leading-tight tracking-tight">
+                <h2 className="text-2xl font-black text-foreground mb-1 leading-tight tracking-tight">
                   {activeJob.service_type?.replace(/-/g, " ")}
                 </h2>
-                <div className="flex items-start gap-2 text-slate-500 mt-2">
-                  <div className="mt-0.5 bg-slate-100 p-1 rounded-full text-slate-400">
+                <div className="flex items-start gap-2 text-muted-foreground/80 mt-2">
+                  <div className="mt-0.5 bg-muted/50 p-1 rounded-full text-slate-400">
                     <MapPin className="w-3.5 h-3.5" />
                   </div>
                   <p className="text-sm font-medium leading-snug line-clamp-2">
@@ -1027,43 +1027,43 @@ const TechnicianDashboard = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                <div className="bg-muted rounded-2xl p-3 border border-border flex items-center gap-3">
+                  <div className="w-10 h-10 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
                     <Navigation className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Dist</p>
-                    <p className="text-sm font-black text-slate-800 leading-none">{jobDistance !== null ? jobDistance.toFixed(1) : "--"} <span className="text-[10px] text-slate-500 font-semibold">km</span></p>
+                    <p className="text-sm font-black text-foreground leading-none">{jobDistance !== null ? jobDistance.toFixed(1) : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">km</span></p>
                   </div>
                 </div>
-                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                <div className="bg-muted rounded-2xl p-3 border border-border flex items-center gap-3">
+                  <div className="w-10 h-10 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
                     <span className="text-xs font-black text-indigo-600">ETA</span>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Time</p>
-                    <p className="text-sm font-black text-slate-800 leading-none">{etaMinutes !== null ? etaMinutes : "--"} <span className="text-[10px] text-slate-500 font-semibold">min</span></p>
+                    <p className="text-sm font-black text-foreground leading-none">{etaMinutes !== null ? etaMinutes : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">min</span></p>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6 border-t border-slate-100 pt-6">
+              <div className="grid grid-cols-2 gap-3 mb-6 border-t border-border pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 border border-slate-200">
+                  <div className="h-12 w-12 bg-muted/50 rounded-full flex items-center justify-center text-muted-foreground/80 border border-border">
                     <User className="w-5 h-5" />
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Client</p>
-                    <p className="font-bold text-slate-900 text-sm truncate">{activeJob.contact_name || "Guest"}</p>
+                    <p className="font-bold text-foreground text-sm truncate">{activeJob.contact_name || "Guest"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 border border-slate-200">
+                  <div className="h-12 w-12 bg-muted/50 rounded-full flex items-center justify-center text-muted-foreground/80 border border-border">
                     <Car className="w-5 h-5" />
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Vehicle</p>
-                    <p className="font-bold text-slate-900 text-sm truncate">{activeJob.vehicle_model || activeJob.vehicle_type}</p>
+                    <p className="font-bold text-foreground text-sm truncate">{activeJob.vehicle_model || activeJob.vehicle_type}</p>
                   </div>
                 </div>
               </div>
@@ -1072,10 +1072,10 @@ const TechnicianDashboard = () => {
               <div className="space-y-3">
                 {activeJob.status !== 'assigned' && activeJob.status !== 'paid' && (
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-white border-slate-200 text-slate-700 shadow-sm active:scale-95" asChild>
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" asChild>
                       <a href={`tel:${activeJob.contact_phone}`}><PhoneCall className="w-4 h-4 mr-2" /> <span className="font-bold">Call</span></a>
                     </Button>
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-white border-slate-200 text-slate-700 shadow-sm active:scale-95" onClick={openNavigation}>
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" onClick={openNavigation}>
                       <Navigation className="w-4 h-4 mr-2" /> <span className="font-bold">Nav</span>
                     </Button>
                   </div>

@@ -31,7 +31,7 @@ const TechnicianCard = ({ technician, isSelected, onSelect }: TechnicianCardProp
         "relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer active:scale-[0.98]",
         isSelected
           ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/20"
-          : "border-border/60 bg-white hover:border-primary/30 hover:shadow-sm"
+          : "border-border/60 bg-card dark:bg-slate-900 hover:border-primary/30 hover:shadow-sm"
       )}
       onClick={() => onSelect(technician.id)}
     >

@@ -90,13 +90,13 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                   </div>
 
                   {/* Title */}
-                  <span className="text-[11px] font-bold text-slate-800 leading-tight tracking-tight">
+                  <span className="text-[11px] font-bold text-foreground leading-tight tracking-tight">
                     {service.name}
                   </span>
                 </div>
               ) : (
                 // Original desktop card
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-primary/20 transition-all duration-300 hover:-translate-y-1">
+                <div className="bg-card dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-primary/20 transition-all duration-300 hover:-translate-y-1">
                   {/* Popular Badge */}
                   {index < 3 && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-primary to-accent px-2 py-1 rounded-full shadow-lg">
@@ -126,8 +126,8 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
             <div className="bg-gradient-to-r from-primary to-accent text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden max-w-2xl mx-auto">
               {/* Background Pattern */}
               <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-4 left-4 w-20 h-20 bg-white/20 rounded-full blur-xl"></div>
-                <div className="absolute bottom-4 right-4 w-16 h-16 bg-white/20 rounded-full blur-xl"></div>
+                <div className="absolute top-4 left-4 w-20 h-20 bg-card dark:bg-slate-900/20 rounded-full blur-xl"></div>
+                <div className="absolute bottom-4 right-4 w-16 h-16 bg-card dark:bg-slate-900/20 rounded-full blur-xl"></div>
               </div>
 
               <div className="relative z-10">
@@ -139,7 +139,7 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                 </p>
                 <Button
                   size="lg"
-                  className="bg-white text-primary hover:bg-white/90 font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 px-8"
+                  className="bg-card dark:bg-slate-900 text-primary hover:bg-card dark:bg-slate-900/90 font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 px-8"
                   asChild
                 >
                   <Link to="/emergency">

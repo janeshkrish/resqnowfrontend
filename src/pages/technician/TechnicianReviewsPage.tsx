@@ -81,7 +81,7 @@ const TechnicianReviewsPage = () => {
                 <Button variant="ghost" size="icon" asChild>
                     <Link to="/technician/dashboard"><ArrowLeft className="w-5 h-5" /></Link>
                 </Button>
-                <h1 className="text-2xl font-bold text-slate-800">Customer Reviews</h1>
+                <h1 className="text-2xl font-bold text-foreground">Customer Reviews</h1>
             </div>
 
             {loading ? (
@@ -93,12 +93,12 @@ const TechnicianReviewsPage = () => {
                 <>
                     <Card className="bg-amber-50 border-amber-100">
                         <CardContent className="p-6 flex items-center gap-4">
-                            <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+                            <div className="h-16 w-16 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
                                 <Star className="w-8 h-8 text-amber-400 fill-amber-400" />
                             </div>
                             <div>
-                                <div className="text-3xl font-bold text-slate-800">{averageRating}</div>
-                                <p className="text-slate-500 font-medium">Average Rating ({reviews.length} reviews)</p>
+                                <div className="text-3xl font-bold text-foreground">{averageRating}</div>
+                                <p className="text-muted-foreground/80 font-medium">Average Rating ({reviews.length} reviews)</p>
                             </div>
                         </CardContent>
                     </Card>

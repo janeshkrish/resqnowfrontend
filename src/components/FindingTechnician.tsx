@@ -12,7 +12,7 @@ const FindingTechnician = ({ vehicleType = 'car' }: FindingTechnicianProps) => {
     const VehicleIcon = isBike ? Bike : isCommercial ? Truck : Car;
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] md:min-h-[500px] w-full bg-white relative overflow-hidden rounded-3xl pb-10">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] md:min-h-[500px] w-full bg-card dark:bg-slate-900 relative overflow-hidden rounded-3xl pb-10">
 
             {/* Background Ambient Gradient */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,theme(colors.slate.50)_0%,theme(colors.white)_100%)] pointer-events-none" />
@@ -30,9 +30,9 @@ const FindingTechnician = ({ vehicleType = 'car' }: FindingTechnicianProps) => {
                 </div>
 
                 {/* Central Identity Puck */}
-                <div className="relative z-10 w-28 h-28 bg-white rounded-full shadow-[0_8px_30px_rgb(225,29,72,0.15)] flex items-center justify-center border border-slate-100">
-                    <div className="absolute inset-2 bg-slate-50 rounded-full flex items-center justify-center">
-                        <VehicleIcon className="w-10 h-10 text-slate-800" strokeWidth={1.5} />
+                <div className="relative z-10 w-28 h-28 bg-card dark:bg-slate-900 rounded-full shadow-[0_8px_30px_rgb(225,29,72,0.15)] flex items-center justify-center border border-border">
+                    <div className="absolute inset-2 bg-muted rounded-full flex items-center justify-center">
+                        <VehicleIcon className="w-10 h-10 text-foreground" strokeWidth={1.5} />
                     </div>
                     {/* Activity Dot */}
                     <div className="absolute top-2 right-2">
@@ -45,7 +45,7 @@ const FindingTechnician = ({ vehicleType = 'car' }: FindingTechnicianProps) => {
 
                 {/* Orbiting Element */}
                 <div className="absolute inset-0 w-full h-full animate-[spin_4s_linear_infinite]">
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white p-2 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.1)] border border-slate-100">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-card dark:bg-slate-900 p-2 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.1)] border border-border">
                         <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
                     </div>
                 </div>
@@ -53,9 +53,9 @@ const FindingTechnician = ({ vehicleType = 'car' }: FindingTechnicianProps) => {
 
             {/* Typography & Status Pill */}
             <div className="text-center z-10 space-y-4 px-6 relative w-full flex flex-col items-center">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Connecting to Partners</h3>
+                <h3 className="text-2xl font-black text-foreground tracking-tight">Connecting to Partners</h3>
 
-                <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)] py-2.5 px-5 rounded-full border border-slate-100">
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground bg-card dark:bg-slate-900 shadow-[0_2px_10px_rgba(0,0,0,0.06)] py-2.5 px-5 rounded-full border border-border">
                     <MapPin className="w-4 h-4 text-rose-500 animate-bounce" />
                     <span>Locating nearest experts...</span>
                 </div>

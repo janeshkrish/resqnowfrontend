@@ -252,7 +252,7 @@ const Subscription = () => {
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ideal For</p>
                       <div className="flex flex-wrap gap-2">
                         {(plan.idealFor || []).map((item, idx) => (
-                          <span key={idx} className="bg-white border border-gray-200 text-gray-700 text-xs px-2 py-1 rounded-md">
+                          <span key={idx} className="bg-card dark:bg-slate-900 border border-gray-200 text-gray-700 text-xs px-2 py-1 rounded-md">
                             {item}
                           </span>
                         ))}

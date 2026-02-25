@@ -139,13 +139,13 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
+          <h1 className="text-4xl font-black text-foreground tracking-tight mb-2">
             Welcome Back
           </h1>
-          <p className="text-slate-500 font-medium text-sm">Sign in to your ResQNow account</p>
+          <p className="text-muted-foreground/80 font-medium text-sm">Sign in to your ResQNow account</p>
         </div>
 
-        <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 relative overflow-hidden border border-slate-100/60">
+        <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 relative overflow-hidden border border-border/60">
           <div className="space-y-6">
             {error && (
               <Alert variant="destructive" className="animate-in fade-in-50">
@@ -157,7 +157,7 @@ const Login = () => {
             <Button
               type="button"
               variant="outline"
-              className="w-full h-14 bg-white border-2 border-slate-100 hover:bg-slate-50 hover:border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm transition-all active:scale-95"
+              className="w-full h-14 bg-card dark:bg-slate-900 border-2 border-border hover:bg-muted hover:border-border text-muted-foreground font-bold rounded-xl shadow-sm transition-all active:scale-95"
               onClick={handleGoogleLogin}
               disabled={isLoading}
             >
@@ -187,7 +187,7 @@ const Login = () => {
                 <Separator />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-slate-500 font-bold tracking-wider">Or continue with email</span>
+                <span className="bg-card dark:bg-slate-900 px-2 text-muted-foreground/80 font-bold tracking-wider">Or continue with email</span>
               </div>
             </div>
 
@@ -198,13 +198,13 @@ const Login = () => {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs uppercase tracking-widest text-slate-500 font-bold">Email</FormLabel>
+                      <FormLabel className="text-xs uppercase tracking-widest text-muted-foreground/80 font-bold">Email</FormLabel>
                       <FormControl>
                         <div className="relative mt-1">
                           <Mail className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                           <Input
                             placeholder="you@example.com"
-                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold"
+                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-border rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold"
                             {...field}
                           />
                         </div>
@@ -219,14 +219,14 @@ const Login = () => {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs uppercase tracking-widest text-slate-500 font-bold">Password</FormLabel>
+                      <FormLabel className="text-xs uppercase tracking-widest text-muted-foreground/80 font-bold">Password</FormLabel>
                       <FormControl>
                         <div className="relative mt-1">
                           <Lock className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                           <Input
                             type="password"
                             placeholder="••••••••"
-                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold tracking-widest"
+                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-border rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold tracking-widest"
                             {...field}
                           />
                         </div>
@@ -257,7 +257,7 @@ const Login = () => {
             </Form>
 
             <div className="text-center pt-2 space-y-2">
-              <p className="text-sm font-medium text-slate-500">
+              <p className="text-sm font-medium text-muted-foreground/80">
                 Don't have an account?{" "}
                 <Link to="/register" className="text-primary hover:text-primary/80 font-bold transition-colors">
                   Sign up

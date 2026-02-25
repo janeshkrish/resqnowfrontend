@@ -162,7 +162,7 @@ const Register = () => {
                           <User className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                           <Input
                             placeholder="John Doe"
-                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold"
+                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold text-slate-900 placeholder:text-slate-400"
                             {...field}
                           />
                         </div>
@@ -183,7 +183,7 @@ const Register = () => {
                           <Mail className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                           <Input
                             placeholder="you@example.com"
-                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold"
+                            className="pl-9 pr-0 h-12 bg-transparent border-0 border-b-2 border-slate-200 rounded-none focus-visible:ring-0 focus-visible:border-slate-800 transition-colors shadow-none text-base font-semibold text-slate-900 placeholder:text-slate-400"
                             {...field}
                           />
                         </div>

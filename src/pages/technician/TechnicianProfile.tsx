@@ -1,38 +1,61 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { useSocket } from "@/contexts/SocketContext";
+import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
-import { Loader2, User, MapPin, Phone, Briefcase, Star } from "lucide-react";
+import {
+    Loader2, User, MapPin, Phone, Briefcase, Star,
+    BarChart, Bell, Shield, Palette, LogOut, ChevronRight,
+    ArrowLeft, Sun, Moon, Globe, Mail, Smartphone
+} from "lucide-react";
+
+type ThemeMode = "light" | "dark" | "system";
 
 const TechnicianProfile = () => {
-    const { technician, isLoading } = useTechnicianAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const isMobile = useIsMobile();
+    const { technician, isLoading, logout } = useTechnicianAuth();
     const { socket } = useSocket();
+    const { theme, setTheme } = useTheme();
+
+    const activeTab = searchParams.get("tab") || (isMobile ? "menu" : "profile");
+
+    const handleTabChange = (id: string) => {
+        setSearchParams({ tab: id });
+    };
+
+    const sidebarItems = [
+        { id: "profile", label: "Profile", icon: User, description: "Personal info & service range" },
+        { id: "stats", label: "Stats & Specialties", icon: BarChart, description: "Your earnings & jobs" },
+        { id: "appearance", label: "Appearance", icon: Palette, description: "Theme & display" },
+        { id: "notifications", label: "Notifications", icon: Bell, description: "Email & push alerts" },
+        { id: "security", label: "Security", icon: Shield, description: "Password & app data" },
+    ];
+
     const [isSaving, setIsSaving] = useState(false);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [isFormInitialized, setIsFormInitialized] = useState(false);
     const [liveTechnician, setLiveTechnician] = useState<any | null>(null);
-    const [liveStats, setLiveStats] = useState({
-        completedJobs: 0,
-        totalEarnings: 0,
-        todayEarnings: 0
-    });
-    const [liveFinancials, setLiveFinancials] = useState({
-        total_earnings: 0,
-        pending_dues: 0
+    const [liveStats, setLiveStats] = useState({ completedJobs: 0, totalEarnings: 0 });
+    const [isFormInitialized, setIsFormInitialized] = useState(false);
+
+    // Profile Form
+    const [formData, setFormData] = useState({
+        name: "", phone: "", address: "", service_area_range: 10, experience: 0
     });
 
-    const [formData, setFormData] = useState({
-        name: "",
-        phone: "",
-        address: "",
-        service_area_range: 10,
-        experience: 0
+    // Settings
+    const [settingsState, setSettingsState] = useState({
+        appearance: { theme: "system" as ThemeMode },
+        notifications: { email_notifications: true, push_notifications: true }
     });
 
     const hydrateForm = useCallback((source: any) => {
@@ -45,24 +68,13 @@ const TechnicianProfile = () => {
         });
     }, []);
 
-    useEffect(() => {
-        if (technician && !isFormInitialized) {
-            hydrateForm(technician);
-            setIsFormInitialized(true);
-        }
-    }, [technician, isFormInitialized, hydrateForm]);
-
-    const fetchLiveData = useCallback(async (showRefreshState = false) => {
+    const fetchLiveData = useCallback(async () => {
         if (!technician?.id) return;
-        if (showRefreshState) {
-            setIsRefreshing(true);
-        }
-
         try {
-            const [meRes, statsRes, financialsRes] = await Promise.all([
+            const [meRes, statsRes, settingsRes] = await Promise.all([
                 apiFetch("/api/technicians/me", { technician: true }),
                 apiFetch("/api/technicians/dashboard-stats", { technician: true }),
-                apiFetch("/api/technicians/me/financials", { technician: true })
+                apiFetch("/api/technicians/me/settings", { technician: true }).catch(() => null)
             ]);
 
             if (meRes.ok) {
@@ -73,258 +85,348 @@ const TechnicianProfile = () => {
                     setIsFormInitialized(true);
                 }
             }
-
             if (statsRes.ok) {
-                const statsData = await statsRes.json();
+                const sData = await statsRes.json();
                 setLiveStats({
-                    completedJobs: Number(statsData?.completedJobs || 0),
-                    totalEarnings: Number(statsData?.totalEarnings || 0),
-                    todayEarnings: Number(statsData?.todayEarnings || 0)
+                    completedJobs: Number(sData?.completedJobs || 0),
+                    totalEarnings: Number(sData?.totalEarnings || 0)
                 });
             }
-
-            if (financialsRes.ok) {
-                const financialData = await financialsRes.json();
-                setLiveFinancials({
-                    total_earnings: Number(financialData?.total_earnings || 0),
-                    pending_dues: Number(financialData?.pending_dues || 0)
-                });
+            if (settingsRes && settingsRes.ok) {
+                const s = await settingsRes.json();
+                if (s) {
+                    setSettingsState(s);
+                    if (s.appearance?.theme) setTheme(s.appearance.theme);
+                }
             }
         } catch (error) {
-            console.error("Failed to refresh technician profile snapshot", error);
-        } finally {
-            if (showRefreshState) {
-                setIsRefreshing(false);
-            }
+            console.error("Fetch profile data error", error);
         }
-    }, [technician?.id, isFormInitialized, hydrateForm]);
+    }, [technician?.id, isFormInitialized, hydrateForm, setTheme]);
 
     useEffect(() => {
         if (!technician?.id) return;
-        fetchLiveData(true);
-        const intervalId = window.setInterval(() => fetchLiveData(false), 20000);
-        return () => window.clearInterval(intervalId);
+        fetchLiveData();
     }, [technician?.id, fetchLiveData]);
 
     useEffect(() => {
         if (!socket) return;
-
-        const handleStatsUpdate = (data: any) => {
-            if (!data) return;
-            setLiveStats((prev) => ({
-                completedJobs: Number(data?.completedJobs ?? prev.completedJobs ?? 0),
-                totalEarnings: Number(data?.totalEarnings ?? prev.totalEarnings ?? 0),
-                todayEarnings: Number(data?.todayEarnings ?? prev.todayEarnings ?? 0)
-            }));
-        };
-
-        const handleFinancialsUpdate = (data: any) => {
-            if (!data) return;
-            setLiveFinancials((prev) => ({
-                total_earnings: Number(data?.total_earnings ?? prev.total_earnings ?? 0),
-                pending_dues: Number(data?.pending_dues ?? prev.pending_dues ?? 0)
-            }));
-        };
-
-        const refreshAll = () => {
-            fetchLiveData(false);
-        };
-
-        socket.on("dashboard:stats_update", handleStatsUpdate);
-        socket.on("technician:financials_update", handleFinancialsUpdate);
-        socket.on("technician:new_review", refreshAll);
-
-        return () => {
-            socket.off("dashboard:stats_update", handleStatsUpdate);
-            socket.off("technician:financials_update", handleFinancialsUpdate);
-            socket.off("technician:new_review", refreshAll);
-        };
+        const handleStats = () => fetchLiveData();
+        socket.on("dashboard:stats_update", handleStats);
+        return () => { socket.off("dashboard:stats_update", handleStats); };
     }, [socket, fetchLiveData]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        const numericFields = new Set(["service_area_range", "experience"]);
+        const numeric = new Set(["service_area_range", "experience"]);
         setFormData((prev) => ({
-            ...prev,
-            [name]: numericFields.has(name) ? Number(value || 0) : value
+            ...prev, [name]: numeric.has(name) ? Number(value || 0) : value
         }));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleProfileSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {
             const res = await apiFetch("/api/technicians/me/profile", {
-                method: "PATCH",
-                body: JSON.stringify(formData),
-                technician: true
+                method: "PATCH", body: JSON.stringify(formData), technician: true
             });
-
             if (res.ok) {
-                toast.success("Profile updated successfully");
-                await fetchLiveData(true);
+                toast.success("Profile updated");
+                fetchLiveData();
             } else {
-                const err = await res.json();
-                toast.error(err.error || "Failed to update profile");
+                toast.error("Failed to update profile");
             }
         } catch (error) {
-            console.error(error);
             toast.error("An error occurred");
         } finally {
             setIsSaving(false);
         }
     };
 
+    const updateSettings = async (patch: any) => {
+        const prev = settingsState;
+        const next = { ...prev, ...patch, appearance: { ...prev.appearance, ...(patch.appearance || {}) }, notifications: { ...prev.notifications, ...(patch.notifications || {}) } };
+        setSettingsState(next);
+        if (patch.appearance?.theme) setTheme(patch.appearance.theme);
+
+        setIsSaving(true);
+        try {
+            await apiFetch("/api/technicians/me/settings", {
+                method: "PATCH", body: JSON.stringify(patch), technician: true
+            });
+        } catch (err) {
+            setSettingsState(prev);
+            toast.error("Failed to update settings");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     if (isLoading || !technician) {
-        return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+        return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-slate-400" /></div>;
     }
 
-    const profile = liveTechnician || technician;
-    const ratingValue = Number(profile?.rating ?? technician?.rating ?? 0);
-    const ratingLabel = Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue.toFixed(1) : "N/A";
-    const jobsDone = Number(liveStats.completedJobs || profile?.jobs_completed || technician?.jobs_completed || 0);
-    const totalEarnings = Number(
-        liveFinancials.total_earnings ||
-        liveStats.totalEarnings ||
-        profile?.total_earnings ||
-        technician?.total_earnings ||
-        0
-    );
+    const profileData = liveTechnician || technician;
+    const ratingLabel = Number(profileData?.rating || 0).toFixed(1);
 
-    return (
-        <div className="container max-w-4xl py-8 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
-                    <p className="text-muted-foreground">Manage your personal information and service details.</p>
-                </div>
-                <div className="bg-yellow-50 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium border border-yellow-200 flex items-center gap-1">
-                    {(isRefreshing || isSaving) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                    <span>Rating: {ratingLabel}</span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Account Status</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex justify-between items-center bg-secondary/50 p-3 rounded-lg">
-                                <span className="text-sm font-medium">Verification</span>
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded uppercase font-bold">
-                                    {profile?.verification_status || technician.verification_status}
-                                </span>
+    const renderContent = () => {
+        switch (activeTab) {
+            case "profile":
+                return (
+                    <form onSubmit={handleProfileSubmit} className="space-y-6">
+                        <div className="zomato-card space-y-4">
+                            <div className="pb-4 border-b border-gray-100">
+                                <h3 className="text-lg font-bold text-gray-900">Personal Details</h3>
+                                <p className="text-xs text-gray-500">Update your contact information.</p>
                             </div>
-                            <div className="flex justify-between items-center bg-secondary/50 p-3 rounded-lg">
-                                <span className="text-sm font-medium">Jobs Done</span>
-                                <span className="font-bold">{jobsDone}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-secondary/50 p-3 rounded-lg">
-                                <span className="text-sm font-medium">Total Earnings</span>
-                                <span className="font-bold text-green-600">Rs {totalEarnings.toFixed(2)}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Specialties</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-wrap gap-2">
-                                {(profile?.specialties || technician.specialties || []).map((spec: string) => (
-                                    <span key={spec} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full border border-blue-200">
-                                        {spec}
-                                    </span>
-                                ))}
-                                {(!(profile?.specialties || technician.specialties) || (profile?.specialties || technician.specialties || []).length === 0) && (
-                                    <span className="text-muted-foreground text-sm">No specialties listed</span>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="md:col-span-2">
-                    <form onSubmit={handleSubmit}>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Personal Details</CardTitle>
-                                <CardDescription>Update your contact information.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Full Name</Label>
-                                        <div className="relative">
-                                            <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            <Input id="name" name="name" className="pl-9" value={formData.name} onChange={handleChange} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Email Address</Label>
-                                        <Input id="email" value={profile?.email || technician.email} disabled className="bg-muted" />
-                                        <p className="text-[10px] text-muted-foreground">Email cannot be changed.</p>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="phone">Phone Number</Label>
-                                        <div className="relative">
-                                            <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            <Input id="phone" name="phone" className="pl-9" value={formData.phone} onChange={handleChange} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="experience">Years of Experience</Label>
-                                        <div className="relative">
-                                            <Briefcase className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            <Input type="number" id="experience" name="experience" className="pl-9" value={formData.experience} onChange={handleChange} />
-                                        </div>
-                                    </div>
-                                </div>
-
+                            <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="address">Base Address</Label>
+                                    <Label>Full Name</Label>
+                                    <div className="relative">
+                                        <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input name="name" className="pl-9" value={formData.name} onChange={handleProfileChange} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Email Address</Label>
+                                    <Input value={profileData?.email} disabled className="bg-muted text-muted-foreground" />
+                                    <p className="text-[10px] text-muted-foreground">Email cannot be changed.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Phone Number</Label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input name="phone" className="pl-9" value={formData.phone} onChange={handleProfileChange} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Base Address</Label>
                                     <div className="relative">
                                         <MapPin className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                                        <Input id="address" name="address" className="pl-9" value={formData.address} onChange={handleChange} />
+                                        <Input name="address" className="pl-9" value={formData.address} onChange={handleProfileChange} />
                                     </div>
-                                    <p className="text-xs text-muted-foreground">This is used as your central location for finding nearby jobs.</p>
                                 </div>
-
-                                <Separator className="my-4" />
-
                                 <div className="space-y-2">
-                                    <Label htmlFor="service_area_range">Service Range (km)</Label>
-                                    <div className="flex items-center gap-4">
-                                        <Input
-                                            type="number"
-                                            id="service_area_range"
-                                            name="service_area_range"
-                                            value={formData.service_area_range}
-                                            onChange={handleChange}
-                                            className="max-w-[150px]"
-                                        />
-                                        <span className="text-sm text-muted-foreground">
-                                            You will receive requests within this radius provided you are online.
-                                        </span>
-                                    </div>
+                                    <Label>Service Range (km)</Label>
+                                    <Input type="number" name="service_area_range" value={formData.service_area_range} onChange={handleProfileChange} />
                                 </div>
-                            </CardContent>
-                        </Card>
-
-                        <div className="flex justify-end mt-6">
-                            <Button type="submit" size="lg" disabled={isSaving}>
-                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save Changes
+                                <div className="space-y-2">
+                                    <Label>Experience (Years)</Label>
+                                    <Input type="number" name="experience" value={formData.experience} onChange={handleProfileChange} />
+                                </div>
+                            </div>
+                            <Button type="submit" className="w-full mt-4" disabled={isSaving}>
+                                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Save Changes
                             </Button>
                         </div>
                     </form>
+                );
+            case "stats":
+                return (
+                    <div className="space-y-6">
+                        <div className="zomato-card space-y-4">
+                            <div className="pb-4 border-b border-gray-100">
+                                <h3 className="text-lg font-bold text-gray-900">Account Status</h3>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                    <span className="text-sm font-bold text-slate-700">Verification</span>
+                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded uppercase font-bold">
+                                        {profileData?.verification_status || "Pending"}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                    <span className="text-sm font-bold text-slate-700">Jobs Done</span>
+                                    <span className="font-black text-slate-900">{liveStats.completedJobs || profileData?.jobs_completed || 0}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                    <span className="text-sm font-bold text-slate-700">Total Earnings</span>
+                                    <span className="font-black text-blue-700">Rs {(liveStats.totalEarnings || profileData?.total_earnings || 0).toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="zomato-card space-y-4">
+                            <div className="pb-4 border-b border-gray-100">
+                                <h3 className="text-lg font-bold text-gray-900">Specialties</h3>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {(profileData?.specialties || []).map((spec: string) => (
+                                    <span key={spec} className="bg-blue-50 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-full border border-blue-100">
+                                        {spec}
+                                    </span>
+                                ))}
+                                {(!profileData?.specialties || profileData.specialties.length === 0) && (
+                                    <span className="text-muted-foreground text-sm font-medium">No specialties listed</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            case "appearance":
+                return (
+                    <div className="zomato-card space-y-4">
+                        <div className="pb-4 border-b border-gray-100">
+                            <h3 className="text-lg font-bold text-gray-900">Appearance</h3>
+                            <p className="text-xs text-gray-500">Customize how the app looks.</p>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                            <Button variant={settingsState.appearance.theme === "light" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "light" } })} className="justify-start">
+                                <Sun className="w-4 h-4 mr-3" /> Light Mode
+                            </Button>
+                            <Button variant={settingsState.appearance.theme === "dark" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "dark" } })} className="justify-start">
+                                <Moon className="w-4 h-4 mr-3" /> Dark Mode
+                            </Button>
+                            <Button variant={settingsState.appearance.theme === "system" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "system" } })} className="justify-start">
+                                <Globe className="w-4 h-4 mr-3" /> System Default
+                            </Button>
+                        </div>
+                    </div>
+                );
+            case "notifications":
+                return (
+                    <div className="zomato-card space-y-4">
+                        <div className="pb-4 border-b border-gray-100">
+                            <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
+                            <p className="text-xs text-gray-500">Manage alerts and emails.</p>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold">Email Notifications</Label>
+                                    <p className="text-xs text-muted-foreground">Receive job summaries via email.</p>
+                                </div>
+                                <Switch checked={settingsState.notifications.email_notifications} onCheckedChange={(c) => updateSettings({ notifications: { email_notifications: c } })} />
+                            </div>
+                            <Separator />
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold">Push Notifications</Label>
+                                    <p className="text-xs text-muted-foreground">Instant alerts for new requests.</p>
+                                </div>
+                                <Switch checked={settingsState.notifications.push_notifications} onCheckedChange={(c) => updateSettings({ notifications: { push_notifications: c } })} />
+                            </div>
+                        </div>
+                    </div>
+                );
+            case "security":
+                return (
+                    <div className="zomato-card space-y-4">
+                        <div className="pb-4 border-b border-gray-100">
+                            <h3 className="text-lg font-bold text-gray-900">Security & Privacy</h3>
+                        </div>
+                        <div className="space-y-3">
+                            <Button variant="outline" className="w-full justify-start rounded-xl font-bold">Update Password</Button>
+                            <Button variant="outline" className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 rounded-xl font-bold" onClick={() => toast.success("Cache cleared")}>Clear App Data</Button>
+                        </div>
+                    </div>
+                );
+            default:
+                return null;
+        }
+    };
+
+    if (isMobile) {
+        if (activeTab === "menu") {
+            return (
+                <div className="min-h-screen bg-slate-50 pb-20 fade-in-0 animate-in duration-300">
+                    <div className="bg-white px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-slate-100 flex items-center gap-5">
+                        <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-slate-100 border-[3px] border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
+                            <User className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-2xl font-black text-slate-900 tracking-tight truncate">
+                                {profileData?.name || profileData?.email?.split('@')[0] || 'Technician'}
+                            </h2>
+                            <p className="text-sm font-semibold text-slate-500 truncate mb-2">{profileData?.email}</p>
+                            <div className="flex items-center gap-2">
+                                <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-yellow-200 flex items-center gap-1 w-fit">
+                                    <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" /> {ratingLabel}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="px-4 space-y-4">
+                        <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                            {sidebarItems.map((item, index) => {
+                                const isLast = index === sidebarItems.length - 1;
+                                return (
+                                    <div key={item.id}>
+                                        <button onClick={() => handleTabChange(item.id)} className="w-full text-left p-4 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100">
+                                                    <item.icon className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-slate-800">{item.label}</h3>
+                                                    <p className="text-[11px] font-medium text-slate-500">{item.description}</p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 text-slate-300" />
+                                        </button>
+                                        {!isLast && <Separator className="mx-4 w-auto bg-slate-100" />}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                            <button onClick={() => { logout(); navigate('/'); }} className="w-full text-left p-4 flex items-center justify-between hover:bg-red-50 active:bg-red-100 transition-colors">
+                                <div className="flex items-center gap-4 text-red-600">
+                                    <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                                        <LogOut className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="font-bold">Log out</h3>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-red-300" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const currentItem = sidebarItems.find(i => i.id === activeTab);
+        return (
+            <div className="min-h-screen bg-slate-50 pb-20 fade-in-0 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-slate-100 shadow-sm">
+                    <button onClick={() => handleTabChange('menu')} className="w-10 h-10 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition-all">
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h2 className="text-lg font-black text-slate-900 tracking-tight">{currentItem?.label || 'Profile'}</h2>
+                </div>
+                <div className="p-4">
+                    {renderContent()}
+                </div>
+            </div>
+        );
+    }
+
+    // Desktop View
+    return (
+        <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
+            <div className="space-y-6">
+                <div className="space-y-0.5">
+                    <h2 className="text-2xl font-bold tracking-tight text-gray-900">My Profile & Settings</h2>
+                    <p className="text-sm text-gray-500">Manage your technician account settings.</p>
+                </div>
+                <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-8 lg:space-x-12">
+                    <aside className="md:w-1/4 lg:w-1/5">
+                        <nav className="flex space-x-2 md:flex-col md:space-x-0 md:space-y-2 overflow-x-auto pb-2 scrollbar-hide">
+                            {sidebarItems.map((item) => (
+                                <Button key={item.id} variant={activeTab === item.id ? "default" : "ghost"} className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-slate-900 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"}`} onClick={() => handleTabChange(item.id)}>
+                                    <item.icon className="mr-2 h-4 w-4" /> {item.label}
+                                </Button>
+                            ))}
+                            <Separator className="my-4 hidden md:block" />
+                            <Button variant="ghost" className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50 hidden md:flex rounded-xl" onClick={() => { logout(); navigate('/'); }}>
+                                <LogOut className="mr-2 h-4 w-4" /> Log out
+                            </Button>
+                        </nav>
+                    </aside>
+                    <div className="flex-1 lg:max-w-3xl">
+                        {renderContent()}
+                    </div>
                 </div>
             </div>
         </div>

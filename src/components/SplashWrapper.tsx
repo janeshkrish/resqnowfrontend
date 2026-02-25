@@ -79,14 +79,13 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                         initial={{ y: -80, opacity: 0, scale: 0.5 }}
                                         animate={{ y: 0, opacity: 1, scale: 1 }}
                                         transition={{ duration: 0.8, delay: 0.5, type: "spring", bounce: 0.5 }}
-                                        className="relative z-10 flex items-center justify-center w-[1.1em] h-[1.1em] text-white bg-[#D32F2F] rounded-full drop-shadow-md"
-                                        style={{
-                                            borderBottomRightRadius: "4px",
-                                            transform: "rotate(45deg)",
-                                            marginTop: "-15px"
-                                        }}
+                                        className="relative z-10 flex items-center justify-center w-10 h-12 drop-shadow-md"
+                                        style={{ marginTop: "-12px", marginLeft: "2px" }}
                                     >
-                                        <span className="absolute block text-[0.8em]" style={{ transform: "rotate(-45deg)", marginTop: "1px", marginLeft: "2px" }}>Q</span>
+                                        <svg viewBox="0 0 24 24" fill="#D32F2F" className="absolute top-0 left-0 w-full h-full drop-shadow-[0_2px_4px_rgba(211,47,47,0.4)]">
+                                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                                        </svg>
+                                        <span className="relative z-20 text-white font-bold text-xl mb-3 pr-[1px]">Q</span>
                                     </motion.div>
                                     {/* Dual Radar Pulse Effect */}
                                     <motion.div

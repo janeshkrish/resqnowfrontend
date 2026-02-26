@@ -21,13 +21,20 @@ const MobileDashboard = () => {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // Chrome sometimes fires this before React mounts
+    if ((window as any).deferredPrompt) {
+      setDeferredPrompt((window as any).deferredPrompt);
+    }
+
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
+      (window as any).deferredPrompt = event;
     };
 
     const handleAppInstalled = () => {
       setDeferredPrompt(null);
+      (window as any).deferredPrompt = null;
       setIsStandalone(true);
     };
 

@@ -268,6 +268,20 @@ const AdminDashboardLayout = () => {
               <Settings className="w-5 h-5 mr-3" />
               {!isSidebarCollapsed && <span>Settings</span>}
             </Link>
+
+            {/* Extended Tools Link */}
+            <Link
+              to="/admin/extended/dashboard"
+              className={cn(
+                "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
+                isActive("/admin/extended")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Settings className="w-5 h-5 mr-3" />
+              {!isSidebarCollapsed && <span>Extended Tools</span>}
+            </Link>
           </div>
         </nav>
 

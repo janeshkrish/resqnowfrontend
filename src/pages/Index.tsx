@@ -63,7 +63,7 @@ const MobileDashboard = () => {
 
       if (!window.isSecureContext) {
         toast.error("Installation blocked: PWA requires HTTPS or localhost.", {
-            description: "If testing on a mobile device on your local network, you must use a secure tunnel or deploy to Netlify."
+          description: "If testing on a mobile device on your local network, you must use a secure tunnel or deploy to Netlify."
         });
         return;
       }
@@ -271,17 +271,20 @@ const Index = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-slate-50/50 dark:bg-slate-950">
       <Hero />
-      
-      {/* Services Section with slight grey background for contrast against white hero/howitworks */}
-      <div className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/40">
-        <div className="max-w-7xl mx-auto w-full">
+
+      {/* Services Section pulled up with negative margin to overlap Hero smoothly */}
+      <div className="relative z-20 -mt-12 sm:-mt-24 pb-8 md:pb-16 px-2 sm:px-0">
+        {/* Glowing glass backdrop blending into the page */}
+        <div className="absolute inset-x-0 top-0 bottom-12 bg-gradient-to-b from-white/90 via-slate-50/90 to-transparent dark:from-slate-900/95 dark:via-slate-950/90 dark:to-transparent backdrop-blur-2xl -z-10 rounded-t-[3rem] shadow-[0_-30px_60px_-15px_rgba(0,0,0,0.05)] border-t border-x border-white/60 dark:border-slate-800/60 transition-colors duration-500"></div>
+
+        <div className="max-w-7xl mx-auto w-full pt-8 sm:pt-12 drop-shadow-sm">
           <Services />
         </div>
       </div>
 
-      <div className="hidden md:block w-full border-b border-border/40">
+      <div className="hidden md:block w-full relative z-30 bg-transparent border-t border-border/40 drop-shadow-sm -mt-8">
         <Map />
       </div>
 
@@ -292,21 +295,21 @@ const Index = () => {
       </div>
 
       <div className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/40">
-         <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-            <VehicleTypes />
-         </div>
+        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+          <VehicleTypes />
+        </div>
       </div>
 
       <div className="bg-white dark:bg-card border-b border-border/40">
-         <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-            <Testimonials />
-         </div>
+        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+          <Testimonials />
+        </div>
       </div>
 
       <div className="bg-slate-50/50 dark:bg-slate-900/50 w-full pb-20">
-         <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-            <TechnicianCTA />
-         </div>
+        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+          <TechnicianCTA />
+        </div>
       </div>
     </div>
   );

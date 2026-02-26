@@ -62,11 +62,11 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                   {isMobile ? "Available 24/7 near you" : "From flat tires to complete breakdowns, our verified mechanics are ready to dispatch in minutes."}
                 </p>
               </div>
-              
+
               {!isMobile && (
-                 <Button variant="outline" className="hidden md:flex bg-white dark:bg-card rounded-2xl border-slate-200 dark:border-slate-800 py-6 px-6 font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800">
-                    View All Services <ArrowRight className="ml-2 w-4 h-4" />
-                 </Button>
+                <Button variant="outline" className="hidden md:flex bg-white dark:bg-card rounded-2xl border-slate-200 dark:border-slate-800 py-6 px-6 font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+                  View All Services <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
               )}
             </div>
           </div>
@@ -106,40 +106,43 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                   </span>
                 </div>
               ) : (
-                // Original desktop card updated to MNC standard
-                <div className="bg-white dark:bg-card rounded-[2rem] p-8 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800/60 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-2 hover:border-transparent dark:hover:border-transparent transition-all duration-300 relative overflow-hidden group/card">
-                  {/* Subtle hover gradient background */}
-                  <div className={`absolute inset-0 bg-gradient-to-br ${service.color} opacity-0 group-hover/card:opacity-[0.03] transition-opacity duration-500`}></div>
+                // Ultra-Modern Bento-Box Card
+                <div className="bg-white dark:bg-card rounded-[2.5rem] p-8 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.06)] border border-slate-100/80 dark:border-slate-800/60 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.12)] hover:-translate-y-2 dark:hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] hover:border-transparent dark:hover:border-transparent transition-all duration-500 relative overflow-hidden group/card isolate">
+                  {/* Sweep Background Gradient Effect */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${service.color} opacity-0 group-hover/card:opacity-[0.02] dark:group-hover/card:opacity-[0.05] transition-opacity duration-500`}></div>
+
+                  {/* Top-Right Glow */}
+                  <div className={`absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${service.color} opacity-0 group-hover/card:opacity-20 blur-2xl rounded-full transition-opacity duration-500`}></div>
 
                   {/* Popular Badge */}
                   {index < 3 && (
-                    <div className="absolute top-4 right-4 bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-1.5 rounded-full shadow-md z-10">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                    <div className="absolute top-5 right-5 bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-1.5 rounded-full shadow-[0_4px_12px_rgba(225,29,72,0.3)] z-10">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white">
                         Popular
                       </span>
                     </div>
                   )}
 
                   <div className="text-left relative z-10 flex flex-col h-full">
-                    {/* Icon Container - Premium Circle */}
-                    <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center mb-6 group-hover/card:scale-110 transition-transform duration-500 group-hover/card:shadow-sm">
-                      <service.icon className="h-7 w-7 text-slate-400 dark:text-slate-500 group-hover/card:text-primary transition-colors duration-300" />
+                    {/* Ultra-Modern Solid Color Circle Icon */}
+                    <div className={`w-14 h-14 rounded-[1.25rem] bg-gradient-to-br ${service.color} flex items-center justify-center mb-8 shadow-md group-hover/card:scale-110 group-hover/card:rotate-[-5deg] transition-all duration-500 group-hover/card:shadow-[0_8px_20px_rgba(0,0,0,0.15)]`}>
+                      <service.icon className="h-6 w-6 text-white drop-shadow-sm" />
                     </div>
-                    
+
                     <div>
-                      <h3 className="font-extrabold text-xl text-slate-800 dark:text-slate-100 mb-2 group-hover/card:text-primary transition-colors duration-300">
+                      <h3 className="font-black text-2xl text-slate-800 dark:text-slate-100 mb-2 group-hover/card:text-primary transition-colors duration-300 tracking-tight">
                         {service.name}
                       </h3>
-                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                         {service.description || "Professional 24/7 service by verified experts."}
                       </p>
                     </div>
 
-                    <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between opacity-0 group-hover/card:opacity-100 -translate-y-2 group-hover/card:translate-y-0 transition-all duration-300">
-                       <span className="text-sm font-bold text-primary">Book Now</span>
-                       <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center">
-                         <ArrowRight className="w-4 h-4 text-primary" />
-                       </div>
+                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between opacity-0 group-hover/card:opacity-100 -translate-y-4 group-hover/card:translate-y-0 transition-all duration-500">
+                      <span className="text-xs font-black uppercase tracking-wider text-primary">Book Now</span>
+                      <div className="w-10 h-10 rounded-[1rem] bg-slate-50 dark:bg-slate-800 group-hover/card:bg-primary flex items-center justify-center transition-colors duration-300">
+                        <ArrowRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover/card:text-white transition-colors" />
+                      </div>
                     </div>
                   </div>
                 </div>

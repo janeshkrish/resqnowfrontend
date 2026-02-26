@@ -2,6 +2,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnifiedServiceRequestFlow } from "@/hooks/useUnifiedServiceRequestFlow";
 import { Button } from "../ui/button";
+import { SlideButton } from "../ui/slide-button";
 import LocationStep from "../service-request/LocationStep";
 import PersonalInfoStep from "../service-request/PersonalInfoStep";
 import ProgressStepper from "../service-request/ProgressStepper";
@@ -150,38 +151,41 @@ const EVServiceRequest = () => {
                     Back
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (!canProceed()) {
-                      if (currentStep === 1) toast.error("Please complete vehicle details first");
-                      else if (currentStep === 2) toast.error("Please provide your location");
-                      else toast.error("Please complete your contact info");
-                      return;
-                    }
-                    if (currentStep === 3) submitRequest();
-                    else handleNext();
-                  }}
-                  disabled={isSubmitting}
-                  className={cn(
-                    "flex-1 py-6 text-base font-bold rounded-xl shadow-lg shadow-primary/25",
-                    "bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all",
-                    currentStep === 1 ? "w-full" : ""
-                  )}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : currentStep === 3 ? (
-                    "Find Technician"
-                  ) : (
-                    <>
-                      Continue <ChevronRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
+                {currentStep === 3 ? (
+                  <div className="flex-1">
+                    <SlideButton
+                      onSlideComplete={() => {
+                        if (!canProceed()) {
+                          toast.error("Please complete your contact info");
+                          return;
+                        }
+                        submitRequest();
+                      }}
+                      text="Slide to Find Technician"
+                      isSubmitting={isSubmitting}
+                    />
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!canProceed()) {
+                        if (currentStep === 1) toast.error("Please complete vehicle details first");
+                        else if (currentStep === 2) toast.error("Please provide your location");
+                        return;
+                      }
+                      handleNext();
+                    }}
+                    disabled={isSubmitting}
+                    className={cn(
+                      "flex-1 py-6 text-base font-bold rounded-xl shadow-lg shadow-primary/25",
+                      "bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 transition-all",
+                      currentStep === 1 ? "w-full" : ""
+                    )}
+                  >
+                    Continue <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
               </div>
             </div>
           )}

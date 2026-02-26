@@ -286,8 +286,11 @@ const Map = () => {
         <MapContainer
           center={mapCenter}
           zoom={13}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', zIndex: 0 }}
           zoomControl={false}
+          scrollWheelZoom={true}
+          dragging={true}
+          touchZoom={true}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -395,7 +398,7 @@ const Map = () => {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 bg-muted/50 rounded-b-[2rem]">
+        <div className="flex-1 bg-muted/50 rounded-b-[2rem] overflow-y-auto overscroll-contain pb-6 hide-scrollbar relative">
           <div className="p-4 space-y-3">
             {loadingTechnicians ? (
               <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-3">
@@ -487,7 +490,7 @@ const Map = () => {
               ))
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </div >
   );

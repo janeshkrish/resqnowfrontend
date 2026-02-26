@@ -65,10 +65,11 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
         <Dialog open={isOpen} onOpenChange={() => { }}>
             <DialogContent
                 className={cn(
-                    "fixed top-auto bottom-0 left-0 right-0 w-full sm:max-w-md mx-auto",
-                    "p-0 overflow-hidden border-t-0 bg-white dark:bg-zinc-950",
+                    "fixed top-auto bottom-0 left-0 right-0 w-full !max-w-full sm:!max-w-md sm:left-1/2 sm:-translate-x-1/2",
+                    "p-0 !m-0 overflow-hidden border-t-0 bg-white dark:bg-zinc-950",
                     "rounded-t-3xl rounded-b-none shadow-[0_-20px_50px_rgba(0,0,0,0.5)]",
                     "data-[state=closed]:slide-out-to-bottom-full data-[state=open]:slide-in-from-bottom-full duration-500",
+                    "transform-none sm:transform", // Override Shadcn default transform on mobile
                     "z-[200]" // Highly elevated
                 )}
                 autoFocus={false}

@@ -122,7 +122,7 @@ const BikeServiceRequest = () => {
               isMobile ? "translate-y-0 text-center" : "md:relative md:border-none md:shadow-none md:p-0 md:mt-8 md:translate-y-0"
             )}>
               <div className="flex gap-3 max-w-4xl mx-auto">
-                {currentStep > 1 && (
+                {currentStep === 2 && (
                   <Button
                     type="button"
                     variant="outline"

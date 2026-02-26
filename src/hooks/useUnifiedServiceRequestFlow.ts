@@ -231,6 +231,27 @@ export function useUnifiedServiceRequestFlow({
     }
   };
 
+  useEffect(() => {
+    // Initialize history state for the step if it doesn't exist
+    if (!window.history.state?.serviceStep) {
+      window.history.replaceState({ serviceStep: currentStep }, "");
+    } else if (window.history.state.serviceStep !== currentStep) {
+      window.history.replaceState({ serviceStep: currentStep }, "");
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      // If the user uses a native back swipe or Android back button
+      if (e.state && typeof e.state.serviceStep === "number") {
+        setCurrentStep(e.state.serviceStep);
+      } else {
+        // If they navigate back before step 1, we let the browser handle it (navigate away)
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [currentStep]);
+
   const handleNext = async () => {
     if (currentStep < 3) {
       if (currentStep === 2 && formData.location && (!formData.locationLat || !formData.locationLng)) {
@@ -243,14 +264,21 @@ export function useUnifiedServiceRequestFlow({
           }));
         }
       }
-      setCurrentStep((prev) => prev + 1);
+      const nextStep = currentStep + 1;
+      // Push history state so the mobile physical back button will pop back cleanly
+      window.history.pushState({ serviceStep: nextStep }, "");
+      setCurrentStep(nextStep);
       return;
     }
     await submitRequest();
   };
 
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
+    if (currentStep > 1) {
+      const prevStep = currentStep - 1;
+      setCurrentStep(prevStep);
+      window.history.replaceState({ serviceStep: prevStep }, "");
+    }
   };
 
   return {

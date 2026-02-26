@@ -1,16 +1,12 @@
-
 import React, { useEffect, useState } from "react";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Clock } from "lucide-react";
-import LiveTrackingMap from "@/components/user/LiveTrackingMap";
+import { SlideButton } from "@/components/ui/slide-button";
+import { MapPin, Zap, Bike, Car, Truck, Flame } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface JobRequest {
     id: string; // Job ID / Service Request ID
@@ -45,8 +41,6 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
                 setTimeLeft((prev) => {
                     if (prev <= 1) {
                         clearInterval(timer);
-                        // Auto reject if time runs out? 
-                        // Usually we just close the modal or let parent handle timeout.
                         return 0;
                     }
                     return prev - 1;
@@ -58,90 +52,105 @@ export function TechnicianJobModal({ job, isOpen, isProcessing = false, onAccept
 
     if (!job) return null;
 
+    const getVehicleIcon = (type: string) => {
+        switch (type.toLowerCase()) {
+            case 'bike': return <Bike className="w-8 h-8 text-white" />;
+            case 'car': return <Car className="w-8 h-8 text-white" />;
+            case 'commercial': return <Truck className="w-8 h-8 text-white" />;
+            default: return <Zap className="w-8 h-8 text-white" />;
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={() => { }}>
-            <DialogContent className="fixed top-auto bottom-0 left-0 right-0 w-full sm:max-w-md mx-auto translate-y-0 translate-x-0 data-[state=closed]:translate-y-full data-[state=open]:translate-y-0 rounded-t-3xl rounded-b-none p-0 overflow-hidden border-t border-border shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-transform duration-300" autoFocus={false} onPointerDownOutside={(e) => e.preventDefault()}>
-
-                {/* Header with Visual Timer */}
-                <div className="bg-red-600 p-6 text-white text-center relative overflow-hidden">
-                    <div className="relative z-10">
-                        <div className="inline-flex items-center gap-1.5 bg-red-700/50 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 backdrop-blur-md border border-red-500/50">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> Live Request
-                        </div>
-                        <h2 className="text-3xl font-black tracking-tight mb-2 drop-shadow-sm leading-none">New Job!</h2>
-                        <div className="flex items-center justify-center gap-1.5 text-red-100 font-medium">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Auto-rejects in <span className="text-white font-black text-lg">{timeLeft}s</span></span>
-                        </div>
-                    </div>
-                    {/* Background Ping Effect */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-card dark:bg-slate-900/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-                </div>
-
-                <div className="p-6 bg-card dark:bg-slate-900 space-y-6">
-                    {/* Price & Service Banner */}
-                    <div className="bg-muted border border-border rounded-2xl p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500" />
-                        <div className="pl-2">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">Service Required</p>
-                            <p className="font-black text-foreground text-xl capitalize leading-none mb-1">{job.serviceType}</p>
-                            <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block">{job.vehicleType}</span>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Est. Payout</p>
-                            <p className="font-black text-emerald-600 text-3xl leading-none tracking-tight">₹{job.amount}</p>
+            <DialogContent
+                className={cn(
+                    "fixed top-auto bottom-0 left-0 right-0 w-full sm:max-w-md mx-auto",
+                    "p-0 overflow-hidden border-t-0 bg-white dark:bg-zinc-950",
+                    "rounded-t-3xl rounded-b-none shadow-[0_-20px_50px_rgba(0,0,0,0.5)]",
+                    "data-[state=closed]:slide-out-to-bottom-full data-[state=open]:slide-in-from-bottom-full duration-500",
+                    "z-[200]" // Highly elevated
+                )}
+                autoFocus={false}
+                onPointerDownOutside={(e) => e.preventDefault()}
+            >
+                {/* Sunlight Visible Header Background */}
+                <div className="bg-primary w-full p-6 pb-12 relative overflow-hidden flex flex-col items-center justify-center">
+                    {/* Animated Pulse Rings behind the icon */}
+                    <div className="absolute top-10 left-1/2 -translate-x-1/2 flex items-center justify-center">
+                        <div className="absolute w-28 h-28 bg-white/20 rounded-full animate-ping" style={{ animationDuration: '2s' }} />
+                        <div className="absolute w-36 h-36 bg-white/10 rounded-full animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.2s' }} />
+                        <div className="relative z-10 w-20 h-20 bg-white/20 backdrop-blur-md border-[3px] border-white/50 rounded-full flex items-center justify-center shadow-2xl">
+                            {getVehicleIcon(job.vehicleType)}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-start gap-3">
-                            <div className="mt-1 h-8 w-8 bg-muted/50 rounded-full flex items-center justify-center shrink-0">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Location</p>
-                                <p className="font-bold text-foreground text-sm leading-snug line-clamp-2">{job.location.address}</p>
-                            </div>
+                    <div className="mt-28 text-center relative z-10 w-full">
+                        <div className="mb-3">
+                            <span className="bg-black/20 text-white text-[11px] font-black uppercase tracking-[0.2em] px-3.5 py-1.5 rounded-full backdrop-blur-md">
+                                New Request
+                            </span>
                         </div>
-                        <div className="flex flex-col gap-3 border-l border-border pl-4">
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Route Distance</p>
-                                <p className="font-bold text-foreground text-sm">{job.distance.toFixed(1)} km</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Customer ETA</p>
-                                <p className="font-bold text-foreground text-sm">~{(job.distance * 2 + 5).toFixed(0)} min</p>
-                            </div>
-                        </div>
+                        <h2 className="text-white font-black text-6xl tracking-tighter drop-shadow-md mb-2">
+                            ₹{job.amount}
+                        </h2>
+                        <p className="text-primary-foreground/90 text-sm font-semibold tracking-wide">Estimated Payout</p>
                     </div>
 
-                    {/* Map Preview */}
-                    <div className="h-32 rounded-2xl border border-border overflow-hidden relative shadow-inner">
-                        <LiveTrackingMap
-                            userLocation={{ lat: job.location.lat, lng: job.location.lng }}
-                            techLocation={null} // tech is current user, we can pass it if we have it, or just show user loc
-                            className="h-full w-full pointer-events-none"
+                    {/* Timer progress bar at the bottom of the header */}
+                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/20">
+                        <div
+                            className="h-full bg-white transition-all duration-1000 ease-linear"
+                            style={{ width: `${(timeLeft / 30) * 100}%` }}
                         />
-                        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
                     </div>
                 </div>
 
-                <div className="p-4 pt-0 bg-card dark:bg-slate-900 flex gap-3 pb-6">
-                    <Button
-                        variant="ghost"
-                        className="flex-1 h-14 rounded-2xl text-muted-foreground/80 hover:bg-muted hover:text-muted-foreground active:scale-95 text-lg font-bold transition-all"
-                        disabled={isProcessing}
-                        onClick={() => onReject(job.id)}
-                    >
-                        Decline
-                    </Button>
-                    <Button
-                        className="flex-[2] h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-[0_8px_20px_rgba(220,38,38,0.3)] active:scale-95 text-xl font-black tracking-wide transition-all"
-                        disabled={isProcessing}
-                        onClick={() => onAccept(job.id)}
-                    >
-                        {isProcessing ? "Accepting..." : "ACCEPT JOB"}
-                    </Button>
+                {/* Details Section */}
+                <div className="p-6 bg-white dark:bg-zinc-950 relative -mt-6 rounded-t-3xl shadow-[0_-10px_20px_rgba(0,0,0,0.1)]">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="text-2xl font-black text-zinc-900 dark:text-锌-100 capitalize leading-none mb-1.5">{job.serviceType}</h3>
+                            <p className="text-zinc-500 dark:text-zinc-400 font-medium">Auto-reject in {timeLeft}s</p>
+                        </div>
+                        <div className="text-right flex flex-col items-end">
+                            <div className="flex items-center gap-1.5 text-orange-600 font-bold bg-orange-50 dark:bg-orange-500/10 px-3 py-1.5 rounded-xl border border-orange-100">
+                                <Flame className="w-5 h-5 fill-current" />
+                                <span className="text-lg">{job.distance.toFixed(1)} km</span>
+                            </div>
+                            <p className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-wider">{(job.distance * 2 + 5).toFixed(0)} MINS AWAY</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 mb-8 shadow-sm">
+                        <div className="mt-0.5 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                            <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5">Pickup Location</p>
+                            <p className="text-[15px] font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug">
+                                {job.location.address}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="space-y-4 pb-2">
+                        <SlideButton
+                            onSlideComplete={() => onAccept(job.id)}
+                            text={isProcessing ? "Accepting..." : "Slide to Accept"}
+                            isSubmitting={isProcessing}
+                            className="shadow-[0_8px_30px_rgba(220,38,38,0.3)] !bg-primary"
+                        />
+                        <Button
+                            variant="ghost"
+                            className="w-full text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 font-bold h-12 rounded-xl transition-colors text-base"
+                            onClick={() => onReject(job.id)}
+                            disabled={isProcessing}
+                        >
+                            Reject Offer
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

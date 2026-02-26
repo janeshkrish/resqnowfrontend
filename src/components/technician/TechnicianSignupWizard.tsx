@@ -17,7 +17,8 @@ import { useNavigate } from "react-router-dom";
 import {
     Loader2, ArrowRight, Check, Car, MapPin, User, Wrench, CreditCard,
     Upload, Clock, Key, AlertTriangle, Truck, Zap,
-    CheckCircle2, ChevronRight, Fuel, ChevronLeft, Building2, Wallet
+    CheckCircle2, ChevronRight, Fuel, ChevronLeft, Building2, Wallet,
+    Globe, Briefcase, Smartphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -429,62 +430,85 @@ const TechnicianSignupWizard = () => {
             </div>
 
             <div className="pt-20 px-4 md:px-0 max-w-xl mx-auto">
+                <div className="mb-6 animate-in fade-in slide-in-from-bottom-2">
+                    <h1 className="text-3xl font-black text-foreground tracking-tight leading-tight">Apply to be a<br /><span className="text-primary">ResQNow Partner</span></h1>
+                    <p className="text-sm font-medium text-muted-foreground mt-2">Join our network of elite mobile mechanics and tow truck operators. Complete the form below to get started.</p>
+                </div>
                 <Form {...form}>
                     <form className="space-y-6">
 
                         {/* STEP 0: PERSONAL */}
                         {currentStep === 0 && (
-                            <div className="space-y-4 animate-in fade-in">
-                                <div className="space-y-3">
-                                    <FormField control={control} name="proprietor_name" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Your Name</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" placeholder="e.g. John Doe" /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={control} name="name" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Shop Name</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" placeholder="e.g. John's Garage" /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <FormField control={control} name="phone" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Mobile</FormLabel><FormControl><Input {...field} type="tel" className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={control} name="alternate_phone" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Aleternate (Opt)</FormLabel><FormControl><Input {...field} type="tel" className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
-                                        )} />
+                            <div className="space-y-6 animate-in fade-in">
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg">Contact Information</h3>
+                                        <p className="text-xs text-muted-foreground">Basic details for your profile.</p>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <FormField control={control} name="password" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Password</FormLabel><FormControl><Input {...field} type="password" className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
+                                    <div className="space-y-4">
+                                        <FormField control={control} name="proprietor_name" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Your Name</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="e.g. John Doe" /></FormControl><FormMessage /></FormItem>
                                         )} />
-                                        <FormField control={control} name="confirmPassword" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Confirm</FormLabel><FormControl><Input {...field} type="password" className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
+                                        <FormField control={control} name="name" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Shop Name</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="e.g. John's Garage" /></FormControl><FormMessage /></FormItem>
                                         )} />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <FormField control={control} name="phone" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Mobile Number</FormLabel><FormControl><Input {...field} type="tel" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                            <FormField control={control} name="alternate_phone" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Alt Mobile (Opt)</FormLabel><FormControl><Input {...field} type="tel" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                        </div>
+                                        <FormField control={control} name="email" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Email Address</FormLabel><FormControl><Input {...field} type="email" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="contact@example.com" /></FormControl></FormItem>
+                                        )} />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <FormField control={control} name="password" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Password</FormLabel><FormControl><Input {...field} type="password" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                            <FormField control={control} name="confirmPassword" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Confirm Password</FormLabel><FormControl><Input {...field} type="password" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                        </div>
                                     </div>
-                                    <FormField control={control} name="email" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Email (Optional)</FormLabel><FormControl><Input {...field} type="email" className="h-11 bg-card dark:bg-slate-900" /></FormControl></FormItem>
-                                    )} />
                                 </div>
 
-                                <Separator />
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50 flex items-center gap-2">
+                                        <MapPin className="w-5 h-5 text-primary" />
+                                        <div>
+                                            <h3 className="font-bold text-lg leading-tight">Operating Area</h3>
+                                            <p className="text-[11px] text-muted-foreground">Define your base location and service radius.</p>
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-4">
-                                    <LocationDetector onLocationDetected={handleLocationDetected} defaultLocation={watch("location")} />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <FormField control={control} name="location.city" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">City/Town</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" placeholder="Auto-detected" /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={control} name="location.state" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">State *</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" placeholder="Required" /></FormControl><FormMessage /></FormItem>
+                                    <div className="pt-2">
+                                        <LocationDetector onLocationDetected={handleLocationDetected} defaultLocation={watch("location")} />
+                                    </div>
+
+                                    <div className="space-y-4 pt-2">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <FormField control={control} name="location.city" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">City/Town</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Auto-detected" /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                            <FormField control={control} name="location.state" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">State *</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Required" /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                        </div>
+                                        <FormField control={control} name="location.address" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Full Address *</FormLabel><FormControl><Textarea {...field} placeholder="Shop Number, Street, Landmark" className="rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all min-h-[80px] resize-none" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                     </div>
-                                    <FormField control={control} name="location.address" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Full Address *</FormLabel><FormControl><Textarea {...field} placeholder="Shop Number, Street, Landmark" className="bg-card dark:bg-slate-900 min-h-[80px]" /></FormControl><FormMessage /></FormItem>
-                                    )} />
+                                </div>
 
-                                    <div className="rounded-xl border border-border bg-card dark:bg-slate-900 p-4 grid grid-cols-2 gap-4">
+                                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-900/20 rounded-[1.5rem] shadow-sm border border-indigo-100/50 dark:border-indigo-900/50 p-5">
+                                    <div className="grid grid-cols-2 gap-5">
                                         <FormField control={control} name="experience" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Experience (Yrs)</FormLabel><FormControl><Input {...field} type="number" className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-foreground/80 font-bold tracking-wider flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> Experience (Yrs)</FormLabel><FormControl><Input {...field} type="number" className="h-12 rounded-xl font-black text-lg bg-white/60 dark:bg-black/20 border-white/40 dark:border-white/10" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={control} name="serviceAreaRange" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Range (km)</FormLabel><FormControl><Input {...field} type="number" className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-foreground/80 font-bold tracking-wider flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Range (km)</FormLabel><FormControl><Input {...field} type="number" className="h-12 rounded-xl font-black text-lg bg-white/60 dark:bg-black/20 border-white/40 dark:border-white/10" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                     </div>
                                 </div>
@@ -494,30 +518,36 @@ const TechnicianSignupWizard = () => {
                         {/* STEP 1: SERVICES */}
                         {currentStep === 1 && (
                             <div className="space-y-6 animate-in fade-in">
-                                <div className="space-y-3">
-                                    <h3 className="font-bold text-foreground flex items-center gap-2"><Car className="w-5 h-5 text-primary" /> Vehicle Types *</h3>
-                                    {errors.vehicle_types && <p className="text-xs text-red-500 font-medium">Please select at least one vehicle type.</p>}
-                                    <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg flex items-center gap-2"><Car className="w-5 h-5 text-primary" /> Vehicle Types *</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Select the vehicles you service.</p>
+                                    </div>
+                                    {errors.vehicle_types && <p className="text-xs text-red-500 font-medium bg-red-50 p-2 rounded">Please select at least one vehicle type.</p>}
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
                                         {VEHICLES.map(v => (
                                             <FormField key={v.id} control={control} name={`vehicle_types.${v.id}` as any} render={({ field }) => (
-                                                <FormItem className={cn("border rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all relative overflow-hidden", field.value ? "border-primary bg-primary/5" : "border-border bg-card dark:bg-slate-900")} onClick={() => { field.onChange(!field.value); trigger("vehicle_types"); }}>
+                                                <FormItem className={cn("border rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all relative overflow-hidden", field.value ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-muted/30 hover:bg-muted/60")} onClick={() => { field.onChange(!field.value); trigger("vehicle_types"); }}>
                                                     {field.value ? (
-                                                        <div className="bg-primary text-white rounded flex items-center justify-center w-5 h-5 shrink-0"><Check className="w-3.5 h-3.5" /></div>
+                                                        <div className="bg-primary text-white rounded flex items-center justify-center w-5 h-5 shrink-0 shadow-sm"><Check className="w-3.5 h-3.5" /></div>
                                                     ) : (
                                                         <div className="border-2 border-slate-300 rounded w-5 h-5 shrink-0" />
                                                     )}
-                                                    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", field.value ? "bg-primary text-white" : "bg-muted/50 text-slate-400")}><v.icon className="w-4 h-4" /></div>
-                                                    <div className="font-semibold text-sm leading-tight">{v.label}</div>
+                                                    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", field.value ? "bg-primary text-white shadow-sm" : "bg-muted text-slate-400")}><v.icon className="w-4 h-4" /></div>
+                                                    <div className="font-semibold text-sm leading-tight text-foreground">{v.label}</div>
                                                 </FormItem>
                                             )} />
                                         ))}
                                     </div>
                                 </div>
-                                <Separator />
-                                <div className="space-y-3">
-                                    <h3 className="font-bold text-foreground flex items-center gap-2"><Wrench className="w-5 h-5 text-primary" /> Services Offered *</h3>
-                                    {errors.specialties && <p className="text-xs text-red-500 font-medium">Please select at least one service.</p>}
-                                    <div className="grid grid-cols-3 gap-2">
+
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg flex items-center gap-2"><Wrench className="w-5 h-5 text-primary" /> Services Offered *</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Choose the specific services you provide.</p>
+                                    </div>
+                                    {errors.specialties && <p className="text-xs text-red-500 font-medium bg-red-50 p-2 rounded">Please select at least one service.</p>}
+                                    <div className="grid grid-cols-3 gap-2 pt-2">
                                         {ALL_SERVICES.map(s => {
                                             const isSelected = selectedServices?.includes(s.id);
                                             return (
@@ -525,12 +555,12 @@ const TechnicianSignupWizard = () => {
                                                     const c = selectedServices || [];
                                                     setValue("specialties", c.includes(s.id) ? c.filter((x: string) => x !== s.id) : [...c, s.id], { shouldValidate: true });
                                                 }}
-                                                    className={cn("flex flex-col items-center justify-between p-2 rounded-xl border text-center h-28 transition-all active:scale-95 relative", isSelected ? "border-primary bg-primary/5 text-primary" : "border-border bg-card dark:bg-slate-900 text-muted-foreground/80")}>
+                                                    className={cn("flex flex-col items-center justify-between p-2 rounded-xl border text-center h-28 transition-all active:scale-95 relative", isSelected ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-muted/30 hover:bg-muted/60 text-muted-foreground/80")}>
                                                     <div className="absolute top-2 right-2">
                                                         {isSelected ? (
-                                                            <div className="bg-primary text-white rounded flex items-center justify-center w-4 h-4"><Check className="w-3 h-3" /></div>
+                                                            <div className="bg-primary text-white rounded flex items-center justify-center w-4 h-4 shadow-sm"><Check className="w-3 h-3" /></div>
                                                         ) : (
-                                                            <div className="border-2 border-border rounded w-4 h-4" />
+                                                            <div className="border-2 border-border/70 rounded w-4 h-4" />
                                                         )}
                                                     </div>
                                                     <div className="flex-1 flex items-center justify-center pt-2"><s.icon className="w-6 h-6" /></div>
@@ -545,104 +575,176 @@ const TechnicianSignupWizard = () => {
 
                         {/* STEP 2: DOCS */}
                         {currentStep === 2 && (
-                            <div className="space-y-4 animate-in fade-in">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <FormField control={control} name="documents.garage_front" render={({ field }) => <ImageUpload label="Shop Front" value={field.value} onChange={field.onChange} />} />
-                                    <FormField control={control} name="documents.profile_photo" render={({ field }) => <ImageUpload label="Profile Photo" value={field.value} onChange={field.onChange} />} />
-                                    <FormField control={control} name="documents.tools_photo" render={({ field }) => <ImageUpload label="Tools / Bay" value={field.value} onChange={field.onChange} />} />
-                                    <FormField control={control} name="documents.facilities_photo" render={({ field }) => <ImageUpload label="Facilities" value={field.value} onChange={field.onChange} />} />
+                            <div className="space-y-6 animate-in fade-in">
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg">Identity Verification</h3>
+                                        <p className="text-xs text-muted-foreground">Required for onboarding.</p>
+                                    </div>
+                                    <div className="space-y-4 pt-2">
+                                        <FormField control={control} name="aadhaar_number" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Aadhaar Number *</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono" maxLength={12} placeholder="12-digit Aadhaar" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={control} name="gst_number" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">GSTIN (Optional)</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono uppercase" placeholder="GST Number" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                    </div>
                                 </div>
-                                <FormField control={control} name="aadhaar_number" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground/80">Aadhaar Number</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" maxLength={12} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={control} name="gst_number" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground/80">GSTIN (Optional)</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" /></FormControl><FormMessage /></FormItem>
-                                )} />
+
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg">Shop Photos</h3>
+                                        <p className="text-xs text-muted-foreground">Upload images of your garage/setup.</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <FormField control={control} name="documents.garage_front" render={({ field }) => <ImageUpload label="Shop Front" value={field.value} onChange={field.onChange} />} />
+                                        <FormField control={control} name="documents.profile_photo" render={({ field }) => <ImageUpload label="Profile Photo" value={field.value} onChange={field.onChange} />} />
+                                        <FormField control={control} name="documents.tools_photo" render={({ field }) => <ImageUpload label="Tools / Bay" value={field.value} onChange={field.onChange} />} />
+                                        <FormField control={control} name="documents.facilities_photo" render={({ field }) => <ImageUpload label="Facilities" value={field.value} onChange={field.onChange} />} />
+                                    </div>
+                                </div>
                             </div>
                         )}
 
                         {/* STEP 3: OPERATIONS */}
                         {currentStep === 3 && (
                             <div className="space-y-6 animate-in fade-in">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <FormField control={control} name="working_hours.opening_time" render={({ field }) => (<FormItem><FormLabel>Open</FormLabel><FormControl><Input type="time" {...field} className="h-11 bg-card dark:bg-slate-900" /></FormControl></FormItem>)} />
-                                    <FormField control={control} name="working_hours.closing_time" render={({ field }) => (<FormItem><FormLabel>Close</FormLabel><FormControl><Input type="time" {...field} className="h-11 bg-card dark:bg-slate-900" /></FormControl></FormItem>)} />
-                                </div>
-                                <FormField control={control} name="working_hours.weekly_off" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Weekly Off</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl><SelectTrigger className="h-11 bg-card dark:bg-slate-900"><SelectValue placeholder="Select Day" /></SelectTrigger></FormControl>
-                                            <SelectContent>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                                        </Select>
-                                    </FormItem>
-                                )} />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <FormField control={control} name="working_hours.is_24x7" render={({ field }) => (
-                                        <FormItem className="flex items-center gap-3 p-3 bg-card dark:bg-slate-900 rounded-xl border">
-                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} className="w-5 h-5" />
-                                            <span className="text-sm font-medium">24/7 Service</span>
-                                        </FormItem>
-                                    )} />
-                                    <FormField control={control} name="app_readiness.preferred_language" render={({ field }) => (
-                                        <FormItem>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger className="h-12 bg-card dark:bg-slate-900 border-0 shadow-none p-0 px-2"><div className="flex items-center gap-2"><span className="text-xs uppercase text-muted-foreground/80 font-bold">Lang:</span> <SelectValue /></div></SelectTrigger></FormControl>
-                                                <SelectContent><SelectItem value="English">English</SelectItem><SelectItem value="Tamil">Tamil</SelectItem><SelectItem value="Hindi">Hindi</SelectItem></SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )} />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* STEP 4: PRICING - RESTORED LOGIC */}
-                        {currentStep === 4 && (
-                            <div className="space-y-4 animate-in fade-in">
-                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-xs text-yellow-800">
-                                    Set your <strong>base prices</strong> below. You can adjust final price after inspecting vehicle.
-                                </div>
-                                {selectedServices.map((s, i) => <ServiceConfigCard key={s} serviceName={s} index={i} register={register} watch={watch} setValue={setValue} />)}
-                            </div>
-                        )}
-
-                        {/* STEP 5: BANKING - RESTORED FIELDS */}
-                        {currentStep === 5 && (
-                            <div className="space-y-6 animate-in fade-in">
-                                <FormField control={control} name="payment_details.upi_id" render={({ field }) => (
-                                    <FormItem><FormLabel>UPI ID</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" placeholder="e.g. number@upi" /></FormControl></FormItem>
-                                )} />
-
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-foreground font-bold border-b pb-2"><Building2 className="w-4 h-4" /> Bank Details (For Payouts)</div>
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <FormField control={control} name="payment_details.bank_name" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Bank Name</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" /></FormControl></FormItem>
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Working Hours</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Set your standard availability.</p>
+                                    </div>
+                                    <div className="space-y-4 pt-2">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField control={control} name="working_hours.opening_time" render={({ field }) => (<FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Open</FormLabel><FormControl><Input type="time" {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl></FormItem>)} />
+                                            <FormField control={control} name="working_hours.closing_time" render={({ field }) => (<FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Close</FormLabel><FormControl><Input type="time" {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl></FormItem>)} />
+                                        </div>
+                                        <FormField control={control} name="working_hours.weekly_off" render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Weekly Off</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all"><SelectValue placeholder="Select Day" /></SelectTrigger></FormControl>
+                                                    <SelectContent>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            </FormItem>
                                         )} />
-                                        <FormField control={control} name="payment_details.bank_account_number" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">Account Number</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" type="password" /></FormControl></FormItem>
-                                        )} />
-                                        <FormField control={control} name="payment_details.ifsc_code" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs uppercase text-muted-foreground/80 font-bold">IFSC Code</FormLabel><FormControl><Input {...field} className="h-11 bg-card dark:bg-slate-900" /></FormControl></FormItem>
+                                        <div className="pt-2">
+                                            <FormField control={control} name="working_hours.is_24x7" render={({ field }) => (
+                                                <FormItem className={cn("flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer", field.value ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card dark:bg-slate-900")} onClick={() => field.onChange(!field.value)}>
+                                                    {field.value ? (
+                                                        <div className="bg-primary text-white rounded flex items-center justify-center w-5 h-5 shrink-0"><Check className="w-3.5 h-3.5" /></div>
+                                                    ) : (
+                                                        <div className="border-2 border-slate-300 rounded w-5 h-5 shrink-0" />
+                                                    )}
+                                                    <span className="text-sm font-bold text-foreground">I am available 24/7</span>
+                                                </FormItem>
+                                            )} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg flex items-center gap-2"><Smartphone className="w-5 h-5 text-primary" /> Application Usage</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Preferences for the ResQNow Partner App.</p>
+                                    </div>
+                                    <div className="pt-2">
+                                        <FormField control={control} name="app_readiness.preferred_language" render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Preferred Language</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-bold"><SelectValue /></SelectTrigger></FormControl>
+                                                    <SelectContent><SelectItem value="English">English</SelectItem><SelectItem value="Tamil">Tamil</SelectItem><SelectItem value="Hindi">Hindi</SelectItem></SelectContent>
+                                                </Select>
+                                            </FormItem>
                                         )} />
                                     </div>
                                 </div>
                             </div>
                         )}
 
+                        {/* STEP 4: PRICING */}
+                        {currentStep === 4 && (
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-900/20 p-4 rounded-[1.5rem] border border-amber-200 dark:border-amber-900/50 flex items-start gap-3 shadow-sm">
+                                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full shrink-0"><AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>
+                                    <div>
+                                        <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Base Pricing Config</h4>
+                                        <p className="text-xs text-amber-800/80 dark:text-amber-400/80 mt-0.5 leading-relaxed">Set your standard base prices. We know every job is different; you can adjust the final price after physically inspecting the vehicle.</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    {selectedServices.map((s, i) => <div className="[&>div]:rounded-[1.5rem] [&>div]:shadow-sm [&>div]:border-border/60 [&_input]:h-11 [&_input]:rounded-lg [&_input]:bg-muted/50 [&_input]:border-transparent [&_input:focus]:border-primary" key={s}><ServiceConfigCard serviceName={s} index={i} register={register} watch={watch} setValue={setValue} /></div>)}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* STEP 5: BANKING */}
+                        {currentStep === 5 && (
+                            <div className="space-y-6 animate-in fade-in">
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50">
+                                        <h3 className="font-bold text-lg flex items-center gap-2"><Wallet className="w-5 h-5 text-primary" /> Fastest Payout</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Receive earnings directly to your UPI.</p>
+                                    </div>
+                                    <div className="pt-2">
+                                        <FormField control={control} name="payment_details.upi_id" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">UPI ID</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono" placeholder="e.g. number@upi" /></FormControl></FormItem>
+                                        )} />
+                                    </div>
+                                </div>
+
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50 flex items-center gap-2 text-foreground">
+                                        <Building2 className="w-5 h-5 text-primary" />
+                                        <div>
+                                            <h3 className="font-bold text-lg">Bank Details</h3>
+                                            <p className="text-xs text-muted-foreground mt-1">Alternative payout method.</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4 pt-2">
+                                        <FormField control={control} name="payment_details.bank_name" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Bank Name</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl></FormItem>
+                                        )} />
+                                        <FormField control={control} name="payment_details.bank_account_number" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Account Number</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono" type="password" /></FormControl></FormItem>
+                                        )} />
+                                        <FormField control={control} name="payment_details.ifsc_code" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">IFSC Code</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono uppercase" /></FormControl></FormItem>
+                                        )} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* STEP 6: FINISH */}
                         {currentStep === 6 && (
-                            <div className="text-center py-10 space-y-6">
-                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto animate-bounce"><Check className="w-10 h-10" /></div>
-                                <h2 className="text-2xl font-bold">Application Ready</h2>
-                                <p className="text-muted-foreground/80">By clicking submit, you agree to our Partner Terms & Conditions.</p>
-                                <FormField control={control} name="consent.agreed" render={({ field }) => (
-                                    <FormItem className="flex items-center justify-center gap-2">
-                                        <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                                        <FormLabel className="pb-0">I Agree to Terms</FormLabel>
-                                    </FormItem>
-                                )} />
+                            <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-lg border border-border/60 p-8 text-center space-y-8 animate-in zoom-in-95 duration-500">
+                                <div className="relative w-28 h-28 mx-auto">
+                                    <div className="absolute inset-0 bg-green-500 blur-[30px] opacity-20 rounded-full animate-pulse"></div>
+                                    <div className="relative w-full h-full bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-xl shadow-green-500/20 ring-8 ring-green-50 dark:ring-green-950/30">
+                                        <Check className="w-12 h-12 text-white" strokeWidth={3} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h2 className="text-3xl font-black text-foreground drop-shadow-sm mb-2">Ready to Launch</h2>
+                                    <p className="text-sm font-medium text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
+                                        You are one step away from joining the fastest growing roadside assistance network.
+                                    </p>
+                                </div>
+                                <div className="bg-muted/50 p-4 rounded-2xl border border-border/50 text-left">
+                                    <FormField control={control} name="consent.agreed" render={({ field }) => (
+                                        <FormItem className="flex items-start gap-4">
+                                            <FormControl>
+                                                <Checkbox checked={field.value} onCheckedChange={field.onChange} className="w-5 h-5 mt-0.5" />
+                                            </FormControl>
+                                            <div className="space-y-1">
+                                                <FormLabel className="font-bold text-sm text-foreground">I agree to the Terms</FormLabel>
+                                                <p className="text-[10px] text-muted-foreground leading-normal">By checking this box, I confirm all provided details are accurate and agree to the ResQNow Partner Platform conditions and background verification processes.</p>
+                                            </div>
+                                        </FormItem>
+                                    )} />
+                                </div>
                             </div>
                         )}
 

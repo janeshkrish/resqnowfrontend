@@ -408,9 +408,8 @@ const RequestTracking = () => {
           </Badge>
         </div>
 
-        {/* 3. Bottom Sheet / Card for Details */}
         {/* 3. Floating Bottom Card for Details */}
-        <div className="absolute inset-x-4 bottom-4 z-[500] bg-white dark:bg-zinc-950 rounded-[2rem] shadow-[0_-5px_40px_rgba(0,0,0,0.12)] border border-border flex flex-col max-h-[60dvh] overflow-hidden">
+        <div className="absolute inset-x-4 bottom-4 z-40 bg-white dark:bg-zinc-950 rounded-[2rem] shadow-[0_-5px_40px_rgba(0,0,0,0.12)] border border-border flex flex-col max-h-[60dvh] overflow-hidden">
           {/* Green Guarantee Banner */}
           <div className="bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3 border-b border-emerald-100 dark:border-emerald-900/50 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">

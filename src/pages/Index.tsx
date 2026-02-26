@@ -61,6 +61,13 @@ const MobileDashboard = () => {
         return;
       }
 
+      if (!window.isSecureContext) {
+        toast.error("Installation blocked: PWA requires HTTPS or localhost.", {
+            description: "If testing on a mobile device on your local network, you must use a secure tunnel or deploy to Netlify."
+        });
+        return;
+      }
+
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
       if (isIOS) {
         toast("Install ResQNow on iOS", {

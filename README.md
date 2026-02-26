@@ -4,20 +4,20 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 
 ## 🚀 Key Features
 
-*   **Smart Dispatch System:** Automatically finds the nearest and best-rated technicians using Google Maps Distance Matrix.
-*   **Real-time Tracking:** Live GPS tracking of technicians and users with route visualization.
-*   **Secure Authentication:** Google OAuth and email-based login (JWT) for users and technicians.
-*   **Technician Dashboard:** Comprehensive tools for managing jobs, earnings, and availability.
-*   **Admin Console:** Manage technicians, users, and service categories.
-*   **Payment Integration:** Razorpay integration for seamless service payments.
+- **Smart Dispatch System:** Automatically finds the nearest and best-rated technicians using Google Maps Distance Matrix.
+- **Real-time Tracking:** Live GPS tracking of technicians and users with route visualization.
+- **Secure Authentication:** Google OAuth and email-based login (JWT) for users and technicians.
+- **Technician Dashboard:** Comprehensive tools for managing jobs, earnings, and availability.
+- **Admin Console:** Manage technicians, users, and service categories.
+- **Payment Integration:** Razorpay integration for seamless service payments.
 
 ## 🛠️ Technology Stack
 
-*   **Frontend:** React (Vite), TypeScript, Tailwind CSS, shadcn/ui
-*   **Backend:** Node.js, Express.js, Socket.io
-*   **Database:** TiDB (MySQL compatible)
-*   **Maps & Location:** Google Maps JavaScript API, Directions Service, Distance Matrix API
-*   **State Management:** React Context + Hooks
+- **Frontend:** React (Vite), TypeScript, Tailwind CSS, shadcn/ui
+- **Backend:** Node.js, Express.js, Socket.io
+- **Database:** TiDB (MySQL compatible)
+- **Maps & Location:** Google Maps JavaScript API, Directions Service, Distance Matrix API
+- **State Management:** React Context + Hooks.
 
 ## 📦 Project Structure
 
@@ -39,34 +39,36 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 
 ### Prerequisites
 
-*   Node.js (v18+)
-*   MySQL Database (or TiDB Cloud)
-*   Google Maps API Key (with Maps JS, Geocoding, Distance Matrix enabled)
+- Node.js (v18+)
+- MySQL Database (or TiDB Cloud)
+- Google Maps API Key (with Maps JS, Geocoding, Distance Matrix enabled)
 
 ### Installation
 
 1.  **Clone the repository**
+
     ```bash
     git clone <your-repo-url>
     cd resqnow
     ```
 
 2.  **Install Dependencies**
-    *   **Root (Frontend):**
-        ```bash
-        npm install
-        ```
-    *   **Server (Backend):**
-        ```bash
-        cd server
-        npm install
-        cd ..
-        ```
+    - **Root (Frontend):**
+      ```bash
+      npm install
+      ```
+    - **Server (Backend):**
+      ```bash
+      cd server
+      npm install
+      cd ..
+      ```
 
 ### Configuration
 
 1.  **Frontend (`.env`)**
     Create a `.env` file in the root directory:
+
     ```env
     VITE_API_URL=http://localhost:3001
     VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
@@ -75,6 +77,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 
 2.  **Backend (`server/.env`)**
     Create a `.env` file in the `server` directory:
+
     ```env
     PORT=3001
     DB_HOST=your_tidb_host
@@ -83,12 +86,12 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
     DB_NAME=resqnow_db
     DB_PORT=4000
     DB_SSL=true
-    
+
     JWT_SECRET=your_jwt_secret
     GOOGLE_CLIENT_ID=your_google_client_id
     GOOGLE_CLIENT_SECRET=your_google_client_secret
     GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
-    
+
     FRONTEND_URL=http://localhost:8080
     VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key;
     ```
@@ -96,17 +99,19 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 ### Running the App
 
 1.  **Start the Backend**
+
     ```bash
     cd server
     npm run dev
     ```
-    *Server runs on `http://localhost:3001`*
+
+    _Server runs on `http://localhost:3001`_
 
 2.  **Start the Frontend** (in a new terminal)
     ```bash
     npm run dev
     ```
-    *App runs on `http://localhost:8080`*
+    _App runs on `http://localhost:8080`_
 
 ## Netlify Deployment (Frontend)
 
@@ -138,6 +143,7 @@ When `VITE_FRONTEND_ONLY=true`, the app runs with in-browser mock API responses 
 Do not set `VITE_FRONTEND_ONLY` for production backend-connected deployments.
 
 Notes:
+
 - SPA routing is handled by `netlify.toml` redirects.
 - `vercel.json` and `public/_redirects` are not needed for Netlify.
 - Build output must remain `dist`.
@@ -177,13 +183,13 @@ If payment stays in pending state:
 
 ## 🗺️ Maps & Dispatch Logic
 
-*   **Google Maps Integration:** Replaced legacy Leaflet maps with native Google Maps JS API for better performance and accurate visualisations.
-*   **Dispatch Algorithm:**
-    1.  Filters technicians by service type and vehicle compatibility.
-    2.  Calculates precise driving distance/time using **Distance Matrix API**.
-    3.  Scores candidates based on ETA and Rating.
-    4.  Broadcasts offers to top 5 candidates via **Socket.io**.
-*   **Live Tracking:** Uses `socket.io` to stream technician location to the user's map in real-time.
+- **Google Maps Integration:** Replaced legacy Leaflet maps with native Google Maps JS API for better performance and accurate visualisations.
+- **Dispatch Algorithm:**
+  1.  Filters technicians by service type and vehicle compatibility.
+  2.  Calculates precise driving distance/time using **Distance Matrix API**.
+  3.  Scores candidates based on ETA and Rating.
+  4.  Broadcasts offers to top 5 candidates via **Socket.io**.
+- **Live Tracking:** Uses `socket.io` to stream technician location to the user's map in real-time.
 
 ## 🤝 Contributing
 

@@ -599,7 +599,7 @@ export default function TechnicianRegistrationForm({ onSubmit, isSubmitting }: T
         <CardHeader className="bg-muted border-b">
           <div className="flex justify-between items-center mb-4">
             {steps.map((step, idx) => (
-              <div key={idx} className={`flex flex-col items-center z-10 ${idx <= currentStep ? "text-primary" : "text-gray-400"}`}>
+              <div key={idx} className={`flex flex-col items-center z-10 ${idx <= currentStep ? "text-primary" : "text-muted-foreground/60"}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx <= currentStep ? "border-primary bg-primary text-white" : "border-gray-300 bg-card dark:bg-slate-900"}`}>
                   {idx < currentStep ? <CheckCircle2 className="w-5 h-5" /> : <span>{idx + 1}</span>}
                 </div>

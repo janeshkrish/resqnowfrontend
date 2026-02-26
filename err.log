@@ -1,0 +1,24 @@
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 189 modules transformed.
+
+PWA v0.20.5
+mode      generateSW
+precache  10 entries (2041.43 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-bebfc3f3.js
+
+[31mx[39m Build failed in 7.98s
+[31merror during build:
+[31m[vite-plugin-pwa:build] [plugin vite-plugin-pwa:build] src/index.css (305:2): There was an error during the build:
+  [postcss] C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/src/index.css:305:3: The `shadow-[0_2px_12px_rgba(0,` class does not exist. If `shadow-[0_2px_12px_rgba(0,` is a custom class, make sure it is defined within a `@layer` directive.
+Additionally, handling the error in the 'buildEnd' hook caused the following error:
+  [postcss] C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/src/index.css:305:3: The `shadow-[0_2px_12px_rgba(0,` class does not exist. If `shadow-[0_2px_12px_rgba(0,` is a custom class, make sure it is defined within a `@layer` directive.[31m
+file: [36mC:/Users/Ash/OneDrive/Desktop/resqnowfrontend/src/index.css:305:2[31m
+    at getRollupError (file:///C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+    at file:///C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/node_modules/rollup/dist/es/shared/node-entry.js:23467:39
+    at async catchUnfinishedHookActions (file:///C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/node_modules/rollup/dist/es/shared/node-entry.js:22925:16)
+    at async rollupInternal (file:///C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/node_modules/rollup/dist/es/shared/node-entry.js:23450:5)
+    at async build (file:///C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65709:14)
+    at async CAC.<anonymous> (file:///C:/Users/Ash/OneDrive/Desktop/resqnowfrontend/node_modules/vite/dist/node/cli.js:829:5)[39m

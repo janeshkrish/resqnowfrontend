@@ -48,13 +48,13 @@ const HowItWorks = () => {
             How It Works
           </span>
         </h2>
-        <p className="text-base md:text-lg text-center text-gray-600 max-w-3xl mx-auto mb-8 md:mb-12 px-4">
+        <p className="text-base md:text-lg text-center text-muted-foreground max-w-3xl mx-auto mb-8 md:mb-12 px-4">
           Getting help is quick and easy with our simple 4-step process
         </p>
 
         <div className="relative">
           {/* Progress line */}
-          <div className="absolute left-0 right-0 top-20 h-1 bg-gray-200 hidden xl:block">
+          <div className="absolute left-0 right-0 top-20 h-1 bg-border hidden xl:block">
             <div className="h-full bg-gradient-to-r from-primary to-blue-600" style={{ width: `${activeStep ? (activeStep / steps.length) * 100 : 25}%` }}></div>
           </div>
 
@@ -76,9 +76,9 @@ const HowItWorks = () => {
                   {step.id}
                 </div>
                 
-                <div className={`rounded-2xl bg-card dark:bg-slate-900 p-6 md:p-8 border border-gray-100 shadow-sm w-full ${activeStep === step.id ? 'transform -translate-y-2 shadow-md' : ''} transition-all duration-300`}>
+                <div className={`rounded-2xl bg-card dark:bg-slate-900 p-6 md:p-8 border border-border shadow-sm w-full ${activeStep === step.id ? 'transform -translate-y-2 shadow-md' : ''} transition-all duration-300`}>
                   <h3 className="text-lg md:text-xl font-semibold mb-3">{step.title}</h3>
-                  <p className="text-gray-600 text-sm md:text-base leading-relaxed">{step.description}</p>
+                  <p className="text-muted-foreground text-sm md:text-base leading-relaxed">{step.description}</p>
                 </div>
               </div>
             ))}

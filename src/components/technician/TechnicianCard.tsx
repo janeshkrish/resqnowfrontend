@@ -15,7 +15,7 @@ export const renderStars = (rating: number) => {
   return (
     <div className="flex items-center">
       <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-      <span className="ml-1 text-sm font-bold text-gray-900">{rating}</span>
+      <span className="ml-1 text-sm font-bold text-foreground">{rating}</span>
     </div>
   );
 };
@@ -54,10 +54,10 @@ const TechnicianCard = ({ technician, isSelected, onSelect }: TechnicianCardProp
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start">
           <div>
-            <h4 className="font-bold text-gray-900 leading-tight truncate pr-2">
+            <h4 className="font-bold text-foreground leading-tight truncate pr-2">
               {technician.name}
             </h4>
-            <div className="flex items-center gap-2 mt-1 mb-1.5 text-xs text-gray-500">
+            <div className="flex items-center gap-2 mt-1 mb-1.5 text-xs text-muted-foreground/80">
               {renderStars(technician.rating)}
               <span>•</span>
               <span>{technician.completedJobs} jobs</span>
@@ -67,9 +67,9 @@ const TechnicianCard = ({ technician, isSelected, onSelect }: TechnicianCardProp
           {/* Price / Selection Indicator */}
           <div className="flex flex-col items-end flex-shrink-0">
             {typeof technician.price === 'number' ? (
-              <div className="text-lg font-bold text-gray-900">{technician.currency}{technician.price}</div>
+              <div className="text-lg font-bold text-foreground">{technician.currency}{technician.price}</div>
             ) : (
-              <div className="text-xs text-gray-400 font-medium italic">Price TBD</div>
+              <div className="text-xs text-muted-foreground/60 font-medium italic">Price TBD</div>
             )}
           </div>
         </div>
@@ -78,12 +78,12 @@ const TechnicianCard = ({ technician, isSelected, onSelect }: TechnicianCardProp
         <div className="flex items-center gap-2 mt-1">
           <div className="flex flex-wrap gap-1.5 overflow-hidden h-6">
             {displayedSpecialties.map((spec) => (
-              <span key={spec} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+              <span key={spec} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted/50 text-muted-foreground border border-border">
                 {spec}
               </span>
             ))}
             {remainingSpecialties > 0 && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground/80 border border-border">
                 +{remainingSpecialties}
               </span>
             )}
@@ -94,7 +94,7 @@ const TechnicianCard = ({ technician, isSelected, onSelect }: TechnicianCardProp
         <div className="flex items-center gap-1 mt-2 text-xs font-semibold text-green-600">
           <Clock className="h-3 w-3" />
           <span>~{technician.estimatedArrival}</span>
-          <span className="text-gray-400 font-normal ml-1">({technician.distance} away)</span>
+          <span className="text-muted-foreground/60 font-normal ml-1">({technician.distance} away)</span>
         </div>
       </div>
 

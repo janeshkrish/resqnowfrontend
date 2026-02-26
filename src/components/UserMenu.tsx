@@ -66,7 +66,7 @@ const UserMenu = () => {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar className="h-10 w-10 border-2 border-gray-200">
+          <Avatar className="h-10 w-10 border-2 border-border">
             <AvatarFallback className="bg-red-100 text-red-800">
               {user ? getInitials(user.name) : "?"}
             </AvatarFallback>

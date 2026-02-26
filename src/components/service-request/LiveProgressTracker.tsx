@@ -33,18 +33,18 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
             <Clock className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-800">Service Request Progress</h3>
-            <p className="text-sm text-gray-600">Track your request status in real-time</p>
+            <h3 className="text-lg font-bold text-foreground">Service Request Progress</h3>
+            <p className="text-sm text-muted-foreground">Track your request status in real-time</p>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm font-medium text-gray-600">Step {currentStep} of {totalSteps}</div>
-          <div className="text-xs text-gray-500">{Math.round(progressPercentage)}% Complete</div>
+          <div className="text-sm font-medium text-muted-foreground">Step {currentStep} of {totalSteps}</div>
+          <div className="text-xs text-muted-foreground/80">{Math.round(progressPercentage)}% Complete</div>
         </div>
       </div>
       
       {/* Progress Bar */}
-      <div className="relative h-3 bg-gray-200 rounded-full mb-6 overflow-hidden">
+      <div className="relative h-3 bg-border rounded-full mb-6 overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-red-500 via-yellow-500 via-blue-500 to-green-500 transition-all duration-700 ease-out rounded-full"
           style={{ width: `${progressPercentage}%` }}
@@ -65,7 +65,7 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
                       ? "bg-green-500 border-green-300 shadow-lg transform scale-110"
                       : step.active
                       ? "bg-red-500 border-red-300 shadow-lg transform scale-110 animate-pulse"
-                      : "bg-gray-100 border-gray-200"
+                      : "bg-muted/50 border-border"
                   }`}
                 >
                   {step.completed ? (
@@ -73,7 +73,7 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
                   ) : (
                     <Icon
                       className={`h-5 w-5 ${
-                        step.active ? "text-white" : "text-gray-400"
+                        step.active ? "text-white" : "text-muted-foreground/60"
                       }`}
                     />
                   )}
@@ -92,7 +92,7 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
                       ? "text-green-700"
                       : step.active
                       ? "text-red-600"
-                      : "text-gray-500"
+                      : "text-muted-foreground/80"
                   }`}
                 >
                   {step.name}
@@ -107,7 +107,7 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
                     <span className="text-[10px] text-red-600 font-medium animate-pulse">● Active</span>
                   )}
                   {!step.completed && !step.active && (
-                    <span className="text-[10px] text-gray-400">Pending</span>
+                    <span className="text-[10px] text-muted-foreground/60">Pending</span>
                   )}
                 </div>
               </div>

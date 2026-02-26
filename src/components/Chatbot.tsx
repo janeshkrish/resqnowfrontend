@@ -91,7 +91,7 @@ const Chatbot = () => {
 
       {/* Chat window */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 max-w-[90vw] bg-card dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-200 flex flex-col animate-fade-in-scale origin-bottom-right overflow-hidden">
+        <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 max-w-[90vw] bg-card dark:bg-slate-900 rounded-xl shadow-2xl border border-border flex flex-col animate-fade-in-scale origin-bottom-right overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-red-600 text-white">
             <span className="flex items-center gap-2 font-bold text-sm">
@@ -109,7 +109,7 @@ const Chatbot = () => {
           {/* Messages Area */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50/50"
+            className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-muted/50"
             style={{ minHeight: 300, maxHeight: 400 }}
           >
             {messages.map((m, i) => (
@@ -120,7 +120,7 @@ const Chatbot = () => {
                 <div
                   className={`rounded-2xl px-4 py-3 max-w-[85%] text-sm shadow-sm whitespace-pre-wrap ${m.sender === "user"
                       ? "bg-red-600 text-white rounded-br-none"
-                      : "bg-card dark:bg-slate-900 text-gray-800 border border-gray-100 rounded-bl-none"
+                      : "bg-card dark:bg-slate-900 text-foreground border border-border rounded-bl-none"
                     }`}
                 >
                   {m.text}
@@ -130,7 +130,7 @@ const Chatbot = () => {
 
             {loading && (
               <div className="flex justify-start animate-fade-in">
-                <div className="bg-card dark:bg-slate-900 border border-gray-100 text-gray-400 rounded-2xl rounded-bl-none px-4 py-3 text-sm shadow-sm flex items-center gap-1">
+                <div className="bg-card dark:bg-slate-900 border border-border text-muted-foreground/60 rounded-2xl rounded-bl-none px-4 py-3 text-sm shadow-sm flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
@@ -141,7 +141,7 @@ const Chatbot = () => {
 
           {/* Input Area */}
           <form
-            className="flex gap-2 p-3 bg-card dark:bg-slate-900 border-t border-gray-100"
+            className="flex gap-2 p-3 bg-card dark:bg-slate-900 border-t border-border"
             onSubmit={(e) => {
               e.preventDefault();
               sendMessage();
@@ -155,7 +155,7 @@ const Chatbot = () => {
               onChange={(e) => setInput(e.target.value)}
               disabled={loading}
               autoFocus
-              className="flex-1 border-gray-200 focus-visible:ring-red-500 rounded-full px-4"
+              className="flex-1 border-border focus-visible:ring-red-500 rounded-full px-4"
             />
             <Button
               type="submit"

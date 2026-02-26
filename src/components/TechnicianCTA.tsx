@@ -17,7 +17,7 @@ const TechnicianCTA = () => {
             <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
               Join our network of professionals
             </h2>
-            <p className="text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+            <p className="text-muted-foreground/80 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
               Become a ResQNow technician and grow your business while helping drivers in need. Get access to a steady stream of customers and enjoy the benefits of our platform.
             </p>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -34,7 +34,7 @@ const TechnicianCTA = () => {
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <Shield className="h-10 w-10 text-blue-600 mb-4" />
                 <h3 className="text-xl font-bold">Reliable Income</h3>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-muted-foreground/80 mt-2">
                   Access to consistent service requests in your area
                 </p>
               </CardContent>
@@ -43,7 +43,7 @@ const TechnicianCTA = () => {
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <Star className="h-10 w-10 text-blue-600 mb-4" />
                 <h3 className="text-xl font-bold">Build Reputation</h3>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-muted-foreground/80 mt-2">
                   Grow your business through customer ratings and reviews
                 </p>
               </CardContent>
@@ -52,7 +52,7 @@ const TechnicianCTA = () => {
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <Clock className="h-10 w-10 text-blue-600 mb-4" />
                 <h3 className="text-xl font-bold">Flexible Schedule</h3>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-muted-foreground/80 mt-2">
                   Work when you want with complete schedule control
                 </p>
               </CardContent>
@@ -61,7 +61,7 @@ const TechnicianCTA = () => {
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <DollarSign className="h-10 w-10 text-blue-600 mb-4" />
                 <h3 className="text-xl font-bold">Competitive Pay</h3>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-muted-foreground/80 mt-2">
                   Earn competitive rates with transparent payment processes
                 </p>
               </CardContent>

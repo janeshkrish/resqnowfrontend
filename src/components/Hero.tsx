@@ -147,7 +147,7 @@ const Hero = () => {
       <div className="relative z-20 mx-4 mb-6">
         <div className="bg-card dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden max-w-5xl mx-auto">
           <div className="p-6">
-            <h3 className="text-gray-800 font-bold text-lg mb-6 text-center">Quick Access Services</h3>
+            <h3 className="text-foreground font-bold text-lg mb-6 text-center">Quick Access Services</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { icon: Anchor, name: "Towing", color: "bg-blue-50 text-blue-600 border-blue-100", link: "/request-service/towing" },
@@ -170,8 +170,8 @@ const Hero = () => {
           {/* Auto Parts Store CTA */}
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6">
             <div className="text-center">
-              <h4 className="text-gray-800 font-bold text-lg mb-2">Auto Parts Store</h4>
-              <p className="text-gray-600 mb-4 text-sm">Premium parts at great prices</p>
+              <h4 className="text-foreground font-bold text-lg mb-2">Auto Parts Store</h4>
+              <p className="text-muted-foreground mb-4 text-sm">Premium parts at great prices</p>
               <Button
                 variant="outline"
                 className="text-primary border-primary hover:bg-primary hover:text-white transition-all"

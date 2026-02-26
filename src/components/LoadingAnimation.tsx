@@ -124,7 +124,7 @@ const LoadingAnimation = () => {
           `}
         </style>
         <h1 className="text-3xl font-bold text-center mt-6 text-red-600">ResQNow</h1>
-        <p className="text-center text-gray-600 mt-2">Your Roadside Assistance Partner</p>
+        <p className="text-center text-muted-foreground mt-2">Your Roadside Assistance Partner</p>
       </div>
     </div>
   );

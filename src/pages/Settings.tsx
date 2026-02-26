@@ -181,12 +181,12 @@ const SettingsPage = () => {
       case "appearance":
         return (
           <div className="zomato-card space-y-4">
-            <div className="pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Appearance</h3>
-              <p className="text-xs text-gray-500">Customize how the app looks and feels.</p>
+            <div className="pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Appearance</h3>
+              <p className="text-xs text-muted-foreground/80">Customize how the app looks and feels.</p>
             </div>
             {settingsLoading ? (
-              <div className="flex items-center justify-center py-8 text-gray-400">
+              <div className="flex items-center justify-center py-8 text-muted-foreground/60">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />
                 Loading settings...
               </div>
@@ -270,9 +270,9 @@ const SettingsPage = () => {
       case "stats":
         return (
           <div className="zomato-card space-y-4">
-            <div className="pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Usage Statistics</h3>
-              <p className="text-xs text-gray-500">Track your service history and activity.</p>
+            <div className="pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Usage Statistics</h3>
+              <p className="text-xs text-muted-foreground/80">Track your service history and activity.</p>
             </div>
             <UsageStats />
           </div>
@@ -280,9 +280,9 @@ const SettingsPage = () => {
       case "privacy":
         return (
           <div className="zomato-card space-y-4">
-            <div className="pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Privacy & Security</h3>
-              <p className="text-xs text-gray-500">Manage your account security.</p>
+            <div className="pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Privacy & Security</h3>
+              <p className="text-xs text-muted-foreground/80">Manage your account security.</p>
             </div>
             <div className="space-y-4">
               <Button variant="outline" className="w-full justify-start h-12 rounded-xl">Change Password</Button>
@@ -395,8 +395,8 @@ const SettingsPage = () => {
     <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
       <div className="space-y-6">
         <div className="space-y-0.5">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">My Account</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">My Account</h2>
+          <p className="text-sm text-muted-foreground/80">
             Manage your account settings and set e-mail preferences.
           </p>
         </div>
@@ -408,10 +408,10 @@ const SettingsPage = () => {
                 <Button
                   key={item.id}
                   variant={activeTab === item.id ? "default" : "ghost"}
-                  className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-gray-100 text-gray-600"}`}
+                  className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted/50 text-muted-foreground"}`}
                   onClick={() => handleTabChange(item.id)}
                 >
-                  <item.icon className={`mr-2 h-4 w-4 ${activeTab === item.id ? "text-primary-foreground" : "text-gray-500"}`} />
+                  <item.icon className={`mr-2 h-4 w-4 ${activeTab === item.id ? "text-primary-foreground" : "text-muted-foreground/80"}`} />
                   {item.label}
                 </Button>
               ))}

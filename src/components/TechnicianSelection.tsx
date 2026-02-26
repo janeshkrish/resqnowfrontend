@@ -163,7 +163,7 @@ const TechnicianSelection = ({ serviceType, onSelect, vehicleType, location, lat
     return (
       <div className="w-full flex flex-col items-center justify-center py-12 space-y-4">
         <LoadingAnimation />
-        <p className="text-gray-600">Finding available technicians near you...</p>
+        <p className="text-muted-foreground">Finding available technicians near you...</p>
       </div>
     );
   }
@@ -191,7 +191,7 @@ const TechnicianSelection = ({ serviceType, onSelect, vehicleType, location, lat
     <div className="w-full space-y-6 animate-fade-in">
       <div className="flex flex-col space-y-4">
         <h3 className="text-2xl font-bold text-center sm:text-left">Available Technicians Near You</h3>
-        <p className="text-gray-600 text-center sm:text-left">
+        <p className="text-muted-foreground text-center sm:text-left">
           Select a technician for your {serviceType} service
         </p>
 

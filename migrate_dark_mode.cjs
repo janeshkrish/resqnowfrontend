@@ -8,6 +8,10 @@ const replacements = [
     { regex: /\bbg-white\b/g, replacement: 'bg-card dark:bg-slate-900' },
     { regex: /\bbg-slate-50\b/g, replacement: 'bg-muted' },
     { regex: /\bbg-slate-100\b/g, replacement: 'bg-muted/50' },
+    { regex: /\bbg-slate-200\b/g, replacement: 'bg-border' },
+    { regex: /\bbg-gray-50\b/g, replacement: 'bg-muted' },
+    { regex: /\bbg-gray-100\b/g, replacement: 'bg-muted/50' },
+    { regex: /\bbg-gray-200\b/g, replacement: 'bg-border' },
 
     // Text Colors
     { regex: /\btext-slate-900\b/g, replacement: 'text-foreground' },
@@ -16,9 +20,18 @@ const replacements = [
     { regex: /\btext-slate-600\b/g, replacement: 'text-muted-foreground' },
     { regex: /\btext-slate-500\b/g, replacement: 'text-muted-foreground\/80' },
 
+    { regex: /\btext-gray-900\b/g, replacement: 'text-foreground' },
+    { regex: /\btext-gray-800\b/g, replacement: 'text-foreground' },
+    { regex: /\btext-gray-700\b/g, replacement: 'text-muted-foreground' },
+    { regex: /\btext-gray-600\b/g, replacement: 'text-muted-foreground' },
+    { regex: /\btext-gray-500\b/g, replacement: 'text-muted-foreground\/80' },
+    { regex: /\btext-gray-400\b/g, replacement: 'text-muted-foreground\/60' },
+
     // Borders
     { regex: /\bborder-slate-100\b/g, replacement: 'border-border' },
-    { regex: /\bborder-slate-200\b/g, replacement: 'border-border' }
+    { regex: /\bborder-slate-200\b/g, replacement: 'border-border' },
+    { regex: /\bborder-gray-100\b/g, replacement: 'border-border' },
+    { regex: /\bborder-gray-200\b/g, replacement: 'border-border' }
 ];
 
 function processDirectory(dir) {

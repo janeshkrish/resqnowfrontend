@@ -176,9 +176,9 @@ const TechnicianProfile = () => {
                 return (
                     <form onSubmit={handleProfileSubmit} className="space-y-6">
                         <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900">Personal Details</h3>
-                                <p className="text-xs text-gray-500">Update your contact information.</p>
+                            <div className="pb-4 border-b border-border">
+                                <h3 className="text-lg font-bold text-foreground">Personal Details</h3>
+                                <p className="text-xs text-muted-foreground/80">Update your contact information.</p>
                             </div>
                             <div className="space-y-4">
                                 <div className="space-y-2">
@@ -226,8 +226,8 @@ const TechnicianProfile = () => {
                 return (
                     <div className="space-y-6">
                         <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900">Account Status</h3>
+                            <div className="pb-4 border-b border-border">
+                                <h3 className="text-lg font-bold text-foreground">Account Status</h3>
                             </div>
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
@@ -247,8 +247,8 @@ const TechnicianProfile = () => {
                             </div>
                         </div>
                         <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900">Specialties</h3>
+                            <div className="pb-4 border-b border-border">
+                                <h3 className="text-lg font-bold text-foreground">Specialties</h3>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {(profileData?.specialties || []).map((spec: string) => (
@@ -266,9 +266,9 @@ const TechnicianProfile = () => {
             case "appearance":
                 return (
                     <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Appearance</h3>
-                            <p className="text-xs text-gray-500">Customize how the app looks.</p>
+                        <div className="pb-4 border-b border-border">
+                            <h3 className="text-lg font-bold text-foreground">Appearance</h3>
+                            <p className="text-xs text-muted-foreground/80">Customize how the app looks.</p>
                         </div>
                         <div className="flex flex-col gap-3">
                             <Button variant={settingsState.appearance.theme === "light" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "light" } })} className="justify-start">
@@ -286,9 +286,9 @@ const TechnicianProfile = () => {
             case "notifications":
                 return (
                     <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
-                            <p className="text-xs text-gray-500">Manage alerts and emails.</p>
+                        <div className="pb-4 border-b border-border">
+                            <h3 className="text-lg font-bold text-foreground">Notifications</h3>
+                            <p className="text-xs text-muted-foreground/80">Manage alerts and emails.</p>
                         </div>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -312,8 +312,8 @@ const TechnicianProfile = () => {
             case "security":
                 return (
                     <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Security & Privacy</h3>
+                        <div className="pb-4 border-b border-border">
+                            <h3 className="text-lg font-bold text-foreground">Security & Privacy</h3>
                         </div>
                         <div className="space-y-3">
                             <Button variant="outline" className="w-full justify-start rounded-xl font-bold">Update Password</Button>
@@ -407,8 +407,8 @@ const TechnicianProfile = () => {
         <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
             <div className="space-y-6">
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight text-gray-900">My Profile & Settings</h2>
-                    <p className="text-sm text-gray-500">Manage your technician account settings.</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-foreground">My Profile & Settings</h2>
+                    <p className="text-sm text-muted-foreground/80">Manage your technician account settings.</p>
                 </div>
                 <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-8 lg:space-x-12">
                     <aside className="md:w-1/4 lg:w-1/5">

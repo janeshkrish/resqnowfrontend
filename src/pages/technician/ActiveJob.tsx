@@ -225,7 +225,7 @@ const ActiveJob = () => {
 
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] relative">
-            <div className="flex-grow bg-slate-200 relative">
+            <div className="flex-grow bg-border relative">
                 <div className="absolute inset-0">
                     <ActiveJobMap
                         technicianLocation={currentLocation || { lat: 28.6139, lng: 77.2090 }}

@@ -109,7 +109,7 @@ const Emergency = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="border border-gray-200 rounded-lg p-4">
+              <div className="border border-border rounded-lg p-4">
                 <h2 className="font-semibold flex items-center gap-2 mb-3">
                   <MapPin className="h-5 w-5 text-red-600" />
                   Your Location in Tamil Nadu
@@ -119,7 +119,7 @@ const Emergency = () => {
                   <div className="space-y-2">
                     <Skeleton className="h-5 w-full" />
                     <Skeleton className="h-5 w-3/4" />
-                    <div className="flex items-center gap-2 text-gray-500 text-sm mt-3">
+                    <div className="flex items-center gap-2 text-muted-foreground/80 text-sm mt-3">
                       <Loader className="h-4 w-4 animate-spin" />
                       Detecting your location...
                     </div>
@@ -156,7 +156,7 @@ const Emergency = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
 
-              <p className="text-xs text-center text-gray-500 mt-2">
+              <p className="text-xs text-center text-muted-foreground/80 mt-2">
                 Our emergency team will contact you immediately.
                 Standard service charges apply (₹).
               </p>

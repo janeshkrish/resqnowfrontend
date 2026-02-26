@@ -36,21 +36,21 @@ class ErrorBoundary extends Component<Props, State> {
     public render() {
         if (this.state.hasError) {
             return (
-                <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                <div className="min-h-screen flex items-center justify-center bg-muted p-4">
                     <div className="bg-card dark:bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
                         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                             <AlertTriangle className="h-8 w-8 text-red-600" />
                         </div>
 
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                        <h1 className="text-2xl font-bold text-foreground mb-2">
                             Something went wrong
                         </h1>
 
-                        <p className="text-gray-600 mb-6">
+                        <p className="text-muted-foreground mb-6">
                             We're sorry, but the application encountered an unexpected error.
                         </p>
 
-                        <div className="bg-gray-100 p-4 rounded-lg text-left text-xs font-mono text-gray-700 overflow-auto max-h-40 mb-6">
+                        <div className="bg-muted/50 p-4 rounded-lg text-left text-xs font-mono text-muted-foreground overflow-auto max-h-40 mb-6">
                             {this.state.error && this.state.error.toString()}
                         </div>
 

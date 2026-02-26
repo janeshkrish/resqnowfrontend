@@ -68,7 +68,7 @@
 
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(0 84% 60% / 0.2);
-    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 2px 8px rgba(0,0,0,0.08);
     --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
   }
 
@@ -203,7 +203,7 @@
     right: 1rem;
     z-index: 50;
     @apply bg-primary text-primary-foreground rounded-full shadow-2xl w-16 h-16 flex items-center justify-center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0,0,0,0.08);
   }
 
   .mobile-bottom-nav {
@@ -302,15 +302,15 @@
 
 /* Swiggy/Zomato specific card styles */
 .zomato-card {
-  @apply bg-white rounded-2xl shadow-[0_2px_12px_rgba(0, 0, 0, 0.06)] border border-gray-100/50 p-4 transition-transform active:scale-[0.98];
+  @apply bg-card text-card-foreground rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-border p-4 transition-transform active:scale-[0.98];
 }
 
 .zomato-bottom-sheet {
-  @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-8px_24px_rgba(0, 0, 0, 0.08)] z-50 p-5 transform transition-transform;
+  @apply fixed bottom-0 left-0 right-0 bg-background text-foreground rounded-t-3xl shadow-[0_-8px_24px_rgba(0,0,0,0.08)] z-50 p-5 transform transition-transform;
 }
 
 .zomato-action-bar {
-  @apply fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 z-40 shadow-[0_-4px_16px_rgba(0, 0, 0, 0.04)];
+  @apply fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border p-4 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.04)];
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
@@ -508,7 +508,7 @@
 
 .service-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
 }
 
 .badge-red {
@@ -740,7 +740,7 @@
 
 .service-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
 }
 
 /* Professional badges */
@@ -1010,7 +1010,7 @@
   /* Card press effect */
   .card-press:active {
     transform: scale(0.98);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   }
 
   /* PWA Splash Screen Animations */

@@ -106,7 +106,7 @@ const Footer = () => {
           </div>
         </div>
         <div className="border-t border-gray-800 pt-8">
-          <p className="text-center text-gray-400 text-sm">
+          <p className="text-center text-muted-foreground/60 text-sm">
             &copy; {new Date().getFullYear()} ResQNow. All rights reserved.
           </p>
         </div>

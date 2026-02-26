@@ -19,7 +19,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           actionButton:
             "group-[.toast]:bg-slate-900 group-[.toast]:text-white font-bold rounded-xl px-4 py-2 hover:bg-slate-800 transition-colors",
           cancelButton:
-            "group-[.toast]:bg-muted/50 group-[.toast]:text-muted-foreground font-bold rounded-xl px-4 py-2 hover:bg-slate-200 transition-colors",
+            "group-[.toast]:bg-muted/50 group-[.toast]:text-muted-foreground font-bold rounded-xl px-4 py-2 hover:bg-border transition-colors",
           success: "group-[.toaster]:border-emerald-200 group-[.toaster]:bg-emerald-50/95 group-[.toaster]:text-emerald-950 [&_[data-icon]]:text-emerald-600",
           error: "group-[.toaster]:border-red-200 group-[.toaster]:bg-red-50/95 group-[.toaster]:text-red-950 [&_[data-icon]]:text-red-600",
           info: "group-[.toaster]:border-blue-200 group-[.toaster]:bg-blue-50/95 group-[.toaster]:text-blue-950 [&_[data-icon]]:text-blue-600",

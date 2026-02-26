@@ -85,7 +85,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                         <svg viewBox="0 0 24 24" fill="#D32F2F" className="absolute top-0 left-0 w-full h-full drop-shadow-[0_4px_8px_rgba(211,47,47,0.5)]">
                                             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
                                         </svg>
-                                        <div className="relative z-20 flex items-center justify-center w-[1.35rem] h-[1.35rem] bg-white rounded-full shadow-sm" style={{ marginTop: "-10px" }}>
+                                        <div className="relative z-20 flex items-center justify-center w-[1.35rem] h-[1.35rem] bg-card dark:bg-slate-900 rounded-full shadow-sm" style={{ marginTop: "-10px" }}>
                                             <span className="text-[#D32F2F] font-black text-sm leading-none pl-[1px]">Q</span>
                                         </div>
                                     </motion.div>

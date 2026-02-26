@@ -554,7 +554,7 @@ const AdminAddTechnicianWizard = () => {
             {/* Sidebar */}
             <div className="w-64 bg-muted border-r flex flex-row relative">
                 {/* Dynamic Progress Bar - Red */}
-                <div className="w-1.5 h-full bg-slate-200 absolute left-0 top-0 bottom-0 z-20">
+                <div className="w-1.5 h-full bg-border absolute left-0 top-0 bottom-0 z-20">
                     <div
                         className="w-full bg-red-500 transition-all duration-500 ease-in-out"
                         style={{ height: `${Math.max(5, progressPercentage)}%` }}
@@ -568,7 +568,7 @@ const AdminAddTechnicianWizard = () => {
                     </div>
 
                     <div className="space-y-1 relative">
-                        <div className="absolute left-3.5 top-2 bottom-4 w-0.5 bg-slate-200 -z-10" />
+                        <div className="absolute left-3.5 top-2 bottom-4 w-0.5 bg-border -z-10" />
                         {STEPS.map((step, idx) => {
                             const isActive = currentStep === idx;
                             const isCompleted = currentStep > idx;

@@ -63,7 +63,7 @@ const ConfirmationStep = ({
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12 border-2 border-gray-100">
+            <Avatar className="h-12 w-12 border-2 border-border">
               <AvatarImage src={defaultAvatar} alt="Technician" />
               <AvatarFallback className="bg-red-100 text-red-800 font-semibold">
                 RT
@@ -75,12 +75,12 @@ const ConfirmationStep = ({
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star key={star} className="h-3 w-3" fill="currentColor" />
                 ))}
-                <span className="ml-1 text-xs text-gray-600">4.8 (538 jobs)</span>
+                <span className="ml-1 text-xs text-muted-foreground">4.8 (538 jobs)</span>
               </div>
             </div>
             <div className="ml-auto text-right">
               <div className="text-xl font-bold text-red-600">{formattedBaseAmount}</div>
-              <div className="text-xs text-gray-500">Base Charge</div>
+              <div className="text-xs text-muted-foreground/80">Base Charge</div>
             </div>
           </div>
         </CardContent>
@@ -94,24 +94,24 @@ const ConfirmationStep = ({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-sm text-gray-500">Name</p>
+                <p className="text-sm text-muted-foreground/80">Name</p>
                 <p className="font-medium">{formData.name}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Phone</p>
+                <p className="text-sm text-muted-foreground/80">Phone</p>
                 <p className="font-medium">{formData.phone}</p>
               </div>
             </div>
             
             <div>
-              <p className="text-sm text-gray-500">Vehicle</p>
+              <p className="text-sm text-muted-foreground/80">Vehicle</p>
               <p className="font-medium">
                 {formData.vehicleSubtype} {formData.vehicleModel}
               </p>
             </div>
             
             <div>
-              <p className="text-sm text-gray-500">Location</p>
+              <p className="text-sm text-muted-foreground/80">Location</p>
               <p className="font-medium">{formData.location}</p>
             </div>
           </div>
@@ -130,7 +130,7 @@ const ConfirmationStep = ({
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Payment Timing:</span>
+                <span className="text-sm text-muted-foreground">Payment Timing:</span>
                 <Badge variant={paymentData.timing === "before" ? "default" : "secondary"} className={
                   paymentData.timing === "before" 
                     ? "bg-green-600 hover:bg-green-700" 
@@ -141,7 +141,7 @@ const ConfirmationStep = ({
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Payment Method:</span>
+                <span className="text-sm text-muted-foreground">Payment Method:</span>
                 <div className="flex items-center gap-2">
                   {paymentData.method === "cash" && <Banknote className="h-4 w-4 text-orange-600" />}
                   {paymentData.method === "upi" && <CreditCard className="h-4 w-4 text-purple-600" />}
@@ -153,7 +153,7 @@ const ConfirmationStep = ({
               
               {paymentData.razorpayOrderId && (
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Transaction ID:</span>
+                  <span className="text-sm text-muted-foreground">Transaction ID:</span>
                   <span className="text-xs font-mono bg-card dark:bg-slate-900 px-2 py-1 rounded border">
                     {paymentData.razorpayOrderId.slice(0, 20)}...
                   </span>

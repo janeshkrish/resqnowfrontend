@@ -316,7 +316,7 @@ const Map = () => {
               <Popup>
                 <div className="p-1 min-w-[150px]">
                   <h3 className="font-bold text-sm mb-1 text-foreground">{tech.name}</h3>
-                  <p className="text-xs text-gray-600 mb-2">{tech.service_type}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{tech.service_type}</p>
                   <Button
                     size="sm"
                     className="w-full h-7 text-xs"
@@ -342,7 +342,7 @@ const Map = () => {
 
         {/* Mobile Drag Handle */}
         <div className="w-full flex justify-center pt-4 pb-2 shrink-0 lg:hidden">
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+          <div className="w-12 h-1.5 bg-border rounded-full"></div>
         </div>
 
         <div className="px-5 pb-4 pt-1 border-b border-border/60 shrink-0 space-y-4">

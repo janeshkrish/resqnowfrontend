@@ -43,7 +43,7 @@ const TechnicianReviews: React.FC<TechnicianReviewsProps> = ({ reviews }) => {
                                         ))}
                                     </div>
                                 </div>
-                                <p className="text-sm text-slate-600 line-clamp-3">{review.comment}</p>
+                                <p className="text-sm text-muted-foreground line-clamp-3">{review.comment}</p>
                                 <p className="text-[10px] text-muted-foreground mt-1">
                                     {formatDistanceToNow(new Date(review.created_at), { addSuffix: true })}
                                 </p>

@@ -65,7 +65,7 @@ const Contact = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <div>
             <h2 className="text-2xl font-bold mb-6">Get In Touch</h2>
-            <p className="text-gray-700 mb-8">
+            <p className="text-muted-foreground mb-8">
               Whether you have questions about our services, need technical support, or want to provide feedback, our team is ready to assist you. Fill out the form, and we'll get back to you as soon as possible.
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -91,16 +91,16 @@ const Contact = () => {
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">We reply within 24 hours.</div>
+                <div className="text-sm text-muted-foreground">We reply within 24 hours.</div>
                 <Button type="submit" disabled={loading}>{loading ? "Sending..." : "Send Message"}</Button>
               </div>
             </form>
           </div>
 
           <div>
-            <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
+            <div className="bg-muted p-6 rounded-lg shadow-sm">
               <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
-              <ul className="space-y-4 text-gray-700">
+              <ul className="space-y-4 text-muted-foreground">
                 <li className="flex items-start gap-3">
                   <MapPin className="mt-1" />
                   <div>123 ResQ Street, Bengaluru, Karnataka</div>

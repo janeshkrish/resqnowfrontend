@@ -86,7 +86,7 @@ const VehicleServiceSelector = () => {
 
   return (
     <div className={cn(
-      "min-h-screen bg-slate-50",
+      "min-h-screen bg-muted",
       isMobile ? "pt-6 pb-safe" : "bg-gradient-to-b from-background to-accent/10 py-4 md:py-8 pb-20 md:pb-8"
     )}>
       <div className={cn("container max-w-4xl", isMobile ? "px-0" : "px-3 md:px-4")}>
@@ -94,13 +94,13 @@ const VehicleServiceSelector = () => {
           isMobile ? "text-left mb-6 px-5" : "text-center mb-6 md:mb-8"
         )}>
           <h1 className={cn(
-            "font-black tracking-tight text-slate-900 mb-1",
+            "font-black tracking-tight text-foreground mb-1",
             isMobile ? "text-2xl" : "text-2xl md:text-4xl mb-3 md:mb-4"
           )}>
             {isMobile ? "Choose Vehicle" : "Select Your Vehicle Type"}
           </h1>
           <p className={cn(
-            "text-slate-500 font-medium",
+            "text-muted-foreground/80 font-medium",
             isMobile ? "text-sm" : "text-lg md:text-xl md:mb-2"
           )}>
             For <span className="text-primary font-bold">{service.name}</span>
@@ -114,7 +114,7 @@ const VehicleServiceSelector = () => {
 
         <div className={cn(
           isMobile
-            ? "flex flex-col bg-white border-y border-slate-100/60 shadow-sm"
+            ? "flex flex-col bg-card dark:bg-slate-900 border-y border-border/60 shadow-sm"
             : "grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8"
         )}>
           {vehicleCategories.map((category, idx) => (
@@ -123,8 +123,8 @@ const VehicleServiceSelector = () => {
               <div
                 key={category.id}
                 className={cn(
-                  "relative flex items-center p-5 cursor-pointer active:bg-slate-50 transition-colors duration-200",
-                  idx !== vehicleCategories.length - 1 && "border-b border-slate-100/60"
+                  "relative flex items-center p-5 cursor-pointer active:bg-muted transition-colors duration-200",
+                  idx !== vehicleCategories.length - 1 && "border-b border-border/60"
                 )}
                 onClick={() => handleVehicleSelect(category.id)}
               >
@@ -132,19 +132,19 @@ const VehicleServiceSelector = () => {
                   {/* Icon with soft tinted background */}
                   <div className={cn(
                     "flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-transform",
-                    selectedVehicle === category.id ? category.color : "bg-slate-100 text-slate-500"
+                    selectedVehicle === category.id ? category.color : "bg-muted/50 text-muted-foreground/80"
                   )}>
-                    <category.icon className={cn("h-6 w-6", selectedVehicle === category.id ? "text-white" : "text-slate-600")} />
+                    <category.icon className={cn("h-6 w-6", selectedVehicle === category.id ? "text-white" : "text-muted-foreground")} />
                   </div>
 
                   <div className="flex-1 pr-6">
                     <h3 className={cn(
                       "font-bold text-[15px] leading-tight mb-1 transition-colors",
-                      selectedVehicle === category.id ? "text-slate-900" : "text-slate-700"
+                      selectedVehicle === category.id ? "text-foreground" : "text-muted-foreground"
                     )}>
                       {category.name}
                     </h3>
-                    <p className="text-[12px] text-slate-500 font-medium leading-snug line-clamp-1">
+                    <p className="text-[12px] text-muted-foreground/80 font-medium leading-snug line-clamp-1">
                       {category.description}
                     </p>
                   </div>

@@ -176,9 +176,9 @@ const TechnicianProfile = () => {
                 return (
                     <form onSubmit={handleProfileSubmit} className="space-y-6">
                         <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900">Personal Details</h3>
-                                <p className="text-xs text-gray-500">Update your contact information.</p>
+                            <div className="pb-4 border-b border-border">
+                                <h3 className="text-lg font-bold text-foreground">Personal Details</h3>
+                                <p className="text-xs text-muted-foreground/80">Update your contact information.</p>
                             </div>
                             <div className="space-y-4">
                                 <div className="space-y-2">
@@ -226,29 +226,29 @@ const TechnicianProfile = () => {
                 return (
                     <div className="space-y-6">
                         <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900">Account Status</h3>
+                            <div className="pb-4 border-b border-border">
+                                <h3 className="text-lg font-bold text-foreground">Account Status</h3>
                             </div>
                             <div className="space-y-3">
-                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <span className="text-sm font-bold text-slate-700">Verification</span>
+                                <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
+                                    <span className="text-sm font-bold text-muted-foreground">Verification</span>
                                     <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded uppercase font-bold">
                                         {profileData?.verification_status || "Pending"}
                                     </span>
                                 </div>
-                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <span className="text-sm font-bold text-slate-700">Jobs Done</span>
-                                    <span className="font-black text-slate-900">{liveStats.completedJobs || profileData?.jobs_completed || 0}</span>
+                                <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
+                                    <span className="text-sm font-bold text-muted-foreground">Jobs Done</span>
+                                    <span className="font-black text-foreground">{liveStats.completedJobs || profileData?.jobs_completed || 0}</span>
                                 </div>
-                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <span className="text-sm font-bold text-slate-700">Total Earnings</span>
+                                <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
+                                    <span className="text-sm font-bold text-muted-foreground">Total Earnings</span>
                                     <span className="font-black text-blue-700">Rs {(liveStats.totalEarnings || profileData?.total_earnings || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900">Specialties</h3>
+                            <div className="pb-4 border-b border-border">
+                                <h3 className="text-lg font-bold text-foreground">Specialties</h3>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {(profileData?.specialties || []).map((spec: string) => (
@@ -266,9 +266,9 @@ const TechnicianProfile = () => {
             case "appearance":
                 return (
                     <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Appearance</h3>
-                            <p className="text-xs text-gray-500">Customize how the app looks.</p>
+                        <div className="pb-4 border-b border-border">
+                            <h3 className="text-lg font-bold text-foreground">Appearance</h3>
+                            <p className="text-xs text-muted-foreground/80">Customize how the app looks.</p>
                         </div>
                         <div className="flex flex-col gap-3">
                             <Button variant={settingsState.appearance.theme === "light" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "light" } })} className="justify-start">
@@ -286,9 +286,9 @@ const TechnicianProfile = () => {
             case "notifications":
                 return (
                     <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
-                            <p className="text-xs text-gray-500">Manage alerts and emails.</p>
+                        <div className="pb-4 border-b border-border">
+                            <h3 className="text-lg font-bold text-foreground">Notifications</h3>
+                            <p className="text-xs text-muted-foreground/80">Manage alerts and emails.</p>
                         </div>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -312,8 +312,8 @@ const TechnicianProfile = () => {
             case "security":
                 return (
                     <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Security & Privacy</h3>
+                        <div className="pb-4 border-b border-border">
+                            <h3 className="text-lg font-bold text-foreground">Security & Privacy</h3>
                         </div>
                         <div className="space-y-3">
                             <Button variant="outline" className="w-full justify-start rounded-xl font-bold">Update Password</Button>
@@ -329,16 +329,16 @@ const TechnicianProfile = () => {
     if (isMobile) {
         if (activeTab === "menu") {
             return (
-                <div className="min-h-screen bg-slate-50 pb-20 fade-in-0 animate-in duration-300">
-                    <div className="bg-white px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-slate-100 flex items-center gap-5">
-                        <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-slate-100 border-[3px] border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
+                <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in duration-300">
+                    <div className="bg-card dark:bg-slate-900 px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-border flex items-center gap-5">
+                        <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-muted/50 border-[3px] border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
                             <User className="w-8 h-8 text-slate-300" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight truncate">
+                            <h2 className="text-2xl font-black text-foreground tracking-tight truncate">
                                 {profileData?.name || profileData?.email?.split('@')[0] || 'Technician'}
                             </h2>
-                            <p className="text-sm font-semibold text-slate-500 truncate mb-2">{profileData?.email}</p>
+                            <p className="text-sm font-semibold text-muted-foreground/80 truncate mb-2">{profileData?.email}</p>
                             <div className="flex items-center gap-2">
                                 <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-yellow-200 flex items-center gap-1 w-fit">
                                     <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" /> {ratingLabel}
@@ -348,29 +348,29 @@ const TechnicianProfile = () => {
                     </div>
 
                     <div className="px-4 space-y-4">
-                        <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
                             {sidebarItems.map((item, index) => {
                                 const isLast = index === sidebarItems.length - 1;
                                 return (
                                     <div key={item.id}>
-                                        <button onClick={() => handleTabChange(item.id)} className="w-full text-left p-4 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                                        <button onClick={() => handleTabChange(item.id)} className="w-full text-left p-4 flex items-center justify-between hover:bg-muted active:bg-muted/50 transition-colors">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100">
+                                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-border">
                                                     <item.icon className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-slate-800">{item.label}</h3>
-                                                    <p className="text-[11px] font-medium text-slate-500">{item.description}</p>
+                                                    <h3 className="font-bold text-foreground">{item.label}</h3>
+                                                    <p className="text-[11px] font-medium text-muted-foreground/80">{item.description}</p>
                                                 </div>
                                             </div>
                                             <ChevronRight className="w-5 h-5 text-slate-300" />
                                         </button>
-                                        {!isLast && <Separator className="mx-4 w-auto bg-slate-100" />}
+                                        {!isLast && <Separator className="mx-4 w-auto bg-muted/50" />}
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
                             <button onClick={() => { logout(); navigate('/'); }} className="w-full text-left p-4 flex items-center justify-between hover:bg-red-50 active:bg-red-100 transition-colors">
                                 <div className="flex items-center gap-4 text-red-600">
                                     <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
@@ -388,12 +388,12 @@ const TechnicianProfile = () => {
 
         const currentItem = sidebarItems.find(i => i.id === activeTab);
         return (
-            <div className="min-h-screen bg-slate-50 pb-20 fade-in-0 animate-in slide-in-from-bottom-4 duration-300">
-                <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-slate-100 shadow-sm">
-                    <button onClick={() => handleTabChange('menu')} className="w-10 h-10 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition-all">
+            <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="sticky top-0 z-50 bg-card dark:bg-slate-900/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-border shadow-sm">
+                    <button onClick={() => handleTabChange('menu')} className="w-10 h-10 flex items-center justify-center bg-muted border border-border rounded-full text-muted-foreground hover:bg-muted/50 active:scale-95 transition-all">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <h2 className="text-lg font-black text-slate-900 tracking-tight">{currentItem?.label || 'Profile'}</h2>
+                    <h2 className="text-lg font-black text-foreground tracking-tight">{currentItem?.label || 'Profile'}</h2>
                 </div>
                 <div className="p-4">
                     {renderContent()}
@@ -407,14 +407,14 @@ const TechnicianProfile = () => {
         <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
             <div className="space-y-6">
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight text-gray-900">My Profile & Settings</h2>
-                    <p className="text-sm text-gray-500">Manage your technician account settings.</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-foreground">My Profile & Settings</h2>
+                    <p className="text-sm text-muted-foreground/80">Manage your technician account settings.</p>
                 </div>
                 <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-8 lg:space-x-12">
                     <aside className="md:w-1/4 lg:w-1/5">
                         <nav className="flex space-x-2 md:flex-col md:space-x-0 md:space-y-2 overflow-x-auto pb-2 scrollbar-hide">
                             {sidebarItems.map((item) => (
-                                <Button key={item.id} variant={activeTab === item.id ? "default" : "ghost"} className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-slate-900 text-white shadow-sm" : "hover:bg-slate-100 text-slate-700"}`} onClick={() => handleTabChange(item.id)}>
+                                <Button key={item.id} variant={activeTab === item.id ? "default" : "ghost"} className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-slate-900 text-white shadow-sm" : "hover:bg-muted/50 text-muted-foreground"}`} onClick={() => handleTabChange(item.id)}>
                                     <item.icon className="mr-2 h-4 w-4" /> {item.label}
                                 </Button>
                             ))}

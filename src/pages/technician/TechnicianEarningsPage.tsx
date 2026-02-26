@@ -278,7 +278,7 @@ const TechnicianEarningsPage = () => {
                 <Button variant="ghost" size="icon" asChild>
                     <Link to="/technician/dashboard"><ArrowLeft className="w-5 h-5" /></Link>
                 </Button>
-                <h1 className="text-2xl font-bold text-slate-800">Earnings & Payouts</h1>
+                <h1 className="text-2xl font-bold text-foreground">Earnings & Payouts</h1>
             </div>
 
             {loading ? (
@@ -297,16 +297,16 @@ const TechnicianEarningsPage = () => {
                         </Card>
                         <Card>
                             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                                <CardTitle className="text-slate-500 text-sm font-medium">Today</CardTitle>
+                                <CardTitle className="text-muted-foreground/80 text-sm font-medium">Today</CardTitle>
                                 <TrendingUp className="w-4 h-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-slate-800">₹{stats.today}</div>
+                                <div className="text-2xl font-bold text-foreground">₹{stats.today}</div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                                <CardTitle className="text-slate-500 text-sm font-medium">Platform Dues</CardTitle>
+                                <CardTitle className="text-muted-foreground/80 text-sm font-medium">Platform Dues</CardTitle>
                                 <CreditCard className="w-4 h-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
@@ -334,7 +334,7 @@ const TechnicianEarningsPage = () => {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-slate-500" />
+                                <Calendar className="w-4 h-4 text-muted-foreground/80" />
                                 Weekly Overview
                             </CardTitle>
                         </CardHeader>
@@ -344,10 +344,10 @@ const TechnicianEarningsPage = () => {
                     </Card>
 
                     <div className="space-y-4">
-                        <h3 className="font-semibold text-lg text-slate-800">Recent Transactions</h3>
-                        <div className="bg-white rounded-xl border divide-y">
+                        <h3 className="font-semibold text-lg text-foreground">Recent Transactions</h3>
+                        <div className="bg-card dark:bg-slate-900 rounded-xl border divide-y">
                             {transactions.length === 0 ? (
-                                <div className="p-4 text-center text-slate-500 text-sm">No transactions found.</div>
+                                <div className="p-4 text-center text-muted-foreground/80 text-sm">No transactions found.</div>
                             ) : (
                                 transactions.slice(0, 10).map((row) => {
                                     const created = row?.created_at ? new Date(row.created_at) : null;
@@ -366,8 +366,8 @@ const TechnicianEarningsPage = () => {
                                     return (
                                     <div key={String(row.payment_id)} className="p-4 flex items-center justify-between">
                                         <div>
-                                            <p className="font-medium text-slate-800">{dateLabel}</p>
-                                            <p className="text-xs text-slate-500 capitalize">{serviceLabel}</p>
+                                            <p className="font-medium text-foreground">{dateLabel}</p>
+                                            <p className="text-xs text-muted-foreground/80 capitalize">{serviceLabel}</p>
                                         </div>
                                         <p className="font-semibold text-green-700">Rs {Number(row.technician_amount || 0).toFixed(2)}</p>
                                     </div>

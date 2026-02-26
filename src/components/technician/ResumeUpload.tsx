@@ -12,18 +12,18 @@ const ResumeUpload = ({ resumeFile, handleResumeChange }: ResumeUploadProps) => 
   return (
     <div className="space-y-2">
       <FormLabel htmlFor="resume">Upload Your Resume (PDF or Word)</FormLabel>
-      <div className="border-2 border-dashed border-gray-200 rounded-md p-4">
+      <div className="border-2 border-dashed border-border rounded-md p-4">
         <div className="flex items-center justify-center space-x-2">
           <label
             htmlFor="resume"
             className="flex items-center justify-center w-full cursor-pointer"
           >
             <div className="flex flex-col items-center space-y-2 text-center">
-              <Upload className="h-6 w-6 text-gray-500" />
-              <span className="text-sm text-gray-500">
+              <Upload className="h-6 w-6 text-muted-foreground/80" />
+              <span className="text-sm text-muted-foreground/80">
                 {resumeFile ? resumeFile.name : "Click to upload or drag and drop"}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-muted-foreground/60">
                 PDF, DOC or DOCX (max 5MB)
               </span>
             </div>

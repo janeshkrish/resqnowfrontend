@@ -23,7 +23,7 @@ const TechnicianJobCompletion = ({ amount, onClose }: TechnicianJobCompletionPro
                         transition={{ delay: 0.3, type: "spring" }}
                         className="bg-amber-400 p-4 rounded-full shadow-lg border-4 border-slate-900"
                     >
-                        <Trophy className="w-10 h-10 text-slate-900 fill-slate-900" />
+                        <Trophy className="w-10 h-10 text-foreground fill-slate-900" />
                     </motion.div>
                 </div>
 
@@ -33,7 +33,7 @@ const TechnicianJobCompletion = ({ amount, onClose }: TechnicianJobCompletionPro
                         You've successfully completed another mission. Thanks for your hard work and cooperation!
                     </p>
 
-                    <div className="bg-white/5 rounded-2xl p-6 border border-white/10 mb-8 backdrop-blur-md">
+                    <div className="bg-card dark:bg-slate-900/5 rounded-2xl p-6 border border-white/10 mb-8 backdrop-blur-md">
                         <p className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-1">Total Earnings</p>
                         <div className="flex items-center justify-center gap-2 text-green-400">
                             <Wallet className="w-6 h-6" />
@@ -43,7 +43,7 @@ const TechnicianJobCompletion = ({ amount, onClose }: TechnicianJobCompletionPro
 
                     <Button
                         onClick={onClose}
-                        className="w-full bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold h-12 rounded-xl"
+                        className="w-full bg-amber-400 hover:bg-amber-500 text-foreground font-bold h-12 rounded-xl"
                     >
                         Back to Dashboard
                     </Button>

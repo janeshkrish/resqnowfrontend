@@ -240,23 +240,23 @@ const Map = () => {
   const mapCenter: [number, number] = coordinates ? [coordinates.lat, coordinates.lng] : DEFAULT_CENTER;
 
   return (
-    <div className="relative w-full h-[calc(100dvh-4rem)] overflow-hidden bg-slate-100 isolate">
+    <div className="relative w-full h-[calc(100dvh-4rem)] overflow-hidden bg-muted/50 isolate">
 
       {/* Floating Top Controls */}
       <div className="absolute top-4 inset-x-4 z-[400] flex justify-between items-start pointer-events-none data-map-controls">
         <div className="flex flex-col gap-2">
           {/* Header Pill */}
-          <div className="pointer-events-auto bg-white/95 backdrop-blur-md pl-2 pr-4 py-2 rounded-full shadow-lg shadow-slate-900/5 border border-slate-100/50 flex items-center gap-3">
+          <div className="pointer-events-auto bg-card dark:bg-slate-900/95 backdrop-blur-md pl-2 pr-4 py-2 rounded-full shadow-lg shadow-slate-900/5 border border-border/50 flex items-center gap-3">
             <div className="bg-red-50 p-1.5 rounded-full">
               <MapIcon className="h-4 w-4 text-red-500" />
             </div>
             <div>
-              <h2 className="font-bold text-sm text-slate-800 leading-none">Live Radar</h2>
+              <h2 className="font-bold text-sm text-foreground leading-none">Live Radar</h2>
             </div>
           </div>
 
           {(address || locationError) && (
-            <div className="pointer-events-auto bg-white/95 backdrop-blur flex items-center gap-2 px-3 py-2 rounded-2xl shadow-md border border-slate-100 max-w-[200px] sm:max-w-xs animate-in slide-in-from-top-2">
+            <div className="pointer-events-auto bg-card dark:bg-slate-900/95 backdrop-blur flex items-center gap-2 px-3 py-2 rounded-2xl shadow-md border border-border max-w-[200px] sm:max-w-xs animate-in slide-in-from-top-2">
               {locationError ? (
                 <>
                   <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
@@ -265,7 +265,7 @@ const Map = () => {
               ) : address ? (
                 <>
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                  <p className="text-slate-600 text-[10px] font-medium leading-tight line-clamp-2">{address}</p>
+                  <p className="text-muted-foreground text-[10px] font-medium leading-tight line-clamp-2">{address}</p>
                 </>
               ) : null}
             </div>
@@ -315,8 +315,8 @@ const Map = () => {
             >
               <Popup>
                 <div className="p-1 min-w-[150px]">
-                  <h3 className="font-bold text-sm mb-1 text-slate-900">{tech.name}</h3>
-                  <p className="text-xs text-gray-600 mb-2">{tech.service_type}</p>
+                  <h3 className="font-bold text-sm mb-1 text-foreground">{tech.name}</h3>
+                  <p className="text-xs text-muted-foreground mb-2">{tech.service_type}</p>
                   <Button
                     size="sm"
                     className="w-full h-7 text-xs"
@@ -331,28 +331,28 @@ const Map = () => {
         </MapContainer>
 
         {loadingTechnicians && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-slate-100 flex items-center gap-2 text-xs font-bold text-slate-700 z-[400]">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-card dark:bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-border flex items-center gap-2 text-xs font-bold text-muted-foreground z-[400]">
             <Loader2 className="h-4 w-4 animate-spin text-primary" /> Fetching Radar...
           </div>
         )}
       </div>
       {/* Bottom Sheet Overlay - Technician List */}
       {/* On desktop, we can pin this to the right side if needed, but going mobile-first: */}
-      <div className="absolute inset-x-0 bottom-0 z-[500] lg:right-6 lg:left-auto lg:top-6 lg:bottom-6 lg:w-[400px] lg:rounded-[2rem] bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col max-h-[55dvh] lg:max-h-full transition-all duration-300">
+      <div className="absolute inset-x-0 bottom-0 z-[500] lg:right-6 lg:left-auto lg:top-6 lg:bottom-6 lg:w-[400px] lg:rounded-[2rem] bg-card dark:bg-slate-900 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.12)] border border-border flex flex-col max-h-[55dvh] lg:max-h-full transition-all duration-300">
 
         {/* Mobile Drag Handle */}
         <div className="w-full flex justify-center pt-4 pb-2 shrink-0 lg:hidden">
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+          <div className="w-12 h-1.5 bg-border rounded-full"></div>
         </div>
 
-        <div className="px-5 pb-4 pt-1 border-b border-slate-100/60 shrink-0 space-y-4">
+        <div className="px-5 pb-4 pt-1 border-b border-border/60 shrink-0 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 shadow-sm text-white">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-black text-xl text-slate-900 tracking-tight leading-none mb-1">Available Techs</h2>
+                <h2 className="font-black text-xl text-foreground tracking-tight leading-none mb-1">Available Techs</h2>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">{filteredTechnicians.length} Online</span>
                 </div>
@@ -363,7 +363,7 @@ const Map = () => {
           {/* Filter Controls (Horizontal Scrollable) */}
           <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
             <Select value={filterService} onValueChange={setFilterService}>
-              <SelectTrigger className="h-9 min-w-[120px] text-xs font-bold bg-slate-50 border-slate-200 rounded-xl shadow-none text-slate-700 hover:bg-slate-100 transition-colors">
+              <SelectTrigger className="h-9 min-w-[120px] text-xs font-bold bg-muted border-border rounded-xl shadow-none text-muted-foreground hover:bg-muted/50 transition-colors">
                 <SelectValue placeholder="Service" />
               </SelectTrigger>
               <SelectContent>
@@ -373,7 +373,7 @@ const Map = () => {
             </Select>
 
             <Select value={filterVehicle} onValueChange={setFilterVehicle}>
-              <SelectTrigger className="h-9 min-w-[120px] text-xs font-bold bg-slate-50 border-slate-200 rounded-xl shadow-none text-slate-700 hover:bg-slate-100 transition-colors">
+              <SelectTrigger className="h-9 min-w-[120px] text-xs font-bold bg-muted border-border rounded-xl shadow-none text-muted-foreground hover:bg-muted/50 transition-colors">
                 <SelectValue placeholder="Vehicle" />
               </SelectTrigger>
               <SelectContent>
@@ -383,7 +383,7 @@ const Map = () => {
             </Select>
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="h-9 min-w-[120px] text-xs font-bold bg-slate-50 border-slate-200 rounded-xl shadow-none text-slate-700 hover:bg-slate-100 transition-colors">
+              <SelectTrigger className="h-9 min-w-[120px] text-xs font-bold bg-muted border-border rounded-xl shadow-none text-muted-foreground hover:bg-muted/50 transition-colors">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
@@ -395,7 +395,7 @@ const Map = () => {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 bg-slate-50/50 rounded-b-[2rem]">
+        <ScrollArea className="flex-1 bg-muted/50 rounded-b-[2rem]">
           <div className="p-4 space-y-3">
             {loadingTechnicians ? (
               <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-3">
@@ -420,8 +420,8 @@ const Map = () => {
                 <Card
                   key={tech.id}
                   className={`group cursor-pointer transition-all duration-300 border rounded-2xl ${selectedTech?.id === tech.id
-                    ? 'border-sky-300 ring-2 ring-sky-100 bg-white shadow-[0_16px_28px_-24px_rgba(2,132,199,0.65)]'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-[0_12px_24px_-22px_rgba(15,23,42,0.45)]'
+                    ? 'border-sky-300 ring-2 ring-sky-100 bg-card dark:bg-slate-900 shadow-[0_16px_28px_-24px_rgba(2,132,199,0.65)]'
+                    : 'border-border bg-card dark:bg-slate-900 hover:border-slate-300 hover:shadow-[0_12px_24px_-22px_rgba(15,23,42,0.45)]'
                     }`}
                   onClick={() => handleTechSelect(tech)}
                 >
@@ -431,10 +431,10 @@ const Map = () => {
                       <div className="space-y-1 w-full overflow-hidden">
                         <div className="flex justify-between items-start w-full gap-2">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-sm shrink-0">
+                            <div className="h-10 w-10 rounded-xl bg-muted/50 border border-border flex items-center justify-center text-muted-foreground font-bold text-sm shrink-0">
                               {getVendorInitials(tech.name)}
                             </div>
-                            <h4 className="font-bold text-base text-slate-900 leading-tight truncate group-hover:text-slate-700 transition-colors">{tech.name}</h4>
+                            <h4 className="font-bold text-base text-foreground leading-tight truncate group-hover:text-muted-foreground transition-colors">{tech.name}</h4>
                           </div>
                           <div className="flex items-center gap-1 text-xs font-bold bg-amber-50 px-2 py-1 rounded-full text-amber-700 border border-amber-200 shrink-0">
                             <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
@@ -443,7 +443,7 @@ const Map = () => {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-1.5 pl-[52px]">
-                          <Badge variant="secondary" className="font-semibold text-[10px] px-2 py-0.5 h-auto bg-slate-100 text-slate-700 border border-slate-200">
+                          <Badge variant="secondary" className="font-semibold text-[10px] px-2 py-0.5 h-auto bg-muted/50 text-muted-foreground border border-border">
                             {tech.service_type}
                           </Badge>
                           {tech.aiRecommended && (
@@ -457,12 +457,12 @@ const Map = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2.5 text-[10px] sm:text-xs">
-                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-center">
-                        <span className="text-slate-500 font-medium flex items-center gap-1.5"><Navigation className="h-3 w-3 text-slate-500" /> Distance</span>
-                        <p className="font-bold text-slate-800 ml-4">{formatDistance(tech.distance)}</p>
+                      <div className="bg-muted p-2.5 rounded-xl border border-border flex flex-col justify-center">
+                        <span className="text-muted-foreground/80 font-medium flex items-center gap-1.5"><Navigation className="h-3 w-3 text-muted-foreground/80" /> Distance</span>
+                        <p className="font-bold text-foreground ml-4">{formatDistance(tech.distance)}</p>
                       </div>
-                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-center">
-                        <span className="text-slate-500 font-medium flex items-center gap-1.5"><Clock3 className="h-3 w-3 text-slate-500" /> Est. Time</span>
+                      <div className="bg-muted p-2.5 rounded-xl border border-border flex flex-col justify-center">
+                        <span className="text-muted-foreground/80 font-medium flex items-center gap-1.5"><Clock3 className="h-3 w-3 text-muted-foreground/80" /> Est. Time</span>
                         <p className="font-bold text-emerald-700 ml-4">{calculateETA(tech.distance)}</p>
                       </div>
                     </div>
@@ -472,7 +472,7 @@ const Map = () => {
                         size="sm"
                         className={`w-full font-bold shadow-sm h-9 text-xs rounded-xl ${selectedTech?.id === tech.id
                           ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                          : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-800 hover:text-slate-900 hover:bg-slate-50'
+                          : 'bg-card dark:bg-slate-900 text-muted-foreground border border-slate-300 hover:border-slate-800 hover:text-foreground hover:bg-muted'
                           }`}
                         onClick={(e) => {
                           e.stopPropagation();

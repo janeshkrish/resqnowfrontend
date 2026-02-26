@@ -51,7 +51,7 @@ const ServiceVehicleSelector = ({
               <Zap className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h4 className="text-2xl font-bold text-gray-800">EV Emergency Charging Service</h4>
+              <h4 className="text-2xl font-bold text-foreground">EV Emergency Charging Service</h4>
               <p className="text-emerald-600 font-medium">Eco-friendly roadside assistance</p>
             </div>
           </div>
@@ -69,7 +69,7 @@ const ServiceVehicleSelector = ({
   }
 
   return (
-    <div className="mt-8 p-8 bg-gradient-to-br from-white via-gray-50 to-red-50/30 rounded-3xl shadow-xl border border-gray-200/50 animate-fade-in relative overflow-hidden">
+    <div className="mt-8 p-8 bg-gradient-to-br from-white via-gray-50 to-red-50/30 rounded-3xl shadow-xl border border-border/50 animate-fade-in relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-red-100/40 to-orange-100/40 rounded-full blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-br from-blue-100/40 to-purple-100/40 rounded-full blur-3xl"></div>
@@ -79,14 +79,14 @@ const ServiceVehicleSelector = ({
             <MapPin className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h4 className="text-2xl font-bold text-gray-800">Select Vehicle & Details</h4>
+            <h4 className="text-2xl font-bold text-foreground">Select Vehicle & Details</h4>
             <p className="text-red-600 font-medium">Let us know how we can help you</p>
           </div>
         </div>
         <div className="space-y-8">
           {/* Vehicle Type Selection */}
           <div className="space-y-4">
-            <label className="block text-lg font-semibold text-gray-800 mb-4">
+            <label className="block text-lg font-semibold text-foreground mb-4">
               Choose Your Vehicle Type
             </label>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -98,7 +98,7 @@ const ServiceVehicleSelector = ({
                     "hover:shadow-lg hover:-translate-y-1",
                     selectedVehicleType === category.id
                       ? "border-red-400 bg-gradient-to-br from-red-50 to-red-100 shadow-lg scale-105"
-                      : "border-gray-200 bg-white hover:border-red-200 hover:bg-red-50/50"
+                      : "border-border bg-card dark:bg-slate-900 hover:border-red-200 hover:bg-red-50/50"
                   )}
                   onClick={() => onVehicleTypeSelect(category.id)}
                 >
@@ -106,23 +106,23 @@ const ServiceVehicleSelector = ({
                     "p-4 rounded-xl mb-3 transition-all duration-300",
                     selectedVehicleType === category.id
                       ? "bg-gradient-to-br from-red-500 to-red-600 shadow-lg"
-                      : "bg-gray-100 group-hover:bg-red-100"
+                      : "bg-muted/50 group-hover:bg-red-100"
                   )}>
                     <category.icon className={cn(
                       "h-8 w-8 transition-colors duration-300",
-                      selectedVehicleType === category.id ? "text-white" : "text-gray-600 group-hover:text-red-600"
+                      selectedVehicleType === category.id ? "text-white" : "text-muted-foreground group-hover:text-red-600"
                     )} />
                   </div>
                   <span className={cn(
                     "text-sm font-semibold text-center transition-colors duration-300",
-                    selectedVehicleType === category.id ? "text-red-700" : "text-gray-700 group-hover:text-red-600"
+                    selectedVehicleType === category.id ? "text-red-700" : "text-muted-foreground group-hover:text-red-600"
                   )}>
                     {category.name}
                   </span>
                   {/* Selection indicator */}
                   {selectedVehicleType === category.id && (
                     <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                      <div className="w-2 h-2 bg-card dark:bg-slate-900 rounded-full"></div>
                     </div>
                   )}
                 </div>
@@ -132,14 +132,14 @@ const ServiceVehicleSelector = ({
           {/* Vehicle Subtype Selection */}
           {selectedVehicleType && (
             <div className="space-y-4 animate-fade-in">
-              <label className="block text-lg font-semibold text-gray-800">
+              <label className="block text-lg font-semibold text-foreground">
                 Vehicle Subtype
               </label>
               <Select onValueChange={onVehicleSubtypeSelect}>
-                <SelectTrigger className="h-14 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400 bg-white shadow-sm text-base">
+                <SelectTrigger className="h-14 rounded-xl border-2 border-border hover:border-red-300 focus:border-red-400 bg-card dark:bg-slate-900 shadow-sm text-base">
                   <SelectValue placeholder="Select your specific vehicle type" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-2 border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm">
+                <SelectContent className="rounded-xl border-2 border-border shadow-xl bg-card dark:bg-slate-900/95 backdrop-blur-sm">
                   {vehicleSubtypes.map((subtype) => (
                     <SelectItem
                       key={subtype}
@@ -157,16 +157,16 @@ const ServiceVehicleSelector = ({
           {selectedVehicleSubtype && (
             <form className="space-y-6 animate-fade-in">
               {/* Location Section */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-sm">
-                <h5 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <div className="bg-card dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-border/50 shadow-sm">
+                <h5 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-red-500" />
                   Location Details
                 </h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">District</label>
                     <Select onValueChange={setSelectedDistrict}>
-                      <SelectTrigger className="h-12 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400">
+                      <SelectTrigger className="h-12 rounded-xl border-2 border-border hover:border-red-300 focus:border-red-400">
                         <SelectValue placeholder="Select your district" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px] overflow-y-auto rounded-xl shadow-xl">
@@ -180,47 +180,47 @@ const ServiceVehicleSelector = ({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Your Location</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Your Location</label>
                     <div className="flex gap-2">
                       <Input
                         placeholder="Enter your current location"
-                        className="h-12 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400"
+                        className="h-12 rounded-xl border-2 border-border hover:border-red-300 focus:border-red-400"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
-                        className="h-12 w-12 rounded-xl border-2 border-gray-200 hover:border-red-300 hover:bg-red-50"
+                        className="h-12 w-12 rounded-xl border-2 border-border hover:border-red-300 hover:bg-red-50"
                       >
                         <MapPin className="h-5 w-5 text-red-500" />
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Click the location icon to use your current location</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1">Click the location icon to use your current location</p>
                   </div>
                 </div>
               </div>
 
               {/* Contact & Details Section */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-sm">
-                <h5 className="text-lg font-semibold text-gray-800 mb-4">Contact & Additional Information</h5>
+              <div className="bg-card dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-border/50 shadow-sm">
+                <h5 className="text-lg font-semibold text-foreground mb-4">Contact & Additional Information</h5>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Contact Number</label>
                     <Input
                       type="tel"
                       placeholder="Enter your contact number (+91)"
-                      className="h-12 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400"
+                      className="h-12 rounded-xl border-2 border-border hover:border-red-300 focus:border-red-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Additional Information <span className="text-gray-400">(Optional)</span>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
+                      Additional Information <span className="text-muted-foreground/60">(Optional)</span>
                     </label>
                     <Input
                       placeholder="Describe your situation or any special requirements"
-                      className="h-12 rounded-xl border-2 border-gray-200 hover:border-red-300 focus:border-red-400"
+                      className="h-12 rounded-xl border-2 border-border hover:border-red-300 focus:border-red-400"
                     />
                   </div>
                 </div>
@@ -237,7 +237,7 @@ const ServiceVehicleSelector = ({
                       >
                         I agree to the terms and conditions
                       </label>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-muted-foreground">
                         • Payment only after successful service completion<br />
                         • All prices are in ₹ (INR) and include applicable taxes<br />
                         • Emergency services available 24/7

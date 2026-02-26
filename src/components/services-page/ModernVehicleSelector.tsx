@@ -54,8 +54,8 @@ const ModernVehicleSelector = ({ onVehicleSelect, selectedVehicle }: ModernVehic
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-gray-800">Select Your Vehicle Type</h2>
-        <p className="text-gray-600">Choose the vehicle category that matches your needs</p>
+        <h2 className="text-2xl font-bold text-foreground">Select Your Vehicle Type</h2>
+        <p className="text-muted-foreground">Choose the vehicle category that matches your needs</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -77,7 +77,7 @@ const ModernVehicleSelector = ({ onVehicleSelect, selectedVehicle }: ModernVehic
                   "w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left relative overflow-hidden group",
                   isSelected
                     ? "border-red-400 bg-red-50 shadow-lg"
-                    : "border-gray-200 bg-white hover:border-red-200 hover:shadow-md"
+                    : "border-border bg-card dark:bg-slate-900 hover:border-red-200 hover:shadow-md"
                 )}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -101,7 +101,7 @@ const ModernVehicleSelector = ({ onVehicleSelect, selectedVehicle }: ModernVehic
                       "p-3 rounded-xl transition-all duration-300",
                       isSelected
                         ? `bg-gradient-to-br ${vehicle.gradient} text-white shadow-lg`
-                        : "bg-gray-100 text-gray-600 group-hover:bg-red-100 group-hover:text-red-600"
+                        : "bg-muted/50 text-muted-foreground group-hover:bg-red-100 group-hover:text-red-600"
                     )}
                   >
                     <Icon className="h-6 w-6" />
@@ -111,7 +111,7 @@ const ModernVehicleSelector = ({ onVehicleSelect, selectedVehicle }: ModernVehic
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className={cn(
                         "font-semibold text-lg transition-colors",
-                        isSelected ? "text-red-700" : "text-gray-800"
+                        isSelected ? "text-red-700" : "text-foreground"
                       )}>
                         {vehicle.name}
                       </h3>
@@ -125,7 +125,7 @@ const ModernVehicleSelector = ({ onVehicleSelect, selectedVehicle }: ModernVehic
                         </motion.div>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">{vehicle.description}</p>
+                    <p className="text-sm text-muted-foreground">{vehicle.description}</p>
                   </div>
 
                   <motion.div

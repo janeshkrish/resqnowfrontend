@@ -28,7 +28,7 @@ const ClientJobCompletion = ({ technicianName, onSubmitReview }: ClientJobComple
                 initial={{ scale: 0.95, opacity: 0, y: 10 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, type: "spring", stiffness: 100 }}
-                className="bg-white w-full max-w-sm overflow-hidden shadow-2xl rounded-sm border-t-4 border-red-600 ring-1 ring-zinc-200"
+                className="bg-card dark:bg-slate-900 w-full max-w-sm overflow-hidden shadow-2xl rounded-sm border-t-4 border-red-600 ring-1 ring-zinc-200"
             >
                 {/* Corporate Header */}
                 <div className="bg-zinc-50 border-b border-zinc-100 p-6 text-center relative">
@@ -40,7 +40,7 @@ const ClientJobCompletion = ({ technicianName, onSubmitReview }: ClientJobComple
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ delay: 0.2 }}
-                        className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-zinc-100"
+                        className="w-16 h-16 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-zinc-100"
                     >
                         <CheckCircle2 className="w-9 h-9 text-green-600" />
                     </motion.div>
@@ -78,7 +78,7 @@ const ClientJobCompletion = ({ technicianName, onSubmitReview }: ClientJobComple
                             placeholder="Additional comments (Optional)"
                             value={comment}
                             onChange={(e) => setComment(e.target.value)}
-                            className="resize-none bg-white border-zinc-200 text-zinc-800 placeholder:text-zinc-400 focus:border-red-500 focus:ring-1 focus:ring-red-500 min-h-[80px] text-sm rounded-sm"
+                            className="resize-none bg-card dark:bg-slate-900 border-zinc-200 text-zinc-800 placeholder:text-zinc-400 focus:border-red-500 focus:ring-1 focus:ring-red-500 min-h-[80px] text-sm rounded-sm"
                         />
                     </div>
 

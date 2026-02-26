@@ -181,12 +181,12 @@ const SettingsPage = () => {
       case "appearance":
         return (
           <div className="zomato-card space-y-4">
-            <div className="pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Appearance</h3>
-              <p className="text-xs text-gray-500">Customize how the app looks and feels.</p>
+            <div className="pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Appearance</h3>
+              <p className="text-xs text-muted-foreground/80">Customize how the app looks and feels.</p>
             </div>
             {settingsLoading ? (
-              <div className="flex items-center justify-center py-8 text-gray-400">
+              <div className="flex items-center justify-center py-8 text-muted-foreground/60">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />
                 Loading settings...
               </div>
@@ -270,9 +270,9 @@ const SettingsPage = () => {
       case "stats":
         return (
           <div className="zomato-card space-y-4">
-            <div className="pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Usage Statistics</h3>
-              <p className="text-xs text-gray-500">Track your service history and activity.</p>
+            <div className="pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Usage Statistics</h3>
+              <p className="text-xs text-muted-foreground/80">Track your service history and activity.</p>
             </div>
             <UsageStats />
           </div>
@@ -280,9 +280,9 @@ const SettingsPage = () => {
       case "privacy":
         return (
           <div className="zomato-card space-y-4">
-            <div className="pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Privacy & Security</h3>
-              <p className="text-xs text-gray-500">Manage your account security.</p>
+            <div className="pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Privacy & Security</h3>
+              <p className="text-xs text-muted-foreground/80">Manage your account security.</p>
             </div>
             <div className="space-y-4">
               <Button variant="outline" className="w-full justify-start h-12 rounded-xl">Change Password</Button>
@@ -298,16 +298,16 @@ const SettingsPage = () => {
   if (isMobile) {
     if (activeTab === "menu") {
       return (
-        <div className="min-h-screen bg-slate-50 pb-20 fade-in-0 animate-in duration-300">
-          <div className="bg-white px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-slate-100 flex items-center gap-5">
-            <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-slate-100 border-[3px] border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
+        <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in duration-300">
+          <div className="bg-card dark:bg-slate-900 px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-border flex items-center gap-5">
+            <div className="w-[4.5rem] h-[4.5rem] rounded-full bg-muted/50 border-[3px] border-white shadow-md flex items-center justify-center overflow-hidden shrink-0">
               <User className="w-8 h-8 text-slate-300" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight truncate">
+              <h2 className="text-2xl font-black text-foreground tracking-tight truncate">
                 {user?.name || user?.email?.split('@')[0] || 'User'}
               </h2>
-              <p className="text-sm font-semibold text-slate-500 truncate mb-2">{user?.email}</p>
+              <p className="text-sm font-semibold text-muted-foreground/80 truncate mb-2">{user?.email}</p>
               <button onClick={() => handleTabChange('profile')} className="text-blue-600 font-bold text-[10px] uppercase tracking-widest bg-blue-50 hover:bg-blue-100 px-4 py-1.5 rounded-full transition-colors active:scale-95">
                 Edit Profile
               </button>
@@ -315,49 +315,49 @@ const SettingsPage = () => {
           </div>
 
           <div className="px-4 space-y-4">
-            <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
               {sidebarItems.filter(item => item.id !== 'profile').map((item, index) => {
                 // Ensure we don't render a separator after the last item
                 const isLast = index === sidebarItems.length - 2;
                 return (
                   <div key={item.id}>
-                    <button onClick={() => handleTabChange(item.id)} className="w-full text-left p-4 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                    <button onClick={() => handleTabChange(item.id)} className="w-full text-left p-4 flex items-center justify-between hover:bg-muted active:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-border">
                           <item.icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800">{item.label}</h3>
-                          <p className="text-[11px] font-medium text-slate-500">{item.description}</p>
+                          <h3 className="font-bold text-foreground">{item.label}</h3>
+                          <p className="text-[11px] font-medium text-muted-foreground/80">{item.description}</p>
                         </div>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-300" />
                     </button>
-                    {!isLast && <Separator className="mx-4 w-auto bg-slate-100" />}
+                    {!isLast && <Separator className="mx-4 w-auto bg-muted/50" />}
                   </div>
                 )
               })}
             </div>
 
-            <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
               <button
                 onClick={() => navigate('/technician/login')}
-                className="w-full text-left p-4 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                className="w-full text-left p-4 flex items-center justify-between hover:bg-muted active:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
                     <Briefcase className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800">Partner with Us</h3>
-                    <p className="text-[11px] font-medium text-slate-500">Earn with ResQNow</p>
+                    <h3 className="font-bold text-foreground">Partner with Us</h3>
+                    <p className="text-[11px] font-medium text-muted-foreground/80">Earn with ResQNow</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-slate-300" />
               </button>
             </div>
 
-            <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
               <button onClick={() => { logout(); navigate('/'); }} className="w-full text-left p-4 flex items-center justify-between hover:bg-red-50 active:bg-red-100 transition-colors">
                 <div className="flex items-center gap-4 text-red-600">
                   <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
@@ -376,12 +376,12 @@ const SettingsPage = () => {
     // Mobile Sub-page view
     const activeItem = sidebarItems.find(i => i.id === activeTab)
     return (
-      <div className="min-h-screen bg-slate-50 pb-20 fade-in-0 animate-in slide-in-from-bottom-4 duration-300">
-        <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-slate-100 shadow-sm">
-          <button onClick={() => handleTabChange('menu')} className="w-10 h-10 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition-all">
+      <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="sticky top-0 z-50 bg-card dark:bg-slate-900/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-border shadow-sm">
+          <button onClick={() => handleTabChange('menu')} className="w-10 h-10 flex items-center justify-center bg-muted border border-border rounded-full text-muted-foreground hover:bg-muted/50 active:scale-95 transition-all">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-lg font-black text-slate-900 tracking-tight">{activeItem?.label || 'Profile'}</h2>
+          <h2 className="text-lg font-black text-foreground tracking-tight">{activeItem?.label || 'Profile'}</h2>
         </div>
         <div className="p-4">
           {renderContent()}
@@ -395,8 +395,8 @@ const SettingsPage = () => {
     <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
       <div className="space-y-6">
         <div className="space-y-0.5">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">My Account</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">My Account</h2>
+          <p className="text-sm text-muted-foreground/80">
             Manage your account settings and set e-mail preferences.
           </p>
         </div>
@@ -408,10 +408,10 @@ const SettingsPage = () => {
                 <Button
                   key={item.id}
                   variant={activeTab === item.id ? "default" : "ghost"}
-                  className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-gray-100 text-gray-600"}`}
+                  className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted/50 text-muted-foreground"}`}
                   onClick={() => handleTabChange(item.id)}
                 >
-                  <item.icon className={`mr-2 h-4 w-4 ${activeTab === item.id ? "text-primary-foreground" : "text-gray-500"}`} />
+                  <item.icon className={`mr-2 h-4 w-4 ${activeTab === item.id ? "text-primary-foreground" : "text-muted-foreground/80"}`} />
                   {item.label}
                 </Button>
               ))}

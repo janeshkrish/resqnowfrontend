@@ -19,7 +19,7 @@ const LoadingAnimation = () => {
   return (
     <div 
       className={cn(
-        "fixed inset-0 z-50 flex flex-col items-center justify-center bg-white transition-opacity duration-500",
+        "fixed inset-0 z-50 flex flex-col items-center justify-center bg-card dark:bg-slate-900 transition-opacity duration-500",
         isLoading ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
     >
@@ -124,7 +124,7 @@ const LoadingAnimation = () => {
           `}
         </style>
         <h1 className="text-3xl font-bold text-center mt-6 text-red-600">ResQNow</h1>
-        <p className="text-center text-gray-600 mt-2">Your Roadside Assistance Partner</p>
+        <p className="text-center text-muted-foreground mt-2">Your Roadside Assistance Partner</p>
       </div>
     </div>
   );

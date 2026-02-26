@@ -66,9 +66,9 @@ const stepDetails = [
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed ? "bg-gradient-to-br from-green-400 via-green-500 to-green-600 border-green-200 shadow-xl animate-glow"
           : active ? "bg-gradient-to-br from-red-400 via-red-500 to-red-600 border-red-200 shadow-lg animate-glow"
-            : "bg-gray-200 border-gray-100"}
+            : "bg-border border-border"}
       `}>
-        <User className={`h-6 w-6 ${completed || active ? "text-white" : "text-gray-400"}`} />
+        <User className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />
       </div>
     ),
     tooltip: "Enter your personal details"
@@ -79,9 +79,9 @@ const stepDetails = [
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed ? "bg-gradient-to-br from-green-400 via-green-500 to-green-600 border-green-200 shadow-xl animate-glow"
           : active ? "bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 border-yellow-200 shadow-lg animate-glow"
-            : "bg-gray-200 border-gray-100"}
+            : "bg-border border-border"}
       `}>
-        <Car className={`h-6 w-6 ${completed || active ? "text-white" : "text-gray-400"}`} />
+        <Car className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />
       </div>
     ),
     tooltip: "Enter your vehicle details"
@@ -92,9 +92,9 @@ const stepDetails = [
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed ? "bg-gradient-to-br from-green-400 via-green-500 to-green-600 border-green-200 shadow-xl animate-glow"
           : active ? "bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 border-blue-200 shadow-lg animate-glow"
-            : "bg-gray-200 border-gray-100"}
+            : "bg-border border-border"}
       `}>
-        <MapPin className={`h-6 w-6 ${completed || active ? "text-white" : "text-gray-400"}`} />
+        <MapPin className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />
       </div>
     ),
     tooltip: "Provide your location"
@@ -105,9 +105,9 @@ const stepDetails = [
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed ? "bg-gradient-to-br from-green-400 via-green-500 to-green-600 border-green-200 shadow-xl animate-glow"
           : active ? "bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 border-purple-200 shadow-lg animate-glow"
-            : "bg-gray-200 border-gray-100"}
+            : "bg-border border-border"}
       `}>
-        <Wrench className={`h-6 w-6 ${completed || active ? "text-white" : "text-gray-400"}`} />
+        <Wrench className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />
       </div>
     ),
     tooltip: "Choose a technician"
@@ -118,9 +118,9 @@ const stepDetails = [
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed ? "bg-gradient-to-br from-green-400 via-green-500 to-green-600 border-green-200 shadow-xl animate-glow"
           : active ? "bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 border-orange-200 shadow-lg animate-glow"
-            : "bg-gray-200 border-gray-100"}
+            : "bg-border border-border"}
       `}>
-        <CreditCard className={`h-6 w-6 ${completed || active ? "text-white" : "text-gray-400"}`} />
+        <CreditCard className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />
       </div>
     ),
     tooltip: "Choose payment method"
@@ -130,9 +130,9 @@ const stepDetails = [
     icon: (active: boolean, completed: boolean) => (
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed || active ? "bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 border-red-200 shadow-xl animate-glow"
-          : "bg-gray-200 border-gray-100"}
+          : "bg-border border-border"}
       `}>
-        <Check className={`h-6 w-6 ${completed || active ? "text-white" : "text-gray-400"}`} />
+        <Check className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />
       </div>
     ),
     tooltip: "Review and confirm"
@@ -366,7 +366,7 @@ const ServiceRequest = () => {
                     {s.tooltip}
                   </div>
                 </div>
-                <span className={`mt-2 text-xs font-bold transition-colors ${active ? "text-red-600" : completed ? "text-green-600" : "text-gray-500 group-hover:text-black"}`}>
+                <span className={`mt-2 text-xs font-bold transition-colors ${active ? "text-red-600" : completed ? "text-green-600" : "text-muted-foreground/80 group-hover:text-black"}`}>
                   {s.name}
                 </span>
               </div>
@@ -383,7 +383,7 @@ const ServiceRequest = () => {
               transition: "width 500ms cubic-bezier(0.4,0,0.2,1)"
             }}
           />
-          <div className="flex-1 bg-gray-200 rounded-full" />
+          <div className="flex-1 bg-border rounded-full" />
         </div>
       </div>
     );
@@ -392,8 +392,8 @@ const ServiceRequest = () => {
   return (
   <div className="min-h-screen app-bg pb-32">
     <div className="container max-w-3xl py-4 md:py-12 px-0 md:px-4">
-      <div className="border-none md:border overflow-hidden md:shadow-2xl bg-white md:rounded-xl">
-        <div className="bg-white text-gray-900 p-4 border-b border-gray-100">
+      <div className="border-none md:border overflow-hidden md:shadow-2xl bg-card dark:bg-slate-900 md:rounded-xl">
+        <div className="bg-card dark:bg-slate-900 text-foreground p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl text-primary">
               {(serviceId === "towing") && <MapPin className="h-6 w-6" />}
@@ -403,7 +403,7 @@ const ServiceRequest = () => {
             </div>
             <div className="flex-1">
               <h1 className="text-xl font-bold leading-tight">{service.name}</h1>
-              <p className="text-gray-500 mt-0.5 text-xs leading-snug line-clamp-1">{service.description}</p>
+              <p className="text-muted-foreground/80 mt-0.5 text-xs leading-snug line-clamp-1">{service.description}</p>
               <div className="mt-2 inline-flex items-center gap-1.5 bg-green-50 text-green-700 rounded-md px-2 py-0.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider">Est.</span>
                 <span className="text-xs font-semibold">{service.estimatedPrice}</span>
@@ -412,13 +412,13 @@ const ServiceRequest = () => {
           </div>
         </div>
 
-        <div className="p-4 md:p-6 bg-gray-50/50">
+        <div className="p-4 md:p-6 bg-muted/50">
           <LiveProgressTracker currentStep={step} totalSteps={6} />
           <div className="mb-6 pt-4">{renderProgress()}</div>
 
           <form onSubmit={handleSubmit} className="pb-8">
             {/* Stepper Content */}
-            <div className="zomato-card bg-white p-5">
+            <div className="zomato-card bg-card dark:bg-slate-900 p-5">
               {step === 1 && (
                 <PersonalInfoStep
                   formData={formData}
@@ -477,7 +477,7 @@ const ServiceRequest = () => {
             <div className="zomato-action-bar">
               <div className="flex justify-between items-center max-w-3xl mx-auto gap-3">
                 {step > 1 && step !== 4 && step !== 5 && (
-                  <Button type="button" variant="outline" onClick={prevStep} className="h-12 flex-1 rounded-xl font-semibold border-gray-200 text-gray-700">
+                  <Button type="button" variant="outline" onClick={prevStep} className="h-12 flex-1 rounded-xl font-semibold border-border text-muted-foreground">
                     Back
                   </Button>
                 )}

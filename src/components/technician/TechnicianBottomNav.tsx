@@ -14,7 +14,7 @@ const TechnicianBottomNav = () => {
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50 shadow-[0_-8px_30px_-5px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom,0px)] md:hidden">
+        <div className="fixed bottom-0 left-0 right-0 bg-card dark:bg-slate-900 border-t border-border z-50 shadow-[0_-8px_30px_-5px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom,0px)] md:hidden">
             <div className="flex justify-between items-center max-w-sm mx-auto px-6 py-2">
                 {navItems.map((item) => {
                     const isActive = currentPath === item.path;
@@ -22,7 +22,7 @@ const TechnicianBottomNav = () => {
                         <Link
                             key={item.label}
                             to={item.path}
-                            className={`flex flex-col items-center gap-1 min-w-[64px] transition-colors py-1 ${isActive ? "text-blue-700" : "text-slate-400 hover:text-slate-600"}`}
+                            className={`flex flex-col items-center gap-1 min-w-[64px] transition-colors py-1 ${isActive ? "text-blue-700" : "text-slate-400 hover:text-muted-foreground"}`}
                         >
                             <div className={`relative flex items-center justify-center w-12 h-8 rounded-full transition-colors ${isActive ? "bg-blue-50" : ""}`}>
                                 <item.icon className={`w-5 h-5 ${isActive ? "fill-current" : ""}`} strokeWidth={isActive ? 2.5 : 2} />

@@ -386,7 +386,7 @@ const CostsStep = () => {
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-medium">Service Costs (Important)</h3>
-      <Card className="p-4 bg-slate-50">
+      <Card className="p-4 bg-muted">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField control={control} name="inspection_2w" render={({ field }) => (
             <FormItem>
@@ -409,7 +409,7 @@ const CostsStep = () => {
         )} />
       </Card>
 
-      <Card className="p-4 bg-slate-50">
+      <Card className="p-4 bg-muted">
         <FormLabel className="block mb-2 font-bold">Roadside Visit Charges</FormLabel>
         <div className="grid grid-cols-3 gap-4">
           <FormField control={control} name="visit_charge_base" render={({ field }) => (
@@ -596,11 +596,11 @@ export default function TechnicianRegistrationForm({ onSubmit, isSubmitting }: T
   return (
     <FormProvider {...methods}>
       <Card className="w-full shadow-lg">
-        <CardHeader className="bg-slate-50 border-b">
+        <CardHeader className="bg-muted border-b">
           <div className="flex justify-between items-center mb-4">
             {steps.map((step, idx) => (
-              <div key={idx} className={`flex flex-col items-center z-10 ${idx <= currentStep ? "text-primary" : "text-gray-400"}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx <= currentStep ? "border-primary bg-primary text-white" : "border-gray-300 bg-white"}`}>
+              <div key={idx} className={`flex flex-col items-center z-10 ${idx <= currentStep ? "text-primary" : "text-muted-foreground/60"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx <= currentStep ? "border-primary bg-primary text-white" : "border-gray-300 bg-card dark:bg-slate-900"}`}>
                   {idx < currentStep ? <CheckCircle2 className="w-5 h-5" /> : <span>{idx + 1}</span>}
                 </div>
                 <span className="text-xs mt-1 hidden sm:block">{step}</span>

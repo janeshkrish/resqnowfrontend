@@ -132,7 +132,7 @@ const UserManagement = () => {
               onChange={(e) => setSearch(e.target.value)}
               className="pr-10 w-64"
             />
-            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/80" />
           </div>
           <Button onClick={() => navigate("/admin/users/add")}>
             <UserPlus className="h-4 w-4 mr-2" />
@@ -149,19 +149,19 @@ const UserManagement = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground/80 uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground/80 uppercase tracking-wider">
                       Email
                     </th>
 
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground/80 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card dark:bg-slate-900 divide-y divide-gray-200">
                   {filteredUsers.map((user) => (
                     <tr key={user.id}>
                       <td className="px-6 py-4 whitespace-nowrap">{user.full_name}</td>

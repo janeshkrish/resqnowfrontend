@@ -18,7 +18,7 @@ const CategoryFilters = ({ categories, selectedCategory, onSelectCategory }: Cat
             "px-5 py-2.5 rounded-[1.25rem] text-sm font-bold transition-all border flex items-center gap-2 shrink-0 shadow-sm",
             selectedCategory === category.id
               ? "bg-slate-900 text-white border-slate-900 shadow-[0_4px_12px_rgba(15,23,42,0.2)]"
-              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 active:scale-95"
+              : "bg-card dark:bg-slate-900 text-muted-foreground border-border hover:bg-muted active:scale-95"
           )}
           onClick={() => onSelectCategory(category.id)}
         >

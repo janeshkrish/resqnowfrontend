@@ -29,7 +29,7 @@ const TechnicianJobHistory: React.FC<TechnicianJobHistoryProps> = ({ jobs, compa
             case 'cancelled':
                 return <Badge className="bg-red-100 text-red-800 border-red-200 text-[10px] px-2 py-0.5"><XCircle className="w-3 h-3 mr-1" /> Cancelled</Badge>;
             case 'rejected':
-                return <Badge className="bg-gray-100 text-gray-800 border-gray-200 text-[10px] px-2 py-0.5"><Clock className="w-3 h-3 mr-1" /> Rejected</Badge>;
+                return <Badge className="bg-muted/50 text-foreground border-border text-[10px] px-2 py-0.5"><Clock className="w-3 h-3 mr-1" /> Rejected</Badge>;
             case 'in-progress':
                 return <Badge className="bg-blue-100 text-blue-800 border-blue-200 animate-pulse text-[10px] px-2 py-0.5"><AlertCircle className="w-3 h-3 mr-1" /> In Progress</Badge>;
             default:
@@ -46,7 +46,7 @@ const TechnicianJobHistory: React.FC<TechnicianJobHistoryProps> = ({ jobs, compa
                     jobs.map((job) => (
                         <div key={job.id} className="flex items-center justify-between p-2 border-b last:border-0">
                             <div>
-                                <p className="font-medium text-sm text-slate-700 capitalize">{job.service_type.replace(/-/g, ' ')}</p>
+                                <p className="font-medium text-sm text-muted-foreground capitalize">{job.service_type.replace(/-/g, ' ')}</p>
                                 <p className="text-xs text-slate-400">{format(new Date(job.created_at), "MMM d, h:mm a")}</p>
                             </div>
                             <div className="text-right">
@@ -99,7 +99,7 @@ const TechnicianJobHistory: React.FC<TechnicianJobHistoryProps> = ({ jobs, compa
                                         <span className="truncate">{job.address}</span>
                                     </div>
                                     {job.amount && (
-                                        <div className="font-bold text-gray-900">
+                                        <div className="font-bold text-foreground">
                                             ₹{job.amount}
                                         </div>
                                     )}

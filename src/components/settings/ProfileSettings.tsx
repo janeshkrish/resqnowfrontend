@@ -61,7 +61,7 @@ const ProfileSettings = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header Section - Zomato Style Banner */}
-      <div className="flex flex-col items-center justify-center py-6 text-center space-y-4 bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-gray-100/50 mb-6">
+      <div className="flex flex-col items-center justify-center py-6 text-center space-y-4 bg-card dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-border/50 mb-6">
         <div className="relative group cursor-pointer">
           <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
             <AvatarImage src={formData.avatar} />
@@ -71,25 +71,25 @@ const ProfileSettings = () => {
           </Avatar>
         </div>
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">{formData.name}</h2>
-          <p className="text-gray-500 font-medium">{formData.email}</p>
+          <h2 className="text-3xl font-bold text-foreground">{formData.name}</h2>
+          <p className="text-muted-foreground/80 font-medium">{formData.email}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         {/* Basic Info Card */}
         <div className="zomato-card">
-          <div className="pb-4 border-b border-gray-100 mb-2">
-            <h3 className="text-lg font-bold text-gray-900">Personal Details</h3>
-            <p className="text-xs text-gray-500">Your information</p>
+          <div className="pb-4 border-b border-border mb-2">
+            <h3 className="text-lg font-bold text-foreground">Personal Details</h3>
+            <p className="text-xs text-muted-foreground/80">Your information</p>
           </div>
           <div className="divide-y divide-gray-100">
             {/* Name Row */}
             <div className="flex items-center justify-between py-4 group">
               <div className="flex flex-col w-1/3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Name</span>
+                <span className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-1">Name</span>
               </div>
-                <div className="flex-1 font-medium text-gray-900">
+                <div className="flex-1 font-medium text-foreground">
                   {isEditing === 'name' ? (
                     <div className="flex gap-2">
                       <Input
@@ -103,7 +103,7 @@ const ProfileSettings = () => {
                     </div>
                   ) : formData.name}
                 </div>
-                <Button variant="ghost" size="icon" className="text-gray-400 group-hover:text-gray-600" onClick={() => handleEdit('name')}>
+                <Button variant="ghost" size="icon" className="text-muted-foreground/60 group-hover:text-muted-foreground" onClick={() => handleEdit('name')}>
                   <Edit2 className="h-4 w-4" />
                 </Button>
             </div>
@@ -111,9 +111,9 @@ const ProfileSettings = () => {
             {/* Birthday Row */}
             <div className="flex items-center justify-between py-4 group">
               <div className="flex flex-col w-1/3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Birthday</span>
+                <span className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-1">Birthday</span>
               </div>
-                <div className="flex-1 font-medium text-gray-900">
+                <div className="flex-1 font-medium text-foreground">
                   {isEditing === 'birthday' ? (
                     <div className="flex gap-2">
                       <Input
@@ -128,7 +128,7 @@ const ProfileSettings = () => {
                     </div>
                   ) : (formData.birthday || "Add birthday")}
                 </div>
-                <Button variant="ghost" size="icon" className="text-gray-400 group-hover:text-gray-600" onClick={() => handleEdit('birthday')}>
+                <Button variant="ghost" size="icon" className="text-muted-foreground/60 group-hover:text-muted-foreground" onClick={() => handleEdit('birthday')}>
                   <Edit2 className="h-4 w-4" />
                 </Button>
             </div>
@@ -136,9 +136,9 @@ const ProfileSettings = () => {
             {/* Gender Row */}
             <div className="flex items-center justify-between py-4 group">
               <div className="flex flex-col w-1/3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Gender</span>
+                <span className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-1">Gender</span>
               </div>
-                <div className="flex-1 font-medium text-gray-900">
+                <div className="flex-1 font-medium text-foreground">
                   {isEditing === 'gender' ? (
                     <div className="flex gap-2">
                       <select
@@ -157,7 +157,7 @@ const ProfileSettings = () => {
                     </div>
                   ) : (formData.gender ? formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1) : "Add gender")}
                 </div>
-                <Button variant="ghost" size="icon" className="text-gray-400 group-hover:text-gray-600" onClick={() => handleEdit('gender')}>
+                <Button variant="ghost" size="icon" className="text-muted-foreground/60 group-hover:text-muted-foreground" onClick={() => handleEdit('gender')}>
                   <Edit2 className="h-4 w-4" />
                 </Button>
             </div>
@@ -166,21 +166,21 @@ const ProfileSettings = () => {
 
         {/* Contact Info Card */}
         <div className="zomato-card">
-          <div className="pb-4 border-b border-gray-100 mb-2">
-            <h3 className="text-lg font-bold text-gray-900">Contact Details</h3>
-            <p className="text-xs text-gray-500">How we can reach you</p>
+          <div className="pb-4 border-b border-border mb-2">
+            <h3 className="text-lg font-bold text-foreground">Contact Details</h3>
+            <p className="text-xs text-muted-foreground/80">How we can reach you</p>
           </div>
           <div className="divide-y divide-gray-100">
             {/* Email Row */}
             <div className="flex items-center justify-between py-4 group">
               <div className="flex flex-col w-1/3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Email</span>
+                <span className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-1">Email</span>
               </div>
-                <div className="flex-1 font-medium text-gray-900">
+                <div className="flex-1 font-medium text-foreground">
                   {formData.email}
                   {user?.isVerified && <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Verified</span>}
                 </div>
-                <Button variant="ghost" size="icon" className="text-gray-400 group-hover:text-gray-600" disabled>
+                <Button variant="ghost" size="icon" className="text-muted-foreground/60 group-hover:text-muted-foreground" disabled>
                   <ShieldCheck className="h-4 w-4" />
                 </Button>
             </div>
@@ -188,9 +188,9 @@ const ProfileSettings = () => {
             {/* Phone Row */}
             <div className="flex items-center justify-between py-4 group">
               <div className="flex flex-col w-1/3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Phone</span>
+                <span className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-1">Phone</span>
               </div>
-                <div className="flex-1 font-medium text-gray-900">
+                <div className="flex-1 font-medium text-foreground">
                   {isEditing === 'phone' ? (
                     <div className="flex gap-2">
                       <Input
@@ -205,7 +205,7 @@ const ProfileSettings = () => {
                     </div>
                   ) : (formData.phone || "Add phone number")}
                 </div>
-                <Button variant="ghost" size="icon" className="text-gray-400 group-hover:text-gray-600" onClick={() => handleEdit('phone')}>
+                <Button variant="ghost" size="icon" className="text-muted-foreground/60 group-hover:text-muted-foreground" onClick={() => handleEdit('phone')}>
                   <Edit2 className="h-4 w-4" />
                 </Button>
             </div>
@@ -216,11 +216,11 @@ const ProfileSettings = () => {
         <div className="zomato-card bg-blue-50/30 border-blue-100/50">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-blue-600" />
                 Account Security
               </h3>
-              <p className="text-sm text-gray-600 max-w-md">
+              <p className="text-sm text-muted-foreground max-w-md">
                 Your account is protected. We regularly check for security risks to keep your personal data safe.
               </p>
             </div>

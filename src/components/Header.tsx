@@ -37,8 +37,8 @@ const Header = () => {
   return (
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${isScrolled
-          ? "bg-white/95 backdrop-blur-md shadow-md border-b border-gray-100"
-          : "bg-white border-b border-gray-200"
+          ? "bg-card dark:bg-slate-900/95 backdrop-blur-md shadow-md border-b border-border"
+          : "bg-card dark:bg-slate-900 border-b border-border"
         }`}
     >
       <div className="container flex h-16 lg:h-20 items-center justify-between px-4">
@@ -51,7 +51,7 @@ const Header = () => {
             to="/"
             className={`font-medium text-lg transition-colors ${isActive('/')
                 ? "text-primary font-semibold"
-                : "text-gray-700 hover:text-primary"
+                : "text-muted-foreground hover:text-primary"
               }`}
           >
             Home
@@ -60,7 +60,7 @@ const Header = () => {
             to="/services"
             className={`font-medium text-lg transition-colors ${isActive('/services')
                 ? "text-primary font-semibold"
-                : "text-gray-700 hover:text-primary"
+                : "text-muted-foreground hover:text-primary"
               }`}
           >
             Services
@@ -69,7 +69,7 @@ const Header = () => {
             to="/about"
             className={`font-medium text-lg transition-colors ${isActive('/about')
                 ? "text-primary font-semibold"
-                : "text-gray-700 hover:text-primary"
+                : "text-muted-foreground hover:text-primary"
               }`}
           >
             About
@@ -78,7 +78,7 @@ const Header = () => {
             to="/contact"
             className={`font-medium text-lg transition-colors ${isActive('/contact')
                 ? "text-primary font-semibold"
-                : "text-gray-700 hover:text-primary"
+                : "text-muted-foreground hover:text-primary"
               }`}
           >
             Contact
@@ -87,7 +87,7 @@ const Header = () => {
             to={isTechAuthenticated ? "/technician/dashboard" : "/technician/login"}
             className={`font-medium text-lg transition-colors ${isActive('/technician')
                 ? "text-primary font-semibold"
-                : "text-gray-700 hover:text-primary"
+                : "text-muted-foreground hover:text-primary"
               }`}
           >
             Technician Portal
@@ -96,7 +96,7 @@ const Header = () => {
             to="/marketplace"
             className={`font-medium text-lg transition-colors ${isActive('/marketplace')
                 ? "text-primary font-semibold"
-                : "text-gray-700 hover:text-primary"
+                : "text-muted-foreground hover:text-primary"
               }`}
           >
             Marketplace
@@ -120,7 +120,7 @@ const Header = () => {
           </div>
 
           <button
-            className="lg:hidden text-gray-700 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="lg:hidden text-muted-foreground p-2 hover:bg-muted/50 rounded-lg transition-colors"
             onClick={toggleMobileMenu}
             aria-label="Toggle menu"
           >
@@ -131,13 +131,13 @@ const Header = () => {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-xl animate-fade-in">
+        <div className="lg:hidden absolute top-16 left-0 right-0 bg-card dark:bg-slate-900 border-b border-border shadow-xl animate-fade-in">
           <div className="container py-6 px-4 flex flex-col gap-2">
             <Link
               to="/"
               className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${isActive('/')
                   ? "text-primary bg-primary/10 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  : "text-muted-foreground hover:bg-muted"
                 }`}
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -147,7 +147,7 @@ const Header = () => {
               to="/services"
               className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${isActive('/services')
                   ? "text-primary bg-primary/10 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  : "text-muted-foreground hover:bg-muted"
                 }`}
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -157,7 +157,7 @@ const Header = () => {
               to="/about"
               className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${isActive('/about')
                   ? "text-primary bg-primary/10 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  : "text-muted-foreground hover:bg-muted"
                 }`}
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -167,7 +167,7 @@ const Header = () => {
               to="/contact"
               className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${isActive('/contact')
                   ? "text-primary bg-primary/10 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  : "text-muted-foreground hover:bg-muted"
                 }`}
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -177,7 +177,7 @@ const Header = () => {
               to={isTechAuthenticated ? "/technician/dashboard" : "/technician/login"}
               className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${isActive('/technician')
                   ? "text-primary bg-primary/10 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  : "text-muted-foreground hover:bg-muted"
                 }`}
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -187,7 +187,7 @@ const Header = () => {
               to="/marketplace"
               className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${isActive('/marketplace')
                   ? "text-primary bg-primary/10 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  : "text-muted-foreground hover:bg-muted"
                 }`}
               onClick={() => setMobileMenuOpen(false)}
             >

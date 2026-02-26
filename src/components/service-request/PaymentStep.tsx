@@ -137,22 +137,22 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center">
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Options</h3>
-        <p className="text-gray-600">Choose your preferred payment method</p>
+        <h3 className="text-2xl font-bold text-foreground mb-2">Payment Options</h3>
+        <p className="text-muted-foreground">Choose your preferred payment method</p>
       </div>
 
       {/* Service Price Display */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardContent className="p-4">
           <div className="flex justify-between items-center">
-            <span className="text-lg font-medium text-gray-700">Service Charge:</span>
+            <span className="text-lg font-medium text-muted-foreground">Service Charge:</span>
             <span className="text-2xl font-bold text-blue-600">{currency} {servicePrice}</span>
           </div>
         </CardContent>
       </Card>
 
       {/* ... Payment Timing ... (UNCHANGED, reusing logic by not replacing if possible? No, need to render full) */}
-      <Card className="border-gray-200 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Clock className="h-5 w-5 text-orange-500" />
@@ -162,13 +162,13 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         <CardContent>
           <RadioGroup value={paymentTiming} onValueChange={setPaymentTiming as any}>
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors">
                 <RadioGroupItem value="before" id="before" />
                 <Label htmlFor="before" className="flex-1 cursor-pointer">
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="font-medium">Pay Now</span>
-                      <p className="text-sm text-gray-500">Secure online payment before service</p>
+                      <p className="text-sm text-muted-foreground/80">Secure online payment before service</p>
                     </div>
                     {payNowDiscountPercent > 0 ? (
                       <Badge variant="secondary" className="bg-green-100 text-green-700">
@@ -183,12 +183,12 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                 </Label>
               </div>
 
-              <div className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors">
                 <RadioGroupItem value="after" id="after" />
                 <Label htmlFor="after" className="flex-1 cursor-pointer">
                   <div>
                     <span className="font-medium">Pay After Service</span>
-                    <p className="text-sm text-gray-500">Pay when technician completes the job</p>
+                    <p className="text-sm text-muted-foreground/80">Pay when technician completes the job</p>
                   </div>
                 </Label>
               </div>
@@ -198,7 +198,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
       </Card>
 
       {/* Payment Methods */}
-      <Card className="border-gray-200 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Wallet className="h-5 w-5 text-blue-500" />
@@ -216,8 +216,8 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                   <div
                     key={method.id}
                     className={`relative flex items-center space-x-3 p-4 rounded-lg border transition-all ${isDisabled
-                        ? "border-gray-200 bg-gray-50 opacity-50"
-                        : "border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                        ? "border-border bg-muted opacity-50"
+                        : "border-border hover:border-blue-300 hover:bg-blue-50"
                       }`}
                   >
                     <RadioGroupItem
@@ -250,7 +250,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500 mt-1">{method.description}</p>
+                          <p className="text-sm text-muted-foreground/80 mt-1">{method.description}</p>
                         </div>
                       </div>
                     </Label>

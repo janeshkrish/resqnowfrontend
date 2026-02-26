@@ -47,13 +47,13 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
               </div>
             )}
             <h2 className={cn(
-              "font-bold text-gray-800",
+              "font-bold text-foreground",
               isMobile ? "text-xl mb-2" : "text-3xl md:text-4xl mb-4"
             )}>
               {isMobile ? "Quick Services" : "Our Professional Services"}
             </h2>
             <p className={cn(
-              "text-gray-600",
+              "text-muted-foreground",
               isMobile ? "text-sm" : "text-lg max-w-2xl mx-auto"
             )}>
               {isMobile ? "Available 24/7 near you" : "Comprehensive roadside assistance available 24/7 across all locations"}
@@ -90,13 +90,13 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                   </div>
 
                   {/* Title */}
-                  <span className="text-[11px] font-bold text-slate-800 leading-tight tracking-tight">
+                  <span className="text-[11px] font-bold text-foreground leading-tight tracking-tight">
                     {service.name}
                   </span>
                 </div>
               ) : (
                 // Original desktop card
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-primary/20 transition-all duration-300 hover:-translate-y-1">
+                <div className="bg-card dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-border hover:shadow-xl hover:border-primary/20 transition-all duration-300 hover:-translate-y-1">
                   {/* Popular Badge */}
                   {index < 3 && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-primary to-accent px-2 py-1 rounded-full shadow-lg">
@@ -108,9 +108,9 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
 
                   <div className="text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 group-hover:from-primary/10 group-hover:to-accent/10 transition-all duration-300 mb-4">
-                      <service.icon className="h-8 w-8 text-gray-600 group-hover:text-primary transition-colors duration-300" />
+                      <service.icon className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
                     </div>
-                    <h3 className="font-bold text-gray-800 group-hover:text-primary transition-colors duration-300 text-sm leading-tight">
+                    <h3 className="font-bold text-foreground group-hover:text-primary transition-colors duration-300 text-sm leading-tight">
                       {service.name}
                     </h3>
                   </div>
@@ -126,8 +126,8 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
             <div className="bg-gradient-to-r from-primary to-accent text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden max-w-2xl mx-auto">
               {/* Background Pattern */}
               <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-4 left-4 w-20 h-20 bg-white/20 rounded-full blur-xl"></div>
-                <div className="absolute bottom-4 right-4 w-16 h-16 bg-white/20 rounded-full blur-xl"></div>
+                <div className="absolute top-4 left-4 w-20 h-20 bg-card dark:bg-slate-900/20 rounded-full blur-xl"></div>
+                <div className="absolute bottom-4 right-4 w-16 h-16 bg-card dark:bg-slate-900/20 rounded-full blur-xl"></div>
               </div>
 
               <div className="relative z-10">
@@ -139,7 +139,7 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                 </p>
                 <Button
                   size="lg"
-                  className="bg-white text-primary hover:bg-white/90 font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 px-8"
+                  className="bg-card dark:bg-slate-900 text-primary hover:bg-card dark:bg-slate-900/90 font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 px-8"
                   asChild
                 >
                   <Link to="/emergency">

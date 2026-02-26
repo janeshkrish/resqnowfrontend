@@ -219,7 +219,7 @@ const TechnicianDetails = () => {
                   { label: "Facilities", src: technician.documents?.facilities_photo, icon: Briefcase },
                 ].map((item, i) => (
                   <div key={i} className="border rounded-lg p-2 text-center">
-                    <div className="mb-2 h-24 bg-slate-100 rounded flex items-center justify-center overflow-hidden">
+                    <div className="mb-2 h-24 bg-muted/50 rounded flex items-center justify-center overflow-hidden">
                       {item.src ? (
                         <img src={item.src} alt={item.label} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => window.open(item.src, '_blank')} />
                       ) : (
@@ -269,11 +269,11 @@ const TechnicianDetails = () => {
                 <p className="text-sm text-muted-foreground mb-2">App Readiness</p>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Smartphone className="w-4 h-4 text-slate-500" />
+                    <Smartphone className="w-4 h-4 text-muted-foreground/80" />
                     <span className="text-sm">{technician.app_readiness?.has_smartphone ? "Has Smartphone" : "No Smartphone"}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-slate-500" />
+                    <Globe className="w-4 h-4 text-muted-foreground/80" />
                     <span className="text-sm">Lang: {technician.app_readiness?.preferred_language || "English"}</span>
                   </div>
                 </div>
@@ -298,18 +298,18 @@ const TechnicianDetails = () => {
               </div>
               <div className="space-y-4">
                 {technician.service_costs && Array.isArray(technician.service_costs) && technician.service_costs.map((sc: any, idx: number) => (
-                  <div key={idx} className="border rounded p-3 bg-slate-50 text-sm">
-                    <p className="font-bold text-slate-700">{sc.service_name}</p>
-                    <div className="grid grid-cols-2 gap-2 mt-2 text-slate-600">
+                  <div key={idx} className="border rounded p-3 bg-muted text-sm">
+                    <p className="font-bold text-muted-foreground">{sc.service_name}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-2 text-muted-foreground">
                       {Object.entries(sc).filter(([k]) => k !== 'service_name').map(([k, v]) => (
-                        <div key={k}><span className="capitalize">{k.replace(/_/g, ' ')}:</span> <span className="font-medium text-slate-900">{String(v)}</span></div>
+                        <div key={k}><span className="capitalize">{k.replace(/_/g, ' ')}:</span> <span className="font-medium text-foreground">{String(v)}</span></div>
                       ))}
                     </div>
                   </div>
                 ))}
                 {technician.service_costs && !Array.isArray(technician.service_costs) && typeof technician.service_costs === "object" && (
-                  <div className="border rounded p-3 bg-slate-50 text-sm">
-                    <pre className="whitespace-pre-wrap break-words text-slate-700">{JSON.stringify(technician.service_costs, null, 2)}</pre>
+                  <div className="border rounded p-3 bg-muted text-sm">
+                    <pre className="whitespace-pre-wrap break-words text-muted-foreground">{JSON.stringify(technician.service_costs, null, 2)}</pre>
                   </div>
                 )}
               </div>
@@ -397,18 +397,18 @@ const TechnicianDetails = () => {
               ) : (
                 <div className="space-y-3">
                   {approvalAudit.map((item) => (
-                    <div key={item.id} className="border rounded p-3 bg-slate-50">
+                    <div key={item.id} className="border rounded p-3 bg-muted">
                       <div className="flex items-center justify-between gap-3">
                         <Badge variant={item.action === "approved" ? "success" : "destructive"}>
                           {item.action}
                         </Badge>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground/80">
                           {new Date(item.created_at).toLocaleString()}
                         </span>
                       </div>
-                      <div className="text-sm mt-2"><span className="text-slate-500">Admin:</span> {item.admin_email}</div>
-                      <div className="text-sm"><span className="text-slate-500">Status:</span> {item.previous_status} to {item.new_status}</div>
-                      <div className="text-sm"><span className="text-slate-500">Reason:</span> {item.reason || "-"}</div>
+                      <div className="text-sm mt-2"><span className="text-muted-foreground/80">Admin:</span> {item.admin_email}</div>
+                      <div className="text-sm"><span className="text-muted-foreground/80">Status:</span> {item.previous_status} to {item.new_status}</div>
+                      <div className="text-sm"><span className="text-muted-foreground/80">Reason:</span> {item.reason || "-"}</div>
                     </div>
                   ))}
                 </div>
@@ -433,13 +433,13 @@ const TechnicianDetails = () => {
           <Card>
             <CardHeader><CardTitle>Payment & Bank</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              <div><span className="text-slate-500 text-sm">Accepted Modes:</span>
+              <div><span className="text-muted-foreground/80 text-sm">Accepted Modes:</span>
                 <div className="flex gap-2 mt-1">
                   {technician.payment_details?.modes?.cash && <Badge variant="outline">Cash</Badge>}
                   {technician.payment_details?.modes?.upi && <Badge variant="outline">UPI</Badge>}
                 </div>
               </div>
-              {technician.payment_details?.upi_id && <div><span className="text-slate-500 text-sm">UPI ID:</span> <span className="font-medium">{technician.payment_details.upi_id}</span></div>}
+              {technician.payment_details?.upi_id && <div><span className="text-muted-foreground/80 text-sm">UPI ID:</span> <span className="font-medium">{technician.payment_details.upi_id}</span></div>}
             </CardContent>
           </Card>
 

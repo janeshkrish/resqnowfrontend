@@ -163,7 +163,7 @@ const Subscription = () => {
         <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-red-600">
           ResQNow Customer Plans
         </h1>
-        <p className="text-xl text-gray-600">Roadside help, made predictable and stress-free</p>
+        <p className="text-xl text-muted-foreground">Roadside help, made predictable and stress-free</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
@@ -210,37 +210,37 @@ const Subscription = () => {
                   <div className={`mx-auto rounded-full p-4 ${tone.iconBg} inline-flex mb-4 group-hover:scale-110 transition-transform`}>
                     <PlanIcon className={`h-8 w-8 ${tone.iconColor}`} />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
+                  <h3 className="text-2xl font-bold text-foreground">{plan.name}</h3>
+                  <p className="text-sm text-muted-foreground/80 mt-1">{plan.description}</p>
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-gray-900">
+                    <span className="text-4xl font-bold text-foreground">
                       {formatPrice(pricingConfig?.currency || "INR", Number(plan.amount || 0))}
                     </span>
                     {Number(plan.amount || 0) > 0 && (
-                      <span className="text-gray-500 ml-1">/ {plan.period || "month"}</span>
+                      <span className="text-muted-foreground/80 ml-1">/ {plan.period || "month"}</span>
                     )}
                   </div>
                 </div>
 
                 <div className="mb-8 text-left">
-                  <h4 className="font-semibold text-gray-900 mb-4">What you get:</h4>
+                  <h4 className="font-semibold text-foreground mb-4">What you get:</h4>
                   <ul className="space-y-3">
                     {(plan.features || []).map((feature, index) => (
                       <li key={index} className="flex items-start">
                         <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-600 text-sm leading-tight">{feature}</span>
+                        <span className="text-muted-foreground text-sm leading-tight">{feature}</span>
                       </li>
                     ))}
                   </ul>
 
                   {(plan.notIncluded || []).length > 0 && (
                     <>
-                      <h4 className="font-semibold text-gray-900 mt-6 mb-4">Not Included:</h4>
+                      <h4 className="font-semibold text-foreground mt-6 mb-4">Not Included:</h4>
                       <ul className="space-y-3">
                         {(plan.notIncluded || []).map((feature, index) => (
                           <li key={index} className="flex items-start">
                             <X className="h-5 w-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-500 text-sm leading-tight">{feature}</span>
+                            <span className="text-muted-foreground/80 text-sm leading-tight">{feature}</span>
                           </li>
                         ))}
                       </ul>
@@ -248,11 +248,11 @@ const Subscription = () => {
                   )}
 
                   {(plan.idealFor || []).length > 0 && (
-                    <div className="mt-6 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ideal For</p>
+                    <div className="mt-6 p-3 bg-muted rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground/80 uppercase tracking-wide mb-2">Ideal For</p>
                       <div className="flex flex-wrap gap-2">
                         {(plan.idealFor || []).map((item, idx) => (
-                          <span key={idx} className="bg-white border border-gray-200 text-gray-700 text-xs px-2 py-1 rounded-md">
+                          <span key={idx} className="bg-card dark:bg-slate-900 border border-border text-muted-foreground text-xs px-2 py-1 rounded-md">
                             {item}
                           </span>
                         ))}
@@ -263,7 +263,7 @@ const Subscription = () => {
               </div>
 
               <div className="p-6 pt-0 mt-auto">
-                <p className="text-xs text-center text-gray-500 mb-4 italic">{plan.footer}</p>
+                <p className="text-xs text-center text-muted-foreground/80 mb-4 italic">{plan.footer}</p>
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();

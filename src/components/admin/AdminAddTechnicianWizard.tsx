@@ -165,7 +165,7 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
         }
     };
     return (
-        <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-center hover:bg-slate-50 transition-colors relative group">
+        <div className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center text-center hover:bg-muted transition-colors relative group">
             {value ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden">
                     <img src={value} alt="Uploaded" className="object-cover w-full h-full" />
@@ -176,10 +176,10 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
             ) : (
                 <>
                     <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                    <div className="font-medium text-slate-700 text-sm">{label}</div>
+                    <div className="font-medium text-muted-foreground text-sm">{label}</div>
                     <p className="text-xs text-slate-400 mt-1">Click to upload</p>
                     <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} disabled={uploading} />
-                    {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>}
+                    {uploading && <div className="absolute inset-0 bg-card dark:bg-slate-900/80 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>}
                 </>
             )}
         </div>
@@ -189,13 +189,13 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
 const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: any) => {
     const prefix = `pricing_config.${index}`;
     const getFieldName = (field: string) => `${prefix}.${field}`;
-    const renderSectionHeader = (title: string) => <div className="font-semibold text-xs mt-3 mb-2 text-slate-500 uppercase tracking-wider">{title}</div>;
+    const renderSectionHeader = (title: string) => <div className="font-semibold text-xs mt-3 mb-2 text-muted-foreground/80 uppercase tracking-wider">{title}</div>;
 
     return (
         <Card className="mb-6 border-l-4 border-l-red-500 shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50 py-3 border-b flex flex-row items-center gap-3">
+            <CardHeader className="bg-muted py-3 border-b flex flex-row items-center gap-3">
                 <Wrench className="w-5 h-5 text-red-500" />
-                <CardTitle className="text-base font-bold text-slate-800">{serviceName}</CardTitle>
+                <CardTitle className="text-base font-bold text-foreground">{serviceName}</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
                 <input type="hidden" {...register(getFieldName("service_name"))} value={serviceName} />
@@ -223,25 +223,25 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                                                     }
                                                 }}
                                             />
-                                            <label className="text-sm text-slate-700">{opt}</label>
+                                            <label className="text-sm text-muted-foreground">{opt}</label>
                                         </div>
                                     )
                                 })}
                             </div>
                         </div>
                         <div className="grid md:grid-cols-2 gap-4">
-                            <div className="bg-slate-50 p-3 rounded">
+                            <div className="bg-muted p-3 rounded">
                                 <div className="text-sm font-semibold mb-2">Two-Wheeler Service Charge</div>
                                 <div className="flex gap-2">
-                                    <Input type="number" placeholder="Min ₹" {...register(getFieldName("price_2w_min"))} className="bg-white" />
-                                    <Input type="number" placeholder="Max ₹" {...register(getFieldName("price_2w_max"))} className="bg-white" />
+                                    <Input type="number" placeholder="Min ₹" {...register(getFieldName("price_2w_min"))} className="bg-card dark:bg-slate-900" />
+                                    <Input type="number" placeholder="Max ₹" {...register(getFieldName("price_2w_max"))} className="bg-card dark:bg-slate-900" />
                                 </div>
                             </div>
-                            <div className="bg-slate-50 p-3 rounded">
+                            <div className="bg-muted p-3 rounded">
                                 <div className="text-sm font-semibold mb-2">Four-Wheeler Service Charge</div>
                                 <div className="flex gap-2">
-                                    <Input type="number" placeholder="Min ₹" {...register(getFieldName("price_4w_min"))} className="bg-white" />
-                                    <Input type="number" placeholder="Max ₹" {...register(getFieldName("price_4w_max"))} className="bg-white" />
+                                    <Input type="number" placeholder="Min ₹" {...register(getFieldName("price_4w_min"))} className="bg-card dark:bg-slate-900" />
+                                    <Input type="number" placeholder="Max ₹" {...register(getFieldName("price_4w_max"))} className="bg-card dark:bg-slate-900" />
                                 </div>
                             </div>
                         </div>
@@ -306,7 +306,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === SERVICE 4: BATTERY REPLACEMENT === */}
                 {serviceName === "Battery Replacement" && (
                     <>
-                        <div>{renderSectionHeader("Work Included")}<p className="text-sm text-slate-600">Testing, Removal, Installation</p></div>
+                        <div>{renderSectionHeader("Work Included")}<p className="text-sm text-muted-foreground">Testing, Removal, Installation</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Labour Charge (₹)</label><Input type="number" {...register(getFieldName("labour_charge"))} /></div>
                             <div className="bg-yellow-50 p-2 rounded border border-yellow-100 flex items-center justify-center text-xs text-yellow-800 font-medium">
@@ -370,7 +370,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === SERVICE 7: GENERAL SERVICING === */}
                 {serviceName === "General Servicing" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">Oil check, Chain lubrication, Basic inspection</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">Oil check, Chain lubrication, Basic inspection</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm font-medium">Labour Range (₹)</label>
@@ -379,7 +379,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                                     <Input type="number" placeholder="Max" {...register(getFieldName("labour_max"))} />
                                 </div>
                             </div>
-                            <div className="bg-slate-50 p-2 rounded flex items-center justify-center text-xs text-slate-600">
+                            <div className="bg-muted p-2 rounded flex items-center justify-center text-xs text-muted-foreground">
                                 Spare Parts Charged Separately
                             </div>
                         </div>
@@ -389,10 +389,10 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === SERVICE 8: BRAKE SERVICE === */}
                 {serviceName === "Brake Service" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">Brake inspection, Pad replacement</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">Brake inspection, Pad replacement</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Labour Charge Range (₹)</label><div className="flex gap-2"><Input placeholder="Min" {...register(getFieldName("labour_min"))} /><Input placeholder="Max" {...register(getFieldName("labour_max"))} /></div></div>
-                            <div className="bg-slate-50 p-2 rounded flex items-center justify-center text-xs text-slate-600">
+                            <div className="bg-muted p-2 rounded flex items-center justify-center text-xs text-muted-foreground">
                                 Spare Parts Charged Separately
                             </div>
                         </div>
@@ -402,7 +402,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === SERVICE 9: ELECTRICAL REPAIR === */}
                 {serviceName === "Electrical Repair" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">Wiring repair, Fuse replacement</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">Wiring repair, Fuse replacement</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Inspection Charge (₹)</label><Input type="number" {...register(getFieldName("inspection_charge"))} /></div>
                             <div><label className="text-sm font-medium">Labour Range (₹)</label><div className="flex gap-2"><Input placeholder="Min" {...register(getFieldName("labour_min"))} /><Input placeholder="Max" {...register(getFieldName("labour_max"))} /></div></div>
@@ -413,7 +413,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === SERVICE 10: ENGINE REPAIR === */}
                 {serviceName === "Engine Repair" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">Engine diagnostics</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">Engine diagnostics</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Inspection Charge (₹)</label><Input type="number" {...register(getFieldName("inspection_charge"))} /></div>
                             <div><label className="text-sm font-medium">Labour Range (₹)</label><div className="flex gap-2"><Input placeholder="Min" {...register(getFieldName("labour_min"))} /><Input placeholder="Max" {...register(getFieldName("labour_max"))} /></div></div>
@@ -425,19 +425,19 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === SERVICE 11: ACCIDENT REPAIR === */}
                 {serviceName === "Accident Repair" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">Damage inspection</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">Damage inspection</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Inspection Charge (₹)</label><Input type="number" {...register(getFieldName("inspection_charge"))} /></div>
                             <div><label className="text-sm font-medium">Labour Charge (₹)</label><Input type="number" {...register(getFieldName("labour_charge"))} /></div>
                         </div>
-                        <div className="mt-2 text-xs text-slate-500">Final cost after inspection only</div>
+                        <div className="mt-2 text-xs text-muted-foreground/80">Final cost after inspection only</div>
                     </>
                 )}
 
                 {/* === SERVICE 12: EV ASSISTANCE === */}
                 {serviceName === "EV Assistance" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">EV diagnostics, Charging assistance</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">EV diagnostics, Charging assistance</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Service Charge (₹)</label><Input type="number" {...register(getFieldName("service_charge"))} /></div>
                             <div><label className="text-sm font-medium">Vehicle Brand (Optional)</label><Input {...register(getFieldName("brand_supported"))} placeholder="e.g. Ather, Ola" /></div>
@@ -448,7 +448,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 {/* === LOCKOUT ASSISTANCE (Default Fallback) === */}
                 {serviceName === "Lockout Assistance" && (
                     <>
-                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-slate-600">Safe vehicle entry</p></div>
+                        <div>{renderSectionHeader("Includes")}<p className="text-sm text-muted-foreground">Safe vehicle entry</p></div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-sm font-medium">Service Charge (₹)</label><Input type="number" {...register(getFieldName("service_charge"))} /></div>
                             <div><label className="text-sm font-medium">Night/Emergency (₹)</label><Input type="number" {...register(getFieldName("night_charge"))} /></div>
@@ -550,11 +550,11 @@ const AdminAddTechnicianWizard = () => {
     const progressPercentage = ((currentStep + 0.5) / STEPS.length) * 100;
 
     return (
-        <div className="flex h-[calc(100vh-theme(spacing.24))] w-full bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="flex h-[calc(100vh-theme(spacing.24))] w-full bg-card dark:bg-slate-900 rounded-lg shadow-sm border overflow-hidden">
             {/* Sidebar */}
-            <div className="w-64 bg-slate-50 border-r flex flex-row relative">
+            <div className="w-64 bg-muted border-r flex flex-row relative">
                 {/* Dynamic Progress Bar - Red */}
-                <div className="w-1.5 h-full bg-slate-200 absolute left-0 top-0 bottom-0 z-20">
+                <div className="w-1.5 h-full bg-border absolute left-0 top-0 bottom-0 z-20">
                     <div
                         className="w-full bg-red-500 transition-all duration-500 ease-in-out"
                         style={{ height: `${Math.max(5, progressPercentage)}%` }}
@@ -563,12 +563,12 @@ const AdminAddTechnicianWizard = () => {
 
                 <div className="flex-1 p-6 pl-8 flex flex-col overflow-y-auto">
                     <div className="mb-8">
-                        <h2 className="text-lg font-bold text-slate-800">Onboarding</h2>
-                        <p className="text-xs text-slate-500">Add a new technician</p>
+                        <h2 className="text-lg font-bold text-foreground">Onboarding</h2>
+                        <p className="text-xs text-muted-foreground/80">Add a new technician</p>
                     </div>
 
                     <div className="space-y-1 relative">
-                        <div className="absolute left-3.5 top-2 bottom-4 w-0.5 bg-slate-200 -z-10" />
+                        <div className="absolute left-3.5 top-2 bottom-4 w-0.5 bg-border -z-10" />
                         {STEPS.map((step, idx) => {
                             const isActive = currentStep === idx;
                             const isCompleted = currentStep > idx;
@@ -579,11 +579,11 @@ const AdminAddTechnicianWizard = () => {
                                         "w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-bold transition-colors z-10",
                                         isActive ? "border-blue-600 bg-blue-600 text-white" :
                                             isCompleted ? "border-green-500 bg-green-500 text-white" :
-                                                "border-slate-300 bg-white text-slate-500"
+                                                "border-slate-300 bg-card dark:bg-slate-900 text-muted-foreground/80"
                                     )}>
                                         {isCompleted ? <Check className="w-3 h-3" /> : (idx + 1)}
                                     </div>
-                                    <div className={cn("text-sm font-medium transition-colors", isActive ? "text-blue-700" : "text-slate-600")}>
+                                    <div className={cn("text-sm font-medium transition-colors", isActive ? "text-blue-700" : "text-muted-foreground")}>
                                         {step.title}
                                     </div>
                                 </div>
@@ -594,10 +594,10 @@ const AdminAddTechnicianWizard = () => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-8 bg-white">
+            <div className="flex-1 overflow-y-auto p-8 bg-card dark:bg-slate-900">
                 <div className="max-w-4xl mx-auto">
                     <div className="mb-6">
-                        <h1 className="text-2xl font-bold text-slate-900">{STEPS[currentStep].title}</h1>
+                        <h1 className="text-2xl font-bold text-foreground">{STEPS[currentStep].title}</h1>
                     </div>
 
                     <Form {...form}>
@@ -652,7 +652,7 @@ const AdminAddTechnicianWizard = () => {
                                     <div className="grid grid-cols-3 gap-3">
                                         {ALL_SERVICES.map(s => (
                                             <FormField key={s.id} control={control} name="specialties" render={({ field }) => (
-                                                <FormItem className={cn("border rounded p-3 cursor-pointer flex flex-col items-center text-center gap-2 hover:bg-slate-50", field.value?.includes(s.id) && "border-blue-500 bg-blue-50")} onClick={() => { const val = field.value || []; field.onChange(val.includes(s.id) ? val.filter((x: string) => x !== s.id) : [...val, s.id]) }}>
+                                                <FormItem className={cn("border rounded p-3 cursor-pointer flex flex-col items-center text-center gap-2 hover:bg-muted", field.value?.includes(s.id) && "border-blue-500 bg-blue-50")} onClick={() => { const val = field.value || []; field.onChange(val.includes(s.id) ? val.filter((x: string) => x !== s.id) : [...val, s.id]) }}>
                                                     <s.icon className={cn("w-6 h-6", field.value?.includes(s.id) ? "text-blue-500" : "text-slate-400")} />
                                                     <span className="text-xs font-medium">{s.label}</span>
                                                 </FormItem>
@@ -729,7 +729,7 @@ const AdminAddTechnicianWizard = () => {
                                             <div className="flex gap-4">
                                                 {['cash', 'upi', 'bank_transfer'].map(mode => (
                                                     <FormField key={mode} control={control} name={`payment_details.modes.${mode}` as any} render={({ field }) => (
-                                                        <FormItem className="border rounded-lg p-4 flex-1 text-center bg-white shadow-sm border-slate-200">
+                                                        <FormItem className="border rounded-lg p-4 flex-1 text-center bg-card dark:bg-slate-900 shadow-sm border-border">
                                                             <FormControl>
                                                                 <div className="flex flex-col items-center gap-3 cursor-pointer" onClick={(e) => {
                                                                     // Prevent double toggle if clicking directly on checkbox
@@ -742,7 +742,7 @@ const AdminAddTechnicianWizard = () => {
                                                                         onCheckedChange={(checked) => field.onChange(checked)}
                                                                         className="h-5 w-5 rounded-full"
                                                                     />
-                                                                    <div className="uppercase font-bold text-xs text-slate-600">{mode.replace('_', ' ')}</div>
+                                                                    <div className="uppercase font-bold text-xs text-muted-foreground">{mode.replace('_', ' ')}</div>
                                                                 </div>
                                                             </FormControl>
                                                         </FormItem>
@@ -751,7 +751,7 @@ const AdminAddTechnicianWizard = () => {
                                             </div>
                                             <Separator />
                                             <div className="space-y-4">
-                                                <h3 className="text-sm font-semibold text-slate-700">Bank Details (For Payouts)</h3>
+                                                <h3 className="text-sm font-semibold text-muted-foreground">Bank Details (For Payouts)</h3>
                                                 <div className="grid md:grid-cols-2 gap-6">
                                                     <FormField control={control} name="payment_details.bank_name" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} placeholder="e.g. HDFC Bank" /></FormControl></FormItem>)} />
                                                     <FormField control={control} name="payment_details.bank_account_number" render={({ field }) => (<FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} type="password" /></FormControl></FormItem>)} />
@@ -770,7 +770,7 @@ const AdminAddTechnicianWizard = () => {
                                 <div className="text-center py-10 animate-in fade-in slide-in-from-right-4">
                                     <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                                     <h2 className="text-2xl font-bold">Ready to Submit</h2>
-                                    <p className="text-slate-500 mb-8">Review the details and create the technician.</p>
+                                    <p className="text-muted-foreground/80 mb-8">Review the details and create the technician.</p>
 
                                     <FormField control={control} name="consent.agreed" render={({ field }) => (
                                         <FormItem className="flex items-center justify-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="m-0">I verify that these details are correct</FormLabel></FormItem>

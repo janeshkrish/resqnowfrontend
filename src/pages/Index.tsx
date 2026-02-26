@@ -9,6 +9,7 @@ import Map from "@/components/Map";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import { MapPin, Search, ArrowRight, Bell, Briefcase, Download } from "lucide-react";
+import { toast } from "sonner";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -47,13 +48,29 @@ const MobileDashboard = () => {
   const canInstallApp = Boolean(deferredPrompt) && !isStandalone;
 
   const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      if (isStandalone) {
+        toast.info("ResQNow App is already installed on your device.");
+        return;
+      }
+
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS) {
+        toast("Install ResQNow on iOS", {
+          description: "Tap the Share icon at the bottom of the screen and select 'Add to Home Screen'."
+        });
+      } else {
+        toast.error("Installation is not supported on this browser.");
+      }
+      return;
+    }
 
     try {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
         setDeferredPrompt(null);
+        toast.success("App installed successfully!");
       }
     } catch (error) {
       console.error("App install prompt failed:", error);

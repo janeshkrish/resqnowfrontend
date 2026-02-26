@@ -17,7 +17,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 - **Backend:** Node.js, Express.js, Socket.io
 - **Database:** TiDB (MySQL compatible)
 - **Maps & Location:** Google Maps JavaScript API, Directions Service, Distance Matrix API
-- **State Management:** React Context + Hooks.
+- **State Management:** React Context + Hooks,
 
 ## 📦 Project Structure
 

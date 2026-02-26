@@ -271,25 +271,42 @@ const Index = () => {
   }
 
   return (
-    <div className="mobile-compact">
+    <div className="flex flex-col min-h-screen">
       <Hero />
-      <div className="mobile-section">
-        <Services />
+      
+      {/* Services Section with slight grey background for contrast against white hero/howitworks */}
+      <div className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/40">
+        <div className="max-w-7xl mx-auto w-full">
+          <Services />
+        </div>
       </div>
-      <div className="hidden md:block">
+
+      <div className="hidden md:block w-full border-b border-border/40">
         <Map />
       </div>
-      <div className="mobile-section">
-        <HowItWorks />
+
+      <div className="bg-white dark:bg-card border-b border-border/40">
+        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+          <HowItWorks />
+        </div>
       </div>
-      <div className="mobile-section">
-        <VehicleTypes />
+
+      <div className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/40">
+         <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+            <VehicleTypes />
+         </div>
       </div>
-      <div className="mobile-section">
-        <Testimonials />
+
+      <div className="bg-white dark:bg-card border-b border-border/40">
+         <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+            <Testimonials />
+         </div>
       </div>
-      <div className="mobile-section">
-        <TechnicianCTA />
+
+      <div className="bg-slate-50/50 dark:bg-slate-900/50 w-full pb-20">
+         <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
+            <TechnicianCTA />
+         </div>
       </div>
     </div>
   );

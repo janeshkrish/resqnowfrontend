@@ -48,13 +48,17 @@ const Testimonials = () => {
   const isMobile = useIsMobile();
 
   return (
-    <section className="py-16 md:py-24 bg-muted selection:bg-primary/10">
+    <section>
       <div className="container px-4 md:px-6">
         <div className="mb-10 md:mb-16 text-center max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 rounded-full mb-6 border border-amber-100 dark:border-amber-500/20">
+             <StarIcon className="w-4 h-4 text-amber-500" />
+             <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">Customer Stories</span>
+          </div>
           <h2 className="text-3xl md:text-5xl font-black text-foreground tracking-tight mb-4">
             Loved by thousands.
           </h2>
-          <p className="text-base md:text-lg text-muted-foreground/80 font-medium">
+          <p className="text-base md:text-xl text-slate-500 dark:text-slate-400 font-medium">
             Real stories from drivers we've helped get back on the road.
           </p>
         </div>
@@ -85,7 +89,7 @@ const Testimonials = () => {
                     </div>
 
                     <div className="relative z-10 flex items-center gap-4 mt-auto pt-5 border-t border-border/80">
-                      <img
+                       <img
                         src={testimonial.avatar}
                         alt={testimonial.name}
                         className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-sm"
@@ -105,13 +109,13 @@ const Testimonials = () => {
             {testimonials.map((testimonial, index) => (
               <div
                 key={testimonial.id}
-                className="bg-card dark:bg-slate-900 rounded-[2rem] p-7 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] border border-border/60 transition-all duration-300 relative overflow-hidden group flex flex-col h-full"
+                className="bg-white dark:bg-card rounded-[2rem] p-8 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100 dark:border-slate-800/60 hover:border-transparent transition-all duration-300 relative overflow-hidden group flex flex-col h-full hover:-translate-y-2"
                 onMouseEnter={() => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(null)}
               >
                 <Quote className={cn(
-                  "absolute -top-4 -right-4 h-32 w-32 text-slate-50 transform rotate-12 transition-transform duration-500",
-                  activeIndex === index && "scale-110 text-slate-100/50"
+                  "absolute -top-6 -right-6 h-32 w-32 text-slate-50 dark:text-slate-800/30 transform rotate-12 transition-transform duration-500",
+                  activeIndex === index && "scale-110 text-slate-100 dark:text-slate-800/50"
                 )} />
 
                 <div className="relative z-10 flex-grow">
@@ -120,22 +124,22 @@ const Testimonials = () => {
                       <StarIcon
                         key={i}
                         className={cn(
-                          "h-4 w-4",
+                          "h-5 w-5",
                           i < testimonial.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"
                         )}
                       />
                     ))}
                   </div>
 
-                  <p className="text-muted-foreground font-medium leading-relaxed mb-8">
+                  <p className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed mb-8 text-lg">
                     "{testimonial.testimonial}"
                   </p>
                 </div>
 
-                <div className="relative z-10 flex items-center gap-4 mt-auto pt-5 border-t border-border/80">
+                <div className="relative z-10 flex items-center gap-4 mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className={cn(
                     "relative w-12 h-12 rounded-full overflow-hidden border-2 transition-all duration-300",
-                    activeIndex === index ? "border-slate-900 scale-105 shadow-md" : "border-transparent"
+                    activeIndex === index ? "border-amber-400 scale-105 shadow-md" : "border-slate-100 dark:border-slate-800"
                   )}>
                     <img
                       src={testimonial.avatar}
@@ -144,8 +148,8 @@ const Testimonials = () => {
                     />
                   </div>
                   <div>
-                    <h4 className="font-bold text-foreground">{testimonial.name}</h4>
-                    <p className="text-muted-foreground/80 text-xs font-medium">{testimonial.location}</p>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100">{testimonial.name}</h4>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-0.5">{testimonial.location}</p>
                   </div>
                 </div>
               </div>

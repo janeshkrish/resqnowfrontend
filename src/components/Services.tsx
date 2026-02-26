@@ -40,24 +40,35 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
       <div className={cn(!compact && "container", !compact ? (isMobile ? "px-3" : "px-4") : "")}>
         {/* Modern Header */}
         {!compact && (
-          <div className={cn("mb-6", isMobile ? "text-left px-1" : "text-center mb-12")}>
-            {!isMobile && (
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-3xl mb-6 shadow-lg">
-                <ArrowRight className="h-8 w-8 text-white" />
+          <div className={cn("mb-6", isMobile ? "text-left px-1" : "text-left mb-16 mt-8")}>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="max-w-2xl">
+                {!isMobile && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-rose-50 dark:bg-rose-500/10 rounded-full mb-6 border border-rose-100 dark:border-rose-500/20">
+                    <Wrench className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold text-primary uppercase tracking-widest">Service Catalog</span>
+                  </div>
+                )}
+                <h2 className={cn(
+                  "font-black text-foreground tracking-tight",
+                  isMobile ? "text-xl mb-2" : "text-4xl md:text-5xl mb-4 leading-tight"
+                )}>
+                  {isMobile ? "Quick Services" : "Professional Roadside Assistance & Repairs."}
+                </h2>
+                <p className={cn(
+                  "text-slate-500 dark:text-slate-400 font-medium",
+                  isMobile ? "text-sm" : "text-lg md:text-xl"
+                )}>
+                  {isMobile ? "Available 24/7 near you" : "From flat tires to complete breakdowns, our verified mechanics are ready to dispatch in minutes."}
+                </p>
               </div>
-            )}
-            <h2 className={cn(
-              "font-bold text-foreground",
-              isMobile ? "text-xl mb-2" : "text-3xl md:text-4xl mb-4"
-            )}>
-              {isMobile ? "Quick Services" : "Our Professional Services"}
-            </h2>
-            <p className={cn(
-              "text-muted-foreground",
-              isMobile ? "text-sm" : "text-lg max-w-2xl mx-auto"
-            )}>
-              {isMobile ? "Available 24/7 near you" : "Comprehensive roadside assistance available 24/7 across all locations"}
-            </p>
+              
+              {!isMobile && (
+                 <Button variant="outline" className="hidden md:flex bg-white dark:bg-card rounded-2xl border-slate-200 dark:border-slate-800 py-6 px-6 font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+                    View All Services <ArrowRight className="ml-2 w-4 h-4" />
+                 </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -95,24 +106,41 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                   </span>
                 </div>
               ) : (
-                // Original desktop card
-                <div className="bg-card dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-border hover:shadow-xl hover:border-primary/20 transition-all duration-300 hover:-translate-y-1">
+                // Original desktop card updated to MNC standard
+                <div className="bg-white dark:bg-card rounded-[2rem] p-8 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800/60 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-2 hover:border-transparent dark:hover:border-transparent transition-all duration-300 relative overflow-hidden group/card">
+                  {/* Subtle hover gradient background */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${service.color} opacity-0 group-hover/card:opacity-[0.03] transition-opacity duration-500`}></div>
+
                   {/* Popular Badge */}
                   {index < 3 && (
-                    <div className="absolute -top-2 -right-2 bg-gradient-to-r from-primary to-accent px-2 py-1 rounded-full shadow-lg">
-                      <span className="text-xs font-bold text-white">
+                    <div className="absolute top-4 right-4 bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-1.5 rounded-full shadow-md z-10">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-white">
                         Popular
                       </span>
                     </div>
                   )}
 
-                  <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 group-hover:from-primary/10 group-hover:to-accent/10 transition-all duration-300 mb-4">
-                      <service.icon className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
+                  <div className="text-left relative z-10 flex flex-col h-full">
+                    {/* Icon Container - Premium Circle */}
+                    <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center mb-6 group-hover/card:scale-110 transition-transform duration-500 group-hover/card:shadow-sm">
+                      <service.icon className="h-7 w-7 text-slate-400 dark:text-slate-500 group-hover/card:text-primary transition-colors duration-300" />
                     </div>
-                    <h3 className="font-bold text-foreground group-hover:text-primary transition-colors duration-300 text-sm leading-tight">
-                      {service.name}
-                    </h3>
+                    
+                    <div>
+                      <h3 className="font-extrabold text-xl text-slate-800 dark:text-slate-100 mb-2 group-hover/card:text-primary transition-colors duration-300">
+                        {service.name}
+                      </h3>
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                        {service.description || "Professional 24/7 service by verified experts."}
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between opacity-0 group-hover/card:opacity-100 -translate-y-2 group-hover/card:translate-y-0 transition-all duration-300">
+                       <span className="text-sm font-bold text-primary">Book Now</span>
+                       <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center">
+                         <ArrowRight className="w-4 h-4 text-primary" />
+                       </div>
+                    </div>
                   </div>
                 </div>
               )}

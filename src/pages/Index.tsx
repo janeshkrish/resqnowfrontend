@@ -90,7 +90,7 @@ const MobileDashboard = () => {
             {/* Background decoration */}
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary blur-[50px] opacity-50 rounded-full"></div>
 
-            <span className="inline-block bg-card dark:bg-slate-900/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">FAST RESPONSE</span>
+            <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">FAST RESPONSE</span>
             <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Emergency<br />Assistance</h2>
             <p className="text-slate-300 text-xs mb-6 font-medium max-w-[200px]">Mechanics and Tow Trucks dispatched instantly.</p>
 
@@ -102,7 +102,7 @@ const MobileDashboard = () => {
           <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-blue-600 to-sky-500 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(2,132,199,0.5)] relative overflow-hidden isolate">
             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-card dark:bg-slate-900 blur-[50px] opacity-25 rounded-full"></div>
 
-            <span className="inline-block bg-card dark:bg-slate-900/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">NEW USER</span>
+            <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">NEW USER</span>
             <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">10% Off Any<br />Two Services</h2>
             <p className="text-blue-100 text-xs mb-6 font-medium max-w-[200px]">Use code RESQ10 at checkout for instant savings.</p>
 
@@ -115,7 +115,7 @@ const MobileDashboard = () => {
             <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-emerald-700 to-teal-500 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(5,150,105,0.5)] relative overflow-hidden isolate">
               <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-card dark:bg-slate-900 blur-[50px] opacity-20 rounded-full"></div>
 
-              <span className="inline-block bg-card dark:bg-slate-900/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">APP INSTALL</span>
+              <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">APP INSTALL</span>
               <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Install<br />ResQNow</h2>
               <p className="text-emerald-100 text-xs mb-6 font-medium max-w-[220px]">Get faster access and a smoother experience from your home screen.</p>
 
@@ -133,7 +133,7 @@ const MobileDashboard = () => {
           <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-indigo-700 to-purple-600 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(79,70,229,0.5)] relative overflow-hidden isolate">
             <div className="absolute top-0 right-0 w-32 h-32 bg-card dark:bg-slate-900 blur-[40px] opacity-20 rounded-full"></div>
 
-            <span className="inline-block bg-card dark:bg-slate-900/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">PARTNER WITH US</span>
+            <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">PARTNER WITH US</span>
             <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Join As A<br />Technician</h2>
             <p className="text-indigo-100 text-xs mb-6 font-medium max-w-[200px]">Earn reliable income. Work flexibly on your schedule.</p>
 

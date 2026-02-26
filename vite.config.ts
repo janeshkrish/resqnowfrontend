@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => {
           "apple-touch-icon.png",
         ],
         manifest: {
-          name: "ResQNow Roadside Assistance",
+          name: "ResQNow",
           short_name: "ResQNow",
           description: "24/7 roadside assistance and puncture repair services.",
           theme_color: "#dc2626",

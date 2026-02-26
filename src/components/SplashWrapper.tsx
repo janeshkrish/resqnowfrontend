@@ -73,22 +73,14 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                     <span className="shrink-0 pr-[1px]">Res</span>
                                 </motion.div>
 
-                                {/* "Q" - The Map Pin / Radar Anchor */}
-                                <div className="relative z-10 flex items-center justify-center">
-                                    <motion.div
-                                        initial={{ y: -80, opacity: 0, scale: 0.5 }}
-                                        animate={{ y: 0, opacity: 1, scale: 1 }}
-                                        transition={{ duration: 0.8, delay: 0.5, type: "spring", bounce: 0.5 }}
-                                        className="relative z-10 flex items-center justify-center w-12 h-14 drop-shadow-xl"
-                                        style={{ marginTop: "-12px", marginLeft: "2px" }}
-                                    >
-                                        <svg viewBox="0 0 24 24" fill="#D32F2F" className="absolute top-0 left-0 w-full h-full drop-shadow-[0_4px_8px_rgba(211,47,47,0.5)]">
-                                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
-                                        </svg>
-                                        <div className="relative z-20 flex items-center justify-center w-[1.35rem] h-[1.35rem] bg-card dark:bg-slate-900 rounded-full shadow-sm" style={{ marginTop: "-10px" }}>
-                                            <span className="text-[#D32F2F] font-black text-sm leading-none pl-[1px]">Q</span>
-                                        </div>
-                                    </motion.div>
+                                {/* "Q" */}
+                                <motion.div
+                                    initial={{ y: -80, opacity: 0, scale: 0.5 }}
+                                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.8, delay: 0.5, type: "spring", bounce: 0.5 }}
+                                    className="relative z-10 flex items-center justify-center text-[#D32F2F] font-black"
+                                >
+                                    <span>Q</span>
                                     {/* Dual Radar Pulse Effect */}
                                     <motion.div
                                         initial={{ scale: 0.5, opacity: 0 }}
@@ -102,14 +94,7 @@ const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
                                         transition={{ duration: 2.5, delay: 1, repeat: 1, ease: "easeOut" }}
                                         className="absolute w-12 h-12 bg-[#D32F2F] rounded-full z-[-1]"
                                     />
-                                    {/* Location marker dot inside the drop area */}
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 1.2, duration: 0.3 }}
-                                        className="absolute mt-12 w-1.5 h-1.5 bg-[#D32F2F] rounded-full shadow-[0_0_8px_rgba(211,47,47,0.8)] z-0"
-                                    />
-                                </div>
+                                </motion.div>
 
                                 {/* "Now" */}
                                 <motion.div

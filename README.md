@@ -149,7 +149,7 @@ Notes:
 3. Open DevTools -> Application -> Manifest and verify:
    - `name` and `short_name` are visible
    - `display` is `standalone`
-   - icons load (`pwa-192x192.png`, `pwa-512x512.png`, `apple-touch-icon.png`)
+   - icons load (`icons/icon-192x192.png`, `icons/icon-512x512.png`)
 4. Open DevTools -> Application -> Service Workers and verify:
    - service worker is active
    - scope is your site root

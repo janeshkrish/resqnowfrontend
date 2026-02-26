@@ -47,9 +47,8 @@ export default defineConfig(({ mode }) => {
         includeAssets: [
           "robots.txt",
           "placeholder.svg",
-          "pwa-192x192.png",
-          "pwa-512x512.png",
-          "apple-touch-icon.png",
+          "icons/icon-192x192.png",
+          "icons/icon-512x512.png",
         ],
         manifest: {
           name: "ResQNow",
@@ -62,19 +61,19 @@ export default defineConfig(({ mode }) => {
           scope: "/",
           icons: [
             {
-              src: "pwa-192x192.png",
+              src: "icons/icon-192x192.png",
               sizes: "192x192",
               type: "image/png",
               purpose: "any"
             },
             {
-              src: "pwa-512x512.png",
+              src: "icons/icon-512x512.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "any",
             },
             {
-              src: "pwa-512x512.png",
+              src: "icons/icon-512x512.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "maskable"

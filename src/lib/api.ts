@@ -1,0 +1,456 @@
+const normalizeBaseUrl = (value: string | undefined): string => {
+  const trimmed = (value ?? "").trim();
+  const unquoted = trimmed.replace(/^["']|["']$/g, "");
+  return unquoted.replace(/\/+$/, "");
+};
+
+const isBrowser = typeof window !== "undefined";
+const runtimeOrigin = () => (isBrowser ? window.location.origin : "");
+
+const FRONTEND_ONLY_ENV = String(import.meta.env.VITE_FRONTEND_ONLY ?? "")
+  .trim()
+  .toLowerCase();
+
+export const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+export const FRONTEND_ONLY_MODE =
+  FRONTEND_ONLY_ENV === "true" || FRONTEND_ONLY_ENV === "1";
+
+const DEMO_USER_TOKEN = "demo-user-token";
+const DEMO_TECH_TOKEN = "demo-tech-token";
+const DEMO_ADMIN_TOKEN = "demo-admin-token";
+
+type AnyRecord = Record<string, any>;
+
+const nowIso = () => new Date().toISOString();
+const json = (payload: unknown, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+const parseJsonBody = (raw: string) => {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+};
+
+const readStore = <T,>(key: string, fallback: T): T => {
+  if (!isBrowser) return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+};
+
+const writeStore = (key: string, value: unknown) => {
+  if (!isBrowser) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore localStorage write failures in demo mode.
+  }
+};
+
+const defaultTechnicians = () => [
+  {
+    id: "tech-101",
+    name: "Rapid Auto Care",
+    email: "rapid@resqnow.demo",
+    phone: "+91 9876500001",
+    verification_status: "verified",
+    specialties: ["Towing Assistance", "Battery Jump Start", "Tyre / Puncture Repair"],
+    vehicle_types: { car: true, bike: true, commercial: true, ev: true },
+    pricing: { towing: 899, puncture: 299, battery: 399 },
+    rating: 4.8,
+    jobs_completed: 186,
+    total_earnings: 148500,
+    latitude: 12.9716,
+    longitude: 77.5946,
+    is_active: true,
+  },
+  {
+    id: "tech-102",
+    name: "City Bike Clinic",
+    email: "bike@resqnow.demo",
+    phone: "+91 9876500002",
+    verification_status: "pending",
+    specialties: ["Tyre / Puncture Repair", "Fuel Delivery"],
+    vehicle_types: { bike: true, ev: true },
+    rating: 4.4,
+    jobs_completed: 74,
+    total_earnings: 54000,
+    latitude: 12.9352,
+    longitude: 77.6245,
+    is_active: false,
+  },
+];
+
+const defaultRequests = () => [
+  {
+    id: "req-1001",
+    service_type: "flat-tire",
+    vehicle_type: "car",
+    vehicle_model: "Hyundai i20",
+    address: "MG Road, Bengaluru",
+    status: "assigned",
+    payment_status: "pending",
+    amount: 699,
+    service_charge: 699,
+    location_lat: 12.9716,
+    location_lng: 77.5946,
+    technician_id: "tech-101",
+    has_review: false,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+];
+
+const defaultUsers = () => [
+  { id: 1, full_name: "Demo User", email: "demo@resqnow.app", email_confirmed: true, created_at: nowIso() },
+];
+
+const getTechnicians = () => readStore("resqnow_mock_technicians", defaultTechnicians());
+const setTechnicians = (value: AnyRecord[]) => writeStore("resqnow_mock_technicians", value);
+const getRequests = () => readStore("resqnow_mock_requests", defaultRequests());
+const setRequests = (value: AnyRecord[]) => writeStore("resqnow_mock_requests", value);
+const getUsers = () => readStore("resqnow_mock_users", defaultUsers());
+const setUsers = (value: AnyRecord[]) => writeStore("resqnow_mock_users", value);
+const getVehicles = () =>
+  readStore("resqnow_mock_vehicles", [
+    { id: 1, type: "car", make: "Hyundai", model: "i20", license_plate: "KA01DEMO1", status: "ready" },
+  ]);
+const setVehicles = (value: AnyRecord[]) => writeStore("resqnow_mock_vehicles", value);
+
+const ensureUserProfile = (patch: AnyRecord = {}) => {
+  const base = getUserProfile() || {
+    id: "demo-user-1",
+    name: "Demo User",
+    email: "demo@resqnow.app",
+    subscription: "free",
+    isVerified: true,
+  };
+  const next = { ...base, ...patch };
+  setUserProfile(next);
+  return next;
+};
+
+const withTechnician = (request: AnyRecord) => {
+  if (!request) return request;
+  const technician = getTechnicians().find((item) => String(item.id) === String(request.technician_id));
+  if (!technician) return request;
+  return {
+    ...request,
+    technician: {
+      id: technician.id,
+      name: technician.name,
+      phone: technician.phone,
+      rating: technician.rating,
+      location_lat: technician.latitude,
+      location_lng: technician.longitude,
+      completedJobs: technician.jobs_completed,
+    },
+  };
+};
+
+const requestById = (id: string) =>
+  getRequests().find((item) => String(item.id) === String(id)) || null;
+
+const upsertRequest = (request: AnyRecord) => {
+  const requests = getRequests();
+  const idx = requests.findIndex((item) => String(item.id) === String(request.id));
+  if (idx >= 0) requests[idx] = { ...requests[idx], ...request, updated_at: nowIso() };
+  else requests.unshift({ ...request, updated_at: nowIso() });
+  setRequests(requests);
+};
+
+const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
+  const path = url.pathname;
+  const q = url.searchParams;
+
+  if (path === "/api/auth/google/url" && method === "GET") {
+    return json({ url: `${runtimeOrigin()}/auth/success?token=${encodeURIComponent(DEMO_USER_TOKEN)}` });
+  }
+  if (path === "/api/auth/verify" && method === "GET") return json({ token: DEMO_USER_TOKEN, user: ensureUserProfile() });
+  if (path === "/api/auth/me" && method === "GET") return getUserToken() ? json(ensureUserProfile()) : json({ error: "Unauthorized" }, 401);
+  if (path === "/api/auth/logout" && method === "POST") return json({ success: true });
+
+  if (path === "/api/users/login" && method === "POST") return json({ token: DEMO_USER_TOKEN, user: ensureUserProfile({ email: body.email || "demo@resqnow.app" }) });
+  if (path === "/api/users/send-otp" && method === "POST") return json({ message: "OTP sent successfully (demo mode)." });
+  if (path === "/api/users/verify-otp" && method === "POST") return json({ token: DEMO_USER_TOKEN, user: ensureUserProfile({ email: body.email, name: body.name || "Demo User" }) });
+  if (path === "/api/users/confirm-email" && method === "GET") return json({ message: "Email confirmed successfully (demo mode)." });
+  if (path === "/api/users/me/settings" && method === "GET") return json(readStore("resqnow_mock_user_settings", { appearance: { theme: "system", force_dark_mode: false }, notifications: { service_updates_email: true, marketing_email: true, push_alerts: false }, privacy: { email_visibility: "verified_only" } }));
+  if (path === "/api/users/me/settings" && (method === "PATCH" || method === "PUT")) {
+    const current = readStore("resqnow_mock_user_settings", { appearance: { theme: "system", force_dark_mode: false }, notifications: { service_updates_email: true, marketing_email: true, push_alerts: false }, privacy: { email_visibility: "verified_only" } });
+    const next = { ...current, ...body, appearance: { ...(current.appearance || {}), ...(body.appearance || {}) }, notifications: { ...(current.notifications || {}), ...(body.notifications || {}) }, privacy: { ...(current.privacy || {}), ...(body.privacy || {}) } };
+    writeStore("resqnow_mock_user_settings", next);
+    return json({ settings: next });
+  }
+  if (path === "/api/users/reviews" && method === "POST") return json({ success: true });
+
+  if (path === "/api/admin/login" && method === "POST") return json({ token: DEMO_ADMIN_TOKEN, admin: { id: "demo-admin-1", email: "admin@resqnow.app", name: "Demo Admin", role: "super_admin" } });
+  if (path === "/api/admin/users" && method === "GET") return json(getUsers());
+  if (path === "/api/admin/users" && method === "POST") {
+    const users = getUsers();
+    users.push({ id: users.length + 1, full_name: body.name || "New User", email: body.email || `user${users.length + 1}@resqnow.app`, email_confirmed: true, created_at: nowIso() });
+    setUsers(users);
+    return json({ message: "User created successfully (demo mode)." });
+  }
+  if (path === "/api/admin/analytics" && method === "GET") return json({ totalTechnicians: getTechnicians().length, totalUsers: getUsers().length, totalServiceRequests: getRequests().length, totalRevenue: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0), monthlyData: [{ name: "Jan", technicians: 1, requests: 3 }, { name: "Feb", technicians: 2, requests: 5 }], serviceDistribution: [{ name: "Towing", value: 35, color: "#ef4444" }, { name: "Battery", value: 25, color: "#3b82f6" }, { name: "Flat Tire", value: 40, color: "#22c55e" }] });
+  if (path === "/api/admin/notifications/count" && method === "GET") return json({ count: 1, pendingApplications: getTechnicians().filter((item) => item.verification_status === "pending").length });
+  if (path === "/api/admin/notifications" && method === "GET") return json([{ id: 1, title: "New technician application", message: "City Bike Clinic submitted documents.", type: "technician_application", is_read: 0, created_at: nowIso() }].slice(Number(q.get("offset") || 0), Number(q.get("offset") || 0) + Number(q.get("limit") || 5)));
+  if (/^\/api\/admin\/notifications\/\d+\/read$/.test(path) && method === "POST") return json({ success: true });
+
+  if (path === "/api/technicians/list" && method === "GET") {
+    const status = String(q.get("status") || "").toLowerCase();
+    const normalized = status === "approved" ? "verified" : status;
+    const technicians = getTechnicians();
+    return json(normalized ? technicians.filter((item) => item.verification_status === normalized) : technicians);
+  }
+  if (path === "/api/technicians/nearby" && method === "GET") {
+    const lat = Number(q.get("lat") || 12.9716);
+    const lng = Number(q.get("lng") || 77.5946);
+    const data = getTechnicians()
+      .filter((item) => item.verification_status === "verified")
+      .map((item) => {
+        const dx = Number(item.latitude || 12.9716) - lat;
+        const dy = Number(item.longitude || 77.5946) - lng;
+        const distance = Math.sqrt(dx * dx + dy * dy) * 111;
+        return { ...item, distance: Number(distance.toFixed(2)), service_type: item.specialties?.[0] || "General", aiRecommended: Number(item.rating || 0) >= 4.7, price: Number(item.pricing?.towing || item.pricing?.puncture || 499), currency: "INR" };
+      });
+    return json(data);
+  }
+  if (path === "/api/technicians/login" && method === "POST") {
+    const technician = getTechnicians().find((item) => String(item.email || "").toLowerCase() === String(body.email || "").toLowerCase()) || getTechnicians()[0];
+    return technician ? json({ token: DEMO_TECH_TOKEN, technician }) : json({ error: "Not found" }, 404);
+  }
+  if (path === "/api/technicians/register" && method === "POST") return json({ token: DEMO_TECH_TOKEN, id: `tech-${Date.now()}`, name: body.name || "New Technician", email: body.email || "new@resqnow.app" });
+  if (path === "/api/technicians/me" && method === "GET") return json(getTechnicians()[0] || null);
+  if (path === "/api/technicians/me/status" && method === "GET") return json({ is_active: true, success: true });
+  if (path === "/api/technicians/me/status" && method === "PATCH") return json({ is_active: Boolean(body.active), success: true });
+  if (path === "/api/technicians/me/settings" && method === "GET") return json(readStore("resqnow_mock_tech_settings", { appearance: { theme: "system" }, notifications: { email_notifications: true, push_notifications: true } }));
+  if (path === "/api/technicians/me/settings" && (method === "PATCH" || method === "PUT")) {
+    const current = readStore("resqnow_mock_tech_settings", { appearance: { theme: "system" }, notifications: { email_notifications: true, push_notifications: true } });
+    const next = { ...current, ...body, appearance: { ...(current.appearance || {}), ...(body.appearance || {}) }, notifications: { ...(current.notifications || {}), ...(body.notifications || {}) } };
+    writeStore("resqnow_mock_tech_settings", next);
+    return json({ settings: next, ...next });
+  }
+  if (path === "/api/technicians/dashboard-stats" && method === "GET") return json({ completedJobs: getRequests().filter((item) => ["completed", "paid"].includes(String(item.status).toLowerCase())).length, totalEarnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0), todayEarnings: 0 });
+  if (path === "/api/technicians/requests" && method === "GET") return json(getRequests().map(withTechnician));
+  if (path === "/api/technicians/jobs/history" && method === "GET") return json(getRequests().filter((item) => ["completed", "paid", "cancelled"].includes(String(item.status).toLowerCase())).map(withTechnician));
+  if (path === "/api/technicians/earnings-history" && method === "GET") return json([{ date: "Mon", amount: 1200 }, { date: "Tue", amount: 1800 }, { date: "Wed", amount: 900 }, { date: "Thu", amount: 2200 }, { date: "Fri", amount: 1500 }]);
+  if (path === "/api/technicians/me/reviews" && method === "GET") return json([{ id: 1, rating: 5, comment: "Quick and professional service." }]);
+  if (path === "/api/technicians/me/notifications" && method === "GET") return json([]);
+  if (path === "/api/technicians/me/financials" && method === "GET") return json({ total_earnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0), pending_dues: 0 });
+  if (path === "/api/technicians/me/dues" && method === "GET") return json({ total: 0 });
+  if (path === "/api/technicians/me/active-job" && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
+  if (path === "/api/technicians/me/profile" && method === "PATCH") return json({ success: true });
+  if (path === "/api/technicians/me/payout-transactions" && method === "GET") return json([]);
+  if (path === "/api/technicians/me/location" && method === "PATCH") return json({ success: true });
+  if (path === "/api/technicians/me/pay-dues/order" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: 0, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
+  if ((path === "/api/technicians/me/pay-dues/verify" || path === "/api/technicians/me/verify-dues") && method === "POST") return json({ success: true, financials: { pending_dues: 0, total_earnings: 0 } });
+  if (path === "/api/technicians/me/pay-dues" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: 0, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
+
+  if (path === "/api/service-requests" && method === "GET") return json(getRequests().map(withTechnician));
+  if (path === "/api/service-requests" && method === "POST") {
+    const id = `req-${Date.now()}`;
+    const request = { id, service_type: body.service_type || "other", vehicle_type: body.vehicle_type || "car", vehicle_model: body.vehicle_model || "Vehicle", address: body.address || "Demo address", status: "pending", payment_status: "pending", amount: Number(body.amount || 500), service_charge: Number(body.amount || 500), location_lat: Number(body.location_lat || 12.9716), location_lng: Number(body.location_lng || 77.5946), technician_id: body.technician_id || null, has_review: false, created_at: nowIso(), updated_at: nowIso() };
+    upsertRequest(request);
+    return json(request);
+  }
+  const requestIdMatch = path.match(/^\/api\/service-requests\/([^/]+)$/);
+  if (requestIdMatch && method === "GET") return requestById(requestIdMatch[1]) ? json(withTechnician(requestById(requestIdMatch[1]))) : json({ error: "Not found" }, 404);
+  const requestAcceptMatch = path.match(/^\/api\/service-requests\/([^/]+)\/accept$/);
+  if (requestAcceptMatch && method === "POST") {
+    const req = requestById(requestAcceptMatch[1]);
+    if (!req) return json({ error: "Not found" }, 404);
+    const next = { ...req, status: "accepted", technician_id: req.technician_id || getTechnicians()[0]?.id || null };
+    upsertRequest(next);
+    return json({ success: true, request: withTechnician(next) });
+  }
+  const requestStatusMatch = path.match(/^\/api\/service-requests\/([^/]+)\/(technician-status|status)$/);
+  if (requestStatusMatch && method === "PATCH") {
+    const req = requestById(requestStatusMatch[1]);
+    if (!req) return json({ error: "Not found" }, 404);
+    const status = String(body.status || req.status);
+    const next = { ...req, status, payment_status: status === "paid" || status === "completed" ? "completed" : req.payment_status };
+    upsertRequest(next);
+    return json({ success: true, request: withTechnician(next) });
+  }
+  const requestCancelMatch = path.match(/^\/api\/service-requests\/([^/]+)\/cancel$/);
+  if (requestCancelMatch && method === "PATCH") {
+    const req = requestById(requestCancelMatch[1]);
+    if (!req) return json({ error: "Not found" }, 404);
+    const next = { ...req, status: "cancelled" };
+    upsertRequest(next);
+    return json({ success: true, request: withTechnician(next) });
+  }
+  const requestInvoiceMatch = path.match(/^\/api\/service-requests\/([^/]+)\/invoice$/);
+  if (requestInvoiceMatch && method === "GET") {
+    const req = requestById(requestInvoiceMatch[1]);
+    return json({ id: `invoice_${requestInvoiceMatch[1]}`, request_id: requestInvoiceMatch[1], amount: Number(req?.amount || 0), service_charge: Number(req?.service_charge || req?.amount || 0), tax: 0, total: Number(req?.amount || 0), created_at: nowIso() });
+  }
+
+  if (path === "/api/vehicles" && method === "GET") return json(getVehicles());
+  if (path === "/api/vehicles" && method === "POST") {
+    const vehicles = getVehicles();
+    vehicles.push({ id: vehicles.length + 1, type: body.type || "car", make: body.make || "Demo", model: body.model || "Model", license_plate: body.license_plate || "", status: "ready" });
+    setVehicles(vehicles);
+    return json(vehicles[vehicles.length - 1]);
+  }
+  const vehicleDeleteMatch = path.match(/^\/api\/vehicles\/(\d+)$/);
+  if (vehicleDeleteMatch && method === "DELETE") {
+    setVehicles(getVehicles().filter((item) => Number(item.id) !== Number(vehicleDeleteMatch[1])));
+    return json({ success: true });
+  }
+
+  if (path === "/api/payments/config" && method === "GET") return json({ currency: "INR", platform_fee_percent: 0.1, registration_fee: 500, booking_fee: 199, pay_now_discount_percent: 0, default_service_amount: 500, service_base_prices: { towing: { car: 599, bike: 399, commercial: 2499, ev: 699 }, "flat-tire": { car: 349, bike: 99, commercial: 999, ev: 299 }, battery: { car: 399, bike: 199, commercial: 899, ev: 499 }, mechanical: { car: 499, bike: 499, commercial: 1499, ev: 399 }, fuel: { car: 299, bike: 99, commercial: 499, ev: 299 }, lockout: { car: 399, bike: 199, commercial: 699, ev: 399 }, winching: { car: 599, bike: 399, commercial: 1999, ev: 699 }, other: { car: 500, bike: 500, commercial: 500, ev: 500 } }, subscription_plans: [{ id: "free", name: "PAY-AS-YOU-GO", amount: 0, period: "per month", description: "Use only when needed", features: ["Roadside assistance", "Live tracking"], notIncluded: ["Priority response"], idealFor: ["Occasional users"], footer: "No commitment.", color: "green", recommended: false, active: true, display_order: 0 }, { id: "basic", name: "SMART CARE", amount: 99, period: "per month", description: "Priority and savings", features: ["Everything in Free", "Priority support"], notIncluded: [], idealFor: ["Daily commuters"], footer: "Best value.", color: "blue", recommended: true, active: true, display_order: 1 }] });
+  if (path === "/api/payments/create-service-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: Number(body.amount || 500) * 100, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: Number(body.amount || 500) });
+  if (path === "/api/payments/create-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: Math.round(Number(requestById(String(body.requestId || ""))?.amount || 500) * 100), currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: Number(requestById(String(body.requestId || ""))?.amount || 500) });
+  if (path === "/api/payments/create-subscription-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: 9900, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: 99 });
+  if (path === "/api/payments/verify-subscription-payment" && method === "POST") return json({ success: true });
+  if (path === "/api/payments/confirm" && method === "POST") {
+    const req = requestById(String(body.requestId || ""));
+    if (req) upsertRequest({ ...req, status: "paid", payment_status: "completed" });
+    return json({ success: true, request: req ? withTechnician({ ...req, status: "paid", payment_status: "completed" }) : undefined });
+  }
+  if (path === "/api/payments/cash" && method === "POST") {
+    const req = requestById(String(body.requestId || ""));
+    if (req) upsertRequest({ ...req, status: "paid", payment_status: "completed" });
+    return json({ success: true });
+  }
+  if (path === "/api/payments/diagnostics/overview" && method === "GET") return json({ records: getRequests().map((item, idx) => ({ payment_id: idx + 1, service_request_id: item.id, payment_method: "online", payment_row_status: "captured", payment_total_amount: Number(item.amount || 0), platform_fee: 0, technician_amount: Number(item.amount || 0), is_settled: 1, payment_created_at: item.updated_at || item.created_at, request_status: item.status, request_payment_status: item.payment_status, customer_name: "Demo User", customer_email: "demo@resqnow.app", technician_name: withTechnician(item).technician?.name || "Rapid Auto Care", checks: { request_paid_consistent: true, payment_method_consistent: true } })), stats: { total_payments: getRequests().length, completed_payments: getRequests().length, cash_payments: 0, online_payments: getRequests().length } });
+  if (/^\/api\/payments\/diagnostics\/request\/.+$/.test(path) && method === "GET") return json({ request: { id: path.split("/").pop(), status: "paid", payment_status: "completed" }, payments: [{ id: "pay_demo", amount: 699 }], invoices: [{ id: "inv_demo", total: 699 }], checks: { request_paid_consistent: true, payment_method_consistent: true } });
+
+  if (path === "/api/upload" && method === "POST") return json({ url: "/placeholder.svg" });
+  if (path === "/api/public/stats" && method === "GET") return json({ users: getUsers().length, technicians: getTechnicians().filter((item) => item.verification_status === "verified").length, completedServices: getRequests().filter((item) => ["completed", "paid"].includes(String(item.status).toLowerCase())).length });
+  if (path === "/api/public/contact" && method === "POST") return json({ success: true, message: "Message received (demo mode)." });
+  if (path === "/api/public/reverse-geocode" && method === "GET") return json({ display_name: `Demo Location (${Number(q.get("lat") || 12.9716).toFixed(4)}, ${Number(q.get("lng") || 77.5946).toFixed(4)}), Bengaluru, Karnataka`, address: { suburb: "Indiranagar", city: "Bengaluru", district: "Bengaluru Urban", state: "Karnataka", postcode: "560038" } });
+  if (path === "/api/chatbot/message" && method === "POST") return json({ text: "Demo mode: backend chatbot is disconnected, but UI remains fully usable." });
+
+  return json({ success: true });
+};
+
+let fetchPatched = false;
+const installMockFetch = () => {
+  if (!FRONTEND_ONLY_MODE || !isBrowser || fetchPatched) return;
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url, runtimeOrigin());
+    if (!url.pathname.startsWith("/api/")) return nativeFetch(input, init);
+    const method = (init?.method || (input instanceof Request ? input.method : "GET") || "GET").toUpperCase();
+    const body = await parseBody(input, init);
+    return mockApi(url, method, body);
+  };
+  fetchPatched = true;
+};
+
+const parseBody = async (input: RequestInfo | URL, init?: RequestInit): Promise<AnyRecord> => {
+  if (typeof init?.body === "string") return parseJsonBody(init.body);
+  if (init?.body instanceof FormData) return {};
+  if (init?.body && typeof init.body === "object") return init.body as AnyRecord;
+  if (input instanceof Request && input.method !== "GET" && input.method !== "HEAD") {
+    try {
+      const raw = await input.clone().text();
+      return parseJsonBody(raw);
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
+installMockFetch();
+
+export function getRequiredApiBaseUrl(): string {
+  if (API_BASE_URL) return API_BASE_URL;
+  if (FRONTEND_ONLY_MODE) return runtimeOrigin();
+  throw new Error(
+    "Missing VITE_API_URL. Set it in Netlify env (example: https://your-render-service.onrender.com)."
+  );
+}
+
+export function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const base = getRequiredApiBaseUrl();
+  if (!API_BASE_URL && FRONTEND_ONLY_MODE) return normalizedPath;
+  return `${base}${normalizedPath}`;
+}
+
+export function getTechnicianToken(): string | null {
+  if (!isBrowser) return null;
+  return localStorage.getItem("resqnow_technician_token");
+}
+
+export function getAdminToken(): string | null {
+  if (!isBrowser) return null;
+  return localStorage.getItem("resqnow_admin_token");
+}
+
+export async function apiFetch(
+  path: string,
+  options: RequestInit & { admin?: boolean; technician?: boolean } = {}
+): Promise<Response> {
+  const { admin, technician, headers = {}, ...rest } = options;
+  const h = new Headers(headers);
+  h.set("Content-Type", "application/json");
+
+  if (admin) {
+    const token = getAdminToken();
+    if (token) h.set("Authorization", `Bearer ${token}`);
+  } else if (technician) {
+    const token = getTechnicianToken();
+    if (token) h.set("Authorization", `Bearer ${token}`);
+  } else {
+    const token = getUserToken();
+    if (token) h.set("Authorization", `Bearer ${token}`);
+  }
+
+  return fetch(apiUrl(path), { ...rest, headers: h });
+}
+
+export function setTechnicianToken(token: string | null) {
+  if (!isBrowser) return;
+  if (token) localStorage.setItem("resqnow_technician_token", token);
+  else localStorage.removeItem("resqnow_technician_token");
+}
+
+export function setAdminToken(token: string | null) {
+  if (!isBrowser) return;
+  if (token) localStorage.setItem("resqnow_admin_token", token);
+  else localStorage.removeItem("resqnow_admin_token");
+}
+
+export function getUserToken(): string | null {
+  if (!isBrowser) return null;
+  return localStorage.getItem("resqnow_user_token");
+}
+
+export function setUserToken(token: string | null) {
+  if (!isBrowser) return;
+  if (token) localStorage.setItem("resqnow_user_token", token);
+  else localStorage.removeItem("resqnow_user_token");
+}
+
+export function getUserProfile(): { id: string; name: string; email: string } | null {
+  if (!isBrowser) return null;
+  try {
+    const raw = localStorage.getItem("resqnow_user_profile");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed.id !== "undefined" && parsed.name && parsed.email ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setUserProfile(profile: { id: string; name: string; email: string } | null) {
+  if (!isBrowser) return;
+  if (profile) localStorage.setItem("resqnow_user_profile", JSON.stringify(profile));
+  else localStorage.removeItem("resqnow_user_profile");
+}

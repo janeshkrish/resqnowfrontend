@@ -115,6 +115,61 @@ const defaultUsers = () => [
   { id: 1, full_name: "Demo User", email: "demo@resqnow.app", email_confirmed: true, created_at: nowIso() },
 ];
 
+const MOCK_PRICING_CONFIG = {
+  currency: "INR",
+  platform_fee_percent: 0.1,
+  welcome_coupon_code: "RESQ10",
+  welcome_coupon_discount_percent: 0.1,
+  welcome_coupon_max_uses_per_user: 2,
+  welcome_coupon_active: true,
+  registration_fee: 500,
+  booking_fee: 199,
+  pay_now_discount_percent: 0,
+  default_service_amount: 500,
+  service_base_prices: {
+    towing: { car: 599, bike: 399, commercial: 2499, ev: 699 },
+    "flat-tire": { car: 349, bike: 99, commercial: 999, ev: 299 },
+    battery: { car: 399, bike: 199, commercial: 899, ev: 499 },
+    mechanical: { car: 499, bike: 499, commercial: 1499, ev: 399 },
+    fuel: { car: 299, bike: 99, commercial: 499, ev: 299 },
+    lockout: { car: 399, bike: 199, commercial: 699, ev: 399 },
+    winching: { car: 599, bike: 399, commercial: 1999, ev: 699 },
+    other: { car: 500, bike: 500, commercial: 500, ev: 500 },
+  },
+  subscription_plans: [
+    {
+      id: "free",
+      name: "PAY-AS-YOU-GO",
+      amount: 0,
+      period: "per month",
+      description: "Use only when needed",
+      features: ["Roadside assistance", "Live tracking"],
+      notIncluded: ["Priority response"],
+      idealFor: ["Occasional users"],
+      footer: "No commitment.",
+      color: "green",
+      recommended: false,
+      active: true,
+      display_order: 0,
+    },
+    {
+      id: "basic",
+      name: "SMART CARE",
+      amount: 99,
+      period: "per month",
+      description: "Priority and savings",
+      features: ["Everything in Free", "Priority support"],
+      notIncluded: [],
+      idealFor: ["Daily commuters"],
+      footer: "Best value.",
+      color: "blue",
+      recommended: true,
+      active: true,
+      display_order: 1,
+    },
+  ],
+};
+
 const getTechnicians = () => readStore("resqnow_mock_technicians", defaultTechnicians());
 const setTechnicians = (value: AnyRecord[]) => writeStore("resqnow_mock_technicians", value);
 const getRequests = () => readStore("resqnow_mock_requests", defaultRequests());
@@ -167,6 +222,93 @@ const upsertRequest = (request: AnyRecord) => {
   if (idx >= 0) requests[idx] = { ...requests[idx], ...request, updated_at: nowIso() };
   else requests.unshift({ ...request, updated_at: nowIso() });
   setRequests(requests);
+};
+
+const roundMoney = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const normalizeCouponCode = (value: unknown) => String(value || "").trim().toUpperCase();
+const isRequestPaid = (request: AnyRecord) =>
+  ["paid", "completed"].includes(String(request?.status || "").toLowerCase()) ||
+  String(request?.payment_status || "").toLowerCase() === "completed";
+
+const buildMockPaymentQuote = (
+  request: AnyRecord,
+  couponCode: unknown,
+  { preserveExistingApplied = false }: { preserveExistingApplied?: boolean } = {}
+) => {
+  const pricingConfig = MOCK_PRICING_CONFIG;
+  const baseAmount = roundMoney(
+    Number(request?.amount || request?.service_charge || pricingConfig.default_service_amount)
+  );
+  const originalPlatformFee = roundMoney(baseAmount * Number(pricingConfig.platform_fee_percent || 0.1));
+
+  const configuredCode = normalizeCouponCode(pricingConfig.welcome_coupon_code);
+  const enteredCode = normalizeCouponCode(couponCode);
+  const requestId = String(request?.id || "");
+
+  const completedServicesCount = getRequests().filter(
+    (item) => String(item?.id || "") !== requestId && isRequestPaid(item)
+  ).length;
+
+  const reservedCouponCount = getRequests().filter((item) => {
+    if (String(item?.id || "") === requestId) return false;
+    if (String(item?.status || "").toLowerCase() === "cancelled") return false;
+    if (String(item?.payment_status || "").toLowerCase() === "completed") return false;
+    return normalizeCouponCode(item?.applied_coupon_code) === configuredCode;
+  }).length;
+
+  const maxUses = Number(pricingConfig.welcome_coupon_max_uses_per_user || 2);
+  const remainingEligibleUses = Math.max(0, maxUses - completedServicesCount - reservedCouponCount);
+  const hasExistingReservation =
+    normalizeCouponCode(request?.applied_coupon_code) === configuredCode &&
+    Number(request?.applied_discount_percent || 0) > 0 &&
+    String(request?.status || "").toLowerCase() !== "cancelled";
+
+  let isApplied = false;
+  let reason: string | null = null;
+
+  if (!enteredCode) {
+    if (preserveExistingApplied && hasExistingReservation && pricingConfig.welcome_coupon_active) {
+      isApplied = true;
+    }
+  } else if (!pricingConfig.welcome_coupon_active) {
+    reason = "This coupon is currently inactive.";
+  } else if (enteredCode !== configuredCode) {
+    reason = "Invalid coupon code.";
+  } else if (!hasExistingReservation && remainingEligibleUses <= 0) {
+    reason = `Coupon is valid only for your first ${maxUses} paid services.`;
+  } else {
+    isApplied = true;
+  }
+
+  const discountPercent = Number(pricingConfig.welcome_coupon_discount_percent || 0.1);
+  const discountAmount = isApplied ? roundMoney(originalPlatformFee * discountPercent) : 0;
+  const platformFee = roundMoney(Math.max(0, originalPlatformFee - discountAmount));
+  const totalAmount = roundMoney(baseAmount + platformFee);
+
+  return {
+    breakdown: {
+      currency: pricingConfig.currency,
+      base_amount: baseAmount,
+      platform_fee_percent: Number(pricingConfig.platform_fee_percent || 0.1),
+      original_platform_fee: originalPlatformFee,
+      discount_amount: discountAmount,
+      platform_fee: platformFee,
+      total_amount: totalAmount,
+    },
+    coupon: {
+      active: Boolean(pricingConfig.welcome_coupon_active),
+      configured_code: configuredCode,
+      entered_code: enteredCode,
+      applied_coupon_code: isApplied ? configuredCode : null,
+      is_applied: isApplied,
+      reason,
+      discount_percent: discountPercent,
+      max_uses_per_user: maxUses,
+      completed_services_count: completedServicesCount,
+      reserved_coupon_count: reservedCouponCount,
+      remaining_eligible_uses: remainingEligibleUses,
+    },
+  };
 };
 
 const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
@@ -309,9 +451,53 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     return json({ success: true });
   }
 
-  if (path === "/api/payments/config" && method === "GET") return json({ currency: "INR", platform_fee_percent: 0.1, registration_fee: 500, booking_fee: 199, pay_now_discount_percent: 0, default_service_amount: 500, service_base_prices: { towing: { car: 599, bike: 399, commercial: 2499, ev: 699 }, "flat-tire": { car: 349, bike: 99, commercial: 999, ev: 299 }, battery: { car: 399, bike: 199, commercial: 899, ev: 499 }, mechanical: { car: 499, bike: 499, commercial: 1499, ev: 399 }, fuel: { car: 299, bike: 99, commercial: 499, ev: 299 }, lockout: { car: 399, bike: 199, commercial: 699, ev: 399 }, winching: { car: 599, bike: 399, commercial: 1999, ev: 699 }, other: { car: 500, bike: 500, commercial: 500, ev: 500 } }, subscription_plans: [{ id: "free", name: "PAY-AS-YOU-GO", amount: 0, period: "per month", description: "Use only when needed", features: ["Roadside assistance", "Live tracking"], notIncluded: ["Priority response"], idealFor: ["Occasional users"], footer: "No commitment.", color: "green", recommended: false, active: true, display_order: 0 }, { id: "basic", name: "SMART CARE", amount: 99, period: "per month", description: "Priority and savings", features: ["Everything in Free", "Priority support"], notIncluded: [], idealFor: ["Daily commuters"], footer: "Best value.", color: "blue", recommended: true, active: true, display_order: 1 }] });
+  if (path === "/api/payments/config" && method === "GET") return json(MOCK_PRICING_CONFIG);
+  if (path === "/api/payments/quote" && method === "POST") {
+    const request = requestById(String(body.requestId || ""));
+    if (!request) return json({ error: "Request not found" }, 404);
+    if (isRequestPaid(request)) return json({ error: "Request already paid" }, 409);
+    const quote = buildMockPaymentQuote(request, body.couponCode, {
+      preserveExistingApplied: body.preserveExistingApplied !== false,
+    });
+    return json({ success: true, request_id: request.id, ...quote });
+  }
   if (path === "/api/payments/create-service-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: Number(body.amount || 500) * 100, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: Number(body.amount || 500) });
-  if (path === "/api/payments/create-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: Math.round(Number(requestById(String(body.requestId || ""))?.amount || 500) * 100), currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: Number(requestById(String(body.requestId || ""))?.amount || 500) });
+  if (path === "/api/payments/create-order" && method === "POST") {
+    const request = requestById(String(body.requestId || ""));
+    if (!request) return json({ error: "Request not found" }, 404);
+    if (isRequestPaid(request)) return json({ error: "Request already paid" }, 409);
+
+    const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false });
+    if (String(body.couponCode || "").trim() && !quote.coupon.is_applied) {
+      return json({ error: quote.coupon.reason || "Coupon could not be applied.", coupon: quote.coupon }, 400);
+    }
+
+    upsertRequest({
+      ...request,
+      applied_coupon_code: quote.coupon.applied_coupon_code,
+      applied_discount_percent: quote.coupon.is_applied ? quote.coupon.discount_percent : 0,
+      applied_discount_amount: quote.breakdown.discount_amount,
+      payment_method: "razorpay",
+      payment_status: "pending",
+    });
+
+    const orderId = `order_${Date.now()}`;
+    return json({
+      id: orderId,
+      order_id: orderId,
+      amount: Math.round(Number(quote.breakdown.total_amount || 0) * 100),
+      currency: quote.breakdown.currency || "INR",
+      key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo",
+      success: true,
+      base_amount: quote.breakdown.base_amount,
+      original_platform_fee: quote.breakdown.original_platform_fee,
+      discount_amount: quote.breakdown.discount_amount,
+      platform_fee: quote.breakdown.platform_fee,
+      platform_fee_percent: quote.breakdown.platform_fee_percent,
+      total_amount: quote.breakdown.total_amount,
+      coupon: quote.coupon,
+    });
+  }
   if (path === "/api/payments/create-subscription-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: 9900, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: 99 });
   if (path === "/api/payments/verify-subscription-payment" && method === "POST") return json({ success: true });
   if (path === "/api/payments/confirm" && method === "POST") {
@@ -320,8 +506,24 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     return json({ success: true, request: req ? withTechnician({ ...req, status: "paid", payment_status: "completed" }) : undefined });
   }
   if (path === "/api/payments/cash" && method === "POST") {
-    const req = requestById(String(body.requestId || ""));
-    if (req) upsertRequest({ ...req, status: "paid", payment_status: "completed" });
+    const request = requestById(String(body.requestId || ""));
+    if (!request) return json({ error: "Request not found" }, 404);
+    if (isRequestPaid(request)) return json({ success: true, alreadyPaid: true });
+
+    const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false });
+    if (String(body.couponCode || "").trim() && !quote.coupon.is_applied) {
+      return json({ error: quote.coupon.reason || "Coupon could not be applied.", coupon: quote.coupon }, 400);
+    }
+
+    upsertRequest({
+      ...request,
+      status: "paid",
+      payment_status: "completed",
+      payment_method: "cash",
+      applied_coupon_code: quote.coupon.applied_coupon_code,
+      applied_discount_percent: quote.coupon.is_applied ? quote.coupon.discount_percent : 0,
+      applied_discount_amount: quote.breakdown.discount_amount,
+    });
     return json({ success: true });
   }
   if (path === "/api/payments/diagnostics/overview" && method === "GET") return json({ records: getRequests().map((item, idx) => ({ payment_id: idx + 1, service_request_id: item.id, payment_method: "online", payment_row_status: "captured", payment_total_amount: Number(item.amount || 0), platform_fee: 0, technician_amount: Number(item.amount || 0), is_settled: 1, payment_created_at: item.updated_at || item.created_at, request_status: item.status, request_payment_status: item.payment_status, customer_name: "Demo User", customer_email: "demo@resqnow.app", technician_name: withTechnician(item).technician?.name || "Rapid Auto Care", checks: { request_paid_consistent: true, payment_method_consistent: true } })), stats: { total_payments: getRequests().length, completed_payments: getRequests().length, cash_payments: 0, online_payments: getRequests().length } });

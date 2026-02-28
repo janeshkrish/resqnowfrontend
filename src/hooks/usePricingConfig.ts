@@ -23,6 +23,10 @@ export type SubscriptionPlanConfig = {
 export type PricingConfig = {
   currency: string;
   platform_fee_percent: number;
+  welcome_coupon_code: string;
+  welcome_coupon_discount_percent: number;
+  welcome_coupon_max_uses_per_user: number;
+  welcome_coupon_active: boolean;
   registration_fee: number;
   booking_fee: number;
   pay_now_discount_percent: number;
@@ -34,6 +38,10 @@ export type PricingConfig = {
 const DEFAULT_PRICING_CONFIG: PricingConfig = {
   currency: "INR",
   platform_fee_percent: 0.1,
+  welcome_coupon_code: "RESQ10",
+  welcome_coupon_discount_percent: 0.1,
+  welcome_coupon_max_uses_per_user: 2,
+  welcome_coupon_active: true,
   registration_fee: 500,
   booking_fee: 199,
   pay_now_discount_percent: 0,
@@ -128,9 +136,21 @@ const toNumber = (value: unknown, fallback: number, allowZero = false) => {
   return parsed;
 };
 
+const toBoolean = (value: unknown, fallback: boolean) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return fallback;
+};
+
 function normalizeConfig(raw: unknown): PricingConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_PRICING_CONFIG };
   const data = raw as Partial<PricingConfig>;
+  const extra = raw as Record<string, unknown>;
 
   const service_base_prices =
     data.service_base_prices && typeof data.service_base_prices === "object"
@@ -144,6 +164,29 @@ function normalizeConfig(raw: unknown): PricingConfig {
   return {
     currency: String(data.currency || DEFAULT_PRICING_CONFIG.currency).toUpperCase(),
     platform_fee_percent: toNumber(data.platform_fee_percent, DEFAULT_PRICING_CONFIG.platform_fee_percent, true),
+    welcome_coupon_code: String(
+      extra.welcome_coupon_code || DEFAULT_PRICING_CONFIG.welcome_coupon_code
+    )
+      .trim()
+      .toUpperCase(),
+    welcome_coupon_discount_percent: toNumber(
+      extra.welcome_coupon_discount_percent,
+      DEFAULT_PRICING_CONFIG.welcome_coupon_discount_percent,
+      true
+    ),
+    welcome_coupon_max_uses_per_user: Math.max(
+      0,
+      Math.floor(
+        toNumber(
+          extra.welcome_coupon_max_uses_per_user,
+          DEFAULT_PRICING_CONFIG.welcome_coupon_max_uses_per_user
+        )
+      )
+    ),
+    welcome_coupon_active: toBoolean(
+      extra.welcome_coupon_active,
+      DEFAULT_PRICING_CONFIG.welcome_coupon_active
+    ),
     registration_fee: toNumber(data.registration_fee, DEFAULT_PRICING_CONFIG.registration_fee),
     booking_fee: toNumber(data.booking_fee, DEFAULT_PRICING_CONFIG.booking_fee),
     pay_now_discount_percent: toNumber(

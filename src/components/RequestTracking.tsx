@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Phone,
@@ -86,6 +86,48 @@ const JOURNEY_STAGES = [
   "Completed"
 ];
 
+const SHEET_MIN_VH = 36;
+const SHEET_MAX_VH = 86;
+const SHEET_SNAP_POINTS = [40, 60, 82];
+
+const clampSheetHeight = (value: number) => Math.min(SHEET_MAX_VH, Math.max(SHEET_MIN_VH, value));
+
+const snapSheetHeight = (value: number) =>
+  SHEET_SNAP_POINTS.reduce((closest, current) =>
+    Math.abs(current - value) < Math.abs(closest - value) ? current : closest
+  );
+
+type PaymentQuoteResponse = {
+  success?: boolean;
+  breakdown?: {
+    currency?: string;
+    base_amount?: number;
+    platform_fee_percent?: number;
+    original_platform_fee?: number;
+    discount_amount?: number;
+    platform_fee?: number;
+    total_amount?: number;
+  };
+  coupon?: {
+    active?: boolean;
+    configured_code?: string;
+    entered_code?: string;
+    applied_coupon_code?: string | null;
+    is_applied?: boolean;
+    reason?: string | null;
+    discount_percent?: number;
+    max_uses_per_user?: number;
+    completed_services_count?: number;
+    reserved_coupon_count?: number;
+    remaining_eligible_uses?: number;
+  };
+};
+
+type CouponMessageState = {
+  tone: "success" | "error" | "info";
+  text: string;
+};
+
 const RequestTracking = () => {
   const params = useParams<{ requestId?: string; serviceId?: string }>();
   const requestId = params.requestId || params.serviceId || "";
@@ -95,6 +137,13 @@ const RequestTracking = () => {
   const [showPaymentSummary, setShowPaymentSummary] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"online" | "cash">("online");
+  const [paymentQuote, setPaymentQuote] = useState<PaymentQuoteResponse | null>(null);
+  const [isFetchingQuote, setIsFetchingQuote] = useState(false);
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [couponMessage, setCouponMessage] = useState<CouponMessageState | null>(null);
+  const [sheetHeightVh, setSheetHeightVh] = useState(60);
+  const sheetDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const isMobile = useIsMobile();
   const { data: pricingConfig } = usePricingConfig();
@@ -144,6 +193,109 @@ const RequestTracking = () => {
     setShowPayment(false);
   }, [request?.status, request?.payment_status]);
 
+  useEffect(() => {
+    setPaymentQuote(null);
+    setCouponCodeInput("");
+    setAppliedCouponCode(null);
+    setCouponMessage(null);
+  }, [request?.id]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (showPayment) {
+      setSheetHeightVh((prev) => clampSheetHeight(Math.max(prev, 64)));
+      return;
+    }
+    setSheetHeightVh((prev) => clampSheetHeight(prev));
+  }, [isMobile, showPayment]);
+
+  const fetchPaymentQuote = async (
+    couponCode: string | null = null,
+    {
+      showFeedback = false,
+      preserveExistingApplied = true,
+    }: { showFeedback?: boolean; preserveExistingApplied?: boolean } = {}
+  ) => {
+    if (!request?.id) return null;
+    setIsFetchingQuote(true);
+
+    try {
+      const payload: Record<string, unknown> = {
+        requestId: request.id,
+        preserveExistingApplied,
+      };
+      const normalizedCoupon = String(couponCode || "").trim().toUpperCase();
+      if (normalizedCoupon) {
+        payload.couponCode = normalizedCoupon;
+      }
+
+      const res = await apiFetch(`/api/payments/quote`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const body = (await res.json().catch(() => ({}))) as PaymentQuoteResponse & { error?: string };
+
+      if (!res.ok) {
+        throw new Error(body?.error || "Failed to fetch payment quote");
+      }
+
+      setPaymentQuote(body);
+
+      const backendAppliedCode = String(body?.coupon?.applied_coupon_code || "")
+        .trim()
+        .toUpperCase();
+      if (backendAppliedCode) {
+        setAppliedCouponCode(backendAppliedCode);
+        setCouponCodeInput(backendAppliedCode);
+      } else if (!preserveExistingApplied) {
+        setAppliedCouponCode(null);
+      }
+
+      if (showFeedback) {
+        if (normalizedCoupon && backendAppliedCode) {
+          setCouponMessage({
+            tone: "success",
+            text: `${backendAppliedCode} applied. Platform fee discount added.`,
+          });
+        } else if (normalizedCoupon && !backendAppliedCode) {
+          setCouponMessage({
+            tone: "error",
+            text: body?.coupon?.reason || "Coupon could not be applied.",
+          });
+        } else if (!normalizedCoupon) {
+          setCouponMessage({
+            tone: "info",
+            text: "Coupon removed. Pricing updated.",
+          });
+        }
+      }
+
+      return body;
+    } catch (error) {
+      const message = (error as Error)?.message || "Failed to fetch payment quote.";
+      if (showFeedback) {
+        setCouponMessage({ tone: "error", text: message });
+      }
+      return null;
+    } finally {
+      setIsFetchingQuote(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showPayment || !request?.id) return;
+    void fetchPaymentQuote(appliedCouponCode, { showFeedback: false, preserveExistingApplied: true });
+    // Deliberately excluding appliedCouponCode to avoid repeated background refetch loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPayment, request?.id]);
+
+  useEffect(() => {
+    if (!showPaymentSummary || !request?.id) return;
+    void fetchPaymentQuote(appliedCouponCode, { showFeedback: false, preserveExistingApplied: true });
+    // Deliberately excluding appliedCouponCode to avoid repeated dialog refetch loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPaymentSummary, request?.id]);
+
   const formatElapsedTime = () => {
     const secs = elapsedSeconds;
     if (secs < 60) return `${secs}s`;
@@ -154,12 +306,26 @@ const RequestTracking = () => {
 
   const handleOnlinePaymentClick = () => {
     setSelectedPaymentMethod("online");
+    setCouponMessage(null);
     setShowPaymentSummary(true);
   };
 
   const handleCashPaymentClick = () => {
     setSelectedPaymentMethod("cash");
+    setCouponMessage(null);
     setShowPaymentSummary(true);
+  };
+
+  const handleApplyCoupon = async () => {
+    const code = couponCodeInput.trim().toUpperCase();
+    if (!code) return;
+    await fetchPaymentQuote(code, { showFeedback: true, preserveExistingApplied: false });
+  };
+
+  const handleRemoveCoupon = async () => {
+    setCouponCodeInput("");
+    setAppliedCouponCode(null);
+    await fetchPaymentQuote(null, { showFeedback: true, preserveExistingApplied: false });
   };
 
   const handleConfirmPayment = async () => {
@@ -219,13 +385,29 @@ const RequestTracking = () => {
     };
 
     try {
+      const normalizedCouponCode = String(appliedCouponCode || "").trim().toUpperCase();
       const orderRes = await apiFetch(`/api/payments/create-order`, {
         method: "POST",
-        body: JSON.stringify({ requestId: request.id })
+        body: JSON.stringify({
+          requestId: request.id,
+          couponCode: normalizedCouponCode || undefined,
+        })
       });
 
       if (!orderRes.ok) {
         const errBody = await orderRes.json().catch(() => ({}));
+        if (errBody?.coupon?.reason || errBody?.error) {
+          setCouponMessage({
+            tone: "error",
+            text: errBody?.coupon?.reason || errBody?.error || "Coupon validation failed.",
+          });
+        }
+        if (normalizedCouponCode) {
+          await fetchPaymentQuote(normalizedCouponCode, {
+            showFeedback: false,
+            preserveExistingApplied: false,
+          });
+        }
         throw new Error(errBody?.error || "Failed to create payment order");
       }
       const orderData = await orderRes.json();
@@ -323,9 +505,13 @@ const RequestTracking = () => {
     setIsProcessingPayment(true);
 
     try {
+      const normalizedCouponCode = String(appliedCouponCode || "").trim().toUpperCase();
       const res = await apiFetch(`/api/payments/cash`, {
         method: "POST",
-        body: JSON.stringify({ requestId: request.id })
+        body: JSON.stringify({
+          requestId: request.id,
+          couponCode: normalizedCouponCode || undefined,
+        })
       });
 
       const body = await res.json().catch(() => ({}));
@@ -337,6 +523,18 @@ const RequestTracking = () => {
         refresh();
       } else {
         console.error("Cash payment backend failure:", body);
+        if (body?.coupon?.reason || body?.error) {
+          setCouponMessage({
+            tone: "error",
+            text: body?.coupon?.reason || body?.error || "Coupon validation failed.",
+          });
+        }
+        if (normalizedCouponCode) {
+          await fetchPaymentQuote(normalizedCouponCode, {
+            showFeedback: false,
+            preserveExistingApplied: false,
+          });
+        }
         toast.error(body?.error || "Failed to record cash payment");
       }
     } catch (error: any) {
@@ -393,6 +591,78 @@ const RequestTracking = () => {
   const stageProgress = Math.round((stageIndex / (JOURNEY_STAGES.length - 1)) * 100);
   const requestAmount = Number(request?.amount || request?.service_charge || 0);
   const amountLabel = Number.isFinite(requestAmount) ? requestAmount.toFixed(2) : "0.00";
+
+  const quoteBreakdown = paymentQuote?.breakdown;
+  const quoteCoupon = paymentQuote?.coupon;
+  const resolvedTotalAmount = Number(quoteBreakdown?.total_amount);
+  const amountDueLabel =
+    Number.isFinite(resolvedTotalAmount) && resolvedTotalAmount > 0
+      ? resolvedTotalAmount.toFixed(2)
+      : amountLabel;
+
+  const couponConfiguredCode = String(
+    quoteCoupon?.configured_code || pricingConfig?.welcome_coupon_code || ""
+  )
+    .trim()
+    .toUpperCase();
+  const couponDiscountPercent = Number(
+    quoteCoupon?.discount_percent ?? pricingConfig?.welcome_coupon_discount_percent ?? 0
+  );
+  const couponMaxUses = Number(
+    quoteCoupon?.max_uses_per_user ?? pricingConfig?.welcome_coupon_max_uses_per_user ?? 2
+  );
+  const couponActive =
+    quoteCoupon?.active ?? Boolean(pricingConfig?.welcome_coupon_active ?? true);
+  const remainingCouponUses = Number(quoteCoupon?.remaining_eligible_uses);
+  const couponHint = couponActive && couponConfiguredCode
+    ? `Try ${couponConfiguredCode} for ${Math.round(couponDiscountPercent * 100)}% off on first ${couponMaxUses} services.`
+    : null;
+  const couponUsageHint =
+    Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
+      ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
+      : null;
+
+  const handleSheetPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    sheetDragRef.current = {
+      startY: event.clientY,
+      startHeight: sheetHeightVh,
+    };
+  };
+
+  const handleSheetPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!sheetDragRef.current) return;
+    const deltaY = sheetDragRef.current.startY - event.clientY;
+    const deltaVh = (deltaY / window.innerHeight) * 100;
+    setSheetHeightVh(clampSheetHeight(sheetDragRef.current.startHeight + deltaVh));
+  };
+
+  const handleSheetPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (sheetDragRef.current) {
+      setSheetHeightVh((prev) => snapSheetHeight(clampSheetHeight(prev)));
+      sheetDragRef.current = null;
+    }
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // no-op
+    }
+  };
+
+  const summaryBreakdown =
+    quoteBreakdown && Number.isFinite(Number(quoteBreakdown.total_amount))
+      ? {
+          currency: String(quoteBreakdown.currency || currency).toUpperCase(),
+          baseAmount: Number(quoteBreakdown.base_amount || requestAmount),
+          platformFeePercent: Number(
+            quoteBreakdown.platform_fee_percent ?? pricingConfig?.platform_fee_percent ?? 0.1
+          ),
+          originalPlatformFee: Number(quoteBreakdown.original_platform_fee || 0),
+          discountAmount: Number(quoteBreakdown.discount_amount || 0),
+          platformFee: Number(quoteBreakdown.platform_fee || 0),
+          totalAmount: Number(quoteBreakdown.total_amount || requestAmount),
+        }
+      : null;
 
   if (isLoading) {
     return (
@@ -465,13 +735,27 @@ const RequestTracking = () => {
         </div>
 
         <div className="absolute inset-x-0 bottom-0 z-40">
-          <div className="mx-3 mb-[calc(env(safe-area-inset-bottom)+0.6rem)] max-h-[70dvh] overflow-hidden rounded-[1.8rem] border border-border bg-background shadow-[0_-10px_40px_rgba(2,6,23,0.24)]">
-            <div className="flex justify-center pt-2">
-              <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+          <div
+            className="mx-3 mb-[calc(env(safe-area-inset-bottom)+0.6rem)] overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/95 shadow-[0_-12px_36px_rgba(15,23,42,0.22)] backdrop-blur"
+            style={{ height: `${sheetHeightVh}dvh` }}
+          >
+            <div
+              role="slider"
+              aria-label="Resize tracking panel"
+              aria-valuemin={SHEET_MIN_VH}
+              aria-valuemax={SHEET_MAX_VH}
+              aria-valuenow={Math.round(sheetHeightVh)}
+              className="flex cursor-grab touch-none justify-center pb-1 pt-2 active:cursor-grabbing"
+              onPointerDown={handleSheetPointerDown}
+              onPointerMove={handleSheetPointerMove}
+              onPointerUp={handleSheetPointerUp}
+              onPointerCancel={handleSheetPointerUp}
+            >
+              <div className="h-1.5 w-12 rounded-full bg-slate-300" />
             </div>
 
-            <div className="max-h-[67dvh] overflow-y-auto px-5 pb-5 pt-4">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+            <div className="h-[calc(100%-2.25rem)] overflow-y-auto px-5 pb-5 pt-3">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -497,7 +781,7 @@ const RequestTracking = () => {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 transition-all duration-700"
+                    className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-700"
                     style={{ width: `${stageProgress}%` }}
                   />
                 </div>
@@ -575,7 +859,7 @@ const RequestTracking = () => {
                             Amount due
                           </p>
                           <h3 className="mt-1 text-3xl font-black">
-                            {currency} {amountLabel}
+                            {currency} {amountDueLabel}
                           </h3>
                         </div>
                         <Badge className="border border-white/20 bg-white/15 text-white hover:bg-white/15">
@@ -709,6 +993,19 @@ const RequestTracking = () => {
           paymentMethod={selectedPaymentMethod}
           platformFeePercent={pricingConfig?.platform_fee_percent}
           currency={currency}
+          breakdown={summaryBreakdown}
+          showCouponSection={true}
+          couponCodeInput={couponCodeInput}
+          onCouponCodeInputChange={(value) => {
+            setCouponCodeInput(value);
+            if (couponMessage) setCouponMessage(null);
+          }}
+          onApplyCoupon={handleApplyCoupon}
+          onRemoveCoupon={handleRemoveCoupon}
+          isApplyingCoupon={isFetchingQuote}
+          couponAppliedCode={appliedCouponCode}
+          couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
+          couponMessage={couponMessage}
         />
 
         {(status === "completed" || status === "paid" || (paymentCompleted && status === "payment_pending")) && (
@@ -757,7 +1054,7 @@ const RequestTracking = () => {
               <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 p-4 text-white">
                 <p className="text-xs uppercase tracking-[0.12em] text-white/70">Amount due</p>
                 <p className="mt-1 text-3xl font-black">
-                  {currency} {amountLabel}
+                  {currency} {amountDueLabel}
                 </p>
                 <Button onClick={handleOnlinePaymentClick} className="mt-3 w-full bg-white text-slate-900 hover:bg-slate-100">
                   Pay now
@@ -780,6 +1077,19 @@ const RequestTracking = () => {
         paymentMethod={selectedPaymentMethod}
         platformFeePercent={pricingConfig?.platform_fee_percent}
         currency={currency}
+        breakdown={summaryBreakdown}
+        showCouponSection={true}
+        couponCodeInput={couponCodeInput}
+        onCouponCodeInputChange={(value) => {
+          setCouponCodeInput(value);
+          if (couponMessage) setCouponMessage(null);
+        }}
+        onApplyCoupon={handleApplyCoupon}
+        onRemoveCoupon={handleRemoveCoupon}
+        isApplyingCoupon={isFetchingQuote}
+        couponAppliedCode={appliedCouponCode}
+        couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
+        couponMessage={couponMessage}
       />
     </div>
   );

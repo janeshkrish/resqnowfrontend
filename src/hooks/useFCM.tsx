@@ -8,7 +8,7 @@ type UseFcmOptions = {
   isTechnicianAuthenticated: boolean;
 };
 
-const DEFAULT_NOTIFICATION_TITLE = "🚨 New Job Alert";
+const DEFAULT_NOTIFICATION_TITLE = "\uD83D\uDEA8 New Job Alert";
 
 function toDistanceText(value: unknown) {
   const raw = String(value || "").trim();
@@ -24,12 +24,12 @@ function toAmountText(value: unknown) {
 
 function resolveServiceEmoji(serviceType: string) {
   const value = String(serviceType || "").toLowerCase();
-  if (value.includes("tow")) return "🛻";
-  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "🛞";
-  if (value.includes("battery") || value.includes("jump")) return "🔋";
-  if (value.includes("fuel")) return "⛽";
-  if (value.includes("lock")) return "🔐";
-  return "🧰";
+  if (value.includes("tow")) return "\uD83D\uDEFB";
+  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "\uD83D\uDEDE";
+  if (value.includes("battery") || value.includes("jump")) return "\uD83D\uDD0B";
+  if (value.includes("fuel")) return "\u26FD";
+  if (value.includes("lock")) return "\uD83D\uDD10";
+  return "\uD83E\uDDF0";
 }
 
 function buildForegroundMessage(payload: any) {
@@ -47,9 +47,9 @@ function buildForegroundMessage(payload: any) {
   const serviceEmoji = resolveServiceEmoji(serviceType);
   const body =
     payload?.notification?.body ||
-    `📍 ${serviceEmoji} ${serviceType} • ${locationDistance}\n👤 Customer: ${customerName}\n💰 ₹${priceAmount}`;
+    `\uD83D\uDCCD ${serviceEmoji} ${serviceType} \u2022 ${locationDistance}\n\uD83D\uDC64 Customer: ${customerName}\n\uD83D\uDCB0 \u20B9${priceAmount}`;
 
-  return { title, body, deepLinkPath };
+  return { title, body, deepLinkPath, jobId };
 }
 
 export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFcmOptions) => {
@@ -86,7 +86,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
       }
     };
 
-    initFCM();
+    void initFCM();
 
     return () => {
       cancelled = true;
@@ -110,6 +110,9 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
             body: message.body,
             icon: "/icons/icon-192x192.png",
             badge: "/icons/icon-192x192.png",
+            requireInteraction: true,
+            vibrate: [200, 100, 200],
+            tag: message.jobId ? `job-${message.jobId}` : `job-${Date.now()}`,
             data: { deepLinkPath: message.deepLinkPath },
           });
           notification.onclick = () => {
@@ -121,7 +124,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
       });
     };
 
-    attachListener();
+    void attachListener();
 
     return () => {
       unsubscribe();

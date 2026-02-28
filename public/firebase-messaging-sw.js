@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getMessaging, onBackgroundMessage } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-sw.js";
 
-const DEFAULT_TITLE = "🚨 New Job Alert";
+const DEFAULT_TITLE = "\uD83D\uDEA8 New Job Alert";
 
 function parseFirebaseConfigFromUrl() {
   const swUrl = new URL(self.location.href);
@@ -38,12 +38,12 @@ function toCurrencyValue(value) {
 
 function resolveServiceEmoji(serviceType) {
   const value = String(serviceType || "").toLowerCase();
-  if (value.includes("tow")) return "🛻";
-  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "🛞";
-  if (value.includes("battery") || value.includes("jump")) return "🔋";
-  if (value.includes("fuel")) return "⛽";
-  if (value.includes("lock")) return "🔐";
-  return "🧰";
+  if (value.includes("tow")) return "\uD83D\uDEFB";
+  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "\uD83D\uDEDE";
+  if (value.includes("battery") || value.includes("jump")) return "\uD83D\uDD0B";
+  if (value.includes("fuel")) return "\u26FD";
+  if (value.includes("lock")) return "\uD83D\uDD10";
+  return "\uD83E\uDDF0";
 }
 
 function buildBody(data = {}) {
@@ -54,9 +54,9 @@ function buildBody(data = {}) {
   const serviceEmoji = resolveServiceEmoji(serviceType);
 
   return [
-    `📍 ${serviceEmoji} ${serviceType} • ${locationDistance}`,
-    `👤 Customer: ${customerName}`,
-    `💰 ₹${priceAmount}`,
+    `\uD83D\uDCCD ${serviceEmoji} ${serviceType} \u2022 ${locationDistance}`,
+    `\uD83D\uDC64 Customer: ${customerName}`,
+    `\uD83D\uDCB0 \u20B9${priceAmount}`,
   ].join("\n");
 }
 
@@ -71,9 +71,12 @@ function resolveDeepLinkPath(data = {}) {
 
 function buildNotification(payload = {}) {
   const data = payload.data || {};
+  const title = payload.notification?.title || DEFAULT_TITLE;
+  const body = payload.notification?.body || buildBody(data);
+
   return {
-    title: payload.notification?.title || DEFAULT_TITLE,
-    body: payload.notification?.body || buildBody(data),
+    title,
+    body: String(body),
     icon: "/icons/icon-192x192.png",
     badge: "/icons/icon-192x192.png",
     tag: data.jobId ? `job-${String(data.jobId)}` : `job-${Date.now()}`,

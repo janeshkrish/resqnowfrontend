@@ -20,12 +20,21 @@ const TechnicianLogin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
+  const resolvePostLoginPath = React.useCallback(() => {
+    const pendingJobId = sessionStorage.getItem("resqnow_pending_job_deeplink");
+    if (pendingJobId) {
+      sessionStorage.removeItem("resqnow_pending_job_deeplink");
+      return `/job/${encodeURIComponent(pendingJobId)}`;
+    }
+    return "/technician/dashboard";
+  }, []);
+
   // Auto-redirect if already logged in
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate("/technician/dashboard", { replace: true });
+      navigate(resolvePostLoginPath(), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, resolvePostLoginPath]);
 
   const form = useForm<LoginFormValues>({
     defaultValues: {
@@ -42,7 +51,7 @@ const TechnicianLogin = () => {
         title: "Login successful!",
         description: "Welcome to the ResQNow technician portal",
       });
-      navigate("/technician/dashboard");
+      navigate(resolvePostLoginPath());
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Invalid email or password. Please try again.";
       toast({

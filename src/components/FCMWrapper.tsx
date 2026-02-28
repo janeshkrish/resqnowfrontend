@@ -7,8 +7,10 @@ export const FCMWrapper: React.FC<{ children: React.ReactNode }> = ({ children }
     const { isAuthenticated } = useAuth();
     const { isAuthenticated: isTechAuthenticated } = useTechnicianAuth();
 
-    // Initialize FCM if either user or technician is logged in
-    useFCM(isAuthenticated || isTechAuthenticated);
+    useFCM({
+        isUserAuthenticated: isAuthenticated,
+        isTechnicianAuthenticated: isTechAuthenticated,
+    });
 
     return <>{children}</>;
 };

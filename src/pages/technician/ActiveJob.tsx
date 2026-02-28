@@ -222,6 +222,9 @@ const ActiveJob = () => {
     const displayService = job.service?.type || "Service";
     const displayVehicle = `${job.vehicle?.type || ''} ${job.vehicle?.model || ''}`.trim() || "Vehicle Details N/A";
     const displayAmount = job.amount || 0;
+    const customerLat = Number(job.location?.lat);
+    const customerLng = Number(job.location?.lng);
+    const hasCustomerLocation = Number.isFinite(customerLat) && Number.isFinite(customerLng);
 
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] relative">
@@ -229,10 +232,7 @@ const ActiveJob = () => {
                 <div className="absolute inset-0">
                     <ActiveJobMap
                         technicianLocation={currentLocation || { lat: 28.6139, lng: 77.2090 }}
-                        customerLocation={{
-                            lat: Number(job.location?.lat),
-                            lng: Number(job.location?.lng)
-                        }}
+                        customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
                     />
                 </div>
 

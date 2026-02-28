@@ -1,57 +1,103 @@
-import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { getApp, getApps, initializeApp } from "firebase/app";
+import {
+  getMessaging,
+  getToken,
+  isSupported,
+  onMessage,
+  type MessagePayload,
+  type Messaging,
+} from "firebase/messaging";
+
+const FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
+const FCM_SW_PATH = "/firebase-messaging-sw.js";
 
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: String(import.meta.env.VITE_FIREBASE_API_KEY || "").trim(),
+  authDomain: String(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "").trim(),
+  projectId: String(import.meta.env.VITE_FIREBASE_PROJECT_ID || "").trim(),
+  storageBucket: String(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "").trim(),
+  messagingSenderId: String(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "").trim(),
+  appId: String(import.meta.env.VITE_FIREBASE_APP_ID || "").trim(),
 };
 
 const hasFirebaseConfig = [
-    firebaseConfig.apiKey,
-    firebaseConfig.authDomain,
-    firebaseConfig.projectId,
-    firebaseConfig.storageBucket,
-    firebaseConfig.messagingSenderId,
-    firebaseConfig.appId,
-].every((value) => Boolean(String(value || "").trim()));
+  firebaseConfig.apiKey,
+  firebaseConfig.projectId,
+  firebaseConfig.messagingSenderId,
+  firebaseConfig.appId,
+].every((value) => Boolean(value));
 
-if (!hasFirebaseConfig) {
-    console.warn("[Firebase] Missing one or more Firebase web config values. FCM is disabled.");
+function createFirebaseApp() {
+  if (!hasFirebaseConfig) return null;
+  return getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 }
 
-const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
-const messaging = typeof window !== "undefined" && app ? getMessaging(app) : null;
+async function getMessagingInstance(): Promise<Messaging | null> {
+  if (typeof window === "undefined" || !hasFirebaseConfig) return null;
+  const supported = await isSupported().catch(() => false);
+  if (!supported) return null;
 
-export const requestForToken = async () => {
-    if (!messaging) return null;
-    try {
-        const currentToken = await getToken(messaging, {
-            vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY // Optional if using basic setup without key pair
-        });
+  const app = createFirebaseApp();
+  if (!app) return null;
+  return getMessaging(app);
+}
 
-        if (currentToken) {
-            console.log('Got FCM Token:', currentToken);
-            return currentToken;
-        } else {
-            console.log('No registration token available. Request permission to generate one.');
-            return null;
-        }
-    } catch (err) {
-        console.log('An error occurred while retrieving token. ', err);
-        return null;
-    }
-};
+function buildMessagingServiceWorkerUrl() {
+  const params = new URLSearchParams({
+    apiKey: firebaseConfig.apiKey,
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+    storageBucket: firebaseConfig.storageBucket,
+    messagingSenderId: firebaseConfig.messagingSenderId,
+    appId: firebaseConfig.appId,
+  });
+  return `${FCM_SW_PATH}?${params.toString()}`;
+}
 
-export const onMessageListener = () =>
-    new Promise((resolve) => {
-        if (!messaging) return;
-        onMessage(messaging, (payload) => {
-            resolve(payload);
-        });
+export async function registerFcmServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+  try {
+    return await navigator.serviceWorker.register(buildMessagingServiceWorkerUrl(), {
+      scope: FCM_SW_SCOPE,
+      type: "module",
     });
+  } catch (error) {
+    console.error("[FCM] Failed to register messaging service worker:", error);
+    return null;
+  }
+}
 
-export { app, messaging };
+export async function requestForToken() {
+  const messaging = await getMessagingInstance();
+  if (!messaging) return null;
+
+  const vapidKey = String(import.meta.env.VITE_FIREBASE_VAPID_KEY || "").trim();
+  if (!vapidKey) {
+    console.warn("[FCM] Missing VAPID key. Token generation skipped.");
+    return null;
+  }
+
+  const serviceWorkerRegistration = await registerFcmServiceWorker();
+  if (!serviceWorkerRegistration) return null;
+
+  try {
+    const token = await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration,
+    });
+    return token || null;
+  } catch (error) {
+    console.error("[FCM] Failed to get token:", error);
+    return null;
+  }
+}
+
+export async function subscribeToForegroundMessages(
+  onPayload: (payload: MessagePayload) => void
+) {
+  const messaging = await getMessagingInstance();
+  if (!messaging) return () => {};
+  return onMessage(messaging, onPayload);
+}
+
+export { hasFirebaseConfig };

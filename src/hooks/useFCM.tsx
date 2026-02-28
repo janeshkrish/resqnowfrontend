@@ -1,84 +1,132 @@
-import { useEffect, useState } from 'react';
-import { requestForToken, onMessageListener } from '../lib/firebase';
-import { apiFetch } from '../lib/api';
-import toast from 'react-hot-toast';
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { apiFetch } from "../lib/api";
+import { requestForToken, subscribeToForegroundMessages } from "../lib/firebase";
 
-export const useFCM = (isLoggedIn: boolean) => {
-    const [fcmToken, setFcmToken] = useState<string | null>(null);
+type UseFcmOptions = {
+  isUserAuthenticated: boolean;
+  isTechnicianAuthenticated: boolean;
+};
 
-    useEffect(() => {
-        if (!isLoggedIn) return;
+const DEFAULT_NOTIFICATION_TITLE = "🚨 New Job Alert";
 
-        const initFCM = async () => {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                const token = await requestForToken();
-                if (token) {
-                    setFcmToken(token);
-                    // Send to backend
-                    try {
-                        await apiFetch('/api/notifications/register-token', {
-                            method: 'POST',
-                            body: JSON.stringify({ token })
-                        });
-                        console.log("FCM token successfully registered on server.");
-                    } catch (err) {
-                        console.error("Failed to register FCM token with server", err);
-                    }
-                }
-            }
-        };
-        initFCM();
-    }, [isLoggedIn]);
+function toDistanceText(value: unknown) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Nearby";
+  return /km|m|away$/i.test(raw) ? raw : `${raw} away`;
+}
 
-    useEffect(() => {
-        // Listen for foreground notifications
-        const listen = () => {
-            onMessageListener().then((payload: any) => {
-                const { title, body } = payload.notification;
+function toAmountText(value: unknown) {
+  const amount = Number(value);
+  if (Number.isFinite(amount)) return amount.toFixed(0);
+  return String(value || "0");
+}
 
-                // Custom hot-toast implementation
-                toast(
-                    (t) => (
-                        <div className="flex gap-3" >
-                            <div className="flex-1" >
-                                <p className="font-bold text-sm text-gray-900" > {title} </p>
-                                < p className="text-sm text-gray-500 mt-1" > {body} </p>
-                            </div>
-                            < button
-                                className="opacity-50 hover:opacity-100"
-                                onClick={() => toast.dismiss(t.id)}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    ),
-                    {
-                        duration: 5000,
-                        position: 'top-center',
-                    }
-                );
+function resolveServiceEmoji(serviceType: string) {
+  const value = String(serviceType || "").toLowerCase();
+  if (value.includes("tow")) return "🛻";
+  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "🛞";
+  if (value.includes("battery") || value.includes("jump")) return "🔋";
+  if (value.includes("fuel")) return "⛽";
+  if (value.includes("lock")) return "🔐";
+  return "🧰";
+}
 
-                // Standard browser notification if supported and allowed
-                if (Notification.permission === 'granted') {
-                    try {
-                        new Notification(title, {
-                            body,
-                            icon: '/icons/icon-192x192.png',
-                            badge: '/icons/icon-192x192.png'
-                        });
-                        // Try playing a sound
-                        const audio = new Audio('/notification.mp3');
-                        audio.play().catch(e => console.log('Audio play failed', e)); // Might fail on some browsers if not user initiated
-                    } catch (e) { }
-                }
+function buildForegroundMessage(payload: any) {
+  const data = payload?.data || {};
+  const title = payload?.notification?.title || DEFAULT_NOTIFICATION_TITLE;
+  const jobId = String(data.jobId || data.requestId || "").trim();
+  const deepLinkPath =
+    String(data.deepLinkPath || "").trim() ||
+    (jobId ? `/job/${encodeURIComponent(jobId)}` : "/technician/dashboard");
 
-                listen(); // Resubscribe
-            }).catch(err => console.log('failed: ', err));
-        };
+  const serviceType = String(data.serviceType || "Roadside Assistance");
+  const customerName = String(data.customerName || "Customer");
+  const locationDistance = toDistanceText(data.locationDistance || data.distance);
+  const priceAmount = toAmountText(data.priceAmount || data.amount);
+  const serviceEmoji = resolveServiceEmoji(serviceType);
+  const body =
+    payload?.notification?.body ||
+    `📍 ${serviceEmoji} ${serviceType} • ${locationDistance}\n👤 Customer: ${customerName}\n💰 ₹${priceAmount}`;
 
-        listen();
-    }, []);
+  return { title, body, deepLinkPath };
+}
 
-    return { fcmToken };
+export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFcmOptions) => {
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const shouldEnableFcm = useMemo(
+    () => Boolean(isUserAuthenticated || isTechnicianAuthenticated),
+    [isUserAuthenticated, isTechnicianAuthenticated]
+  );
+
+  useEffect(() => {
+    if (!shouldEnableFcm || typeof window === "undefined" || !("Notification" in window)) return;
+
+    let cancelled = false;
+
+    const initFCM = async () => {
+      const permission =
+        Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
+      if (permission !== "granted" || cancelled) return;
+
+      const token = await requestForToken();
+      if (!token || cancelled) return;
+      setFcmToken(token);
+
+      try {
+        await apiFetch("/api/notifications/register-token", {
+          method: "POST",
+          technician: isTechnicianAuthenticated,
+          body: JSON.stringify({ token }),
+        });
+      } catch (error) {
+        console.error("[FCM] Failed to register token with backend:", error);
+      }
+    };
+
+    initFCM();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldEnableFcm, isTechnicianAuthenticated]);
+
+  useEffect(() => {
+    if (!shouldEnableFcm || typeof window === "undefined") return;
+    let unsubscribe = () => {};
+
+    const attachListener = async () => {
+      unsubscribe = await subscribeToForegroundMessages((payload) => {
+        const message = buildForegroundMessage(payload);
+
+        toast(message.title, {
+          description: message.body.replace(/\n/g, " "),
+        });
+
+        if (Notification.permission === "granted") {
+          const notification = new Notification(message.title, {
+            body: message.body,
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/icon-192x192.png",
+            data: { deepLinkPath: message.deepLinkPath },
+          });
+          notification.onclick = () => {
+            window.focus();
+            window.location.assign(message.deepLinkPath);
+            notification.close();
+          };
+        }
+      });
+    };
+
+    attachListener();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [shouldEnableFcm]);
+
+  return { fcmToken };
 };

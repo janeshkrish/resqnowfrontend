@@ -26,6 +26,7 @@ import TechnicianReviewsPage from "./pages/technician/TechnicianReviewsPage";
 import ActiveJob from "./pages/technician/ActiveJob";
 import TechnicianProfile from "./pages/technician/TechnicianProfile";
 import TechnicianSettings from "./pages/technician/TechnicianSettings";
+import JobDeepLink from "./pages/technician/JobDeepLink";
 
 // Admin pages
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -146,6 +147,7 @@ const App = () => (
                           <Route path="marketplace/product/:id" element={<ProductDetail />} />
                           <Route path="service-communication/:serviceId" element={<ProtectedRoute><ServiceCommunicationPage /></ProtectedRoute>} />
                           <Route path="map" element={<MapPage />} />
+                          <Route path="job/:jobId" element={<JobDeepLink />} />
                         </Route>
 
                         {/* Technician portal routes */}

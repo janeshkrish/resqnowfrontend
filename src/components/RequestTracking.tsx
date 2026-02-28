@@ -87,7 +87,8 @@ const JOURNEY_STAGES = [
 ];
 
 const RequestTracking = () => {
-  const { requestId } = useParams<{ requestId: string }>();
+  const params = useParams<{ requestId?: string; serviceId?: string }>();
+  const requestId = params.requestId || params.serviceId || "";
   const navigate = useNavigate();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showPayment, setShowPayment] = useState(false);

@@ -134,6 +134,9 @@ const App = () => (
                           <Route path="request-service/:serviceId/commercial" element={<ProtectedRoute><CommercialServiceRequest /></ProtectedRoute>} />
                           <Route path="request-service/:serviceId/ev" element={<ProtectedRoute><EVServiceRequest /></ProtectedRoute>} />
                           <Route path="request-service-tracking/:requestId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                          <Route path="service-tracking/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                          <Route path="payment/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                          <Route path="service-summary/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
                           <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                           <Route path="profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                           <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />

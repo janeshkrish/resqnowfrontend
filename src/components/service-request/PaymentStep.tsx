@@ -12,9 +12,12 @@ import {
   Clock,
   CheckCircle2,
   Shield,
-  Smartphone
+  Smartphone,
+  ArrowRight
 } from "lucide-react";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
+import { cn } from "@/lib/utils";
+import { PaymentSummaryDialog } from "../payments/PaymentSummaryDialog";
 
 interface PaymentStepProps {
   servicePrice: number;
@@ -26,8 +29,6 @@ export interface PaymentData {
   method: "cash" | "card" | "upi" | "netbanking";
   razorpayOrderId?: string;
 }
-
-import { PaymentSummaryDialog } from "../payments/PaymentSummaryDialog";
 
 const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
   const { data: pricingConfig } = usePricingConfig();
@@ -43,31 +44,44 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
   const platformFee = roundMoney(servicePrice * platformFeePercent);
   const totalAmount = roundMoney(servicePrice + platformFee);
 
+  const ensureRazorpayLoaded = async () => {
+    if ((window as any).Razorpay) return true;
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
+      document.body.appendChild(script);
+    });
+    return !!(window as any).Razorpay;
+  };
+
   const paymentMethods = [
     {
       id: "upi",
-      name: "UPI",
+      name: "UPI Apps",
       icon: Smartphone,
-      description: "Pay using UPI apps like GPay, PhonePe, Paytm",
+      description: "Google Pay, PhonePe, Paytm and BHIM",
       popular: true
     },
     {
       id: "card",
       name: "Card",
       icon: CreditCard,
-      description: "Credit/Debit Card payments"
+      description: "Credit, debit and prepaid cards"
     },
     {
       id: "netbanking",
       name: "Net Banking",
       icon: Building2,
-      description: "Direct bank transfer"
+      description: "Pay directly from your bank"
     },
     {
       id: "cash",
       name: "Cash",
       icon: Banknote,
-      description: "Pay in cash to technician"
+      description: "Pay directly to the technician"
     }
   ];
 
@@ -83,11 +97,15 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
     setIsProcessing(true);
 
     if (paymentTiming === "before" && paymentMethod !== "cash") {
-      // Simulate Razorpay payment processing
       try {
+        const sdkReady = await ensureRazorpayLoaded();
+        if (!sdkReady) {
+          throw new Error("Razorpay SDK not available");
+        }
+
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-          amount: Math.round(totalAmount * 100), // Amount in paise (Base + Fee)
+          amount: Math.round(totalAmount * 100),
           currency,
           name: "ResQNow",
           description: "Roadside Assistance Service",
@@ -100,6 +118,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
               razorpayOrderId: response.razorpay_payment_id
             });
             setShowPaymentSummary(false);
+            setIsProcessing(false);
           },
           prefill: {
             name: "Customer",
@@ -107,7 +126,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
             contact: "9999999999"
           },
           theme: {
-            color: "#dc2626"
+            color: "#ea580c"
           },
           modal: {
             ondismiss: () => {
@@ -125,7 +144,6 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         setIsProcessing(false);
       }
     } else {
-      // Cash payment or pay after service
       onPaymentConfirm({
         timing: paymentTiming,
         method: paymentMethod as any
@@ -135,47 +153,75 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="text-center">
-        <h3 className="text-2xl font-bold text-foreground mb-2">Payment Options</h3>
-        <p className="text-muted-foreground">Choose your preferred payment method</p>
+    <div
+      className="space-y-5 animate-fade-in"
+      style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
+    >
+      <div className="overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-500 via-orange-600 to-slate-900 text-white shadow-lg">
+        <div className="p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">
+              <Wallet className="h-3.5 w-3.5" />
+              Payment Checkout
+            </div>
+            <Badge className="bg-white/15 text-white border border-white/20 hover:bg-white/20">
+              Secure
+            </Badge>
+          </div>
+          <h3 className="mt-4 text-2xl font-extrabold tracking-tight">Choose how you want to pay</h3>
+          <p className="mt-1 text-sm text-white/80">
+            Fast checkout now, or pay after service completion.
+          </p>
+
+          <div className="mt-5 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
+            <div className="flex items-center justify-between text-sm text-white/90">
+              <span>Service charge</span>
+              <span className="font-semibold">{currency} {servicePrice.toFixed(2)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm text-white/90">
+              <span>Platform fee</span>
+              <span className="font-semibold">{currency} {platformFee.toFixed(2)}</span>
+            </div>
+            <div className="mt-3 h-px bg-white/20" />
+            <div className="mt-3 flex items-end justify-between">
+              <span className="text-sm font-semibold text-white/80">Estimated total</span>
+              <span className="text-2xl font-black">{currency} {totalAmount.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Service Price Display */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardContent className="p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-medium text-muted-foreground">Service Charge:</span>
-            <span className="text-2xl font-bold text-blue-600">{currency} {servicePrice}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ... Payment Timing ... (UNCHANGED, reusing logic by not replacing if possible? No, need to render full) */}
-      <Card className="border-border shadow-sm">
+      <Card className="rounded-2xl border-border/80 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Clock className="h-5 w-5 text-orange-500" />
-            When would you like to pay?
+          <CardTitle className="flex items-center gap-2 text-base font-bold">
+            <Clock className="h-4 w-4 text-orange-500" />
+            Payment timing
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <RadioGroup value={paymentTiming} onValueChange={setPaymentTiming as any}>
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors">
+              <div
+                className={cn(
+                  "flex items-start space-x-3 rounded-xl border p-3 transition-colors",
+                  paymentTiming === "before"
+                    ? "border-orange-200 bg-orange-50/70"
+                    : "border-border hover:bg-muted/60"
+                )}
+              >
                 <RadioGroupItem value="before" id="before" />
                 <Label htmlFor="before" className="flex-1 cursor-pointer">
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between gap-2">
                     <div>
-                      <span className="font-medium">Pay Now</span>
-                      <p className="text-sm text-muted-foreground/80">Secure online payment before service</p>
+                      <span className="text-sm font-semibold text-foreground">Pay now</span>
+                      <p className="text-xs text-muted-foreground">Complete secure checkout before service starts</p>
                     </div>
                     {payNowDiscountPercent > 0 ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-700">
+                      <Badge variant="secondary" className="border border-emerald-200 bg-emerald-100 text-emerald-700">
                         {Math.round(payNowDiscountPercent * 100)}% Discount
                       </Badge>
                     ) : (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                      <Badge variant="secondary" className="border border-blue-200 bg-blue-100 text-blue-700">
                         Online Payment
                       </Badge>
                     )}
@@ -183,12 +229,19 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                 </Label>
               </div>
 
-              <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors">
+              <div
+                className={cn(
+                  "flex items-start space-x-3 rounded-xl border p-3 transition-colors",
+                  paymentTiming === "after"
+                    ? "border-zinc-300 bg-zinc-50"
+                    : "border-border hover:bg-muted/60"
+                )}
+              >
                 <RadioGroupItem value="after" id="after" />
                 <Label htmlFor="after" className="flex-1 cursor-pointer">
                   <div>
-                    <span className="font-medium">Pay After Service</span>
-                    <p className="text-sm text-muted-foreground/80">Pay when technician completes the job</p>
+                    <span className="text-sm font-semibold text-foreground">Pay after service</span>
+                    <p className="text-xs text-muted-foreground">Cash payment after technician marks job complete</p>
                   </div>
                 </Label>
               </div>
@@ -197,28 +250,32 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         </CardContent>
       </Card>
 
-      {/* Payment Methods */}
-      <Card className="border-border shadow-sm">
+      <Card className="rounded-2xl border-border/80 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle className="flex items-center gap-2 text-base font-bold">
             <Wallet className="h-5 w-5 text-blue-500" />
-            Payment Method
+            Payment method
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod as any}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {paymentMethods.map((method) => {
                 const Icon = method.icon;
                 const isDisabled = paymentTiming === "after" && method.id !== "cash";
+                const isSelected = paymentMethod === method.id;
 
                 return (
                   <div
                     key={method.id}
-                    className={`relative flex items-center space-x-3 p-4 rounded-lg border transition-all ${isDisabled
-                        ? "border-border bg-muted opacity-50"
-                        : "border-border hover:border-blue-300 hover:bg-blue-50"
-                      }`}
+                    className={cn(
+                      "relative flex items-start space-x-3 rounded-xl border p-4 transition-all",
+                      isDisabled
+                        ? "border-border bg-muted/60 opacity-50"
+                        : isSelected
+                        ? "border-orange-200 bg-orange-50/70 shadow-sm"
+                        : "border-border hover:border-orange-200 hover:bg-orange-50/30"
+                    )}
                   >
                     <RadioGroupItem
                       value={method.id}
@@ -230,27 +287,28 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                       className={`flex-1 ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${method.id === "upi" ? "bg-purple-100" :
-                            method.id === "card" ? "bg-blue-100" :
-                              method.id === "netbanking" ? "bg-green-100" :
-                                "bg-orange-100"
-                          }`}>
-                          <Icon className={`h-5 w-5 ${method.id === "upi" ? "text-purple-600" :
-                              method.id === "card" ? "text-blue-600" :
-                                method.id === "netbanking" ? "text-green-600" :
-                                  "text-orange-600"
-                            }`} />
+                        <div className={cn(
+                          "rounded-lg p-2.5",
+                          method.id === "upi"
+                            ? "bg-amber-100 text-amber-700"
+                            : method.id === "card"
+                            ? "bg-blue-100 text-blue-700"
+                            : method.id === "netbanking"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-zinc-100 text-zinc-700"
+                        )}>
+                          <Icon className="h-4 w-4" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{method.name}</span>
+                            <span className="text-sm font-semibold">{method.name}</span>
                             {method.popular && (
-                              <Badge variant="secondary" className="bg-orange-100 text-orange-700 text-xs">
+                              <Badge variant="secondary" className="border border-orange-200 bg-orange-100 text-[10px] text-orange-700">
                                 Popular
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground/80 mt-1">{method.description}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{method.description}</p>
                         </div>
                       </div>
                     </Label>
@@ -262,18 +320,17 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         </CardContent>
       </Card>
 
-      {/* Security Notice */}
       {paymentTiming === "before" && paymentMethod !== "cash" && (
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+        <Card className="rounded-2xl border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Shield className="h-5 w-5 text-green-600" />
+            <div className="flex items-start gap-3">
+              <Shield className="mt-0.5 h-5 w-5 text-emerald-700" />
               <div>
-                <p className="text-sm font-medium text-green-800">
+                <p className="text-sm font-semibold text-emerald-800">
                   Secure Payment by Razorpay
                 </p>
-                <p className="text-xs text-green-600">
-                  Your payment information is encrypted and secure
+                <p className="text-xs text-emerald-700/80">
+                  256-bit encryption and verified payment gateway protection.
                 </p>
               </div>
             </div>
@@ -281,27 +338,30 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         </Card>
       )}
 
-      {/* Action Button */}
-      <div className="flex justify-end pt-4">
+      <div className="pt-2">
         <Button
           onClick={handlePaymentClick}
           disabled={isProcessing}
-          className="bg-red-600 hover:bg-red-700 min-w-[200px]"
+          className="h-12 w-full rounded-xl bg-orange-600 text-sm font-semibold text-white hover:bg-orange-500"
         >
           {isProcessing ? (
             "Processing..."
           ) : paymentTiming === "before" && paymentMethod !== "cash" ? (
             <>
-              <CreditCard className="h-4 w-4 mr-2" />
-              Pay {currency} {totalAmount}
+              <CreditCard className="mr-2 h-4 w-4" />
+              Proceed to pay {currency} {totalAmount.toFixed(2)}
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Confirm Booking
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Confirm booking
             </>
           )}
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          You can review full bill breakup before final confirmation.
+        </p>
       </div>
 
       <PaymentSummaryDialog
@@ -313,11 +373,6 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         platformFeePercent={platformFeePercent}
         currency={currency}
       />
-
-      {/* Load Razorpay Script */}
-      {paymentTiming === "before" && paymentMethod !== "cash" && (
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-      )}
     </div>
   );
 };

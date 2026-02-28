@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,14 @@ import NotificationBanner from "@/components/notifications/NotificationBanner";
 import TechnicianRatingDialog from "@/components/rating/TechnicianRatingDialog";
 
 interface ServiceRequest {
+  _id?: string;
   id: string;
   service_type: string;
   vehicle_type: string | null;
   vehicle_model: string | null;
   address: string | null;
   status: string | null;
+  serviceStatus?: string | null;
   payment_status?: string | null;
   paymentStatus?: string | null;
   created_at: string;
@@ -37,6 +39,7 @@ interface ServiceRequest {
 
 const MyRequests = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
@@ -109,107 +112,210 @@ const MyRequests = () => {
     }
   };
 
-  const getNormalizedServiceStatus = (request: ServiceRequest) => {
-    const rawStatus = String(request.status || "").toLowerCase();
-    return rawStatus === "paid" ? "completed" : rawStatus;
+  const getServiceId = (request: ServiceRequest) => {
+    const resolved = request._id || request.id;
+    return String(resolved || "").trim();
   };
 
-  const getNormalizedPaymentStatus = (request: ServiceRequest) => {
-    const rawPaymentStatus = String(request.paymentStatus || request.payment_status || "").toLowerCase();
-    return rawPaymentStatus === "completed" ? "paid" : rawPaymentStatus;
+  const normalizeServiceStatus = (request: ServiceRequest) => {
+    const rawStatus = String(request.serviceStatus || request.status || "").trim().toLowerCase();
+    switch (rawStatus) {
+      case "assigned":
+      case "technician_assigned":
+        return "technician_assigned";
+      case "accepted":
+        return "accepted";
+      case "on-the-way":
+      case "on_the_way":
+      case "en-route":
+      case "en_route":
+        return "on_the_way";
+      case "arrived":
+        return "arrived";
+      case "in-progress":
+      case "in_progress":
+        return "in_progress";
+      case "payment_pending":
+      case "completed":
+      case "job_completed":
+      case "paid":
+        return "job_completed";
+      case "cancelled":
+        return "cancelled";
+      case "pending":
+        return "pending";
+      default:
+        return rawStatus || "pending";
+    }
+  };
+
+  const normalizePaymentStatus = (request: ServiceRequest) => {
+    const rawPaymentStatus = String(request.paymentStatus || request.payment_status || "").trim().toLowerCase();
+    switch (rawPaymentStatus) {
+      case "completed":
+      case "paid":
+        return "paid";
+      case "pending":
+      case "payment_pending":
+        return "payment_pending";
+      default:
+        return rawPaymentStatus || "payment_pending";
+    }
+  };
+
+  const isKnownRedirectStatus = (serviceStatus: string) => {
+    return [
+      "pending",
+      "accepted",
+      "technician_assigned",
+      "on_the_way",
+      "arrived",
+      "in_progress",
+      "job_completed",
+      "cancelled",
+    ].includes(serviceStatus);
+  };
+
+  const getServiceRedirectPath = (request: ServiceRequest) => {
+    const serviceId = getServiceId(request);
+    if (!serviceId) return null;
+
+    const serviceStatus = normalizeServiceStatus(request);
+    const paymentStatus = normalizePaymentStatus(request);
+
+    switch (serviceStatus) {
+      case "pending":
+      case "accepted":
+      case "technician_assigned":
+      case "on_the_way":
+      case "arrived":
+      case "in_progress":
+        return `/service-tracking/${serviceId}`;
+      case "job_completed":
+        return paymentStatus === "paid"
+          ? `/service-summary/${serviceId}`
+          : `/payment/${serviceId}`;
+      case "cancelled":
+        return `/service-summary/${serviceId}`;
+      default:
+        return `/service-tracking/${serviceId}`;
+    }
+  };
+
+  const handleServiceCardClick = (request: ServiceRequest) => {
+    const serviceId = getServiceId(request);
+    if (!serviceId) {
+      toast.error("Unable to open this service right now.");
+      return;
+    }
+    const serviceStatus = normalizeServiceStatus(request);
+    if (!isKnownRedirectStatus(serviceStatus)) {
+      toast.info("Status updated. Opening live tracking.");
+    }
+    const redirectPath = getServiceRedirectPath(request);
+    if (!redirectPath) {
+      toast.error("Invalid service state. Please refresh and try again.");
+      return;
+    }
+    navigate(redirectPath);
   };
 
   const activeRequests = requests.filter((request) => {
-    const serviceStatus = getNormalizedServiceStatus(request);
-    const paymentStatus = getNormalizedPaymentStatus(request);
+    const serviceStatus = normalizeServiceStatus(request);
+    const paymentStatus = normalizePaymentStatus(request);
     if (serviceStatus === "cancelled") return false;
-    return serviceStatus !== "completed" || paymentStatus !== "paid";
+    return serviceStatus !== "job_completed" || paymentStatus !== "paid";
   });
 
   const completedRequests = requests.filter((request) => {
-    const serviceStatus = getNormalizedServiceStatus(request);
-    const paymentStatus = getNormalizedPaymentStatus(request);
+    const serviceStatus = normalizeServiceStatus(request);
+    const paymentStatus = normalizePaymentStatus(request);
     if (serviceStatus === "cancelled") return true;
-    return serviceStatus === "completed" && paymentStatus === "paid";
+    return serviceStatus === "job_completed" && paymentStatus === "paid";
   });
 
-  const renderRequestCard = (request: ServiceRequest) => (
-    <Card key={request.id} className="hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h4 className="font-semibold text-lg">{request.service_type}</h4>
-            <p className="text-sm text-muted-foreground">
-              {request.vehicle_type} {request.vehicle_model && `- ${request.vehicle_model}`}
-            </p>
-          </div>
-          {getStatusBadge(request.status)}
-        </div>
+  const renderRequestCard = (request: ServiceRequest) => {
+    const serviceStatus = normalizeServiceStatus(request);
+    const paymentStatus = normalizePaymentStatus(request);
+    const canTrack =
+      ["pending", "accepted", "technician_assigned", "on_the_way", "arrived", "in_progress"].includes(serviceStatus) ||
+      (serviceStatus === "job_completed" && paymentStatus !== "paid");
+    const isPaidCompleted = serviceStatus === "job_completed" && paymentStatus === "paid";
 
-        <div className="space-y-2 text-sm mb-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            <span>{request.address || 'Address not specified'}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{format(new Date(request.created_at), 'PPp')}</span>
-          </div>
-          {request.technician && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Wrench className="h-4 w-4" />
-              <span>{request.technician.name} - {request.technician.phone}</span>
+    return (
+      <Card
+        key={request.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => handleServiceCardClick(request)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleServiceCardClick(request);
+          }
+        }}
+        className="cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg active:scale-[0.99] active:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h4 className="font-semibold text-lg">{request.service_type}</h4>
+              <p className="text-sm text-muted-foreground">
+                {request.vehicle_type} {request.vehicle_model && `- ${request.vehicle_model}`}
+              </p>
             </div>
-          )}
-        </div>
+            {getStatusBadge(request.status)}
+          </div>
 
-        <div className="flex gap-2">
-          {(() => {
-            const serviceStatus = getNormalizedServiceStatus(request);
-            const paymentStatus = getNormalizedPaymentStatus(request);
-            const canTrack =
-              ['pending', 'assigned', 'en-route', 'in-progress', 'arrived'].includes(serviceStatus) ||
-              (serviceStatus === 'completed' && paymentStatus !== 'paid');
-            return canTrack;
-          })() && (
-            <Link to={`/request-service-tracking/${request.id}`} className="flex-1">
-              <Button variant="outline" size="sm" className="w-full">
-                Track Request
+          <div className="space-y-2 text-sm mb-4">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span>{request.address || "Address not specified"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>{format(new Date(request.created_at), "PPp")}</span>
+            </div>
+            {request.technician && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Wrench className="h-4 w-4" />
+                <span>{request.technician.name} - {request.technician.phone}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            {canTrack && (
+              <div className="flex-1">
+                <Button variant="outline" size="sm" className="w-full">
+                  Track Request
+                </Button>
+              </div>
+            )}
+            {isPaidCompleted && request.technician && !request.has_review && (
+              <Button
+                size="sm"
+                className="gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRatingDialog({ open: true, request });
+                }}
+              >
+                <Star className="h-4 w-4" />
+                Rate Service
               </Button>
-            </Link>
-          )}
-          {/* Show rate button for completed requests without review */}
-          {(() => {
-            const serviceStatus = getNormalizedServiceStatus(request);
-            const paymentStatus = getNormalizedPaymentStatus(request);
-            return serviceStatus === "completed" && paymentStatus === "paid";
-          })() && request.technician && !request.has_review && (
-            <Button
-              size="sm"
-
-              className="gap-1"
-              onClick={() => setRatingDialog({ open: true, request })}
-            >
-              <Star className="h-4 w-4" />
-              Rate Service
-            </Button>
-          )}
-
-          {/* Show rated badge */}
-          {(() => {
-            const serviceStatus = getNormalizedServiceStatus(request);
-            const paymentStatus = getNormalizedPaymentStatus(request);
-            return serviceStatus === "completed" && paymentStatus === "paid";
-          })() && request.has_review && (
-            <Badge variant="secondary" className="gap-1">
-              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-              Rated
-            </Badge>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
+            )}
+            {isPaidCompleted && request.has_review && (
+              <Badge variant="secondary" className="gap-1">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                Rated
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (isLoading) {
     return (

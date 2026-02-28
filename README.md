@@ -55,7 +55,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 2.  **Install Dependencies**
     - **Root (Frontend):**
       ```bash
-      npm install
+      npm install.
       ```
     - **Server (Backend):**
       ```bash

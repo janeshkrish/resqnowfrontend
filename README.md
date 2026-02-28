@@ -34,7 +34,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 │   └── db.js             # Database Connection
 └── public/               # Static Assets
 ```
-
+.
 ## ⚡ Getting Started
 
 ### Prerequisites

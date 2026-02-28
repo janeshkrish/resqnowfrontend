@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { apiFetch, setUserToken, setUserProfile, getUserToken, getUserProfile } from "@/lib/api";
+import { apiFetch, setUserToken, setUserProfile, getUserToken, getUserProfile, setAdminToken } from "@/lib/api";
 
 interface UserProfile {
   id: string;
@@ -39,6 +39,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const useAuth = () => useContext(AuthContext);
+const ADMIN_STORAGE_KEY = "resqnow_admin_user";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -93,6 +94,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const msg = data.error || "Login failed.";
         throw new Error(msg);
       }
+
+      const resolvedRole = String(data?.role || data?.user?.role || "").trim().toLowerCase();
+      if (resolvedRole === "admin") {
+        const adminProfile = {
+          id: String(data?.user?.id || "admin"),
+          name: String(data?.user?.name || "Admin"),
+          email: String(data?.user?.email || email),
+          role: "admin",
+        };
+
+        setAdminToken(data.token || null);
+        localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(adminProfile));
+        setUserToken(null);
+        setUserProfile(null);
+        setUser(null);
+        localStorage.removeItem("isAuthenticated");
+
+        return {
+          ...data,
+          role: "admin",
+          user: adminProfile,
+        };
+      }
+
+      // Ensure stale admin auth doesn't leak into user sessions.
+      setAdminToken(null);
+      localStorage.removeItem(ADMIN_STORAGE_KEY);
+
       setUserToken(data.token);
       setUserProfile(data.user);
       setUser({

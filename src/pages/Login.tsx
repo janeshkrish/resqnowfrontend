@@ -93,14 +93,25 @@ const Login = () => {
     try {
       const result = await login(data.email, data.password);
       if (result.user) {
+        const role = String(result?.role || result?.user?.role || "").trim().toLowerCase();
+        if (role === "admin") {
+          toast.success("Admin login successful!");
+          setTimeout(() => {
+            navigate("/admin/dashboard");
+          }, 100);
+          return;
+        }
+
         toast.success("Login successful!");
+        const isProfileLogin = searchParams.get("from") === "profile";
         const returnUrl = sessionStorage.getItem('returnUrl');
-        if (returnUrl) {
+        if (!isProfileLogin && returnUrl) {
           sessionStorage.removeItem('returnUrl');
           setTimeout(() => {
             navigate(returnUrl);
           }, 100);
         } else {
+          sessionStorage.removeItem('returnUrl');
           setTimeout(() => {
             navigate("/");
           }, 100);

@@ -322,6 +322,9 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
 const TechnicianSignupWizard = () => {
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isTechnicianAgreementOpen, setIsTechnicianAgreementOpen] = useState(false);
+    const [hasAcceptedTechnicianAgreement, setHasAcceptedTechnicianAgreement] = useState(false);
+    const [showTechnicianAgreementError, setShowTechnicianAgreementError] = useState(false);
     const navigate = useNavigate();
 
     const form = useForm<TechnicianFormValues>({
@@ -364,6 +367,11 @@ const TechnicianSignupWizard = () => {
 
         const isValid = await trigger(fields);
         if (isValid) {
+            if (currentStep === 6 && !hasAcceptedTechnicianAgreement) {
+                setShowTechnicianAgreementError(true);
+                toast.error("Please accept the ResQNow Technician Agreement.");
+                return;
+            }
             if (currentStep < STEPS.length - 1) setCurrentStep(prev => prev + 1);
             else await onSubmit(form.getValues());
         } else {
@@ -470,6 +478,122 @@ const TechnicianSignupWizard = () => {
                                             <FormField control={control} name="confirmPassword" render={({ field }) => (
                                                 <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Confirm Password</FormLabel><FormControl><Input {...field} type="password" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
                                             )} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsTechnicianAgreementOpen((prev) => !prev)}
+                                        className="w-full flex items-center justify-between text-left"
+                                    >
+                                        <h3 className="font-bold text-lg">View Technician Agreement & Responsibilities</h3>
+                                        <ChevronRight className={cn("w-5 h-5 text-primary transition-transform duration-300", isTechnicianAgreementOpen ? "rotate-90" : "rotate-0")} />
+                                    </button>
+
+                                    <div className={cn("overflow-hidden transition-all duration-300", isTechnicianAgreementOpen ? "max-h-[34rem] opacity-100" : "max-h-0 opacity-0")}>
+                                        <div className="max-h-[30rem] overflow-y-auto rounded-xl border border-border/60 bg-muted/40 p-4 space-y-4 text-sm">
+                                            <div className="space-y-2">
+                                                <p className="font-bold">1. Independent Service Partner</p>
+                                                <p>• You are an independent service partner.</p>
+                                                <p>• You manage your own schedule.</p>
+                                                <p>• You are responsible for your tools and licenses.</p>
+                                                <p>• You manage your personal tax obligations.</p>
+                                                <p>ResQNow provides the technology platform to connect you with customers.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">2. Professional Conduct</p>
+                                                <p>You agree to:</p>
+                                                <p>• Treat customers with respect and professionalism.</p>
+                                                <p>• Provide services honestly and responsibly.</p>
+                                                <p>• Maintain safety and proper behavior at all times.</p>
+                                                <p>• Communicate clearly regarding work scope and pricing.</p>
+                                                <p>Unprofessional or inappropriate behavior may lead to account review.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">3. Transparent Pricing & Payments</p>
+                                                <p>To protect both you and the customer:</p>
+                                                <p>• Charge only the system-approved or mutually agreed amount.</p>
+                                                <p>• Inform customers before performing additional chargeable work.</p>
+                                                <p>• Avoid requesting or accepting direct/offline payments to bypass the platform.</p>
+                                                <p>If misuse related to payments is detected, ResQNow may:</p>
+                                                <p>• Temporarily hold payouts during investigation.</p>
+                                                <p>• Reverse payments in case of verified disputes.</p>
+                                                <p>• Restrict or suspend account access if violations are confirmed.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">4. Responsible Use of the App</p>
+                                                <p>You must:</p>
+                                                <p>• Use only your registered account.</p>
+                                                <p>• Keep login credentials secure.</p>
+                                                <p>• Accept jobs only when genuinely available.</p>
+                                                <p>• Mark jobs complete only after full service delivery.</p>
+                                                <p>The following actions are considered serious violations:</p>
+                                                <p>• Fake bookings or fake job completion.</p>
+                                                <p>• Repeated cancellation to manipulate job allocation.</p>
+                                                <p>• Diverting customers intentionally for offline service.</p>
+                                                <p>• Manipulating pricing or service details.</p>
+                                                <p>• Sharing or misusing customer contact information.</p>
+                                                <p>Confirmed misuse may result in:</p>
+                                                <p>• Temporary suspension</p>
+                                                <p>• Permanent account deactivation</p>
+                                                <p>• Loss of pending incentives</p>
+                                                <p>• Legal action in case of fraud or criminal activity.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">5. Customer Privacy</p>
+                                                <p>You agree to:</p>
+                                                <p>• Use customer information only for service purposes.</p>
+                                                <p>• Not store, share, or misuse personal data.</p>
+                                                <p>• Obtain permission before taking photos or recordings.</p>
+                                                <p>Violation of privacy standards may result in immediate suspension.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">6. Reliability & Cancellations</p>
+                                                <p>• Frequent unnecessary cancellations may reduce job allocation.</p>
+                                                <p>• No-show without communication may trigger account review.</p>
+                                                <p>• Repeated reliability issues may result in temporary restrictions.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">7. Performance & Ratings</p>
+                                                <p>If consistent complaints arise:</p>
+                                                <p>• You may receive warning or guidance.</p>
+                                                <p>• Continued issues may lead to temporary suspension.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">8. Account Review & Termination</p>
+                                                <p>ResQNow reserves the right to suspend or terminate accounts if:</p>
+                                                <p>• There is evidence of fraud.</p>
+                                                <p>• Customer safety is compromised.</p>
+                                                <p>• Platform policies are repeatedly violated.</p>
+                                                <p>• Brand reputation is at risk.</p>
+                                                <p>Serious misconduct may result in immediate termination without prior notice.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">9. Commitment to Growth</p>
+                                                <p>ResQNow values honest and hardworking technicians.</p>
+                                                <p>We aim to:</p>
+                                                <p>• Provide fair earning opportunities.</p>
+                                                <p>• Maintain a safe platform.</p>
+                                                <p>• Support long-term professional growth.</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="font-bold">10. Acceptance</p>
+                                                <p>By signing below, the Technician confirms:</p>
+                                                <p>• They have read and understood this Agreement.</p>
+                                                <p>• They agree to comply with all terms.</p>
+                                                <p>• They understand that policy violations may affect platform access.</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -744,6 +868,30 @@ const TechnicianSignupWizard = () => {
                                             </div>
                                         </FormItem>
                                     )} />
+                                </div>
+                            </div>
+                        )}
+
+                        {currentStep === 6 && (
+                            <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5">
+                                <div className="flex items-start gap-4">
+                                    <Checkbox
+                                        checked={hasAcceptedTechnicianAgreement}
+                                        onCheckedChange={(checked) => {
+                                            const isChecked = checked === true;
+                                            setHasAcceptedTechnicianAgreement(isChecked);
+                                            if (isChecked) {
+                                                setShowTechnicianAgreementError(false);
+                                            }
+                                        }}
+                                        className="w-5 h-5 mt-0.5"
+                                    />
+                                    <div className="space-y-1">
+                                        <p className="font-bold text-sm text-foreground">I have read and agree to the ResQNow Technician Agreement.</p>
+                                        {showTechnicianAgreementError && (
+                                            <p className="text-xs text-red-500">Please accept this agreement to submit.</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}

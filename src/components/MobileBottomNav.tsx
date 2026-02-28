@@ -2,9 +2,11 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Home, MapPin, Grid, Clock, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MobileBottomNav = () => {
     const location = useLocation();
+    const { isAuthenticated } = useAuth();
 
     const isActive = (path: string) => {
         return location.pathname === path;
@@ -15,7 +17,7 @@ const MobileBottomNav = () => {
         { name: "Map", path: "/map", icon: MapPin },
         { name: "Services", path: "/services", icon: Grid },
         { name: "Activity", path: "/my-requests", icon: Clock },
-        { name: "Profile", path: "/settings", icon: User },
+        { name: "Profile", path: isAuthenticated ? "/settings" : "/login?from=profile", icon: User },
     ];
 
     const isServiceRequest = location.pathname.startsWith('/request-service') || location.pathname.startsWith('/request-service-tracking');

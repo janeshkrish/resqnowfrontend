@@ -30,6 +30,25 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
 
 const ADMIN_STORAGE_KEY = "resqnow_admin_user";
 
+const decodeJwtPayload = (token: string): any | null => {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(atob(normalized + padding));
+  } catch {
+    return null;
+  }
+};
+
+const hasAdminRoleToken = (token: string | null): boolean => {
+  if (!token) return false;
+  const payload = decodeJwtPayload(token);
+  const role = String(payload?.role || payload?.type || "").trim().toLowerCase();
+  return role === "admin";
+};
+
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +56,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     const stored = localStorage.getItem(ADMIN_STORAGE_KEY);
-    if (stored && getAdminToken()) {
+    const token = getAdminToken();
+    const hasAdminToken = hasAdminRoleToken(token);
+    if (stored && hasAdminToken) {
       try {
         const user = JSON.parse(stored) as AdminUser;
         setAdminUser(user);
@@ -45,6 +66,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localStorage.removeItem(ADMIN_STORAGE_KEY);
         setAdminToken(null);
       }
+    } else if (token && !hasAdminToken) {
+      localStorage.removeItem(ADMIN_STORAGE_KEY);
+      setAdminToken(null);
     }
     setIsLoading(false);
   }, []);
@@ -85,7 +109,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const checkAdminAccess = async (): Promise<boolean> => {
-    return !!getAdminToken();
+    return hasAdminRoleToken(getAdminToken());
   };
 
   return (

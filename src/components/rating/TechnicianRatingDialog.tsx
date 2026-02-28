@@ -18,7 +18,6 @@ interface TechnicianRatingDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   requestId: string;
-  userId: string;
   technicianId: string;
   technicianName: string;
   onSuccess?: () => void;
@@ -28,7 +27,6 @@ const TechnicianRatingDialog = ({
   isOpen,
   onOpenChange,
   requestId,
-  userId,
   technicianId,
   technicianName,
   onSuccess,
@@ -46,28 +44,35 @@ const TechnicianRatingDialog = ({
 
     try {
       setIsSubmitting(true);
+      const normalizedTechnicianId = Number(technicianId);
+      const normalizedRequestId = Number(requestId);
+      if (!Number.isFinite(normalizedTechnicianId) || normalizedTechnicianId <= 0) {
+        throw new Error("Invalid technician selected for rating.");
+      }
+      if (!Number.isFinite(normalizedRequestId) || normalizedRequestId <= 0) {
+        throw new Error("Invalid service request for rating.");
+      }
 
       const res = await apiFetch("/api/users/reviews", {
         method: "POST",
         body: JSON.stringify({
-          technician_id: technicianId,
-          user_id: userId,
+          technician_id: normalizedTechnicianId,
           rating,
           comment,
-          request_id: requestId,
+          request_id: normalizedRequestId,
         }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body?.error || "Failed to submit review");
+        throw new Error(body?.error || body?.message || "Failed to submit review");
       }
 
-      toast.success("Thank you for your feedback!");
+      toast.success(body?.message || "Thank you for your feedback!");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error("Error submitting rating:", error);
-      toast.error("Failed to submit rating");
+      const message = error instanceof Error ? error.message : "Failed to submit rating";
+      toast.error(message);
 
     } finally {
       setIsSubmitting(false);

@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -9,8 +10,21 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
-const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
+const hasFirebaseConfig = [
+    firebaseConfig.apiKey,
+    firebaseConfig.authDomain,
+    firebaseConfig.projectId,
+    firebaseConfig.storageBucket,
+    firebaseConfig.messagingSenderId,
+    firebaseConfig.appId,
+].every((value) => Boolean(String(value || "").trim()));
+
+if (!hasFirebaseConfig) {
+    console.warn("[Firebase] Missing one or more Firebase web config values. FCM is disabled.");
+}
+
+const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+const messaging = typeof window !== "undefined" && app ? getMessaging(app) : null;
 
 export const requestForToken = async () => {
     if (!messaging) return null;

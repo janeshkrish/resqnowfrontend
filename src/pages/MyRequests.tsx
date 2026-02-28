@@ -20,6 +20,8 @@ interface ServiceRequest {
   vehicle_model: string | null;
   address: string | null;
   status: string | null;
+  payment_status?: string | null;
+  paymentStatus?: string | null;
   created_at: string;
   updated_at: string;
   technician_id: string | null;
@@ -107,13 +109,29 @@ const MyRequests = () => {
     }
   };
 
-  const activeRequests = requests.filter(r =>
-    ['pending', 'assigned', 'en-route', 'in-progress', 'arrived'].includes(r.status || '')
-  );
+  const getNormalizedServiceStatus = (request: ServiceRequest) => {
+    const rawStatus = String(request.status || "").toLowerCase();
+    return rawStatus === "paid" ? "completed" : rawStatus;
+  };
 
-  const completedRequests = requests.filter(r =>
-    ['completed', 'paid', 'cancelled'].includes(r.status || '')
-  );
+  const getNormalizedPaymentStatus = (request: ServiceRequest) => {
+    const rawPaymentStatus = String(request.paymentStatus || request.payment_status || "").toLowerCase();
+    return rawPaymentStatus === "completed" ? "paid" : rawPaymentStatus;
+  };
+
+  const activeRequests = requests.filter((request) => {
+    const serviceStatus = getNormalizedServiceStatus(request);
+    const paymentStatus = getNormalizedPaymentStatus(request);
+    if (serviceStatus === "cancelled") return false;
+    return serviceStatus !== "completed" || paymentStatus !== "paid";
+  });
+
+  const completedRequests = requests.filter((request) => {
+    const serviceStatus = getNormalizedServiceStatus(request);
+    const paymentStatus = getNormalizedPaymentStatus(request);
+    if (serviceStatus === "cancelled") return true;
+    return serviceStatus === "completed" && paymentStatus === "paid";
+  });
 
   const renderRequestCard = (request: ServiceRequest) => (
     <Card key={request.id} className="hover:shadow-md transition-shadow">
@@ -140,13 +158,20 @@ const MyRequests = () => {
           {request.technician && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Wrench className="h-4 w-4" />
-              <span>{request.technician.name} • {request.technician.phone}</span>
+              <span>{request.technician.name} - {request.technician.phone}</span>
             </div>
           )}
         </div>
 
         <div className="flex gap-2">
-          {['pending', 'assigned', 'en-route', 'in-progress', 'arrived'].includes(request.status || '') && (
+          {(() => {
+            const serviceStatus = getNormalizedServiceStatus(request);
+            const paymentStatus = getNormalizedPaymentStatus(request);
+            const canTrack =
+              ['pending', 'assigned', 'en-route', 'in-progress', 'arrived'].includes(serviceStatus) ||
+              (serviceStatus === 'completed' && paymentStatus !== 'paid');
+            return canTrack;
+          })() && (
             <Link to={`/request-service-tracking/${request.id}`} className="flex-1">
               <Button variant="outline" size="sm" className="w-full">
                 Track Request
@@ -154,7 +179,11 @@ const MyRequests = () => {
             </Link>
           )}
           {/* Show rate button for completed requests without review */}
-          {['completed', 'paid'].includes(request.status || '') && request.technician && !request.has_review && (
+          {(() => {
+            const serviceStatus = getNormalizedServiceStatus(request);
+            const paymentStatus = getNormalizedPaymentStatus(request);
+            return serviceStatus === "completed" && paymentStatus === "paid";
+          })() && request.technician && !request.has_review && (
             <Button
               size="sm"
 
@@ -167,7 +196,11 @@ const MyRequests = () => {
           )}
 
           {/* Show rated badge */}
-          {['completed', 'paid'].includes(request.status || '') && request.has_review && (
+          {(() => {
+            const serviceStatus = getNormalizedServiceStatus(request);
+            const paymentStatus = getNormalizedPaymentStatus(request);
+            return serviceStatus === "completed" && paymentStatus === "paid";
+          })() && request.has_review && (
             <Badge variant="secondary" className="gap-1">
               <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
               Rated
@@ -279,7 +312,6 @@ const MyRequests = () => {
           isOpen={ratingDialog.open}
           onOpenChange={(open) => setRatingDialog({ ...ratingDialog, open })}
           requestId={ratingDialog.request.id}
-          userId={user.id}
           technicianId={ratingDialog.request.technician.id}
           technicianName={ratingDialog.request.technician.name}
           onSuccess={() => {

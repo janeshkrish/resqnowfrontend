@@ -74,7 +74,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
     VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
     VITE_RAZORPAY_KEY_ID=your_razorpay_key
     ```
-
+.
 2.  **Backend (`server/.env`)**
     Create a `.env` file in the `server` directory:
 

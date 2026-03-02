@@ -60,8 +60,8 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
 }
 
 export const technicianAuthService = {
-  fetchTechnicianProfile: async (email: string): Promise<Technician> => {
-    const res = await apiFetch(`${BASE}/me`, { method: "GET", technician: true });
+  fetchTechnicianProfile: async (email: string, options?: { signal?: AbortSignal }): Promise<Technician> => {
+    const res = await apiFetch(`${BASE}/me`, { method: "GET", technician: true, signal: options?.signal });
     if (!res.ok) {
       if (res.status === 401) throw new Error("Session expired. Please log in again.");
       throw new Error("Technician profile not found");
@@ -78,11 +78,20 @@ export const technicianAuthService = {
     return { verification_status: data.verification_status };
   },
 
-  login: async (email: string, password: string): Promise<Technician> => {
-    const res = await apiFetch(`${BASE}/login`, {
-      method: "POST",
-      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
-    });
+  login: async (
+    email: string,
+    password: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<Technician> => {
+    const res = await apiFetch(
+      `${BASE}/login`,
+      {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        signal: options?.signal,
+        technician: true,
+      }
+    );
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       const msg = body.error || "Login failed.";

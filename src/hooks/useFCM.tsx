@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "../lib/api";
 import { requestForToken, subscribeToForegroundMessages } from "../lib/firebase";
+import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from "@capacitor/push-notifications";
+import { Capacitor } from "@capacitor/core";
 
 type UseFcmOptions = {
   isUserAuthenticated: boolean;
   isTechnicianAuthenticated: boolean;
 };
 
-const DEFAULT_NOTIFICATION_TITLE = "\uD83D\uDEA8 New Job Alert";
+const DEFAULT_NOTIFICATION_TITLE = "🚨 New Job Alert";
 
 function toDistanceText(value: unknown) {
   const raw = String(value || "").trim();
@@ -24,17 +26,18 @@ function toAmountText(value: unknown) {
 
 function resolveServiceEmoji(serviceType: string) {
   const value = String(serviceType || "").toLowerCase();
-  if (value.includes("tow")) return "\uD83D\uDEFB";
-  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "\uD83D\uDEDE";
-  if (value.includes("battery") || value.includes("jump")) return "\uD83D\uDD0B";
-  if (value.includes("fuel")) return "\u26FD";
-  if (value.includes("lock")) return "\uD83D\uDD10";
-  return "\uD83E\uDDF0";
+  if (value.includes("tow")) return "🛻";
+  if (value.includes("flat") || value.includes("tyre") || value.includes("tire")) return "🛞";
+  if (value.includes("battery") || value.includes("jump")) return "🔋";
+  if (value.includes("fuel")) return "⛽";
+  if (value.includes("lock")) return "🔐";
+  return "🧰";
 }
 
 function buildForegroundMessage(payload: any) {
   const data = payload?.data || {};
-  const title = payload?.notification?.title || DEFAULT_NOTIFICATION_TITLE;
+  const title = payload?.notification?.title || payload?.title || DEFAULT_NOTIFICATION_TITLE;
+  const bodyText = payload?.notification?.body || payload?.body || "";
   const jobId = String(data.jobId || data.requestId || "").trim();
   const deepLinkPath =
     String(data.deepLinkPath || "").trim() ||
@@ -46,11 +49,22 @@ function buildForegroundMessage(payload: any) {
   const priceAmount = toAmountText(data.priceAmount || data.amount);
   const serviceEmoji = resolveServiceEmoji(serviceType);
   const body =
-    payload?.notification?.body ||
-    `\uD83D\uDCCD ${serviceEmoji} ${serviceType} \u2022 ${locationDistance}\n\uD83D\uDC64 Customer: ${customerName}\n\uD83D\uDCB0 \u20B9${priceAmount}`;
+    bodyText ||
+    `📍 ${serviceEmoji} ${serviceType} • ${locationDistance}\n👤 Customer: ${customerName}\n💰 ₹${priceAmount}`;
 
   return { title, body, deepLinkPath, jobId };
 }
+
+// 🔊 Custom sound player for the foreground active state
+const playCustomAlarm = () => {
+  try {
+    const audio = new Audio('/emergency_alarm.mp3');
+    audio.volume = 1.0;
+    audio.play().catch(e => console.warn('Audio play failed in browser:', e));
+  } catch (err) {
+    console.warn('Failed to play alarm:', err);
+  }
+};
 
 export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFcmOptions) => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
@@ -60,71 +74,211 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
   );
 
   useEffect(() => {
-    if (!shouldEnableFcm || typeof window === "undefined" || !("Notification" in window)) return;
+    if (!shouldEnableFcm || typeof window === "undefined") return;
 
     let cancelled = false;
+    let listeners: Array<() => void> = [];
 
-    const initFCM = async () => {
-      const permission =
-        Notification.permission === "granted"
-          ? "granted"
-          : await Notification.requestPermission();
-      if (permission !== "granted" || cancelled) return;
+    // run registration async after the current render cycle so that
+    // any pending navigation/cleanup from login page has a chance to run
+    const startTimeout = setTimeout(() => {
+      if (cancelled) return;
 
-      const token = await requestForToken();
-      if (!token || cancelled) return;
-      setFcmToken(token);
+      const initNativePush = async () => {
+        console.log("[Native Push] init start (shouldEnableFcm=", shouldEnableFcm, ")");
+        try {
+          // 1. Validate & Request Permissions
+          let permStatus = await PushNotifications.checkPermissions();
+          console.log("[Native Push] current permission:", permStatus);
+          if (permStatus.receive === 'prompt') {
+            permStatus = await PushNotifications.requestPermissions();
+            console.log("[Native Push] permission result:", permStatus);
+          }
 
-      try {
-        await apiFetch("/api/notifications/register-token", {
-          method: "POST",
-          technician: isTechnicianAuthenticated,
-          body: JSON.stringify({ token }),
-        });
-      } catch (error) {
-        console.error("[FCM] Failed to register token with backend:", error);
+          if (permStatus.receive !== 'granted' || cancelled) {
+            console.warn("[Native Push] permissions not granted, skipping registration");
+            return;
+          }
+
+          // 2. Setup Notification Channel for Android 13+ High Priority Sounds
+          if (Capacitor.getPlatform() === 'android') {
+            try {
+              await PushNotifications.createChannel({
+                id: 'high_priority_alarms',
+                name: 'High Priority Alarms',
+                description: 'Critical Job Alerts for Technicians',
+                importance: 5,
+                sound: 'emergency_alarm',
+                visibility: 1,
+                vibration: true,
+              });
+            } catch (e) {
+              console.warn("[Native Push] Failed to create channel", e);
+            }
+          }
+
+          // 3. Register natively with Firebase/APNs
+          try {
+            await PushNotifications.register();
+          } catch (e) {
+            console.error("[Native Push] register() threw", e);
+          }
+
+          // 4. Registration Listeners (token and refresh)
+          const onRegister = PushNotifications.addListener('registration', async (token: Token) => {
+            if (cancelled) return;
+            console.log("[Native Push] registration event, token=", token.value);
+            if (!token.value) {
+              console.warn("[Native Push] empty token received, ignoring");
+              return;
+            }
+            setFcmToken(token.value);
+            try {
+              await apiFetch("/api/notifications/register-token", {
+                method: "POST",
+                technician: isTechnicianAuthenticated,
+                body: JSON.stringify({ token: token.value }),
+              });
+              console.log("[Native Push] token synced with backend");
+            } catch (error) {
+              console.error("[Native Push] failed to sync token", error);
+            }
+          });
+          listeners.push(() => onRegister.remove());
+
+          const onRegError = PushNotifications.addListener('registrationError', (error: any) => {
+            console.error('[Native Push] registrationError', error);
+          });
+          listeners.push(() => onRegError.remove());
+
+          // 5. Foreground notifications
+          const onPush = PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+            if (cancelled) return;
+            if ((notification as any).channelId === 'high_priority_alarms' || Number(notification.data?.priority) > 1) {
+              playCustomAlarm();
+            }
+            const message = buildForegroundMessage(notification);
+            toast(message.title, {
+              description: message.body.replace(/\n/g, " "),
+              duration: 8000,
+              action: {
+                label: "View Request",
+                onClick: () => {
+                  try {
+                    window.location.assign(message.deepLinkPath);
+                  } catch (e) {
+                    console.error("navigation exception from toast action", e);
+                  }
+                },
+              },
+            });
+          });
+          listeners.push(() => onPush.remove());
+
+          // 6. Background action
+          const onAction = PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+            if (cancelled) return;
+            const message = buildForegroundMessage(notification.notification);
+            if (message.deepLinkPath) {
+              try {
+                window.location.assign(message.deepLinkPath);
+              } catch (e) {
+                console.error("navigation exception in action performed", e);
+              }
+            }
+          });
+          listeners.push(() => onAction.remove());
+
+          console.log("[Native Push] listeners attached", listeners.length);
+        } catch (err) {
+          console.error("[Native Push Init Error]:", err);
+        }
+      };
+
+      const initWebFcm = async () => {
+        console.log("[Web FCM] init");
+        try {
+          if (!("Notification" in window)) return;
+          const permission =
+            Notification.permission === "granted"
+              ? "granted"
+              : await Notification.requestPermission();
+          console.log("[Web FCM] permission result", permission);
+          if (permission !== "granted" || cancelled) return;
+          const token = await requestForToken();
+          if (!token || cancelled) return;
+          setFcmToken(token);
+          try {
+            await apiFetch("/api/notifications/register-token", {
+              method: "POST",
+              technician: isTechnicianAuthenticated,
+              body: JSON.stringify({ token }),
+            });
+            console.log("[Web FCM] token synced with backend");
+          } catch (error) {
+            console.error("[Web FCM] failed to sync token", error);
+          }
+        } catch (err) {
+          console.warn("[Web FCM Init Error]:", err);
+        }
+      };
+
+      if (Capacitor.isNativePlatform()) {
+        void initNativePush();
+      } else {
+        void initWebFcm();
       }
-    };
-
-    void initFCM();
+    }, 50);
 
     return () => {
       cancelled = true;
+      clearTimeout(startTimeout);
+      listeners.forEach((fn) => fn());
+      if (Capacitor.isNativePlatform()) {
+        PushNotifications.removeAllListeners().catch(() => {});
+      }
     };
   }, [shouldEnableFcm, isTechnicianAuthenticated]);
 
   useEffect(() => {
-    if (!shouldEnableFcm || typeof window === "undefined") return;
-    let unsubscribe = () => {};
+    // If we're native, native listeners handle the foreground messages and rendering.
+    if (!shouldEnableFcm || typeof window === "undefined" || Capacitor.isNativePlatform()) return;
 
-    const attachListener = async () => {
-      unsubscribe = await subscribeToForegroundMessages((payload) => {
-        const message = buildForegroundMessage(payload);
+    let unsubscribe = () => { };
 
-        toast(message.title, {
-          description: message.body.replace(/\n/g, " "),
-        });
+    const attachWebListener = async () => {
+      try {
+        unsubscribe = await subscribeToForegroundMessages((payload) => {
+          const message = buildForegroundMessage(payload);
 
-        if (Notification.permission === "granted") {
-          const notification = new Notification(message.title, {
-            body: message.body,
-            icon: "/icons/icon-192x192.png",
-            badge: "/icons/icon-192x192.png",
-            requireInteraction: true,
-            vibrate: [200, 100, 200],
-            tag: message.jobId ? `job-${message.jobId}` : `job-${Date.now()}`,
-            data: { deepLinkPath: message.deepLinkPath },
+          toast(message.title, {
+            description: message.body.replace(/\n/g, " "),
           });
-          notification.onclick = () => {
-            window.focus();
-            window.location.assign(message.deepLinkPath);
-            notification.close();
-          };
-        }
-      });
+
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            const options: any = {
+              body: message.body,
+              icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-192x192.png",
+              requireInteraction: true,
+              vibrate: [200, 100, 200],
+              tag: message.jobId ? `job-${message.jobId}` : `job-${Date.now()}`,
+              data: { deepLinkPath: message.deepLinkPath },
+            };
+            const notification = new Notification(message.title, options);
+            notification.onclick = function () {
+              window.focus();
+              window.location.assign(message.deepLinkPath);
+              if (typeof notification.close === "function") notification.close();
+            };
+          }
+        });
+      } catch (err) {
+        console.warn("Foreground web listener error: ", err);
+      }
     };
 
-    void attachListener();
+    void attachWebListener();
 
     return () => {
       unsubscribe();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import { LogIn, Mail, Lock, AlertCircle } from "lucide-react";
@@ -27,6 +28,18 @@ const Login = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+  const loginController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (loginController.current) {
+        loginController.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const confirmed = searchParams.get("confirmed");
@@ -88,38 +101,49 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
+    if (!isMounted.current) return;
+
     setIsLoading(true);
     setError(null);
+
+    const controller = new AbortController();
     try {
-      const result = await login(data.email, data.password);
+      const result = await login(data.email, data.password, { signal: controller.signal });
       if (result.user) {
         const role = String(result?.role || result?.user?.role || "").trim().toLowerCase();
         if (role === "admin") {
           toast.success("Admin login successful!");
-          setTimeout(() => {
-            navigate("/admin/dashboard");
-          }, 100);
+          console.log("navigating as admin");
+          navigate("/admin/dashboard");
           return;
         }
 
         toast.success("Login successful!");
+
         const isProfileLogin = searchParams.get("from") === "profile";
         const returnUrl = sessionStorage.getItem('returnUrl');
         if (!isProfileLogin && returnUrl) {
           sessionStorage.removeItem('returnUrl');
-          setTimeout(() => {
-            navigate(returnUrl);
-          }, 100);
+          console.log("redirecting to returnUrl", returnUrl);
+          navigate(returnUrl);
         } else {
           sessionStorage.removeItem('returnUrl');
-          setTimeout(() => {
-            navigate("/");
-          }, 100);
+          console.log("redirecting to home after login");
+          navigate("/");
         }
+        // after navigation we keep going but don't await any fcm work
       }
     } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        console.warn('Login request aborted');
+        return;
+      }
       console.error("Login error:", error);
-      if (error.message?.includes("Email not confirmed") || error.message?.includes("email_not_confirmed") || error.message?.includes("confirm your email")) {
+      if (
+        error.message?.includes("Email not confirmed") ||
+        error.message?.includes("email_not_confirmed") ||
+        error.message?.includes("confirm your email")
+      ) {
         setError("Please confirm your email before logging in. Check your inbox for the confirmation link.");
         toast.error("Email not confirmed");
       } else {
@@ -127,13 +151,21 @@ const Login = () => {
         toast.error("Login failed");
       }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
-      const response = await fetch(apiUrl("/api/auth/google/url"));
+      if (!isMounted.current) return;
+      setIsLoading(true);
+
+      const isNative = Capacitor.isNativePlatform();
+      const endpoint = isNative ? "/api/auth/google/url?platform=capacitor" : "/api/auth/google/url";
+
+      const response = await fetch(apiUrl(endpoint));
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
@@ -142,7 +174,13 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Google Login Error:", error);
-      toast.error("Something went wrong with Google Login");
+      if (isMounted.current) {
+        toast.error("Something went wrong with Google Login");
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 

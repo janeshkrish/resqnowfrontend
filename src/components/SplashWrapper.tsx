@@ -1,21 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { Geolocation } from '@capacitor/geolocation';
+import { PushNotifications } from '@capacitor/push-notifications';
 
 const SplashWrapper = ({ children }: { children: React.ReactNode }) => {
     const [showSplash, setShowSplash] = useState(true);
 
     useEffect(() => {
-        // Check if running in standalone mode (installed PWA)
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && (navigator as any).standalone === true);
+        let mounted = true;
 
-        if (isStandalone) {
-            setShowSplash(true);
-            // Wait for all animations to complete, then trigger exit
-            const timer = setTimeout(() => setShowSplash(false), 4600);
-            return () => clearTimeout(timer);
-        } else {
-            setShowSplash(false);
-        }
+        const initApp = async () => {
+            const isNative = Capacitor.isNativePlatform();
+
+            if (isNative) {
+                // Request permissions gracefully on Android/iOS
+                try {
+                    await Geolocation.requestPermissions().catch(e => console.warn("Geo Perm Err:", e));
+                } catch (err) {
+                    console.warn("Geolocation permission request error:", err);
+                }
+
+                // Hide native splash screen immediately to show our animated React splash screen 
+                // avoiding any white screen delay or backend blocking.
+                try {
+                    await SplashScreen.hide();
+                } catch (e) {
+                    console.warn("Splash hide error:", e);
+                }
+            }
+
+            // Check if running in standalone mode (installed PWA) or Native Capacitor
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && (navigator as any).standalone === true);
+
+            if (isNative || isStandalone) {
+                setShowSplash(true);
+                // Wait for all animations to complete, then trigger exit
+                // Fallback timeout max 2-3 seconds as requested
+                const timer = setTimeout(() => {
+                    if (mounted) setShowSplash(false);
+                }, 2800);
+                return () => clearTimeout(timer);
+            } else {
+                setShowSplash(false);
+            }
+        };
+
+        initApp();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     return (

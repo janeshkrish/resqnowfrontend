@@ -83,11 +83,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (
+    email: string,
+    password: string,
+    options?: { signal?: AbortSignal }
+  ) => {
     try {
       const res = await apiFetch("/api/users/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
+        signal: options?.signal,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -95,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(msg);
       }
 
+      console.log("[Auth] login response", data);
       const resolvedRole = String(data?.role || data?.user?.role || "").trim().toLowerCase();
       if (resolvedRole === "admin") {
         const adminProfile = {

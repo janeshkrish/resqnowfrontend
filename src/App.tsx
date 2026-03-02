@@ -13,6 +13,9 @@ import { FCMWrapper } from "@/components/FCMWrapper";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
+import { App as CapacitorApp } from '@capacitor/app';
+import { useEffect } from 'react';
+import { setupGlobalErrorHandlers } from "./lib/globalErrors"; // install once at startup
 
 // Technician pages
 import TechnicianLayout from "./components/technician/TechnicianLayout";
@@ -97,136 +100,171 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-        <BrowserRouter>
-          <ScrollToTop />
-          <AdminAuthProvider>
-            <AuthProvider>
-              <TechnicianAuthProvider>
-                <SocketProvider>
-                  <FCMWrapper>
-                    <TooltipProvider>
-                      <Sonner />
-                      <LoadingAnimation />
-                      <Routes>
-                        {/* Auth routes */}
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route path="/otp-verify" element={<OTPVerify />} />
-                        <Route path="/confirm-email" element={<ConfirmEmail />} />
-                        <Route path="/auth/success" element={<AuthSuccess />} />
+const App = () => {
 
-                        {/* Main app routes with AppLayout */}
-                        <Route path="/" element={<AppLayout />}>
-                          <Route index element={<Index />} />
-                          <Route path="services" element={<ServicesPage />} />
-                          <Route path="about" element={<About />} />
-                          <Route path="contact" element={<Contact />} />
-                          <Route path="emergency" element={<Emergency />} />
-                          <Route path="privacy-policy" element={<PrivacyPolicy />} />
-                          <Route path="terms-of-service" element={<TermsOfService />} />
+  useEffect(() => {
+    // set up a global error listener so unhandled promise rejections
+    // or runtime errors do not crash the webview and are logged to console
+    setupGlobalErrorHandlers();
 
-                          <Route path="request-service/:serviceId" element={<VehicleServiceSelector />} />
-                          <Route path="request-service/:serviceId/car" element={<ProtectedRoute><CarServiceRequest /></ProtectedRoute>} />
-                          <Route path="request-service/:serviceId/bike" element={<ProtectedRoute><BikeServiceRequest /></ProtectedRoute>} />
-                          <Route path="request-service/:serviceId/commercial" element={<ProtectedRoute><CommercialServiceRequest /></ProtectedRoute>} />
-                          <Route path="request-service/:serviceId/ev" element={<ProtectedRoute><EVServiceRequest /></ProtectedRoute>} />
-                          <Route path="request-service-tracking/:requestId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
-                          <Route path="service-tracking/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
-                          <Route path="payment/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
-                          <Route path="service-summary/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
-                          <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                          <Route path="profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                          <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
-                          <Route path="my-requests" element={<ProtectedRoute><MyRequests /></ProtectedRoute>} />
-                          <Route path="notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-                          <Route path="marketplace" element={<Marketplace />} />
-                          <Route path="marketplace/product/:id" element={<ProductDetail />} />
-                          <Route path="service-communication/:serviceId" element={<ProtectedRoute><ServiceCommunicationPage /></ProtectedRoute>} />
-                          <Route path="map" element={<MapPage />} />
-                          <Route path="job/:jobId" element={<JobDeepLink />} />
-                        </Route>
+    // Listen for custom schema deep links (e.g. resqnow://auth/callback)
+    const urlListener = CapacitorApp.addListener('appUrlOpen', async (data) => {
+      // Example: data.url = resqnow://auth/callback?token=XYZ
+      if (data.url.includes("auth/callback") || data.url.includes("auth/failed")) {
+        // Extract the path and query string natively without relying on a browser navigation event
+        const urlObj = new URL(data.url);
 
-                        {/* Technician portal routes */}
-                        <Route path="/technician" element={<TechnicianLayout />}>
-                          <Route path="login" element={<TechnicianLogin />} />
-                          <Route path="register" element={<TechnicianRegister />} />
-                          <Route path="verification" element={<TechnicianVerification />} />
-                          <Route path="dashboard" element={<TechnicianDashboard />} />
-                          <Route path="active-job" element={<ActiveJob />} />
-                          <Route path="history" element={<TechnicianHistoryPage />} />
-                          <Route path="earnings" element={<TechnicianEarningsPage />} />
-                          <Route path="reviews" element={<TechnicianReviewsPage />} />
-                          <Route path="profile" element={<TechnicianProfile />} />
-                          <Route path="settings" element={<TechnicianSettings />} />
-                        </Route>
+        // Strip out the custom protocol scheme entirely so React Router doesn't get confused 
+        // e.g. /auth/success?token=XYZ
+        let pathRoute = urlObj.pathname + urlObj.search;
 
-                        {/* Admin login route */}
-                        <Route path="/admin/login" element={<AdminLogin />} />
+        // Map the backend intent path "callback" manually back to our React route "success"
+        if (pathRoute.includes("auth/callback")) {
+          pathRoute = pathRoute.replace("auth/callback", "auth/success");
+        }
 
-                        {/* Admin routes with separate Layout */}
-                        <Route path="/admin" element={
-                          <AdminProtectedRoute>
-                            <AdminDashboardLayout />
-                          </AdminProtectedRoute>
-                        }>
-                          <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                          <Route path="dashboard" element={<AdminDashboard />} />
-                          <Route path="technicians" element={<TechnicianManagement />} />
-                          {/* AddTechnician moved to standalone route below to remove sidebar */}
-                          <Route path="users" element={<UserManagement />} />
-                          <Route path="users/add" element={<AddUser />} />
-                          <Route path="applications" element={<TechnicianApplications />} />
-                          <Route path="analytics" element={<AdminAnalytics />} />
-                          <Route path="payments" element={<AdminPaymentLogs />} />
-                          <Route path="settings" element={<AdminSettings />} />
-                          <Route path="technician/:technicianId" element={<TechnicianDetails />} />
-                        </Route>
+        // Use the native window history hack to coerce the HashRouter/BrowserRouter
+        // to rapidly update without reloading the Capacitor Webview context.
+        window.location.assign(pathRoute);
+      }
+    });
 
-                        {/* Standalone Add Technician Page (No Sidebar) */}
-                        <Route path="/admin/technicians/add" element={
-                          <AdminProtectedRoute>
-                            <AddTechnician />
-                          </AdminProtectedRoute>
-                        } />
+    return () => {
+      urlListener.then(listener => listener.remove());
+    };
+  }, []);
 
-                        {/* Admin Approval Routes */}
-                        <Route path="/admin/approve-technician/:technicianId" element={
-                          <AdminProtectedRoute>
-                            <ApproveTechnician />
-                          </AdminProtectedRoute>
-                        } />
-                        <Route path="/admin/reject-technician/:technicianId" element={
-                          <AdminProtectedRoute>
-                            <RejectTechnician />
-                          </AdminProtectedRoute>
-                        } />
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+          <BrowserRouter>
+            <ScrollToTop />
+            <AdminAuthProvider>
+              <AuthProvider>
+                <TechnicianAuthProvider>
+                  <SocketProvider>
+                    <FCMWrapper>
+                      <TooltipProvider>
+                        <Sonner />
+                        <LoadingAnimation />
+                        <Routes>
+                          {/* Auth routes */}
+                          <Route path="/login" element={<Login />} />
+                          <Route path="/register" element={<Register />} />
+                          <Route path="/otp-verify" element={<OTPVerify />} />
+                          <Route path="/confirm-email" element={<ConfirmEmail />} />
+                          <Route path="/auth/success" element={<AuthSuccess />} />
 
-                        {/* Admin Extended Routes */}
-                        {adminExtendedLazyRoutes.map((route, i) => (
-                          <Route key={`extended-${i}`} path={route.path} element={<AdminProtectedRoute>{route.element}</AdminProtectedRoute>}>
-                            {route.children?.map((child, j) => (
-                              <Route key={`extended-child-${j}`} index={child.index} path={child.path} element={child.element} />
-                            ))}
+                          {/* Main app routes with AppLayout */}
+                          <Route path="/" element={<AppLayout />}>
+                            <Route index element={<Index />} />
+                            <Route path="services" element={<ServicesPage />} />
+                            <Route path="about" element={<About />} />
+                            <Route path="contact" element={<Contact />} />
+                            <Route path="emergency" element={<Emergency />} />
+                            <Route path="privacy-policy" element={<PrivacyPolicy />} />
+                            <Route path="terms-of-service" element={<TermsOfService />} />
+
+                            <Route path="request-service/:serviceId" element={<VehicleServiceSelector />} />
+                            <Route path="request-service/:serviceId/car" element={<ProtectedRoute><CarServiceRequest /></ProtectedRoute>} />
+                            <Route path="request-service/:serviceId/bike" element={<ProtectedRoute><BikeServiceRequest /></ProtectedRoute>} />
+                            <Route path="request-service/:serviceId/commercial" element={<ProtectedRoute><CommercialServiceRequest /></ProtectedRoute>} />
+                            <Route path="request-service/:serviceId/ev" element={<ProtectedRoute><EVServiceRequest /></ProtectedRoute>} />
+                            <Route path="request-service-tracking/:requestId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                            <Route path="service-tracking/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                            <Route path="payment/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                            <Route path="service-summary/:serviceId" element={<ProtectedRoute><RequestTracking /></ProtectedRoute>} />
+                            <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                            <Route path="profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                            <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+                            <Route path="my-requests" element={<ProtectedRoute><MyRequests /></ProtectedRoute>} />
+                            <Route path="notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                            <Route path="marketplace" element={<Marketplace />} />
+                            <Route path="marketplace/product/:id" element={<ProductDetail />} />
+                            <Route path="service-communication/:serviceId" element={<ProtectedRoute><ServiceCommunicationPage /></ProtectedRoute>} />
+                            <Route path="map" element={<MapPage />} />
+                            <Route path="job/:jobId" element={<JobDeepLink />} />
                           </Route>
-                        ))}
 
-                        {/* 404 page */}
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </TooltipProvider>
-                  </FCMWrapper>
-                </SocketProvider>
-              </TechnicianAuthProvider>
-            </AuthProvider>
-          </AdminAuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
-);
+                          {/* Technician portal routes */}
+                          <Route path="/technician" element={<TechnicianLayout />}>
+                            <Route path="login" element={<TechnicianLogin />} />
+                            <Route path="register" element={<TechnicianRegister />} />
+                            <Route path="verification" element={<TechnicianVerification />} />
+                            <Route path="dashboard" element={<TechnicianDashboard />} />
+                            <Route path="active-job" element={<ActiveJob />} />
+                            <Route path="history" element={<TechnicianHistoryPage />} />
+                            <Route path="earnings" element={<TechnicianEarningsPage />} />
+                            <Route path="reviews" element={<TechnicianReviewsPage />} />
+                            <Route path="profile" element={<TechnicianProfile />} />
+                            <Route path="settings" element={<TechnicianSettings />} />
+                          </Route>
+
+                          {/* Admin login route */}
+                          <Route path="/admin/login" element={<AdminLogin />} />
+
+                          {/* Admin routes with separate Layout */}
+                          <Route path="/admin" element={
+                            <AdminProtectedRoute>
+                              <AdminDashboardLayout />
+                            </AdminProtectedRoute>
+                          }>
+                            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                            <Route path="dashboard" element={<AdminDashboard />} />
+                            <Route path="technicians" element={<TechnicianManagement />} />
+                            {/* AddTechnician moved to standalone route below to remove sidebar */}
+                            <Route path="users" element={<UserManagement />} />
+                            <Route path="users/add" element={<AddUser />} />
+                            <Route path="applications" element={<TechnicianApplications />} />
+                            <Route path="analytics" element={<AdminAnalytics />} />
+                            <Route path="payments" element={<AdminPaymentLogs />} />
+                            <Route path="settings" element={<AdminSettings />} />
+                            <Route path="technician/:technicianId" element={<TechnicianDetails />} />
+                          </Route>
+
+                          {/* Standalone Add Technician Page (No Sidebar) */}
+                          <Route path="/admin/technicians/add" element={
+                            <AdminProtectedRoute>
+                              <AddTechnician />
+                            </AdminProtectedRoute>
+                          } />
+
+                          {/* Admin Approval Routes */}
+                          <Route path="/admin/approve-technician/:technicianId" element={
+                            <AdminProtectedRoute>
+                              <ApproveTechnician />
+                            </AdminProtectedRoute>
+                          } />
+                          <Route path="/admin/reject-technician/:technicianId" element={
+                            <AdminProtectedRoute>
+                              <RejectTechnician />
+                            </AdminProtectedRoute>
+                          } />
+
+                          {/* Admin Extended Routes */}
+                          {adminExtendedLazyRoutes.map((route, i) => (
+                            <Route key={`extended-${i}`} path={route.path} element={<AdminProtectedRoute>{route.element}</AdminProtectedRoute>}>
+                              {route.children?.map((child, j) => (
+                                <Route key={`extended-child-${j}`} index={child.index} path={child.path} element={child.element} />
+                              ))}
+                            </Route>
+                          ))}
+
+                          {/* 404 page */}
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </TooltipProvider>
+                    </FCMWrapper>
+                  </SocketProvider>
+                </TechnicianAuthProvider>
+              </AuthProvider>
+            </AdminAuthProvider>
+          </BrowserRouter>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import { UserPlus, Mail, Lock, User, AlertCircle } from "lucide-react";
@@ -31,6 +32,14 @@ const Register = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(formSchema),
@@ -43,6 +52,7 @@ const Register = () => {
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
+    if (!isMounted.current) return;
     setIsLoading(true);
     setError(null);
 
@@ -71,16 +81,26 @@ const Register = () => {
         errorMessage = error.message;
       }
 
-      setError(errorMessage);
-      toast.error(errorMessage);
+      if (isMounted.current) {
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleGoogleSignup = async () => {
     try {
-      const response = await fetch(apiUrl("/api/auth/google/url"));
+      if (!isMounted.current) return;
+      setIsLoading(true);
+
+      const isNative = Capacitor.isNativePlatform();
+      const endpoint = isNative ? "/api/auth/google/url?platform=capacitor" : "/api/auth/google/url";
+
+      const response = await fetch(apiUrl(endpoint));
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
@@ -89,7 +109,13 @@ const Register = () => {
       }
     } catch (error) {
       console.error("Google Sign-up Error:", error);
-      toast.error("Something went wrong with Google Sign-up");
+      if (isMounted.current) {
+        toast.error("Something went wrong with Google Sign-up");
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 

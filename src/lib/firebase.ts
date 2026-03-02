@@ -55,7 +55,7 @@ function buildMessagingServiceWorkerUrl() {
 }
 
 export async function registerFcmServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+  if (typeof window === "undefined" || !navigator || !("serviceWorker" in navigator)) return null;
   try {
     return await navigator.serviceWorker.register(buildMessagingServiceWorkerUrl(), {
       scope: FCM_SW_SCOPE,
@@ -96,7 +96,7 @@ export async function subscribeToForegroundMessages(
   onPayload: (payload: MessagePayload) => void
 ) {
   const messaging = await getMessagingInstance();
-  if (!messaging) return () => {};
+  if (!messaging) return () => { };
   return onMessage(messaging, onPayload);
 }
 

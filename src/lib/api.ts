@@ -613,7 +613,12 @@ export async function apiFetch(
     if (token) h.set("Authorization", `Bearer ${token}`);
   }
 
-  return fetch(apiUrl(path), { ...rest, headers: h });
+  try {
+    return await fetch(apiUrl(path), { ...rest, headers: h });
+  } catch (networkError) {
+    console.error("[apiFetch] network failure for", path, networkError);
+    throw networkError;
+  }
 }
 
 export function setTechnicianToken(token: string | null) {

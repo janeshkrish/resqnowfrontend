@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,18 @@ const TechnicianLogin = () => {
   const { login, isAuthenticated } = useTechnicianAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const isMounted = useRef(true);
+  const loginController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (loginController.current) {
+        loginController.current.abort();
+      }
+    };
+  }, []);
 
   const resolvePostLoginPath = React.useCallback(() => {
     const pendingJobId = sessionStorage.getItem("resqnow_pending_job_deeplink");
@@ -45,14 +57,19 @@ const TechnicianLogin = () => {
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
+    loginController.current = new AbortController();
     try {
-      await login(data.email, data.password);
+      await login(data.email, data.password, { signal: loginController.current.signal });
       toast({
         title: "Login successful!",
         description: "Welcome to the ResQNow technician portal",
       });
       navigate(resolvePostLoginPath());
     } catch (error: unknown) {
+      if ((error as any)?.name === 'AbortError') {
+        console.warn("Technician login aborted");
+        return;
+      }
       const message = error instanceof Error ? error.message : "Invalid email or password. Please try again.";
       toast({
         title: "Login failed",
@@ -60,7 +77,9 @@ const TechnicianLogin = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 

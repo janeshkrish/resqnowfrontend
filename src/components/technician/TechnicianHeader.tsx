@@ -13,6 +13,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User, Settings } from "lucide-react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
+import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
 import { apiUrl } from "@/lib/api";
 
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +22,7 @@ import { toast } from "sonner";
 
 const TechnicianHeader = () => {
   const { technician, isAuthenticated, logout, token, isOnline, setIsOnline } = useTechnicianAuth();
+  const { clearAcceptedJobId } = useTechnicianJob();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -28,6 +30,7 @@ const TechnicianHeader = () => {
   //Ideally we should fetch this from backend
 
   const handleLogout = () => {
+    clearAcceptedJobId();
     logout();
     navigate("/technician/login");
   };

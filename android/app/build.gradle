@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+import groovy.json.JsonSlurper
 
 android {
     namespace = "com.resqnow1.app"
@@ -40,15 +41,31 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+    implementation 'com.google.firebase:firebase-messaging:24.1.0'
 }
 
 apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+def servicesJSON = file('google-services.json')
+if (!servicesJSON.exists()) {
+    throw new GradleException("Missing android/app/google-services.json. Firebase Messaging cannot initialize without it.")
 }
+
+def googleServices
+try {
+    googleServices = new JsonSlurper().parse(servicesJSON)
+} catch (Exception e) {
+    throw new GradleException("Invalid google-services.json format in android/app/google-services.json", e)
+}
+
+def applicationIdValue = android.defaultConfig.applicationId
+def hasMatchingClient = (googleServices?.client ?: []).any { client ->
+    client?.client_info?.android_client_info?.package_name == applicationIdValue
+}
+
+if (!hasMatchingClient) {
+    throw new GradleException(
+        "google-services.json package_name does not match applicationId '${applicationIdValue}'."
+    )
+}
+
+apply plugin: 'com.google.gms.google-services'

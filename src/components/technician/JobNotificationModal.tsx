@@ -6,7 +6,9 @@ import { Navigation, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { apiUrl } from '@/lib/api';
+import { apiFetch, apiUrl } from '@/lib/api';
+import { useTechnicianJob } from '@/contexts/TechnicianJobContext';
+import { normalizeTechnicianStatus } from '@/utils/technicianStatus';
 
 interface JobRequest {
   id: string;
@@ -19,7 +21,8 @@ const JobNotificationModal = () => {
   const [jobRequest, setJobRequest] = useState<JobRequest | null>(null);
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { token } = useTechnicianAuth();
+  const { token, technician } = useTechnicianAuth();
+  const { acceptedJobId, setAcceptedJobId } = useTechnicianJob();
   const navigate = useNavigate();
   const location = useLocation();
   const isDashboardRoute = location.pathname.startsWith('/technician/dashboard');
@@ -27,11 +30,28 @@ const JobNotificationModal = () => {
   useEffect(() => {
     if (!socket || isDashboardRoute) return;
 
-    const handleNewJob = (data: Record<string, unknown>) => {
+    const handleNewJob = async (data: Record<string, unknown>) => {
       const rawId = data.requestId ?? data.id;
       if (!rawId) return;
       const normalizedId = String(rawId).trim();
       if (!normalizedId || normalizedId === 'undefined') return;
+      if (acceptedJobId && acceptedJobId === normalizedId) return;
+
+      try {
+        const activeJobRes = await apiFetch('/api/technicians/me/active-job', { technician: true });
+        if (activeJobRes.ok) {
+          const activeJob = await activeJobRes.json();
+          const activeStatus = normalizeTechnicianStatus(activeJob?.status);
+          if (
+            activeJob?.id &&
+            !['pending', 'completed', 'cancelled', 'rejected'].includes(activeStatus)
+          ) {
+            return;
+          }
+        }
+      } catch {
+        // Ignore active-job probe failures and still show the offer modal.
+      }
 
       const normalized: JobRequest = {
         id: normalizedId,
@@ -49,7 +69,7 @@ const JobNotificationModal = () => {
     return () => {
       socket.off('job_offer', handleNewJob);
     };
-  }, [socket, isDashboardRoute]);
+  }, [socket, isDashboardRoute, acceptedJobId]);
 
   const handleAccept = async () => {
     if (!jobRequest || isSubmitting) return;
@@ -71,9 +91,20 @@ const JobNotificationModal = () => {
 
       const data = await response.json();
       if (data.success) {
+        const acceptedJobId = String(data?.request?.id || requestId).trim();
+        const role = String((technician as any)?.role || 'technician').trim().toLowerCase();
         toast.success('Job Accepted!');
         setOpen(false);
-        navigate('/technician/active-job');
+        setJobRequest(null);
+        setAcceptedJobId(acceptedJobId);
+        if (role === 'technician') {
+          navigate('/technician/dashboard', {
+            replace: true,
+            state: { acceptedJobId },
+          });
+        } else {
+          navigate('/', { replace: true });
+        }
       } else {
         toast.error(data.error || 'Failed to accept job');
         setOpen(false);

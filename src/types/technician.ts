@@ -3,6 +3,7 @@ export type VerificationStatus = "pending" | "verified" | "rejected";
 
 export type Technician = {
   id: string;
+  role?: string;
   name: string;
   email: string;
   phone: string;

@@ -10,6 +10,7 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
 
   return {
     id: String(data.id),
+    role: String(data.role ?? "technician"),
     name: String(data.name),
     email: String(data.email),
     phone: String(data.phone ?? ""),
@@ -120,6 +121,7 @@ export const technicianAuthService = {
     return {
       ...data,
       id: String(responseData.id),
+      role: "technician",
       name: responseData.name,
       email: responseData.email,
       verification_status: "pending" as const,
@@ -131,6 +133,12 @@ export const technicianAuthService = {
   logout: async () => {
     setTechnicianToken(null);
     localStorage.removeItem("resqnow_technician");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("resqnow_tech_last_accepted_job_id");
+      sessionStorage.removeItem("resqnow_pending_job_deeplink");
+      sessionStorage.removeItem("resqnow_pending_job_alert_action");
+      sessionStorage.removeItem("technicianReturnUrl");
+    }
     return true;
   },
 };

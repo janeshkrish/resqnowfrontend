@@ -23,7 +23,9 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
       const res = await apiFetch("/api/technicians/me/active-job", { technician: true });
       if (!res.ok) return;
       const data = await res.json();
-      setActiveJob(normalizeJob(data));
+      const normalized = normalizeJob(data);
+      setActiveJob(normalized);
+      return normalized;
     } catch {
       // ignore transient failures
     }

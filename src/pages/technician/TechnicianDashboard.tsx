@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
 import { toast } from "sonner";
 import { Loader2, MapPin, DollarSign, Briefcase, Navigation, PhoneCall, User, Car, AlertCircle, TrendingUp, Star, CreditCard } from "lucide-react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
@@ -15,6 +15,7 @@ import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from "@/l
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
+import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
 
 // Restored imports for widgets
 import TechnicianJobHistory from "@/components/technician/TechnicianJobHistory";
@@ -24,6 +25,8 @@ import TechnicianNotifications from "@/components/technician/TechnicianNotificat
 
 const TechnicianDashboard = () => {
   const { technician, isOnline, setIsOnline, isLoading } = useTechnicianAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ jobs: 0, earnings: 0, today: 0 });
   const [incomingJob, setIncomingJob] = useState<JobRequest | null>(null);
 
@@ -40,12 +43,16 @@ const TechnicianDashboard = () => {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
+  const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
 
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isOnlineRef = useRef(false);
   const activeJobIdRef = useRef<string | null>(null);
+  const activeJobStatusRef = useRef<string>("");
+  const acceptedJobIdRef = useRef<string | null>(acceptedJobId);
+  const handledRouteJobRef = useRef<string | null>(null);
 
   const stopAlertSound = () => {
     if (!audioRef.current) return;
@@ -103,7 +110,24 @@ const TechnicianDashboard = () => {
 
   useEffect(() => {
     activeJobIdRef.current = activeJob?.id ? String(activeJob.id) : null;
-  }, [activeJob?.id]);
+    activeJobStatusRef.current = activeJob?.status ? normalizeTechnicianStatus(activeJob.status) : "";
+  }, [activeJob?.id, activeJob?.status]);
+
+  useEffect(() => {
+    acceptedJobIdRef.current = acceptedJobId || null;
+  }, [acceptedJobId]);
+
+  useEffect(() => {
+    const status = normalizeTechnicianStatus(activeJob?.status);
+    const activeJobId = String(activeJob?.id || "").trim();
+    if (activeJobId && status !== "completed" && status !== "cancelled" && status !== "rejected") {
+      setAcceptedJobId(activeJobId);
+      return;
+    }
+    if (!activeJobId || ["completed", "cancelled", "rejected"].includes(status)) {
+      clearAcceptedJobId();
+    }
+  }, [activeJob?.id, activeJob?.status, setAcceptedJobId, clearAcceptedJobId]);
 
   useEffect(() => {
     if (activeJob) {
@@ -222,7 +246,7 @@ const TechnicianDashboard = () => {
 
 
     // New: Listen for Broadcast Offers
-    socket.on("job_offer", (offerData) => {
+    socket.on("job_offer", async (offerData) => {
       console.log("New Job Offer Received!", offerData);
       const rawRequestId = offerData?.requestId ?? offerData?.id;
       const requestId = rawRequestId != null ? String(rawRequestId).trim() : "";
@@ -230,6 +254,33 @@ const TechnicianDashboard = () => {
         console.warn("Skipping malformed job_offer payload: missing requestId", offerData);
         return;
       }
+
+      if (acceptedJobIdRef.current && acceptedJobIdRef.current === requestId) {
+        return;
+      }
+
+      const currentActiveStatus = activeJobStatusRef.current;
+      const currentActiveJobId = activeJobIdRef.current;
+      if (
+        currentActiveJobId &&
+        !["pending", "completed", "cancelled", "rejected"].includes(currentActiveStatus)
+      ) {
+        return;
+      }
+
+      try {
+        const latestActiveJob = await refreshActiveJob();
+        const latestStatus = normalizeTechnicianStatus(latestActiveJob?.status);
+        if (
+          latestActiveJob?.id &&
+          !["pending", "completed", "cancelled", "rejected"].includes(latestStatus)
+        ) {
+          return;
+        }
+      } catch {
+        // Ignore refresh failures and continue showing incoming offer.
+      }
+
       // Map offer payload to JobRequest interface expected by Modal
       const jobRequest: JobRequest = {
         id: requestId,
@@ -420,7 +471,7 @@ const TechnicianDashboard = () => {
       stopLocationTracking();
       clearInterval(pollInterval);
     };
-  }, [technician?.id]); // Close socket effect
+  }, [technician?.id, refreshActiveJob]); // Close socket effect
 
 
 
@@ -466,7 +517,8 @@ const TechnicianDashboard = () => {
         throw new Error("Invalid job id");
       }
 
-      const useAcceptEndpoint = status === "accepted" && !!options?.useAcceptEndpoint;
+      const useAcceptEndpoint =
+        status === "accepted" && options?.useAcceptEndpoint !== false;
       const endpoint = useAcceptEndpoint
         ? apiUrl(`/api/service-requests/${normalizedJobId}/accept`)
         : apiUrl(`/api/service-requests/${normalizedJobId}/technician-status`);
@@ -500,6 +552,76 @@ const TechnicianDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    if (!technician?.id) return;
+
+    const params = new URLSearchParams(location.search);
+    const routeState = (location.state || {}) as {
+      acceptedJobId?: string;
+      jobId?: string;
+      alertAction?: string;
+    };
+
+    const routeJobId = String(
+      routeState.acceptedJobId || routeState.jobId || params.get("jobId") || ""
+    ).trim();
+    const routeAction = String(
+      routeState.alertAction ||
+      params.get("alertAction") ||
+      params.get("alert_action") ||
+      ""
+    ).trim().toLowerCase();
+
+    const normalizedJobId = routeJobId || String(acceptedJobId || "").trim();
+    if (!normalizedJobId || normalizedJobId === "undefined") return;
+
+    const handledKey = `${routeAction}:${normalizedJobId}`;
+    if (handledRouteJobRef.current === handledKey) return;
+    handledRouteJobRef.current = handledKey;
+
+    const syncRouteState = async () => {
+      const currentJobId = String(activeJob?.id || "").trim();
+      const currentStatus = normalizeTechnicianStatus(activeJob?.status);
+      const isSameJob = currentJobId === normalizedJobId;
+      const isAlreadyAccepted =
+        isSameJob &&
+        ["accepted", "en-route", "arrived", "in-progress", "payment_pending", "paid", "completed"].includes(currentStatus);
+
+      if (routeAction === "accept" && !isAlreadyAccepted) {
+        await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+        toast.success("Job Accepted!");
+      }
+
+      if (routeAction === "accept" || isAlreadyAccepted) {
+        setAcceptedJobId(normalizedJobId);
+      }
+
+      await refreshActiveJob();
+      setIncomingJob(null);
+      setShowJobModal(false);
+
+      if (location.search || location.state) {
+        navigate("/technician/dashboard", { replace: true });
+      }
+    };
+
+    syncRouteState().catch((error) => {
+      console.error("Failed to sync dashboard route job state", error);
+      toast.error("Unable to restore accepted job automatically.");
+    });
+  }, [
+    technician?.id,
+    location.search,
+    location.state,
+    acceptedJobId,
+    activeJob?.id,
+    activeJob?.status,
+    navigate,
+    refreshActiveJob,
+    setAcceptedJobId,
+    updateJobStatus,
+  ]);
+
   const handleAcceptJob = async (jobId: string) => {
     if (isJobActionLoading) return;
     const normalizedJobId = String(jobId || "").trim();
@@ -511,10 +633,10 @@ const TechnicianDashboard = () => {
     try {
       setIsJobActionLoading(true);
       stopAlertSound();
-      const isOfferAccept = !!(incomingJob && String(incomingJob.id) === normalizedJobId);
-      await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: isOfferAccept });
+      await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
       toast.success("Job Accepted!");
       setIncomingJob(null);
+      setAcceptedJobId(normalizedJobId);
 
       // Fix: Update activeJob state reliably even if incomingJob is null
       setActiveJob((prev: any) => {
@@ -535,6 +657,7 @@ const TechnicianDashboard = () => {
         };
       });
 
+      await refreshActiveJob();
       startLocationTracking();
     } catch (e) {
       console.error(e);
@@ -556,6 +679,9 @@ const TechnicianDashboard = () => {
       stopAlertSound();
       await updateJobStatus("rejected", normalizedJobId);
       setIncomingJob(null);
+      if (acceptedJobId && acceptedJobId === normalizedJobId) {
+        clearAcceptedJobId();
+      }
       toast.info("Job Rejected");
     } catch (e) {
       console.error(e);
@@ -570,6 +696,7 @@ const TechnicianDashboard = () => {
       await updateJobStatus(newStatus, activeJob.id);
       if (newStatus === 'completed') {
         toast.success("Job Completed! Great work.");
+        clearAcceptedJobId();
         setActiveJob(null);
         setStats(prev => ({ ...prev, jobs: prev.jobs + 1 }));
         stopLocationTracking();
@@ -833,6 +960,7 @@ const TechnicianDashboard = () => {
     try {
       await updateJobStatus("cancelled", activeJob.id);
       toast.info("Job Cancelled");
+      clearAcceptedJobId();
       setActiveJob(null);
       stopLocationTracking();
       if (isOnline) startLocationTracking();
@@ -1070,7 +1198,7 @@ const TechnicianDashboard = () => {
 
               {/* Action Buttons with Bottom Sheet flow feel */}
               <div className="space-y-3">
-                {activeJob.status !== 'assigned' && activeJob.status !== 'paid' && (
+                {activeJob.status !== 'pending' && activeJob.status !== 'paid' && (
                   <div className="flex gap-2">
                     <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" asChild>
                       <a href={`tel:${activeJob.contact_phone}`}><PhoneCall className="w-4 h-4 mr-2" /> <span className="font-bold">Call</span></a>
@@ -1081,7 +1209,7 @@ const TechnicianDashboard = () => {
                   </div>
                 )}
 
-                {activeJob.status === 'assigned' && (
+                {activeJob.status === 'pending' && (
                   <div className="flex gap-2">
                     <Button
                       disabled={isJobActionLoading}
@@ -1101,7 +1229,7 @@ const TechnicianDashboard = () => {
                   </div>
                 )}
 
-                {activeJob.status === 'accepted' && (
+                {(activeJob.status === 'accepted' || activeJob.status === 'assigned') && (
                   <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
                     START JOURNEY
                   </Button>

@@ -33,10 +33,25 @@ const TechnicianLogin = () => {
   }, []);
 
   const resolvePostLoginPath = React.useCallback(() => {
+    const technicianReturnUrl = sessionStorage.getItem("technicianReturnUrl");
+    if (technicianReturnUrl) {
+      sessionStorage.removeItem("technicianReturnUrl");
+      return technicianReturnUrl;
+    }
+
     const pendingJobId = sessionStorage.getItem("resqnow_pending_job_deeplink");
     if (pendingJobId) {
+      const pendingAlertAction = String(
+        sessionStorage.getItem("resqnow_pending_job_alert_action") || ""
+      ).trim();
       sessionStorage.removeItem("resqnow_pending_job_deeplink");
-      return `/job/${encodeURIComponent(pendingJobId)}`;
+      sessionStorage.removeItem("resqnow_pending_job_alert_action");
+      const pendingParams = new URLSearchParams();
+      pendingParams.set("jobId", pendingJobId);
+      if (pendingAlertAction) {
+        pendingParams.set("alertAction", pendingAlertAction);
+      }
+      return `/technician/dashboard?${pendingParams.toString()}`;
     }
     return "/technician/dashboard";
   }, []);

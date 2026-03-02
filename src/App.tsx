@@ -2,13 +2,16 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TechnicianAuthProvider } from "@/contexts/TechnicianAuthContext";
 import { AdminAuthProvider, AdminProtectedRoute } from "@/contexts/AdminAuthContext";
 import { ThemeProvider } from "@/components/item-providers/ThemeProvider";
 import { SocketProvider } from "@/contexts/SocketContext";
+import { TechnicianJobProvider } from "@/contexts/TechnicianJobContext";
 import { FCMWrapper } from "@/components/FCMWrapper";
+import TechnicianProtectedRoute from "@/components/routing/TechnicianProtectedRoute";
+import { APP_NAVIGATE_EVENT } from "@/lib/appNavigation";
 
 import LoadingAnimation from "@/components/LoadingAnimation";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -83,6 +86,7 @@ import TermsOfService from "./pages/TermsOfService";
 import MapPage from "./pages/MapPage";
 
 const queryClient = new QueryClient();
+type AppNavigateEventDetail = { path?: string; replace?: boolean; state?: unknown };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -100,38 +104,107 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const resolveRouteFromCustomUrl = (rawUrl: string): string | null => {
+  if (!rawUrl) return null;
+
+  try {
+    const parsed = new URL(rawUrl);
+    const protocol = String(parsed.protocol || "").toLowerCase();
+    if (!protocol.startsWith("resqnow")) return null;
+
+    const hostAndPath = `/${parsed.host}${parsed.pathname}`.replace(/\/{2,}/g, "/");
+    let routePath = `${hostAndPath}${parsed.search}`;
+
+    if (routePath.includes("auth/callback")) {
+      routePath = routePath.replace("auth/callback", "auth/success");
+      return routePath;
+    }
+
+    if (routePath.includes("auth/failed")) {
+      const errorParam = parsed.searchParams.get("error") || "google_auth_failed";
+      return `/login?error=${encodeURIComponent(errorParam)}`;
+    }
+
+    if (routePath === "/auth") {
+      return "/";
+    }
+
+    if (routePath.startsWith("/auth/")) {
+      routePath = routePath.replace(/^\/auth/, "");
+    }
+
+    if (!routePath.startsWith("/")) {
+      routePath = `/${routePath}`;
+    }
+
+    return routePath;
+  } catch {
+    return null;
+  }
+};
+
+const AppRuntimeBridge = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const navigateToPath = (path: string, options?: { replace?: boolean; state?: unknown }) => {
+      const normalizedPath = String(path || "").trim();
+      if (!normalizedPath) return;
+      navigate(normalizedPath, {
+        replace: options?.replace !== false,
+        state: options?.state,
+      });
+    };
+
+    const handleCustomUrl = (rawUrl?: string | null) => {
+      const routePath = resolveRouteFromCustomUrl(String(rawUrl || "").trim());
+      if (!routePath) return;
+      navigateToPath(routePath, { replace: true });
+    };
+
+    const handleAppNavigate = (event: Event) => {
+      const customEvent = event as CustomEvent<AppNavigateEventDetail>;
+      const path = String(customEvent.detail?.path || "").trim();
+      if (!path) return;
+      navigateToPath(path, {
+        replace: customEvent.detail?.replace,
+        state: customEvent.detail?.state,
+      });
+    };
+
+    const urlListener = CapacitorApp.addListener("appUrlOpen", (data) => {
+      handleCustomUrl(data?.url);
+    });
+
+    CapacitorApp.getLaunchUrl()
+      .then((launchData) => {
+        handleCustomUrl(launchData?.url);
+      })
+      .catch((error) => {
+        console.warn("Failed to resolve launch URL", error);
+      });
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(APP_NAVIGATE_EVENT, handleAppNavigate as EventListener);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(APP_NAVIGATE_EVENT, handleAppNavigate as EventListener);
+      }
+      urlListener.then(listener => listener.remove());
+    };
+  }, [navigate]);
+
+  return null;
+};
+
 const App = () => {
 
   useEffect(() => {
     // set up a global error listener so unhandled promise rejections
     // or runtime errors do not crash the webview and are logged to console
     setupGlobalErrorHandlers();
-
-    // Listen for custom schema deep links (e.g. resqnow://auth/callback)
-    const urlListener = CapacitorApp.addListener('appUrlOpen', async (data) => {
-      // Example: data.url = resqnow://auth/callback?token=XYZ
-      if (data.url.includes("auth/callback") || data.url.includes("auth/failed")) {
-        // Extract the path and query string natively without relying on a browser navigation event
-        const urlObj = new URL(data.url);
-
-        // Strip out the custom protocol scheme entirely so React Router doesn't get confused 
-        // e.g. /auth/success?token=XYZ
-        let pathRoute = urlObj.pathname + urlObj.search;
-
-        // Map the backend intent path "callback" manually back to our React route "success"
-        if (pathRoute.includes("auth/callback")) {
-          pathRoute = pathRoute.replace("auth/callback", "auth/success");
-        }
-
-        // Use the native window history hack to coerce the HashRouter/BrowserRouter
-        // to rapidly update without reloading the Capacitor Webview context.
-        window.location.assign(pathRoute);
-      }
-    });
-
-    return () => {
-      urlListener.then(listener => listener.remove());
-    };
   }, []);
 
   return (
@@ -139,16 +212,18 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
           <BrowserRouter>
+            <AppRuntimeBridge />
             <ScrollToTop />
             <AdminAuthProvider>
               <AuthProvider>
                 <TechnicianAuthProvider>
                   <SocketProvider>
-                    <FCMWrapper>
-                      <TooltipProvider>
-                        <Sonner />
-                        <LoadingAnimation />
-                        <Routes>
+                    <TechnicianJobProvider>
+                      <FCMWrapper>
+                        <TooltipProvider>
+                          <Sonner />
+                          <LoadingAnimation />
+                          <Routes>
                           {/* Auth routes */}
                           <Route path="/login" element={<Login />} />
                           <Route path="/register" element={<Register />} />
@@ -191,14 +266,14 @@ const App = () => {
                           <Route path="/technician" element={<TechnicianLayout />}>
                             <Route path="login" element={<TechnicianLogin />} />
                             <Route path="register" element={<TechnicianRegister />} />
-                            <Route path="verification" element={<TechnicianVerification />} />
-                            <Route path="dashboard" element={<TechnicianDashboard />} />
-                            <Route path="active-job" element={<ActiveJob />} />
-                            <Route path="history" element={<TechnicianHistoryPage />} />
-                            <Route path="earnings" element={<TechnicianEarningsPage />} />
-                            <Route path="reviews" element={<TechnicianReviewsPage />} />
-                            <Route path="profile" element={<TechnicianProfile />} />
-                            <Route path="settings" element={<TechnicianSettings />} />
+                            <Route path="verification" element={<TechnicianProtectedRoute><TechnicianVerification /></TechnicianProtectedRoute>} />
+                            <Route path="dashboard" element={<TechnicianProtectedRoute><TechnicianDashboard /></TechnicianProtectedRoute>} />
+                            <Route path="active-job" element={<TechnicianProtectedRoute><ActiveJob /></TechnicianProtectedRoute>} />
+                            <Route path="history" element={<TechnicianProtectedRoute><TechnicianHistoryPage /></TechnicianProtectedRoute>} />
+                            <Route path="earnings" element={<TechnicianProtectedRoute><TechnicianEarningsPage /></TechnicianProtectedRoute>} />
+                            <Route path="reviews" element={<TechnicianProtectedRoute><TechnicianReviewsPage /></TechnicianProtectedRoute>} />
+                            <Route path="profile" element={<TechnicianProtectedRoute><TechnicianProfile /></TechnicianProtectedRoute>} />
+                            <Route path="settings" element={<TechnicianProtectedRoute><TechnicianSettings /></TechnicianProtectedRoute>} />
                           </Route>
 
                           {/* Admin login route */}
@@ -253,9 +328,10 @@ const App = () => {
 
                           {/* 404 page */}
                           <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </TooltipProvider>
-                    </FCMWrapper>
+                          </Routes>
+                        </TooltipProvider>
+                      </FCMWrapper>
+                    </TechnicianJobProvider>
                   </SocketProvider>
                 </TechnicianAuthProvider>
               </AuthProvider>

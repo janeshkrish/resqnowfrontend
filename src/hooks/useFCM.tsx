@@ -4,6 +4,7 @@ import { apiFetch } from "../lib/api";
 import { requestForToken, subscribeToForegroundMessages } from "../lib/firebase";
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from "@capacitor/push-notifications";
 import { Capacitor } from "@capacitor/core";
+import { navigateWithinApp } from "@/lib/appNavigation";
 
 type UseFcmOptions = {
   isUserAuthenticated: boolean;
@@ -55,17 +56,6 @@ function buildForegroundMessage(payload: any) {
   return { title, body, deepLinkPath, jobId };
 }
 
-// 🔊 Custom sound player for the foreground active state
-const playCustomAlarm = () => {
-  try {
-    const audio = new Audio('/emergency_alarm.mp3');
-    audio.volume = 1.0;
-    audio.play().catch(e => console.warn('Audio play failed in browser:', e));
-  } catch (err) {
-    console.warn('Failed to play alarm:', err);
-  }
-};
-
 export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFcmOptions) => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const shouldEnableFcm = useMemo(
@@ -87,44 +77,24 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
       const initNativePush = async () => {
         console.log("[Native Push] init start (shouldEnableFcm=", shouldEnableFcm, ")");
         try {
-          // 1. Validate & Request Permissions
-          let permStatus = await PushNotifications.checkPermissions();
-          console.log("[Native Push] current permission:", permStatus);
-          if (permStatus.receive === 'prompt') {
-            permStatus = await PushNotifications.requestPermissions();
-            console.log("[Native Push] permission result:", permStatus);
-          }
+          // 1. Request permission first and register only on explicit grant.
+          const permStatus = await PushNotifications.requestPermissions();
+          console.log("[Native Push] permission result:", permStatus);
 
           if (permStatus.receive !== 'granted' || cancelled) {
             console.warn("[Native Push] permissions not granted, skipping registration");
             return;
           }
 
-          // 2. Setup Notification Channel for Android 13+ High Priority Sounds
-          if (Capacitor.getPlatform() === 'android') {
-            try {
-              await PushNotifications.createChannel({
-                id: 'high_priority_alarms',
-                name: 'High Priority Alarms',
-                description: 'Critical Job Alerts for Technicians',
-                importance: 5,
-                sound: 'emergency_alarm',
-                visibility: 1,
-                vibration: true,
-              });
-            } catch (e) {
-              console.warn("[Native Push] Failed to create channel", e);
-            }
-          }
-
-          // 3. Register natively with Firebase/APNs
+          // 2. Register natively with Firebase/APNs.
+          // Android channel/sound setup is handled in native code via R.raw.emergency_alarm.
           try {
             await PushNotifications.register();
           } catch (e) {
             console.error("[Native Push] register() threw", e);
           }
 
-          // 4. Registration Listeners (token and refresh)
+          // 3. Registration Listeners (token and refresh)
           const onRegister = PushNotifications.addListener('registration', async (token: Token) => {
             if (cancelled) return;
             console.log("[Native Push] registration event, token=", token.value);
@@ -151,12 +121,9 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
           });
           listeners.push(() => onRegError.remove());
 
-          // 5. Foreground notifications
+          // 4. Foreground notifications
           const onPush = PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
             if (cancelled) return;
-            if ((notification as any).channelId === 'high_priority_alarms' || Number(notification.data?.priority) > 1) {
-              playCustomAlarm();
-            }
             const message = buildForegroundMessage(notification);
             toast(message.title, {
               description: message.body.replace(/\n/g, " "),
@@ -165,7 +132,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
                 label: "View Request",
                 onClick: () => {
                   try {
-                    window.location.assign(message.deepLinkPath);
+                    navigateWithinApp(message.deepLinkPath, { replace: true });
                   } catch (e) {
                     console.error("navigation exception from toast action", e);
                   }
@@ -175,13 +142,13 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
           });
           listeners.push(() => onPush.remove());
 
-          // 6. Background action
+          // 5. Background action
           const onAction = PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
             if (cancelled) return;
             const message = buildForegroundMessage(notification.notification);
             if (message.deepLinkPath) {
               try {
-                window.location.assign(message.deepLinkPath);
+                navigateWithinApp(message.deepLinkPath, { replace: true });
               } catch (e) {
                 console.error("navigation exception in action performed", e);
               }
@@ -268,7 +235,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
             const notification = new Notification(message.title, options);
             notification.onclick = function () {
               window.focus();
-              window.location.assign(message.deepLinkPath);
+              navigateWithinApp(message.deepLinkPath, { replace: true });
               if (typeof notification.close === "function") notification.close();
             };
           }
@@ -287,3 +254,4 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
 
   return { fcmToken };
 };
+

@@ -141,6 +141,9 @@ export default function AdminExtendedRequestsPage() {
     onSuccess: () => {
       toast.success("Request closed.");
       refreshRequests();
+      void queryClient.invalidateQueries({ queryKey: ["admin", "finance"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "analytics"] });
       closeModal();
     },
     onError: (error: Error) => toast.error(error.message),

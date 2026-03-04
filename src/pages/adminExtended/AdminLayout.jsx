@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Bell,
@@ -27,6 +27,7 @@ const navItems = [
 export default function AdminLayout() {
   const { adminUser, logoutAdmin } = useAdminAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const activePage = useMemo(
@@ -59,11 +60,15 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-slate-100/70">
       <div className="mx-auto grid min-h-screen max-w-[1600px] grid-cols-1 md:grid-cols-[260px_1fr]">
         <aside className="hidden border-r border-slate-200 bg-white p-5 md:flex md:flex-col">
-          <div className="mb-8 rounded-2xl bg-slate-900 p-4 text-white">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="mb-8 rounded-2xl bg-slate-900 p-4 text-left text-white transition hover:bg-slate-800"
+          >
             <p className="text-xs uppercase tracking-[0.2em] text-slate-300">ResQNow</p>
             <h1 className="mt-2 text-lg font-semibold">Extended Admin</h1>
             <p className="mt-1 text-xs text-slate-300">Operations control center</p>
-          </div>
+          </button>
           <nav className="space-y-1">{navItems.map((item) => renderNavLink(item))}</nav>
           <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
             Live environment dashboards with API-backed controls.

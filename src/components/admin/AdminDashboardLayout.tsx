@@ -67,7 +67,8 @@ const AdminDashboardLayout = () => {
           setNotifications(prev => [data.data, ...prev]);
           setUnreadCount(prev => prev + 1);
           // Also update sidebar count if it's a technician application
-          if (data.data.type === "technician_application") {
+          const notificationType = String(data.data?.type || "").trim().toLowerCase();
+          if (notificationType === "technician_application" || notificationType === "new_technician_application") {
             setPendingCount(prev => prev + 1);
           }
         }

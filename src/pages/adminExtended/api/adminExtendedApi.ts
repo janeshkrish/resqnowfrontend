@@ -92,16 +92,31 @@ export type FinanceTransactionRow = {
 };
 
 export type AnalyticsPayload = {
-  requestsPerDay: Array<{ day: string; requestCount: number }>;
-  peakHours: Array<{ hourOfDay: number; requestCount: number }>;
-  issueCategoryBreakdown: Array<{ issueCategory: string; requestCount: number }>;
-  technicianUtilization: Array<{
+  totalTechnicians: number;
+  totalRequests: number;
+  activeUsers: number;
+  revenue: number;
+  requestsOverTime: Array<{ date: string; count: number }>;
+  serviceDistribution: Array<{ name: string; value: number; color?: string }>;
+  requestsPerDay?: Array<{ day: string; requestCount: number }>;
+  peakHours?: Array<{ hourOfDay: number; requestCount: number }>;
+  issueCategoryBreakdown?: Array<{ issueCategory: string; requestCount: number }>;
+  technicianUtilization?: Array<{
     technicianId: number;
     technicianName: string;
     activeRequests: number;
     totalAssigned: number;
     utilizationRate: number;
   }>;
+};
+
+export type AdminNotificationRow = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  is_read: boolean | number;
+  created_at: string;
 };
 
 export type ComplaintRow = {
@@ -149,7 +164,7 @@ export async function markAdminRequestHighPriority(payload: { requestId: number;
 }
 
 export async function closeAdminRequest(payload: { requestId: number; status?: string; reason?: string }) {
-  const { data } = await adminApi.post("/close", payload);
+  const { data } = await adminApi.post("/requests/close", payload);
   return data;
 }
 
@@ -268,6 +283,43 @@ export async function broadcastNotification(payload: {
   message: string;
   technicianIds?: number[];
 }) {
-  const { data } = await adminApi.post("/notifications/broadcast", payload);
+  if (payload.type === "technician") {
+    const { data } = await adminApi.post("/notifications/technician", payload);
+    return data;
+  }
+  if (payload.type === "emergency") {
+    const { data } = await adminApi.post("/notifications/emergency", payload);
+    return data;
+  }
+  const { data } = await adminApi.post("/notifications/system", payload);
+  return data;
+}
+
+export async function sendSystemAnnouncement(payload: { title: string; message: string }) {
+  const { data } = await adminApi.post("/notifications/system", payload);
+  return data;
+}
+
+export async function sendTechnicianBroadcast(payload: {
+  title: string;
+  message: string;
+  technicianIds: number[];
+}) {
+  const { data } = await adminApi.post("/notifications/technician", payload);
+  return data;
+}
+
+export async function sendEmergencyMessage(payload: { title: string; message: string }) {
+  const { data } = await adminApi.post("/notifications/emergency", payload);
+  return data;
+}
+
+export async function getAdminNotifications(params: { limit?: number; offset?: number } = {}) {
+  const { data } = await adminApi.get<AdminNotificationRow[]>("/notifications", { params });
+  return data;
+}
+
+export async function deleteAdminNotification(id: number) {
+  const { data } = await adminApi.delete(`/notifications/${id}`);
   return data;
 }

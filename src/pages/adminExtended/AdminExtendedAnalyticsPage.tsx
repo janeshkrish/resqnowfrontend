@@ -28,6 +28,28 @@ export default function AdminExtendedAnalyticsPage() {
 
   const chartData = analyticsQuery.data;
 
+  const requestsPerDayData = useMemo(() => {
+    if (chartData?.requestsPerDay && chartData.requestsPerDay.length > 0) {
+      return chartData.requestsPerDay;
+    }
+    return (chartData?.requestsOverTime || []).map((item) => ({
+      day: item.date,
+      requestCount: item.count,
+    }));
+  }, [chartData?.requestsPerDay, chartData?.requestsOverTime]);
+
+  const peakHoursData = chartData?.peakHours || [];
+
+  const issueCategoryBreakdownData = useMemo(() => {
+    if (chartData?.issueCategoryBreakdown && chartData.issueCategoryBreakdown.length > 0) {
+      return chartData.issueCategoryBreakdown;
+    }
+    return (chartData?.serviceDistribution || []).map((item) => ({
+      issueCategory: item.name,
+      requestCount: item.value,
+    }));
+  }, [chartData?.issueCategoryBreakdown, chartData?.serviceDistribution]);
+
   const utilizationData = useMemo(
     () =>
       (chartData?.technicianUtilization || [])
@@ -60,7 +82,7 @@ export default function AdminExtendedAnalyticsPage() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Requests Per Day</h2>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData.requestsPerDay}>
+                <LineChart data={requestsPerDayData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
@@ -75,7 +97,7 @@ export default function AdminExtendedAnalyticsPage() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Peak Hours</h2>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData.peakHours}>
+                <BarChart data={peakHoursData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="hourOfDay" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
@@ -92,7 +114,7 @@ export default function AdminExtendedAnalyticsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={chartData.issueCategoryBreakdown}
+                    data={issueCategoryBreakdownData}
                     dataKey="requestCount"
                     nameKey="issueCategory"
                     innerRadius={70}
@@ -100,7 +122,7 @@ export default function AdminExtendedAnalyticsPage() {
                     paddingAngle={3}
                     label
                   >
-                    {chartData.issueCategoryBreakdown.map((_, index) => (
+                    {issueCategoryBreakdownData.map((_, index) => (
                       <Cell key={`issue-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

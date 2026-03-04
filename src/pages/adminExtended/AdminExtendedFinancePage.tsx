@@ -153,19 +153,22 @@ export default function AdminExtendedFinancePage() {
       {
         key: "status",
         header: "Status",
-        render: (row: FinanceTransactionRow) => (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
-              String(row.status || "").toLowerCase() === "completed"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : String(row.status || "").toLowerCase() === "pending"
-                  ? "border-amber-200 bg-amber-50 text-amber-700"
-                  : "border-slate-200 bg-slate-50 text-slate-700"
-            }`}
-          >
-            {row.status}
-          </span>
-        ),
+        render: (row: FinanceTransactionRow) => {
+          const status = String(row.status || "").toLowerCase();
+          const className =
+            status === "completed"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : status === "pending" || status === "processing"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : status === "cancelled"
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : "border-slate-200 bg-slate-50 text-slate-700";
+          return (
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>
+              {row.status}
+            </span>
+          );
+        },
       },
       {
         key: "date",

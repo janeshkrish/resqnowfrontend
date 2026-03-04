@@ -1,177 +1,112 @@
-import { Component, type ErrorInfo, type ReactNode, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { adminExtendedApiRequest } from "./api/adminExtendedApi";
-import { AdminExtendedShell } from "./components/AdminExtendedShell";
+import {
+  Activity,
+  BadgeDollarSign,
+  CircleCheckBig,
+  Clock3,
+  CreditCard,
+  UsersRound,
+} from "lucide-react";
+import MetricCard from "./components/MetricCard";
+import LoadingSpinner from "./components/LoadingSpinner";
+import { getDashboardMetrics } from "./api/adminExtendedApi";
 
-type DashboardMetrics = {
-  activeRequestsCount: number;
-  availableTechniciansCount: number;
-  completedToday: number;
-  avgResponseTime: number;
-  todayRevenue: number;
-  pendingPayments: number;
-};
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
-type DashboardMetricsPayload = Partial<DashboardMetrics> & {
-  metrics?: Partial<DashboardMetrics> | null;
-  data?: {
-    metrics?: Partial<DashboardMetrics> | null;
-  } | null;
-  dashboardMetrics?: Partial<DashboardMetrics> | null;
-};
-
-const metricLabels: Record<keyof DashboardMetrics, string> = {
-  activeRequestsCount: "Active Requests",
-  availableTechniciansCount: "Available Technicians",
-  completedToday: "Completed Today",
-  avgResponseTime: "Avg Response (min)",
-  todayRevenue: "Today Revenue",
-  pendingPayments: "Pending Payments",
-};
-
-const metricKeys = Object.keys(metricLabels) as Array<keyof DashboardMetrics>;
-
-const defaultMetrics: DashboardMetrics = {
-  activeRequestsCount: 0,
-  availableTechniciansCount: 0,
-  completedToday: 0,
-  avgResponseTime: 0,
-  todayRevenue: 0,
-  pendingPayments: 0,
-};
-
-const toSafeNumber = (value: unknown): number => {
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-// Normalize API shape so rendering never depends on unstable backend payloads.
-const normalizeDashboardMetrics = (rawData: unknown): DashboardMetrics => {
-  const payload = (rawData ?? null) as DashboardMetricsPayload | null;
-
-  // Optional chaining keeps this safe when any wrapper level is missing.
-  const metricSource =
-    payload?.metrics ??
-    payload?.data?.metrics ??
-    payload?.dashboardMetrics ??
-    payload ??
-    {};
-
-  return {
-    activeRequestsCount: toSafeNumber(metricSource.activeRequestsCount),
-    availableTechniciansCount: toSafeNumber(metricSource.availableTechniciansCount),
-    completedToday: toSafeNumber(metricSource.completedToday),
-    avgResponseTime: toSafeNumber(metricSource.avgResponseTime),
-    todayRevenue: toSafeNumber(metricSource.todayRevenue),
-    pendingPayments: toSafeNumber(metricSource.pendingPayments),
-  };
-};
-
-type DashboardMetricCardProps = {
-  label?: string;
-  value?: number;
-};
-
-function DashboardMetricCard({ label, value }: DashboardMetricCardProps) {
-  // Guard props so the card always renders valid JSX even with malformed input.
-  const safeLabel = typeof label === "string" && label.trim() ? label : "Unknown Metric";
-  const safeValue = Number.isFinite(value ?? Number.NaN) ? Number(value) : 0;
-
+function DashboardSkeleton() {
   return (
-    <article style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12 }}>
-      <h3 style={{ marginTop: 0 }}>{safeLabel}</h3>
-      <p style={{ fontSize: 24, margin: 0 }}>{safeValue.toLocaleString()}</p>
-    </article>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={`metric-skeleton-${index}`}
+          className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-white"
+        />
+      ))}
+    </div>
   );
-}
-
-type DashboardErrorBoundaryState = {
-  hasError: boolean;
-};
-
-class DashboardErrorBoundary extends Component<{ children: ReactNode }, DashboardErrorBoundaryState> {
-  public state: DashboardErrorBoundaryState = { hasError: false };
-
-  public static getDerivedStateFromError(): DashboardErrorBoundaryState {
-    return { hasError: true };
-  }
-
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Admin extended dashboard render failure:", error, errorInfo);
-  }
-
-  public render() {
-    if (this.state.hasError) {
-      return (
-        <p role="alert" style={{ color: "#b00020" }}>
-          Dashboard widgets failed to render. Please refresh and try again.
-        </p>
-      );
-    }
-
-    return this.props.children;
-  }
 }
 
 export default function AdminExtendedDashboardPage() {
-  const metricsQuery = useQuery({
-    queryKey: ["adminExtended", "dashboard"],
-    queryFn: () => adminExtendedApiRequest<unknown>("/dashboard"),
+  const dashboardQuery = useQuery({
+    queryKey: ["admin", "dashboard"],
+    queryFn: getDashboardMetrics,
   });
 
-  const metrics = useMemo(
-    () => (metricsQuery.data == null ? defaultMetrics : normalizeDashboardMetrics(metricsQuery.data)),
-    [metricsQuery.data]
-  );
-
-  const metricItems = useMemo(
-    () =>
-      metricKeys.map((key) => ({
-        key,
-        label: metricLabels[key],
-        value: metrics[key],
-      })),
-    [metrics]
-  );
-
-  const errorMessage =
-    metricsQuery.error instanceof Error
-      ? metricsQuery.error.message
-      : "Failed to load dashboard metrics.";
+  const metrics = dashboardQuery.data;
 
   return (
-    <AdminExtendedShell title="Admin Extended Dashboard" subtitle="Read-only pilot metrics">
-      {metricsQuery.isPending ? <p>Loading dashboard metrics...</p> : null}
-      {metricsQuery.isError ? (
-        <div role="alert" style={{ color: "#b00020" }}>
-          <p style={{ marginBottom: 8 }}>{errorMessage}</p>
-          <button type="button" onClick={() => void metricsQuery.refetch()}>
+    <section className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Operations Dashboard</h1>
+        <p className="text-sm text-slate-500">
+          Live admin metrics from request, technician, and payment services.
+        </p>
+      </header>
+
+      {dashboardQuery.isLoading ? <DashboardSkeleton /> : null}
+
+      {dashboardQuery.isError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p>{(dashboardQuery.error as Error).message}</p>
+          <button
+            type="button"
+            onClick={() => void dashboardQuery.refetch()}
+            className="mt-3 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white"
+          >
             Retry
           </button>
         </div>
       ) : null}
 
-      {!metricsQuery.isPending && !metricsQuery.isError ? (
-        <DashboardErrorBoundary>
-          {metricsQuery.data == null ? (
-            // Explicit empty state for null/undefined API responses.
-            <p>No dashboard data is available right now.</p>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {metricItems.map((item) => (
-                <DashboardMetricCard key={item.key} label={item.label} value={item.value} />
-              ))}
-            </div>
-          )}
-        </DashboardErrorBoundary>
+      {!dashboardQuery.isLoading && metrics ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <MetricCard
+            title="Active Requests"
+            value={metrics.activeRequests.toLocaleString()}
+            icon={<Activity className="h-4 w-4" />}
+            accent="blue"
+          />
+          <MetricCard
+            title="Available Technicians"
+            value={metrics.availableTechnicians.toLocaleString()}
+            icon={<UsersRound className="h-4 w-4" />}
+            accent="teal"
+          />
+          <MetricCard
+            title="Completed Today"
+            value={metrics.completedToday.toLocaleString()}
+            icon={<CircleCheckBig className="h-4 w-4" />}
+            accent="emerald"
+          />
+          <MetricCard
+            title="Average Response Time"
+            value={`${metrics.avgResponseTime.toFixed(1)} min`}
+            icon={<Clock3 className="h-4 w-4" />}
+            accent="amber"
+          />
+          <MetricCard
+            title="Today's Revenue"
+            value={formatCurrency(metrics.todayRevenue)}
+            icon={<BadgeDollarSign className="h-4 w-4" />}
+            accent="rose"
+          />
+          <MetricCard
+            title="Pending Payments"
+            value={metrics.pendingPayments.toLocaleString()}
+            icon={<CreditCard className="h-4 w-4" />}
+            accent="slate"
+          />
+        </div>
       ) : null}
-    </AdminExtendedShell>
+
+      {!dashboardQuery.isLoading && !dashboardQuery.isError && !metrics ? (
+        <LoadingSpinner label="No dashboard data found." />
+      ) : null}
+    </section>
   );
 }
-

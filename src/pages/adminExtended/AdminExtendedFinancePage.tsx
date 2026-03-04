@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+﻿import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertOctagon, Download, FileSearch, Landmark, ReceiptIndianRupee } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import DataTable from "./components/DataTable";
 import MetricCard from "./components/MetricCard";
 import Modal from "./components/Modal";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import {
   exportFinanceCsv,
   getFinanceAuditLogs,
@@ -26,6 +28,7 @@ const formatCurrency = (value: number) =>
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
 export default function AdminExtendedFinancePage() {
+  const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -40,6 +43,33 @@ export default function AdminExtendedFinancePage() {
     }, 350);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    // Keep finance views synced after request/payment status changes.
+    const refreshFinance = () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "finance"] });
+    };
+
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket: Socket = io(socketBaseUrl, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+      auth: { token: getAdminToken() || undefined },
+    });
+
+    socket.on("admin:payment_update", refreshFinance);
+    socket.on("admin:request_status_updated", refreshFinance);
+
+    const fallbackRefreshId = window.setInterval(refreshFinance, 60000);
+
+    return () => {
+      window.clearInterval(fallbackRefreshId);
+      socket.off("admin:payment_update", refreshFinance);
+      socket.off("admin:request_status_updated", refreshFinance);
+      socket.disconnect();
+    };
+  }, [queryClient]);
 
   const summaryQuery = useQuery({
     queryKey: ["admin", "finance", "summary"],
@@ -93,6 +123,17 @@ export default function AdminExtendedFinancePage() {
         key: "transactionId",
         header: "Transaction ID",
         render: (row: FinanceTransactionRow) => <span className="font-semibold text-slate-900">#{row.transactionId}</span>,
+      },
+      {
+        key: "requestId",
+        header: "REQUEST ID",
+        render: (row: FinanceTransactionRow) => {
+          const requestId = Number(row.requestId);
+          if (!Number.isInteger(requestId) || requestId <= 0) {
+            return "—";
+          }
+          return <span className="font-semibold text-slate-900">#{requestId}</span>;
+        },
       },
       {
         key: "user",
@@ -251,7 +292,7 @@ export default function AdminExtendedFinancePage() {
           {(flaggedQuery.data?.data || []).map((item) => (
             <div key={`flag-${item.transactionId}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
               <p className="font-semibold text-slate-900">
-                #{item.transactionId} � {formatCurrency(item.amount)}
+                #{item.transactionId} • {formatCurrency(item.amount)}
               </p>
               <p className="text-slate-600">
                 {item.user} / {item.technician}
@@ -288,3 +329,4 @@ export default function AdminExtendedFinancePage() {
     </section>
   );
 }
+

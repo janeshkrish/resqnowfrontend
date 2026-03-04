@@ -83,6 +83,7 @@ export type FinanceSummary = {
 
 export type FinanceTransactionRow = {
   transactionId: number;
+  requestId?: number | null;
   user: string;
   technician: string;
   amount: number;

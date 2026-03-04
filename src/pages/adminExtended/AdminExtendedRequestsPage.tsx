@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, CircleX, ShieldAlert, UserPlus } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import DataTable from "./components/DataTable";
 import Modal from "./components/Modal";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import {
   AdminRequestRow,
   assignAdminRequest,
@@ -21,6 +23,9 @@ const statusBadgeClass: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   assigned: "bg-blue-50 text-blue-700 border-blue-200",
   accepted: "bg-blue-50 text-blue-700 border-blue-200",
+  processing: "bg-violet-50 text-violet-700 border-violet-200",
+  "in progress": "bg-cyan-50 text-cyan-700 border-cyan-200",
+  in_progress: "bg-cyan-50 text-cyan-700 border-cyan-200",
   "in-progress": "bg-cyan-50 text-cyan-700 border-cyan-200",
   completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
   cancelled: "bg-rose-50 text-rose-700 border-rose-200",
@@ -57,6 +62,33 @@ export default function AdminExtendedRequestsPage() {
     }, 350);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    // Keep requests table synced after server-side status updates.
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "requests"] });
+    };
+
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket: Socket = io(socketBaseUrl, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+      auth: { token: getAdminToken() || undefined },
+    });
+
+    socket.on("admin:request_status_updated", refresh);
+    socket.on("admin:analytics_update", refresh);
+
+    const fallbackRefreshId = window.setInterval(refresh, 45000);
+
+    return () => {
+      window.clearInterval(fallbackRefreshId);
+      socket.off("admin:request_status_updated", refresh);
+      socket.off("admin:analytics_update", refresh);
+      socket.disconnect();
+    };
+  }, [queryClient]);
 
   const requestsQuery = useQuery({
     queryKey: ["admin", "requests", page, PAGE_LIMIT, search, statusFilter, priorityFilter],
@@ -302,7 +334,8 @@ export default function AdminExtendedRequestsPage() {
           <option value="pending">Pending</option>
           <option value="assigned">Assigned</option>
           <option value="accepted">Accepted</option>
-          <option value="in-progress">In Progress</option>
+          <option value="processing">Processing</option>
+          <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>

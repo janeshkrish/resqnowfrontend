@@ -17,7 +17,7 @@ import LoadingAnimation from "@/components/LoadingAnimation";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { App as CapacitorApp } from '@capacitor/app';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from "react";
 import { setupGlobalErrorHandlers } from "./lib/globalErrors"; // install once at startup
 
 // Technician pages
@@ -87,6 +87,10 @@ import MapPage from "./pages/MapPage";
 
 const queryClient = new QueryClient();
 type AppNavigateEventDetail = { path?: string; replace?: boolean; state?: unknown };
+
+const adminExtendedRouteFallback = (
+  <div className="p-4 text-sm text-muted-foreground">Loading admin tools...</div>
+);
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -211,7 +215,8 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-          <BrowserRouter>
+          {/* v7_startTransition avoids sync-suspend crashes during lazy route navigation. */}
+          <BrowserRouter future={{ v7_startTransition: true }}>
             <AppRuntimeBridge />
             <ScrollToTop />
             <AdminAuthProvider>
@@ -319,9 +324,24 @@ const App = () => {
 
                           {/* Admin Extended Routes */}
                           {adminExtendedLazyRoutes.map((route, i) => (
-                            <Route key={`extended-${i}`} path={route.path} element={<AdminProtectedRoute>{route.element}</AdminProtectedRoute>}>
+                            <Route
+                              key={`extended-${i}`}
+                              path={route.path}
+                              element={
+                                <AdminProtectedRoute>
+                                  <Suspense fallback={adminExtendedRouteFallback}>{route.element ?? null}</Suspense>
+                                </AdminProtectedRoute>
+                              }
+                            >
                               {route.children?.map((child, j) => (
-                                <Route key={`extended-child-${j}`} index={child.index} path={child.path} element={child.element} />
+                                <Route
+                                  key={`extended-child-${j}`}
+                                  index={child.index}
+                                  path={child.path}
+                                  element={
+                                    <Suspense fallback={adminExtendedRouteFallback}>{child.element ?? null}</Suspense>
+                                  }
+                                />
                               ))}
                             </Route>
                           ))}

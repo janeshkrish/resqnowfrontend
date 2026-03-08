@@ -32,8 +32,8 @@ export const useTechnicianAuth = () => {
     checkTechnicianAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const technicianData = await technicianAuthService.login(email, password);
+  const login = async (email: string, password: string, options?: { signal?: AbortSignal }) => {
+    const technicianData = await technicianAuthService.login(email, password, options);
     setTechnician(technicianData);
     localStorage.setItem("resqnow_technician", JSON.stringify(technicianData));
     return technicianData;

@@ -94,8 +94,15 @@ export const technicianAuthService = {
       }
     );
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const msg = body.error || "Login failed.";
+      const body = await res.json().catch(() => ({} as Record<string, unknown>));
+      const responseStatus = String(body.status || "").trim().toLowerCase();
+      let msg = String(body.error || "").trim();
+      if (!msg && res.status === 403 && responseStatus === "pending_approval") {
+        msg = "Your technician account is pending admin approval. Please wait until your account is approved.";
+      }
+      if (!msg) {
+        msg = "Login failed.";
+      }
       throw new Error(msg);
     }
     const { token, technician } = await res.json();

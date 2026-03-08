@@ -60,7 +60,7 @@ export interface TechnicianAuthContextType {
   isAuthenticated: boolean;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<any>;
+  login: (email: string, password: string, options?: { signal?: AbortSignal }) => Promise<any>;
   register: (data: any) => Promise<any>;
   approveTechnician: (technicianId: string) => Promise<boolean>;
   rejectTechnician: (technicianId: string) => Promise<boolean>;

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SERVICE_CATALOG } from "@/config/serviceCatalog";
 import {
     normalizePricingConfigForApi,
     normalizeSpecialtiesForApi,
@@ -118,21 +119,30 @@ const STEPS = [
     { id: 6, title: "Finish", subtitle: "Submit" },
 ];
 
-const ALL_SERVICES = [
-    { id: "Tyre / Puncture Repair", label: "Flat Tire", icon: AlertTriangle, desc: "Tire change" },
-    { id: "Tubeless Tyre Repair", label: "Tubeless", icon: AlertTriangle, desc: "Plug/Patch" },
-    { id: "Battery Jump Start", label: "Jumpstart", icon: Zap, desc: "Dead battery" },
-    { id: "Battery Replacement", label: "Battery", icon: Zap, desc: "New battery" },
-    { id: "Towing Assistance", label: "Towing", icon: Truck, desc: "Recovery" },
-    { id: "Fuel Delivery", label: "Fuel", icon: Fuel, desc: "Petrol/Diesel" },
-    { id: "General Servicing", label: "Mechanic", icon: Wrench, desc: "General repairs" },
-    { id: "Brake Service", label: "Brakes", icon: Wrench, desc: "Pads & Discs" },
-    { id: "Electrical Repair", label: "Electrical", icon: Zap, desc: "Wiring" },
-    { id: "Engine Repair", label: "Engine", icon: Wrench, desc: "Diagnostics" },
-    { id: "Accident Repair", label: "Accident", icon: AlertTriangle, desc: "Recovery" },
-    { id: "Lockout Assistance", label: "Lockout", icon: Key, desc: "Keys locked" },
-    { id: "EV Assistance", label: "EV Help", icon: Zap, desc: "Charging" },
-];
+const SERVICE_VISUALS: Record<string, { icon: any; desc: string }> = {
+    towing: { icon: Truck, desc: "Vehicle towing" },
+    "flat-tire": { icon: AlertTriangle, desc: "Tire repair" },
+    battery: { icon: Zap, desc: "Battery jumpstart" },
+    mechanical: { icon: Wrench, desc: "Mechanical support" },
+    fuel: { icon: Fuel, desc: "Emergency fuel" },
+    lockout: { icon: Key, desc: "Vehicle unlock" },
+    winching: { icon: Truck, desc: "Vehicle recovery" },
+    "ev-charging": { icon: Zap, desc: "Portable charging" },
+};
+
+const ALL_SERVICES = SERVICE_CATALOG
+    .filter((service) => service.id !== "other")
+    .map((service) => ({
+        id: service.id,
+        label: service.name,
+        icon: SERVICE_VISUALS[service.id]?.icon || Wrench,
+        desc: SERVICE_VISUALS[service.id]?.desc || service.description,
+    }));
+
+const SERVICE_NAME_BY_ID = ALL_SERVICES.reduce<Record<string, string>>((acc, service) => {
+    acc[service.id] = service.label;
+    return acc;
+}, {});
 
 const VEHICLES = [
     { id: "Two-Wheeler", label: "M/Cycle", icon: Car },
@@ -196,8 +206,9 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
 };
 
 // --- SERVICE CONFIGURATION WITH FULL LOGIC ---
-const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: any) => {
+const ServiceConfigCard = ({ serviceId, index, register, watch, setValue }: any) => {
     const prefix = `pricing_config.${index}`;
+    const serviceLabel = SERVICE_NAME_BY_ID[serviceId] || serviceId;
     const getFieldName = (field: string) => `${prefix}.${field}`;
     const renderSectionHeader = (title: string) => <div className="font-bold text-xs mt-3 mb-2 text-muted-foreground/80 uppercase">{title}</div>;
 
@@ -218,13 +229,13 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
         <Card className="mb-4 border shadow-sm">
             <CardHeader className="bg-muted py-2 px-4 border-b flex flex-row items-center gap-2">
                 <Wrench className="w-4 h-4 text-primary" />
-                <CardTitle className="text-sm font-bold text-foreground">{serviceName}</CardTitle>
+                <CardTitle className="text-sm font-bold text-foreground">{serviceLabel}</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-3">
-                <input type="hidden" {...register(getFieldName("service_name"))} value={serviceName} />
+                <input type="hidden" {...register(getFieldName("service_name"))} value={serviceId} />
 
                 {/* --- 1. TYRE / PUNCTURE REPAIR --- */}
-                {serviceName === "Tyre / Puncture Repair" && (
+                {serviceId === "flat-tire" && (
                     <>
                         <div>
                             {renderSectionHeader("Includes")}
@@ -250,7 +261,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 )}
 
                 {/* --- 2. TUBELESS REPAIR --- */}
-                {serviceName === "Tubeless Tyre Repair" && (
+                {serviceId === "__tubeless-legacy__" && (
                     <>
                         <div>
                             {renderSectionHeader("Type")}
@@ -271,7 +282,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 )}
 
                 {/* --- 3. JUMPSTART --- */}
-                {serviceName === "Battery Jump Start" && (
+                {serviceId === "battery" && (
                     <div className="grid grid-cols-2 gap-3">
                         <div><label className="text-xs font-semibold">Service Fee (₹)</label><Input className="h-9" type="number" {...register(getFieldName("service_charge"))} /></div>
                         <div><label className="text-xs font-semibold">Visit Charge (₹)</label><Input className="h-9" type="number" {...register(getFieldName("visit_charge"))} /></div>
@@ -279,7 +290,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 )}
 
                 {/* --- 5. TOWING --- */}
-                {serviceName === "Towing Assistance" && (
+                {serviceId === "towing" && (
                     <>
                         <div className="grid grid-cols-3 gap-2">
                             <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Base (₹)</label><Input className="h-8" type="number" {...register(getFieldName("base_charge"))} /></div>
@@ -297,7 +308,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 )}
 
                 {/* --- 6. FUEL --- */}
-                {serviceName === "Fuel Delivery" && (
+                {serviceId === "fuel" && (
                     <div className="grid grid-cols-2 gap-3">
                         <div><label className="text-xs font-semibold">Delivery Fee (₹)</label><Input className="h-9" type="number" {...register(getFieldName("delivery_charge"))} /></div>
                         <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded flex items-center">Fuel cost charged at actuals.</div>
@@ -305,7 +316,7 @@ const ServiceConfigCard = ({ serviceName, index, register, watch, setValue }: an
                 )}
 
                 {/* --- DEFAULT / GENERIC (Used for General Servicing, etc) --- */}
-                {!["Tyre / Puncture Repair", "Tubeless Tyre Repair", "Battery Jump Start", "Towing Assistance", "Fuel Delivery"].includes(serviceName) && (
+                {!["flat-tire", "battery", "towing", "fuel"].includes(serviceId) && (
                     <div className="grid grid-cols-2 gap-3">
                         <div><label className="text-xs font-semibold">Min Labour (₹)</label><Input type="number" {...register(getFieldName("labour_min"))} className="h-9" /></div>
                         <div><label className="text-xs font-semibold">Max Labour (₹)</label><Input type="number" {...register(getFieldName("labour_max"))} className="h-9" /></div>
@@ -798,7 +809,7 @@ const TechnicianSignupWizard = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    {selectedServices.map((s, i) => <div className="[&>div]:rounded-[1.5rem] [&>div]:shadow-sm [&>div]:border-border/60 [&_input]:h-11 [&_input]:rounded-lg [&_input]:bg-muted/50 [&_input]:border-transparent [&_input:focus]:border-primary" key={s}><ServiceConfigCard serviceName={s} index={i} register={register} watch={watch} setValue={setValue} /></div>)}
+                                    {selectedServices.map((s, i) => <div className="[&>div]:rounded-[1.5rem] [&>div]:shadow-sm [&>div]:border-border/60 [&_input]:h-11 [&_input]:rounded-lg [&_input]:bg-muted/50 [&_input]:border-transparent [&_input:focus]:border-primary" key={s}><ServiceConfigCard serviceId={s} index={i} register={register} watch={watch} setValue={setValue} /></div>)}
                                 </div>
                             </div>
                         )}

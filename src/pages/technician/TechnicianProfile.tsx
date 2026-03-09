@@ -55,7 +55,8 @@ const TechnicianProfile = () => {
     // Settings
     const [settingsState, setSettingsState] = useState({
         appearance: { theme: "system" as ThemeMode },
-        notifications: { email_notifications: true, push_notifications: true }
+        notifications: { email_notifications: true, push_notifications: true },
+        navigation: { mobile_bottom_nav_enabled: true, auto_hide_bottom_nav: true }
     });
 
     const hydrateForm = useCallback((source: any) => {
@@ -95,7 +96,20 @@ const TechnicianProfile = () => {
             if (settingsRes && settingsRes.ok) {
                 const s = await settingsRes.json();
                 if (s) {
-                    setSettingsState(s);
+                    setSettingsState((prev) => ({
+                        appearance: {
+                            ...prev.appearance,
+                            ...(s.appearance || {})
+                        },
+                        notifications: {
+                            ...prev.notifications,
+                            ...(s.notifications || {})
+                        },
+                        navigation: {
+                            ...prev.navigation,
+                            ...(s.navigation || {})
+                        }
+                    }));
                     if (s.appearance?.theme) setTheme(s.appearance.theme);
                 }
             }
@@ -146,7 +160,13 @@ const TechnicianProfile = () => {
 
     const updateSettings = async (patch: any) => {
         const prev = settingsState;
-        const next = { ...prev, ...patch, appearance: { ...prev.appearance, ...(patch.appearance || {}) }, notifications: { ...prev.notifications, ...(patch.notifications || {}) } };
+        const next = {
+            ...prev,
+            ...patch,
+            appearance: { ...prev.appearance, ...(patch.appearance || {}) },
+            notifications: { ...prev.notifications, ...(patch.notifications || {}) },
+            navigation: { ...prev.navigation, ...(patch.navigation || {}) }
+        };
         setSettingsState(next);
         if (patch.appearance?.theme) setTheme(patch.appearance.theme);
 
@@ -280,6 +300,31 @@ const TechnicianProfile = () => {
                             <Button variant={settingsState.appearance.theme === "system" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "system" } })} className="justify-start">
                                 <Globe className="w-4 h-4 mr-3" /> System Default
                             </Button>
+                        </div>
+                        <Separator />
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold">Show Bottom Navigation</Label>
+                                    <p className="text-xs text-muted-foreground">Enable the technician bottom nav bar.</p>
+                                </div>
+                                <Switch
+                                    checked={!!settingsState.navigation.mobile_bottom_nav_enabled}
+                                    onCheckedChange={(c) => updateSettings({ navigation: { mobile_bottom_nav_enabled: c } })}
+                                />
+                            </div>
+                            <Separator />
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-bold">Auto-hide Navigation</Label>
+                                    <p className="text-xs text-muted-foreground">Hide on scroll down and reveal on scroll up.</p>
+                                </div>
+                                <Switch
+                                    checked={!!settingsState.navigation.auto_hide_bottom_nav}
+                                    onCheckedChange={(c) => updateSettings({ navigation: { auto_hide_bottom_nav: c } })}
+                                    disabled={!settingsState.navigation.mobile_bottom_nav_enabled}
+                                />
+                            </div>
                         </div>
                     </div>
                 );

@@ -29,6 +29,7 @@ const TechnicianDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({ jobs: 0, earnings: 0, today: 0 });
   const [incomingJob, setIncomingJob] = useState<JobRequest | null>(null);
+  const [incomingJobUnavailable, setIncomingJobUnavailable] = useState(false);
 
   // Modals & Completion
   const [showJobModal, setShowJobModal] = useState(false);
@@ -44,6 +45,7 @@ const TechnicianDashboard = () => {
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
   const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
+  const JOB_TAKEN_MESSAGE = "This job has already been taken by another technician.";
 
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
@@ -52,6 +54,7 @@ const TechnicianDashboard = () => {
   const activeJobIdRef = useRef<string | null>(null);
   const activeJobStatusRef = useRef<string>("");
   const acceptedJobIdRef = useRef<string | null>(acceptedJobId);
+  const incomingJobRef = useRef<JobRequest | null>(incomingJob);
   const handledRouteJobRef = useRef<string | null>(null);
 
   const stopAlertSound = () => {
@@ -116,6 +119,10 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     acceptedJobIdRef.current = acceptedJobId || null;
   }, [acceptedJobId]);
+
+  useEffect(() => {
+    incomingJobRef.current = incomingJob;
+  }, [incomingJob]);
 
   useEffect(() => {
     const status = normalizeTechnicianStatus(activeJob?.status);
@@ -235,6 +242,7 @@ const TechnicianDashboard = () => {
       console.log("Job assigned directly!", jobData);
       stopAlertSound();
       setIncomingJob(null); // Clear offer if any
+      setIncomingJobUnavailable(false);
       const normalized = normalizeIncomingAssignedJob(jobData);
       setActiveJob(normalized);
       setShowJobModal(false);
@@ -282,21 +290,23 @@ const TechnicianDashboard = () => {
       }
 
       // Map offer payload to JobRequest interface expected by Modal
+      const offerLocation = offerData?.location || {};
       const jobRequest: JobRequest = {
         id: requestId,
-        customerName: offerData.customerName,
-        serviceType: offerData.serviceType,
-        vehicleType: offerData.vehicleType,
+        customerName: String(offerData?.customerName || "Customer"),
+        serviceType: String(offerData?.serviceType || offerData?.service_type || "Service"),
+        vehicleType: String(offerData?.vehicleType || offerData?.vehicle_type || "car"),
         location: {
-          lat: offerData.location.lat,
-          lng: offerData.location.lng,
-          address: offerData.address
+          lat: Number(offerLocation?.lat ?? offerData?.location_lat ?? 0),
+          lng: Number(offerLocation?.lng ?? offerData?.location_lng ?? 0),
+          address: String(offerData?.address || offerLocation?.address || "Location not available")
         },
-        distance: parseFloat(offerData.distance) || 0, // Ensure number
-        amount: offerData.amount != null && !Number.isNaN(Number(offerData.amount)) ? Number(offerData.amount) : 0
+        distance: parseFloat(String(offerData?.distance ?? 0)) || 0,
+        amount: offerData?.amount != null && !Number.isNaN(Number(offerData?.amount)) ? Number(offerData.amount) : 0
       };
       (jobRequest as any).eta = offerData.eta ?? null;
       setIncomingJob(jobRequest);
+      setIncomingJobUnavailable(false);
       setShowJobModal(true);
 
       // Play Siren - Use the loud siren ref defined earlier
@@ -310,9 +320,14 @@ const TechnicianDashboard = () => {
     // New: Listen for Revocations (Job Taken)
     socket.on("job:revoked", (data) => {
       console.log("Job Offer Revoked/Taken", data);
-      setIncomingJob((prev) => (prev && prev.id === data.requestId ? null : prev));
+      const revokedRequestId = String(data?.requestId || data?.id || "").trim();
+      if (!revokedRequestId) return;
+      const currentOffer = incomingJobRef.current;
+      if (!currentOffer || String(currentOffer.id) !== revokedRequestId) return;
       stopAlertSound();
-      toast.info("Job was taken by another technician.");
+      setIncomingJobUnavailable(true);
+      setShowJobModal(true);
+      toast.warning(JOB_TAKEN_MESSAGE);
     });
 
     // ... (rest of listeners)
@@ -461,6 +476,8 @@ const TechnicianDashboard = () => {
     return () => {
       socket.off("job:assigned", handleAssignedJob);
       socket.off("job_assigned", handleAssignedJob);
+      socket.off("job_offer");
+      socket.off("job:revoked");
       socket.off("job:status_update");
       socket.off("job:list_update");
       socket.off("dashboard:stats_update");
@@ -535,8 +552,16 @@ const TechnicianDashboard = () => {
         ...(body ? { body: JSON.stringify(body) } : {})
       });
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed");
+        let errData: any = {};
+        try {
+          errData = await res.json();
+        } catch {
+          errData = {};
+        }
+        const error = new Error(errData.error || errData.message || "Failed");
+        (error as any).status = res.status;
+        (error as any).code = errData.code || null;
+        throw error;
       }
       const data = await res.json();
 
@@ -547,7 +572,11 @@ const TechnicianDashboard = () => {
       }
       return data;
     } catch (e: any) {
-      toast.error(`Failed: ${e.message || "Unknown error"}`);
+      const statusCode = Number(e?.status || 0);
+      // 409 on accept is handled by the caller so we can keep modal state visible and disabled.
+      if (!(statusCode === 409 && status === "accepted")) {
+        toast.error(`Failed: ${e.message || "Unknown error"}`);
+      }
       throw e;
     }
   };
@@ -598,6 +627,7 @@ const TechnicianDashboard = () => {
 
       await refreshActiveJob();
       setIncomingJob(null);
+      setIncomingJobUnavailable(false);
       setShowJobModal(false);
 
       if (location.search || location.state) {
@@ -636,6 +666,8 @@ const TechnicianDashboard = () => {
       await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
       toast.success("Job Accepted!");
       setIncomingJob(null);
+      setIncomingJobUnavailable(false);
+      setShowJobModal(false);
       setAcceptedJobId(normalizedJobId);
 
       // Fix: Update activeJob state reliably even if incomingJob is null
@@ -659,7 +691,14 @@ const TechnicianDashboard = () => {
 
       await refreshActiveJob();
       startLocationTracking();
-    } catch (e) {
+    } catch (e: any) {
+      const statusCode = Number(e?.status || 0);
+      if (statusCode === 409) {
+        setIncomingJobUnavailable(true);
+        setShowJobModal(true);
+        toast.error(JOB_TAKEN_MESSAGE);
+        return;
+      }
       console.error(e);
     } finally {
       setIsJobActionLoading(false);
@@ -674,11 +713,25 @@ const TechnicianDashboard = () => {
       return;
     }
 
+    if (
+      incomingJobUnavailable &&
+      incomingJob &&
+      String(incomingJob.id) === normalizedJobId
+    ) {
+      stopAlertSound();
+      setIncomingJob(null);
+      setIncomingJobUnavailable(false);
+      setShowJobModal(false);
+      return;
+    }
+
     try {
       setIsJobActionLoading(true);
       stopAlertSound();
       await updateJobStatus("rejected", normalizedJobId);
       setIncomingJob(null);
+      setIncomingJobUnavailable(false);
+      setShowJobModal(false);
       if (acceptedJobId && acceptedJobId === normalizedJobId) {
         clearAcceptedJobId();
       }
@@ -1265,11 +1318,19 @@ const TechnicianDashboard = () => {
         ) : null}
 
         <TechnicianJobModal
-          isOpen={!!incomingJob}
+          isOpen={showJobModal && !!incomingJob}
           job={incomingJob}
           isProcessing={isJobActionLoading}
+          isUnavailable={incomingJobUnavailable}
+          unavailableMessage={JOB_TAKEN_MESSAGE}
           onAccept={handleAcceptJob}
           onReject={handleRejectJob}
+          onDismissUnavailable={(jobId) => {
+            if (!incomingJob || String(incomingJob.id) !== String(jobId)) return;
+            setIncomingJob(null);
+            setIncomingJobUnavailable(false);
+            setShowJobModal(false);
+          }}
         />
       </div>
 

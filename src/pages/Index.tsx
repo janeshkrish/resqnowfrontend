@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Hero from "@/components/Hero";
 import Services from "@/components/Services";
 import HowItWorks from "@/components/HowItWorks";
@@ -8,87 +8,32 @@ import TechnicianCTA from "@/components/TechnicianCTA";
 import Map from "@/components/Map";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
-import { MapPin, Search, ArrowRight, Bell, Briefcase, Download } from "lucide-react";
+import { MapPin, Search, ArrowRight, Bell, Briefcase, Download, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-}
+import { apiUrl } from "@/lib/api";
 
 const MobileDashboard = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isDownloadingApp, setIsDownloadingApp] = useState(false);
 
-  useEffect(() => {
-    // Chrome sometimes fires this before React mounts
-    if ((window as any).deferredPrompt) {
-      setDeferredPrompt((window as any).deferredPrompt);
-    }
-
-    const handleBeforeInstallPrompt = (event: Event) => {
-      // Guard preventDefault to avoid browser warnings on non-cancelable events.
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-      setDeferredPrompt(event as BeforeInstallPromptEvent);
-      (window as any).deferredPrompt = event;
-    };
-
-    const handleAppInstalled = () => {
-      setDeferredPrompt(null);
-      (window as any).deferredPrompt = null;
-      setIsStandalone(true);
-    };
-
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as { standalone?: boolean }).standalone === true;
-    setIsStandalone(standalone);
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) {
-      if (isStandalone) {
-        toast.info("ResQNow App is already installed on your device.");
-        return;
-      }
-
-      if (!window.isSecureContext) {
-        toast.error("Installation blocked: PWA requires HTTPS or localhost.", {
-          description: "If testing on a mobile device on your local network, you must use a secure tunnel or deploy to Netlify."
-        });
-        return;
-      }
-
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS) {
-        toast("Install ResQNow on iOS", {
-          description: "Tap the Share icon at the bottom of the screen and select 'Add to Home Screen'."
-        });
-      } else {
-        toast.error("Installation is not supported on this browser.");
-      }
-      return;
-    }
+  const handleDownloadAndroidApp = async () => {
+    if (isDownloadingApp) return;
+    setIsDownloadingApp(true);
+    const apkUrl = apiUrl("/api/public/android-app/download");
 
     try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === "accepted") {
-        setDeferredPrompt(null);
-        toast.success("App installed successfully!");
+      const probeRes = await fetch(apkUrl, { method: "HEAD" });
+      if (!probeRes.ok) {
+        toast.error("Android app package is not available yet.", {
+          description: "Please upload app-release.apk to the release folder.",
+        });
+        return;
       }
+      window.open(apkUrl, "_blank", "noopener,noreferrer");
     } catch (error) {
-      console.error("App install prompt failed:", error);
+      console.error("Android app download check failed:", error);
+      toast.error("Could not start Android app download.");
+    } finally {
+      setIsDownloadingApp(false);
     }
   };
 
@@ -146,17 +91,17 @@ const MobileDashboard = () => {
           <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-br from-emerald-700 to-teal-500 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(5,150,105,0.5)] relative overflow-hidden isolate">
             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-card dark:bg-slate-900 blur-[50px] opacity-20 rounded-full"></div>
 
-            <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">APP INSTALL</span>
-            <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Install<br />ResQNow</h2>
-            <p className="text-emerald-100 text-xs mb-6 font-medium max-w-[220px]">Get faster access and a smoother experience from your home screen.</p>
+            <span className="inline-block bg-white/20 text-white border-0 mb-3 backdrop-blur-md font-bold uppercase tracking-widest text-[10px] px-2 py-1 rounded-md">ANDROID APP</span>
+            <h2 className="font-black text-3xl mb-1 leading-tight text-white shadow-sm drop-shadow-md">Download<br />ResQNow App</h2>
+            <p className="text-emerald-100 text-xs mb-6 font-medium max-w-[220px]">Install the Android app for faster alerts and smoother live tracking.</p>
 
             <button
               type="button"
-              onClick={handleInstallApp}
+              onClick={handleDownloadAndroidApp}
               className="inline-flex items-center bg-card dark:bg-slate-900 text-emerald-700 px-5 py-2.5 rounded-full text-sm font-bold hover:scale-105 active:scale-95 transition-all shadow-[0_8px_16px_rgba(0,0,0,0.1)]"
             >
-              <Download className="mr-2 h-4 w-4" />
-              Install App
+              {isDownloadingApp ? <Download className="mr-2 h-4 w-4 animate-bounce" /> : <Smartphone className="mr-2 h-4 w-4" />}
+              Download Android App
             </button>
           </div>
 

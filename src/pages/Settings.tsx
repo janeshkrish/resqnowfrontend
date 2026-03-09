@@ -41,6 +41,10 @@ type UserSettings = {
     marketing_email: boolean
     push_alerts: boolean
   }
+  navigation: {
+    mobile_bottom_nav_enabled: boolean
+    auto_hide_bottom_nav: boolean
+  }
   privacy: {
     email_visibility: string
   }
@@ -55,6 +59,10 @@ const DEFAULT_USER_SETTINGS: UserSettings = {
     service_updates_email: true,
     marketing_email: true,
     push_alerts: false
+  },
+  navigation: {
+    mobile_bottom_nav_enabled: true,
+    auto_hide_bottom_nav: true
   },
   privacy: {
     email_visibility: "verified_only"
@@ -76,6 +84,10 @@ const mergeUserSettings = (
   notifications: {
     ...base.notifications,
     ...(patch?.notifications || {})
+  },
+  navigation: {
+    ...base.navigation,
+    ...(patch?.navigation || {})
   },
   privacy: {
     ...base.privacy,
@@ -191,14 +203,51 @@ const SettingsPage = () => {
                 Loading settings...
               </div>
             ) : (
-              <ThemeCustomizer
-                onThemeChange={(nextTheme) => updateSettings({
-                  appearance: {
-                    theme: nextTheme,
-                    force_dark_mode: nextTheme === "dark"
-                  }
-                })}
-              />
+              <div className="space-y-4">
+                <ThemeCustomizer
+                  onThemeChange={(nextTheme) => updateSettings({
+                    appearance: {
+                      theme: nextTheme,
+                      force_dark_mode: nextTheme === "dark"
+                    }
+                  })}
+                />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Navigation</CardTitle>
+                    <CardDescription>Control mobile bottom navigation behavior.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Show Bottom Navigation</Label>
+                        <p className="text-sm text-muted-foreground">Enable mobile bottom navigation bar.</p>
+                      </div>
+                      <Switch
+                        checked={!!settings.navigation.mobile_bottom_nav_enabled}
+                        onCheckedChange={(checked) => updateSettings({
+                          navigation: { mobile_bottom_nav_enabled: checked }
+                        })}
+                        disabled={settingsLoading || isSavingSettings}
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Auto-hide Navigation</Label>
+                        <p className="text-sm text-muted-foreground">Hide on scroll down and show on scroll up.</p>
+                      </div>
+                      <Switch
+                        checked={!!settings.navigation.auto_hide_bottom_nav}
+                        onCheckedChange={(checked) => updateSettings({
+                          navigation: { auto_hide_bottom_nav: checked }
+                        })}
+                        disabled={settingsLoading || isSavingSettings || !settings.navigation.mobile_bottom_nav_enabled}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </div>
         )

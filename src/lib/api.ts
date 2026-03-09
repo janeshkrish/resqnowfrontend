@@ -326,10 +326,10 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/users/send-otp" && method === "POST") return json({ message: "OTP sent successfully (demo mode)." });
   if (path === "/api/users/verify-otp" && method === "POST") return json({ token: DEMO_USER_TOKEN, user: ensureUserProfile({ email: body.email, name: body.name || "Demo User" }) });
   if (path === "/api/users/confirm-email" && method === "GET") return json({ message: "Email confirmed successfully (demo mode)." });
-  if (path === "/api/users/me/settings" && method === "GET") return json(readStore("resqnow_mock_user_settings", { appearance: { theme: "system", force_dark_mode: false }, notifications: { service_updates_email: true, marketing_email: true, push_alerts: false }, privacy: { email_visibility: "verified_only" } }));
+  if (path === "/api/users/me/settings" && method === "GET") return json(readStore("resqnow_mock_user_settings", { appearance: { theme: "system", force_dark_mode: false }, notifications: { service_updates_email: true, marketing_email: true, push_alerts: false }, navigation: { mobile_bottom_nav_enabled: true, auto_hide_bottom_nav: true }, privacy: { email_visibility: "verified_only" } }));
   if (path === "/api/users/me/settings" && (method === "PATCH" || method === "PUT")) {
-    const current = readStore("resqnow_mock_user_settings", { appearance: { theme: "system", force_dark_mode: false }, notifications: { service_updates_email: true, marketing_email: true, push_alerts: false }, privacy: { email_visibility: "verified_only" } });
-    const next = { ...current, ...body, appearance: { ...(current.appearance || {}), ...(body.appearance || {}) }, notifications: { ...(current.notifications || {}), ...(body.notifications || {}) }, privacy: { ...(current.privacy || {}), ...(body.privacy || {}) } };
+    const current = readStore("resqnow_mock_user_settings", { appearance: { theme: "system", force_dark_mode: false }, notifications: { service_updates_email: true, marketing_email: true, push_alerts: false }, navigation: { mobile_bottom_nav_enabled: true, auto_hide_bottom_nav: true }, privacy: { email_visibility: "verified_only" } });
+    const next = { ...current, ...body, appearance: { ...(current.appearance || {}), ...(body.appearance || {}) }, notifications: { ...(current.notifications || {}), ...(body.notifications || {}) }, navigation: { ...(current.navigation || {}), ...(body.navigation || {}) }, privacy: { ...(current.privacy || {}), ...(body.privacy || {}) } };
     writeStore("resqnow_mock_user_settings", next);
     return json({ settings: next });
   }
@@ -375,10 +375,10 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/technicians/me" && method === "GET") return json(getTechnicians()[0] || null);
   if (path === "/api/technicians/me/status" && method === "GET") return json({ is_active: true, success: true });
   if (path === "/api/technicians/me/status" && method === "PATCH") return json({ is_active: Boolean(body.active), success: true });
-  if (path === "/api/technicians/me/settings" && method === "GET") return json(readStore("resqnow_mock_tech_settings", { appearance: { theme: "system" }, notifications: { email_notifications: true, push_notifications: true } }));
+  if (path === "/api/technicians/me/settings" && method === "GET") return json(readStore("resqnow_mock_tech_settings", { appearance: { theme: "system" }, notifications: { email_notifications: true, push_notifications: true }, navigation: { mobile_bottom_nav_enabled: true, auto_hide_bottom_nav: true } }));
   if (path === "/api/technicians/me/settings" && (method === "PATCH" || method === "PUT")) {
-    const current = readStore("resqnow_mock_tech_settings", { appearance: { theme: "system" }, notifications: { email_notifications: true, push_notifications: true } });
-    const next = { ...current, ...body, appearance: { ...(current.appearance || {}), ...(body.appearance || {}) }, notifications: { ...(current.notifications || {}), ...(body.notifications || {}) } };
+    const current = readStore("resqnow_mock_tech_settings", { appearance: { theme: "system" }, notifications: { email_notifications: true, push_notifications: true }, navigation: { mobile_bottom_nav_enabled: true, auto_hide_bottom_nav: true } });
+    const next = { ...current, ...body, appearance: { ...(current.appearance || {}), ...(body.appearance || {}) }, notifications: { ...(current.notifications || {}), ...(body.notifications || {}) }, navigation: { ...(current.navigation || {}), ...(body.navigation || {}) } };
     writeStore("resqnow_mock_tech_settings", next);
     return json({ settings: next, ...next });
   }

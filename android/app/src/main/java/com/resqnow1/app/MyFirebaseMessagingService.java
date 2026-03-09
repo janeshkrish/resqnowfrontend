@@ -27,6 +27,8 @@ public class MyFirebaseMessagingService extends MessagingService {
     private static final String EVENT_JOB_REVOKED = "job:revoked";
     private static final String PAYLOAD_TYPE_EMERGENCY = "EMERGENCY_JOB";
     private static final String PAYLOAD_TYPE_REVOKED = "JOB_REVOKED";
+    private static final String ALERT_ACTION_ACCEPT = "accept";
+    private static final String ALERT_ACTION_REJECT = "reject";
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
@@ -137,7 +139,7 @@ public class MyFirebaseMessagingService extends MessagingService {
             // Best effort; direct notification cancellation already ran.
         }
 
-        AlertActivity.dismissActiveAlertForJob(jobId);
+        JobAlertActivity.dismissActiveAlertForJob(jobId);
     }
 
     private void postEmergencyFullScreenNotification(RemoteMessage remoteMessage, String jobId) {
@@ -146,10 +148,39 @@ public class MyFirebaseMessagingService extends MessagingService {
         int notificationId = resolveNotificationId(remoteMessage, jobId);
 
         Intent alertIntent = buildAlertIntent(remoteMessage, title, body, notificationId, jobId);
+        Intent acceptIntent = buildActionIntent(
+            remoteMessage,
+            title,
+            body,
+            notificationId,
+            jobId,
+            ALERT_ACTION_ACCEPT
+        );
+        Intent rejectIntent = buildActionIntent(
+            remoteMessage,
+            title,
+            body,
+            notificationId,
+            jobId,
+            ALERT_ACTION_REJECT
+        );
+
         PendingIntent fullScreenIntent = PendingIntent.getActivity(
             this,
             notificationId,
             alertIntent,
+            pendingIntentFlags()
+        );
+        PendingIntent acceptPendingIntent = PendingIntent.getActivity(
+            this,
+            notificationId + 1000,
+            acceptIntent,
+            pendingIntentFlags()
+        );
+        PendingIntent rejectPendingIntent = PendingIntent.getActivity(
+            this,
+            notificationId + 2000,
+            rejectIntent,
             pendingIntentFlags()
         );
 
@@ -165,6 +196,8 @@ public class MyFirebaseMessagingService extends MessagingService {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenIntent, true)
             .setContentIntent(fullScreenIntent)
+            .addAction(resolveSmallIcon(), "Accept", acceptPendingIntent)
+            .addAction(resolveSmallIcon(), "Reject", rejectPendingIntent)
             .setVibrate(new long[] { 0L, 500L, 250L, 500L, 250L, 500L });
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -224,14 +257,27 @@ public class MyFirebaseMessagingService extends MessagingService {
         int notificationId,
         String resolvedJobId
     ) {
-        Intent alertIntent = new Intent(this, AlertActivity.class);
+        Intent alertIntent = new Intent(this, JobAlertActivity.class);
         alertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        alertIntent.putExtra(AlertActivity.EXTRA_NOTIFICATION_ID, notificationId);
-        alertIntent.putExtra(AlertActivity.EXTRA_TITLE, title);
-        alertIntent.putExtra(AlertActivity.EXTRA_BODY, body);
-        alertIntent.putExtra(AlertActivity.EXTRA_JOB_ID, isBlank(resolvedJobId) ? resolveJobId(remoteMessage) : resolvedJobId);
-        alertIntent.putExtra(AlertActivity.EXTRA_DEEP_LINK_PATH, value(remoteMessage.getData(), "deepLinkPath"));
+        alertIntent.putExtra(JobAlertActivity.EXTRA_NOTIFICATION_ID, notificationId);
+        alertIntent.putExtra(JobAlertActivity.EXTRA_TITLE, title);
+        alertIntent.putExtra(JobAlertActivity.EXTRA_BODY, body);
+        alertIntent.putExtra(JobAlertActivity.EXTRA_JOB_ID, isBlank(resolvedJobId) ? resolveJobId(remoteMessage) : resolvedJobId);
+        alertIntent.putExtra(JobAlertActivity.EXTRA_DEEP_LINK_PATH, value(remoteMessage.getData(), "deepLinkPath"));
         return alertIntent;
+    }
+
+    private Intent buildActionIntent(
+        RemoteMessage remoteMessage,
+        String title,
+        String body,
+        int notificationId,
+        String resolvedJobId,
+        String action
+    ) {
+        Intent actionIntent = buildAlertIntent(remoteMessage, title, body, notificationId, resolvedJobId);
+        actionIntent.putExtra(JobAlertActivity.EXTRA_ALERT_ACTION, action);
+        return actionIntent;
     }
 
     private int pendingIntentFlags() {

@@ -52,6 +52,7 @@ const TechnicianDashboard = () => {
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const confirmationAudioContextRef = useRef<AudioContext | null>(null);
   const isOnlineRef = useRef(false);
   const activeJobIdRef = useRef<string | null>(null);
   const activeJobStatusRef = useRef<string>("");
@@ -67,6 +68,49 @@ const TechnicianDashboard = () => {
       delete (window as any).currentSiren;
     } catch {
       // no-op
+    }
+  };
+
+  const playAlertSound = () => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch((error) => {
+      console.error("Siren play failed", error);
+    });
+    (window as any).currentSiren = audioRef.current;
+  };
+
+  const playAcceptConfirmationSound = () => {
+    try {
+      const AudioContextClass =
+        (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const context: AudioContext =
+        confirmationAudioContextRef.current ||
+        new AudioContextClass();
+      confirmationAudioContextRef.current = context;
+      if (context.state === "suspended") {
+        void context.resume();
+      }
+
+      const now = context.currentTime;
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(720, now);
+      oscillator.frequency.exponentialRampToValueAtTime(1240, now + 0.18);
+      gainNode.gain.setValueAtTime(0.0001, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.26);
+    } catch (error) {
+      console.error("Confirmation sound failed", error);
     }
   };
 
@@ -105,6 +149,10 @@ const TechnicianDashboard = () => {
       if (audioRef.current) {
         stopAlertSound();
         audioRef.current = null;
+      }
+      if (confirmationAudioContextRef.current) {
+        confirmationAudioContextRef.current.close().catch(() => { });
+        confirmationAudioContextRef.current = null;
       }
     };
   }, []);
@@ -317,12 +365,7 @@ const TechnicianDashboard = () => {
       setIncomingJobUnavailable(false);
       setShowJobModal(true);
 
-      // Play Siren - Use the loud siren ref defined earlier
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(e => console.error("Siren play failed", e));
-        (window as any).currentSiren = audioRef.current;
-      }
+      playAlertSound();
     });
 
     // New: Listen for Revocations (Job Taken)
@@ -545,11 +588,11 @@ const TechnicianDashboard = () => {
       const useAcceptEndpoint =
         status === "accepted" && options?.useAcceptEndpoint !== false;
       const endpoint = useAcceptEndpoint
-        ? apiUrl(`/api/service-requests/${normalizedJobId}/accept`)
+        ? apiUrl("/api/jobs/accept")
         : apiUrl(`/api/service-requests/${normalizedJobId}/technician-status`);
 
       const method = useAcceptEndpoint ? 'POST' : 'PATCH';
-      const body = useAcceptEndpoint ? null : { status };
+      const body = useAcceptEndpoint ? { jobId: normalizedJobId } : { status };
 
       const res = await fetch(endpoint, {
         method,
@@ -659,6 +702,7 @@ const TechnicianDashboard = () => {
       setIncomingJob(fallbackJob);
       setIncomingJobUnavailable(false);
       setShowJobModal(true);
+      playAlertSound();
     };
 
     const syncRouteState = async () => {
@@ -671,7 +715,9 @@ const TechnicianDashboard = () => {
 
       if (routeAction === "accept" && !isAlreadyAccepted) {
         try {
+          stopAlertSound();
           await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+          playAcceptConfirmationSound();
           toast.success("Job Accepted!");
         } catch (error: any) {
           const statusCode = Number(error?.status || 0);
@@ -687,6 +733,7 @@ const TechnicianDashboard = () => {
 
       if (routeAction === "reject") {
         try {
+          stopAlertSound();
           await updateJobStatus("rejected", normalizedJobId);
           toast.info("Job Rejected");
         } catch (error: any) {
@@ -750,6 +797,7 @@ const TechnicianDashboard = () => {
       setIsJobActionLoading(true);
       stopAlertSound();
       await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+      playAcceptConfirmationSound();
       toast.success("Job Accepted!");
       setIncomingJob(null);
       setIncomingJobUnavailable(false);

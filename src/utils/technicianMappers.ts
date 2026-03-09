@@ -33,11 +33,11 @@ export const mapTechnicianData = (data: any): Technician => {
   const parsedPaymentDetails = parseMaybeJson<Record<string, any>>(data.payment_details, {});
   const parsedAppReadiness = parseMaybeJson<Record<string, any>>(data.app_readiness, {});
   const mappedDocuments = {
+    ...docs,
     profile_photo: resolveUrl(docs.profile_photo),
     garage_front: resolveUrl(docs.garage_front),
     tools_photo: resolveUrl(docs.tools_photo),
     facilities_photo: resolveUrl(docs.facilities_photo),
-    ...docs
   };
 
   return {

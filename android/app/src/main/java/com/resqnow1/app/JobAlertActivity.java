@@ -8,19 +8,21 @@ import android.view.WindowManager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationManagerCompat;
 
-public class AlertActivity extends AppCompatActivity {
+public class JobAlertActivity extends AppCompatActivity {
 
     public static final String EXTRA_NOTIFICATION_ID = "extra_notification_id";
     public static final String EXTRA_TITLE = "extra_title";
     public static final String EXTRA_BODY = "extra_body";
     public static final String EXTRA_JOB_ID = "extra_job_id";
     public static final String EXTRA_DEEP_LINK_PATH = "extra_deep_link_path";
+    public static final String EXTRA_ALERT_ACTION = "extra_alert_action";
 
-    private static volatile AlertActivity activeAlertActivity = null;
+    private static volatile JobAlertActivity activeAlertActivity = null;
 
     private int notificationId = -1;
     private String jobId = "";
     private String deepLinkPath = "";
+    private String alertAction = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,7 +50,7 @@ public class AlertActivity extends AppCompatActivity {
     }
 
     public static void dismissActiveAlertForJob(String revokedJobId) {
-        AlertActivity active = activeAlertActivity;
+        JobAlertActivity active = activeAlertActivity;
         if (active == null) return;
 
         String normalizedRevoked = String.valueOf(revokedJobId == null ? "" : revokedJobId).trim();
@@ -80,6 +82,7 @@ public class AlertActivity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                     | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                     | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
             );
         }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -91,6 +94,7 @@ public class AlertActivity extends AppCompatActivity {
         notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
         jobId = stringExtra(intent, EXTRA_JOB_ID);
         deepLinkPath = stringExtra(intent, EXTRA_DEEP_LINK_PATH);
+        alertAction = stringExtra(intent, EXTRA_ALERT_ACTION).toLowerCase();
     }
 
     private void openExistingJobCardUi() {
@@ -132,7 +136,7 @@ public class AlertActivity extends AppCompatActivity {
             normalizedPath = "/technician/dashboard";
         }
 
-        return appendSystemAlertQuery(normalizedPath);
+        return appendSystemAlertQuery(appendAlertActionQuery(normalizedPath));
     }
 
     private String appendSystemAlertQuery(String path) {
@@ -145,6 +149,24 @@ public class AlertActivity extends AppCompatActivity {
         }
         String join = normalizedPath.contains("?") ? "&" : "?";
         return normalizedPath + join + "alertSource=system";
+    }
+
+    private String appendAlertActionQuery(String path) {
+        if (isBlank(alertAction)) return path;
+        String normalizedAction = alertAction.trim().toLowerCase();
+        if (!normalizedAction.equals("accept") && !normalizedAction.equals("reject")) {
+            return path;
+        }
+
+        String normalizedPath = isBlank(path) ? "/technician/dashboard" : path.trim();
+        if (!normalizedPath.startsWith("/")) {
+            normalizedPath = "/" + normalizedPath;
+        }
+        if (normalizedPath.contains("alertAction=") || normalizedPath.contains("alert_action=")) {
+            return normalizedPath;
+        }
+        String join = normalizedPath.contains("?") ? "&" : "?";
+        return normalizedPath + join + "alertAction=" + Uri.encode(normalizedAction);
     }
 
     private String buildAppUrl(String path) {

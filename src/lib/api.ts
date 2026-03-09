@@ -415,6 +415,14 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     upsertRequest(next);
     return json({ success: true, request: withTechnician(next) });
   }
+  if (path === "/api/jobs/accept" && method === "POST") {
+    const jobId = String(body.jobId || body.requestId || body.id || "");
+    const req = requestById(jobId);
+    if (!req) return json({ error: "Not found" }, 404);
+    const next = { ...req, status: "accepted", technician_id: req.technician_id || getTechnicians()[0]?.id || null };
+    upsertRequest(next);
+    return json({ success: true, request: withTechnician(next) });
+  }
   const requestStatusMatch = path.match(/^\/api\/service-requests\/([^/]+)\/(technician-status|status)$/);
   if (requestStatusMatch && method === "PATCH") {
     const req = requestById(requestStatusMatch[1]);
@@ -531,6 +539,22 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
 
   if (path === "/api/upload" && method === "POST") return json({ url: "/placeholder.svg" });
   if (path === "/api/public/stats" && method === "GET") return json({ users: getUsers().length, technicians: getTechnicians().filter((item) => item.verification_status === "verified").length, completedServices: getRequests().filter((item) => ["completed", "paid"].includes(String(item.status).toLowerCase())).length });
+  if (path === "/api/public/android-app/status" && method === "GET") {
+    return json({
+      available: false,
+      apkPath: null,
+      fileName: null,
+      fileSize: null,
+      modifiedAt: null,
+      downloadUrl: "/api/public/android-app/download",
+      source: null,
+      releaseDir: null,
+      error: "Android app package is not available in frontend-only demo mode.",
+    });
+  }
+  if (path === "/api/public/android-app/download" && (method === "GET" || method === "HEAD")) {
+    return json({ error: "Android app package is not available in frontend-only demo mode." }, 404);
+  }
   if (path === "/api/public/contact" && method === "POST") return json({ success: true, message: "Message received (demo mode)." });
   if (path === "/api/public/reverse-geocode" && method === "GET") return json({ display_name: `Demo Location (${Number(q.get("lat") || 12.9716).toFixed(4)}, ${Number(q.get("lng") || 77.5946).toFixed(4)}), Bengaluru, Karnataka`, address: { suburb: "Indiranagar", city: "Bengaluru", district: "Bengaluru Urban", state: "Karnataka", postcode: "560038" } });
   if (path === "/api/chatbot/message" && method === "POST") return json({ text: "Demo mode: backend chatbot is disconnected, but UI remains fully usable." });

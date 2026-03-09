@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -45,9 +45,11 @@ export function TechnicianJobModal({
     onDismissUnavailable,
 }: TechnicianJobModalProps) {
     const [timeLeft, setTimeLeft] = useState(30);
+    const timeoutHandledRef = useRef(false);
 
     useEffect(() => {
         if (isOpen && !isUnavailable) {
+            timeoutHandledRef.current = false;
             setTimeLeft(30);
             const timer = setInterval(() => {
                 setTimeLeft((prev) => {
@@ -61,6 +63,14 @@ export function TechnicianJobModal({
             return () => clearInterval(timer);
         }
     }, [isOpen, isUnavailable]);
+
+    useEffect(() => {
+        if (!isOpen || isUnavailable || !job) return;
+        if (timeLeft > 0) return;
+        if (timeoutHandledRef.current) return;
+        timeoutHandledRef.current = true;
+        onReject(job.id);
+    }, [isOpen, isUnavailable, job, onReject, timeLeft]);
 
     if (!job) return null;
 

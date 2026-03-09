@@ -105,12 +105,13 @@ const JobNotificationModal = () => {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(apiUrl(`/api/service-requests/${requestId}/accept`), {
+      const response = await fetch(apiUrl('/api/jobs/accept'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ jobId: requestId })
       });
 
       const data = await response.json().catch(() => ({}));

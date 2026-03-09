@@ -242,7 +242,7 @@ public class JobAlertActivity extends AppCompatActivity {
             return normalizedPath;
         }
         String join = normalizedPath.contains("?") ? "&" : "?";
-        return normalizedPath + join + "alertAction=" + Uri.encode(normalizedAction);
+        return normalizedAction.isEmpty() ? path : (normalizedPath + join + "alertAction=" + Uri.encode(normalizedAction));
     }
 
     private String buildAppUrl(String path) {
@@ -303,4 +303,3 @@ public class JobAlertActivity extends AppCompatActivity {
         return value == null || value.trim().isEmpty();
     }
 }
-

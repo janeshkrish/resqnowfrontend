@@ -24,6 +24,8 @@ const statusBadgeClass: Record<string, string> = {
   assigned: "bg-blue-50 text-blue-700 border-blue-200",
   accepted: "bg-blue-50 text-blue-700 border-blue-200",
   processing: "bg-violet-50 text-violet-700 border-violet-200",
+  service_started: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  payment_pending: "bg-orange-50 text-orange-700 border-orange-200",
   "in progress": "bg-cyan-50 text-cyan-700 border-cyan-200",
   in_progress: "bg-cyan-50 text-cyan-700 border-cyan-200",
   "in-progress": "bg-cyan-50 text-cyan-700 border-cyan-200",
@@ -338,7 +340,9 @@ export default function AdminExtendedRequestsPage() {
           <option value="assigned">Assigned</option>
           <option value="accepted">Accepted</option>
           <option value="processing">Processing</option>
+          <option value="service_started">Service Started</option>
           <option value="in_progress">In Progress</option>
+          <option value="payment_pending">Payment Pending</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>

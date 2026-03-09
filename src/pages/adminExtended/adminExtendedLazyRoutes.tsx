@@ -4,6 +4,7 @@ import { Navigate, type RouteObject } from "react-router-dom";
 const AdminExtendedLayout = lazy(() => import("./AdminExtendedLayout"));
 const AdminExtendedDashboardPage = lazy(() => import("./AdminExtendedDashboardPage"));
 const AdminExtendedRequestsPage = lazy(() => import("./AdminExtendedRequestsPage"));
+const AdminExtendedCommandCenterPage = lazy(() => import("./AdminExtendedCommandCenterPage"));
 const AdminExtendedTechniciansPage = lazy(() => import("./AdminExtendedTechniciansPage"));
 const AdminExtendedFinancePage = lazy(() => import("./AdminExtendedFinancePage"));
 const AdminExtendedAnalyticsPage = lazy(() => import("./AdminExtendedAnalyticsPage"));
@@ -18,6 +19,7 @@ export const adminExtendedLazyRoutes: RouteObject[] = [
       { index: true, element: <Navigate to="/admin/extended/dashboard" replace /> },
       { path: "dashboard", element: <AdminExtendedDashboardPage /> },
       { path: "requests", element: <AdminExtendedRequestsPage /> },
+      { path: "command-center", element: <AdminExtendedCommandCenterPage /> },
       { path: "technicians", element: <AdminExtendedTechniciansPage /> },
       { path: "finance", element: <AdminExtendedFinancePage /> },
       { path: "analytics", element: <AdminExtendedAnalyticsPage /> },

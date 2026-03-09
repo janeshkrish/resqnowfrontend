@@ -65,6 +65,54 @@ export type AdminRequestRow = {
   createdTime: string;
 };
 
+export type CommandCenterReason = {
+  id: number;
+  code: string;
+  text: string;
+  riskLevel: "yellow" | "red" | "green" | string;
+  lastDetectedAt: string;
+};
+
+export type CommandCenterJob = {
+  requestId: number;
+  jobId: number;
+  serviceType: string;
+  status: string;
+  customerLocation: {
+    address: string;
+    lat: number | null;
+    lng: number | null;
+  };
+  technician: {
+    id: number;
+    name: string;
+    phone: string;
+    rating: number | null;
+    acceptanceRate: number | null;
+    currentLat: number | null;
+    currentLng: number | null;
+  };
+  reasons: CommandCenterReason[];
+  etaMinutes: number | null;
+  etaArrival: string | null;
+  slaDeadline: string | null;
+  timeRemainingMs: number | null;
+  riskLevel: "yellow" | "red" | "green" | string;
+  firstDetectedAt: string;
+  lastDetectedAt: string;
+};
+
+export type CommandCenterExceptionsResponse = {
+  title: string;
+  monitor: {
+    running: boolean;
+    intervalMs: number;
+    lastRunAt: string | null;
+    lastError: string | null;
+  };
+  data: CommandCenterJob[];
+};
+
 export type TechnicianRow = {
   technicianId: number;
   name: string;
@@ -165,6 +213,44 @@ export async function markAdminRequestHighPriority(payload: { requestId: number;
 
 export async function closeAdminRequest(payload: { requestId: number; status?: string; reason?: string }) {
   const { data } = await adminApi.post("/requests/close", payload);
+  return data;
+}
+
+export async function getCommandCenterExceptions() {
+  const { data } = await adminApi.get<CommandCenterExceptionsResponse>("/command-center/exceptions");
+  return data;
+}
+
+export async function getCommandCenterTrack(requestId: number, limit = 80) {
+  const { data } = await adminApi.get<{ requestId: number; points: Array<{ id: number; lat: number | null; lng: number | null; capturedAt: string }> }>(
+    `/command-center/tracks/${requestId}`,
+    { params: { limit } }
+  );
+  return data;
+}
+
+export async function runCommandCenterMonitorCycle() {
+  const { data } = await adminApi.post("/command-center/monitor/run");
+  return data;
+}
+
+export async function remindCommandCenterTechnician(payload: { requestId: number }) {
+  const { data } = await adminApi.post("/command-center/actions/remind-technician", payload);
+  return data;
+}
+
+export async function callCommandCenterTechnician(payload: { requestId: number }) {
+  const { data } = await adminApi.post("/command-center/actions/call-technician", payload);
+  return data;
+}
+
+export async function reassignCommandCenterJob(payload: { requestId: number; radiusKm?: number; maxCandidates?: number }) {
+  const { data } = await adminApi.post("/command-center/actions/reassign", payload);
+  return data;
+}
+
+export async function escalateCommandCenterJob(payload: { requestId: number; radiusKm?: number }) {
+  const { data } = await adminApi.post("/command-center/actions/escalate", payload);
   return data;
 }
 

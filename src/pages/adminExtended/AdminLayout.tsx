@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   Gauge,
   MessageSquareWarning,
+  Radar,
   Users,
   Wrench,
   Menu,
@@ -21,6 +22,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { to: "/admin/extended/dashboard", label: "Dashboard", icon: Gauge },
+  { to: "/admin/extended/command-center", label: "Operations Command Center", icon: Radar },
   { to: "/admin/extended/requests", label: "Requests", icon: Wrench },
   { to: "/admin/extended/technicians", label: "Technicians", icon: Users },
   { to: "/admin/extended/finance", label: "Finance", icon: CircleDollarSign },

@@ -97,8 +97,12 @@ export const technicianAuthService = {
       const body = await res.json().catch(() => ({} as Record<string, unknown>));
       const responseStatus = String(body.status || "").trim().toLowerCase();
       let msg = String(body.error || "").trim();
-      if (!msg && res.status === 403 && responseStatus === "pending_approval") {
-        msg = "Your technician account is pending admin approval. Please wait until your account is approved.";
+      if (res.status === 404) {
+        msg = "User not found.";
+      } else if (res.status === 401) {
+        msg = "Incorrect password. Please try again.";
+      } else if (res.status === 403 && responseStatus === "pending_approval") {
+        msg = "Your account is pending admin approval.";
       }
       if (!msg) {
         msg = "Login failed.";

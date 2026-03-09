@@ -271,7 +271,7 @@ public class MyFirebaseMessagingService extends MessagingService {
     }
 
     private int stableNotificationIdForJob(String jobId) {
-        return ("job:" + String(jobId).trim()).hashCode();
+        return ("job:" + jobId.trim()).hashCode();
     }
 
     private int resolveSmallIcon() {

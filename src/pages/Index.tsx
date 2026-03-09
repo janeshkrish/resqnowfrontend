@@ -27,7 +27,10 @@ const MobileDashboard = () => {
     }
 
     const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
+      // Guard preventDefault to avoid browser warnings on non-cancelable events.
+      if (event.cancelable) {
+        event.preventDefault();
+      }
       setDeferredPrompt(event as BeforeInstallPromptEvent);
       (window as any).deferredPrompt = event;
     };
@@ -51,8 +54,6 @@ const MobileDashboard = () => {
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
-
-  const canInstallApp = Boolean(deferredPrompt) && !isStandalone;
 
   const handleInstallApp = async () => {
     if (!deferredPrompt) {

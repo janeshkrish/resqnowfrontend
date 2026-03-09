@@ -13,7 +13,9 @@ const PWAInstallPrompt = () => {
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
+      if (event.cancelable) {
+        event.preventDefault();
+      }
       setDeferredPrompt(event as BeforeInstallPromptEvent);
     };
 

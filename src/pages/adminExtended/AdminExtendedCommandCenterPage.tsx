@@ -3,13 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
 import { AlertTriangle, BellRing, PhoneCall, RefreshCcw, Route, Siren } from "lucide-react";
-import { MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
+import { Slider } from "@/components/ui/slider";
 import {
   callCommandCenterTechnician,
   CommandCenterJob,
+  CommandCenterMonitorRunResponse,
   escalateCommandCenterJob,
   getCommandCenterExceptions,
   getCommandCenterTrack,
@@ -55,16 +57,41 @@ function createDotIcon(color: string) {
 const technicianIcon = createDotIcon("#dc2626");
 const customerIcon = createDotIcon("#2563eb");
 
-function CommandCenterTrackMap({ job }: { job: CommandCenterJob }) {
+function MapViewportSync({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  const lastSignatureRef = useRef("");
+
+  useEffect(() => {
+    if (!points.length) return;
+
+    const signature = points.map((point) => `${point[0].toFixed(5)},${point[1].toFixed(5)}`).join("|");
+    if (!signature || signature === lastSignatureRef.current) return;
+    lastSignatureRef.current = signature;
+
+    if (points.length === 1) {
+      map.setView(points[0], Math.max(map.getZoom(), 13), { animate: false });
+      return;
+    }
+
+    // Keep map viewport synced with latest technician/customer path updates.
+    map.fitBounds(L.latLngBounds(points), { padding: [20, 20], maxZoom: 15, animate: false });
+  }, [map, points]);
+
+  return null;
+}
+
+function CommandCenterTrackMap({ job, trackLimit }: { job: CommandCenterJob; trackLimit: number }) {
   const hasTechnician = job.technician.currentLat != null && job.technician.currentLng != null;
   const hasCustomer = job.customerLocation.lat != null && job.customerLocation.lng != null;
   const queryEnabled = hasTechnician || hasCustomer;
 
   const trackQuery = useQuery({
-    queryKey: ["admin", "command-center", "track", job.requestId],
-    queryFn: () => getCommandCenterTrack(job.requestId, 80),
+    queryKey: ["admin", "command-center", "track", job.requestId, trackLimit],
+    queryFn: () => getCommandCenterTrack(job.requestId, trackLimit),
     enabled: queryEnabled,
     staleTime: 20_000,
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: true,
   });
 
   const technicianPoint = hasTechnician
@@ -78,6 +105,9 @@ function CommandCenterTrackMap({ job }: { job: CommandCenterJob }) {
   const trackPath = (trackQuery.data?.points || [])
     .filter((point) => point.lat != null && point.lng != null)
     .map((point) => [Number(point.lat), Number(point.lng)] as [number, number]);
+  const viewportPoints = (trackPath.length >= 2
+    ? trackPath
+    : [technicianPoint, customerPoint].filter(Boolean)) as [number, number][];
 
   if (!queryEnabled) {
     return <div className="h-44 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">No GPS location available.</div>;
@@ -85,11 +115,12 @@ function CommandCenterTrackMap({ job }: { job: CommandCenterJob }) {
 
   return (
     <div className="h-44 overflow-hidden rounded-xl border border-slate-200">
-      <MapContainer center={fallbackCenter} zoom={12} style={{ height: "100%", width: "100%" }}>
+      <MapContainer center={fallbackCenter} zoom={12} scrollWheelZoom={false} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <MapViewportSync points={viewportPoints} />
         {customerPoint ? (
           <Marker position={customerPoint} icon={customerIcon} />
         ) : null}
@@ -106,7 +137,15 @@ function CommandCenterTrackMap({ job }: { job: CommandCenterJob }) {
   );
 }
 
-function JobCardActions({ job, onReload }: { job: CommandCenterJob; onReload: () => void }) {
+function JobCardActions({
+  job,
+  onReload,
+  reassignRadiusKm,
+}: {
+  job: CommandCenterJob;
+  onReload: () => void;
+  reassignRadiusKm: number;
+}) {
   const callMutation = useMutation({
     mutationFn: callCommandCenterTechnician,
     onSuccess: (data) => {
@@ -166,15 +205,15 @@ function JobCardActions({ job, onReload }: { job: CommandCenterJob; onReload: ()
       </button>
       <button
         type="button"
-        onClick={() => reassignMutation.mutate({ requestId: job.requestId })}
+        onClick={() => reassignMutation.mutate({ requestId: job.requestId, radiusKm: reassignRadiusKm })}
         className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100"
       >
         <Route className="h-3.5 w-3.5" />
-        Reassign Job
+        Reassign Job ({reassignRadiusKm} km)
       </button>
       <button
         type="button"
-        onClick={() => escalateMutation.mutate({ requestId: job.requestId, radiusKm: 45 })}
+        onClick={() => escalateMutation.mutate({ requestId: job.requestId, radiusKm: reassignRadiusKm })}
         className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
       >
         <Siren className="h-3.5 w-3.5" />
@@ -187,6 +226,8 @@ function JobCardActions({ job, onReload }: { job: CommandCenterJob; onReload: ()
 export default function AdminExtendedCommandCenterPage() {
   const queryClient = useQueryClient();
   const [banner, setBanner] = useState<string | null>(null);
+  const [reassignRadiusKm, setReassignRadiusKm] = useState(35);
+  const [trackPointLimit, setTrackPointLimit] = useState(80);
   const lastBannerAtRef = useRef<number>(0);
 
   const exceptionsQuery = useQuery({
@@ -197,8 +238,10 @@ export default function AdminExtendedCommandCenterPage() {
 
   const manualRunMutation = useMutation({
     mutationFn: runCommandCenterMonitorCycle,
-    onSuccess: () => {
-      toast.success("Monitoring cycle completed.");
+    onSuccess: (data: CommandCenterMonitorRunResponse) => {
+      const jobsScanned = Number(data?.jobsScanned || 0);
+      const alertsDetected = Number(data?.alertsDetected || 0);
+      toast.success(`Monitoring cycle completed. Scanned ${jobsScanned} jobs and detected ${alertsDetected} alerts.`);
       void queryClient.invalidateQueries({ queryKey: ["admin", "command-center", "exceptions"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -256,6 +299,36 @@ export default function AdminExtendedCommandCenterPage() {
             <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 font-semibold text-red-700">Red Delay: {summary.red}</span>
             <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">Yellow Risk: {summary.yellow}</span>
             <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 font-semibold text-slate-700">Flagged Jobs: {summary.total}</span>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-700">
+                <span className="font-semibold">Reassign Radius</span>
+                <span className="font-bold">{reassignRadiusKm} km</span>
+              </div>
+              <Slider
+                min={5}
+                max={80}
+                step={5}
+                value={[reassignRadiusKm]}
+                onValueChange={(value) => setReassignRadiusKm(Math.max(5, Number(value?.[0] || 35)))}
+                aria-label="Reassign radius slider"
+              />
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-700">
+                <span className="font-semibold">Track History Points</span>
+                <span className="font-bold">{trackPointLimit}</span>
+              </div>
+              <Slider
+                min={20}
+                max={200}
+                step={10}
+                value={[trackPointLimit]}
+                onValueChange={(value) => setTrackPointLimit(Math.max(20, Number(value?.[0] || 80)))}
+                aria-label="Track history slider"
+              />
+            </div>
           </div>
         </div>
         <button
@@ -340,9 +413,10 @@ export default function AdminExtendedCommandCenterPage() {
               </div>
             </div>
 
-            <CommandCenterTrackMap job={job} />
+            <CommandCenterTrackMap job={job} trackLimit={trackPointLimit} />
             <JobCardActions
               job={job}
+              reassignRadiusKm={reassignRadiusKm}
               onReload={() => {
                 void queryClient.invalidateQueries({ queryKey: ["admin", "command-center", "exceptions"] });
               }}

@@ -113,6 +113,17 @@ export type CommandCenterExceptionsResponse = {
   data: CommandCenterJob[];
 };
 
+export type CommandCenterMonitorRunResponse = {
+  success: boolean;
+  trigger: string;
+  jobsScanned: number;
+  alertsDetected: number;
+  alertsResolved: number;
+  workerFailures?: number;
+  workerErrors?: Array<{ index: number; message: string }>;
+  googleCallsRemaining?: number;
+};
+
 export type TechnicianRow = {
   technicianId: number;
   name: string;
@@ -230,7 +241,7 @@ export async function getCommandCenterTrack(requestId: number, limit = 80) {
 }
 
 export async function runCommandCenterMonitorCycle() {
-  const { data } = await adminApi.post("/command-center/monitor/run");
+  const { data } = await adminApi.post<CommandCenterMonitorRunResponse>("/command-center/monitor/run");
   return data;
 }
 

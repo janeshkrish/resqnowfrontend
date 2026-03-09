@@ -1,4 +1,4 @@
-﻿package com.resqnow1.app;
+package com.resqnow1.app;
 
 import android.app.KeyguardManager;
 import android.media.AudioManager;

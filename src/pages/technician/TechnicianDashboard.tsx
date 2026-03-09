@@ -16,6 +16,7 @@ import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; /
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
+import { Capacitor } from "@capacitor/core";
 
 // Restored imports for widgets
 import TechnicianJobHistory from "@/components/technician/TechnicianJobHistory";
@@ -43,6 +44,7 @@ const TechnicianDashboard = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
+  const isNativePlatform = Capacitor.isNativePlatform();
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
   const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
   const JOB_TAKEN_MESSAGE = "This job has already been taken by another technician.";
@@ -260,6 +262,12 @@ const TechnicianDashboard = () => {
       const requestId = rawRequestId != null ? String(rawRequestId).trim() : "";
       if (!requestId || requestId === "undefined") {
         console.warn("Skipping malformed job_offer payload: missing requestId", offerData);
+        return;
+      }
+
+      // Native Android uses system-level full-screen alerts from FCM.
+      // Skipping in-app socket modal here avoids duplicate cards/alerts.
+      if (isNativePlatform) {
         return;
       }
 
@@ -608,6 +616,51 @@ const TechnicianDashboard = () => {
     if (handledRouteJobRef.current === handledKey) return;
     handledRouteJobRef.current = handledKey;
 
+    const hydrateIncomingJobFromDeepLink = async () => {
+      const offerRes = await apiFetch(
+        `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-offer`,
+        { technician: true }
+      );
+      const offerData = await offerRes.json().catch(() => ({} as any));
+
+      const offerRequest = offerData?.request || {};
+      const location = offerRequest?.location || {};
+      const lat = Number(location?.lat ?? offerRequest?.location_lat ?? 0);
+      const lng = Number(location?.lng ?? offerRequest?.location_lng ?? 0);
+      const parsedDistance = Number.parseFloat(
+        String(offerRequest?.distance ?? offerRequest?.locationDistance ?? 0)
+      );
+      const parsedAmount = Number(offerRequest?.amount ?? 0);
+
+      const fallbackJob: JobRequest = {
+        id: normalizedJobId,
+        customerName: String(offerRequest?.customerName || "Customer"),
+        serviceType: String(offerRequest?.serviceType || offerRequest?.service_type || "Service"),
+        vehicleType: String(offerRequest?.vehicleType || offerRequest?.vehicle_type || "car"),
+        location: {
+          lat: Number.isFinite(lat) ? lat : 0,
+          lng: Number.isFinite(lng) ? lng : 0,
+          address: String(location?.address || offerRequest?.address || "Location not available"),
+        },
+        distance: Number.isFinite(parsedDistance) ? parsedDistance : 0,
+        amount: Number.isFinite(parsedAmount) ? parsedAmount : 0,
+      };
+      (fallbackJob as any).eta = offerRequest?.eta ?? null;
+
+      if (!offerRes.ok || !offerData?.available) {
+        const unavailableText = String(offerData?.message || JOB_TAKEN_MESSAGE);
+        setIncomingJob(fallbackJob);
+        setIncomingJobUnavailable(true);
+        setShowJobModal(true);
+        toast.warning(unavailableText);
+        return;
+      }
+
+      setIncomingJob(fallbackJob);
+      setIncomingJobUnavailable(false);
+      setShowJobModal(true);
+    };
+
     const syncRouteState = async () => {
       const currentJobId = String(activeJob?.id || "").trim();
       const currentStatus = normalizeTechnicianStatus(activeJob?.status);
@@ -617,18 +670,51 @@ const TechnicianDashboard = () => {
         ["accepted", "en-route", "arrived", "in-progress", "payment_pending", "paid", "completed"].includes(currentStatus);
 
       if (routeAction === "accept" && !isAlreadyAccepted) {
-        await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
-        toast.success("Job Accepted!");
+        try {
+          await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+          toast.success("Job Accepted!");
+        } catch (error: any) {
+          const statusCode = Number(error?.status || 0);
+          if (statusCode === 409) {
+            setIncomingJobUnavailable(true);
+            setShowJobModal(true);
+            toast.error(JOB_TAKEN_MESSAGE);
+            return;
+          }
+          throw error;
+        }
+      }
+
+      if (routeAction === "reject") {
+        try {
+          await updateJobStatus("rejected", normalizedJobId);
+          toast.info("Job Rejected");
+        } catch (error: any) {
+          const statusCode = Number(error?.status || 0);
+          if (statusCode !== 404 && statusCode !== 409) {
+            throw error;
+          }
+        }
+        setIncomingJob(null);
+        setIncomingJobUnavailable(false);
+        setShowJobModal(false);
       }
 
       if (routeAction === "accept" || isAlreadyAccepted) {
         setAcceptedJobId(normalizedJobId);
       }
 
+      if (!routeAction && !isAlreadyAccepted) {
+        await hydrateIncomingJobFromDeepLink();
+      }
+
       await refreshActiveJob();
-      setIncomingJob(null);
-      setIncomingJobUnavailable(false);
-      setShowJobModal(false);
+
+      if (routeAction === "accept") {
+        setIncomingJob(null);
+        setIncomingJobUnavailable(false);
+        setShowJobModal(false);
+      }
 
       if (location.search || location.state) {
         navigate("/technician/dashboard", { replace: true });

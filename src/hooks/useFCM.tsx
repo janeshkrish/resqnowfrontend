@@ -124,6 +124,11 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
           // 4. Foreground notifications
           const onPush = PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
             if (cancelled) return;
+            const payloadType = String((notification as any)?.data?.type || "").trim().toUpperCase();
+            if (payloadType === "EMERGENCY_JOB" || payloadType === "JOB_REVOKED") {
+              // Native Android full-screen alert flow handles emergency/revocation UI.
+              return;
+            }
             const message = buildForegroundMessage(notification);
             toast(message.title, {
               description: message.body.replace(/\n/g, " "),

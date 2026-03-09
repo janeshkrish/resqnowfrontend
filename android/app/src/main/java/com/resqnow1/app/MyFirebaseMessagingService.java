@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 import com.capacitorjs.plugins.pushnotifications.MessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 import java.util.Map;
@@ -20,15 +21,25 @@ public class MyFirebaseMessagingService extends MessagingService {
     private static final AtomicInteger NOTIFICATION_ID = new AtomicInteger(1000);
     private static final String FALLBACK_TITLE = "Emergency Service Request";
     private static final String FALLBACK_BODY = "A nearby customer needs immediate assistance.";
+
+    private static final String EVENT_JOB_OFFER = "job_offer";
+    private static final String EVENT_JOB_ASSIGNED = "job:assigned";
+    private static final String EVENT_JOB_REVOKED = "job:revoked";
     private static final String PAYLOAD_TYPE_EMERGENCY = "EMERGENCY_JOB";
+    private static final String PAYLOAD_TYPE_REVOKED = "JOB_REVOKED";
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         EmergencyNotificationHelper.ensureEmergencyChannel(this);
 
+        if (isRevocationPayload(remoteMessage)) {
+            dismissEmergencyAlert(remoteMessage);
+            return;
+        }
+
         if (isEmergencyPayload(remoteMessage)) {
-            postEmergencyFullScreenNotification(remoteMessage);
+            launchEmergencyForegroundAlert(remoteMessage);
             return;
         }
 
@@ -52,7 +63,17 @@ public class MyFirebaseMessagingService extends MessagingService {
         }
 
         String event = value(remoteMessage.getData(), "event");
-        return "job_offer".equalsIgnoreCase(event) || "job:assigned".equalsIgnoreCase(event);
+        return EVENT_JOB_OFFER.equalsIgnoreCase(event) || EVENT_JOB_ASSIGNED.equalsIgnoreCase(event);
+    }
+
+    private boolean isRevocationPayload(RemoteMessage remoteMessage) {
+        String type = value(remoteMessage.getData(), "type");
+        if (PAYLOAD_TYPE_REVOKED.equalsIgnoreCase(type)) {
+            return true;
+        }
+
+        String event = value(remoteMessage.getData(), "event");
+        return EVENT_JOB_REVOKED.equalsIgnoreCase(event);
     }
 
     private boolean hasRenderableContent(RemoteMessage remoteMessage) {
@@ -64,19 +85,67 @@ public class MyFirebaseMessagingService extends MessagingService {
         return data != null && !data.isEmpty();
     }
 
-    private void postEmergencyFullScreenNotification(RemoteMessage remoteMessage) {
+    private void launchEmergencyForegroundAlert(RemoteMessage remoteMessage) {
         String title = resolveTitle(remoteMessage);
         String body = resolveBody(remoteMessage);
-        int notificationId = resolveNotificationId(remoteMessage);
+        String jobId = resolveJobId(remoteMessage);
+        String deepLinkPath = value(remoteMessage.getData(), "deepLinkPath");
+        int notificationId = resolveNotificationId(remoteMessage, jobId);
 
-        Intent alertIntent = new Intent(this, AlertActivity.class);
-        alertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        alertIntent.putExtra(AlertActivity.EXTRA_NOTIFICATION_ID, notificationId);
-        alertIntent.putExtra(AlertActivity.EXTRA_TITLE, title);
-        alertIntent.putExtra(AlertActivity.EXTRA_BODY, body);
-        alertIntent.putExtra(AlertActivity.EXTRA_JOB_ID, value(remoteMessage.getData(), "jobId"));
-        alertIntent.putExtra(AlertActivity.EXTRA_DEEP_LINK_PATH, value(remoteMessage.getData(), "deepLinkPath"));
+        Intent serviceIntent = new Intent(this, JobAlertForegroundService.class);
+        serviceIntent.setAction(JobAlertForegroundService.ACTION_SHOW_ALERT);
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_NOTIFICATION_ID, notificationId);
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_TITLE, title);
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_BODY, body);
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_JOB_ID, jobId);
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_DEEP_LINK_PATH, deepLinkPath);
 
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(this, serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Exception serviceError) {
+            // Fallback to direct full-screen notification if service start is blocked.
+            postEmergencyFullScreenNotification(remoteMessage, jobId);
+        }
+    }
+
+    private void dismissEmergencyAlert(RemoteMessage remoteMessage) {
+        String jobId = resolveJobId(remoteMessage);
+        int fallbackNotificationId = resolveNotificationId(remoteMessage, jobId);
+
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        notificationManager.cancel(fallbackNotificationId);
+
+        if (!isBlank(jobId)) {
+            notificationManager.cancel(stableNotificationIdForJob(jobId));
+        }
+
+        Intent dismissIntent = new Intent(this, JobAlertForegroundService.class);
+        dismissIntent.setAction(JobAlertForegroundService.ACTION_DISMISS_ALERT);
+        dismissIntent.putExtra(JobAlertForegroundService.EXTRA_NOTIFICATION_ID, fallbackNotificationId);
+        dismissIntent.putExtra(JobAlertForegroundService.EXTRA_JOB_ID, jobId);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(this, dismissIntent);
+            } else {
+                startService(dismissIntent);
+            }
+        } catch (Exception ignored) {
+            // Best effort; direct notification cancellation already ran.
+        }
+
+        AlertActivity.dismissActiveAlertForJob(jobId);
+    }
+
+    private void postEmergencyFullScreenNotification(RemoteMessage remoteMessage, String jobId) {
+        String title = resolveTitle(remoteMessage);
+        String body = resolveBody(remoteMessage);
+        int notificationId = resolveNotificationId(remoteMessage, jobId);
+
+        Intent alertIntent = buildAlertIntent(remoteMessage, title, body, notificationId, jobId);
         PendingIntent fullScreenIntent = PendingIntent.getActivity(
             this,
             notificationId,
@@ -118,8 +187,9 @@ public class MyFirebaseMessagingService extends MessagingService {
         String title = resolveTitle(remoteMessage);
         String body = resolveBody(remoteMessage);
         Intent intent = buildLaunchIntent(remoteMessage);
+        int notificationId = resolveNotificationId(remoteMessage, resolveJobId(remoteMessage));
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, pendingIntentFlags());
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, intent, pendingIntentFlags());
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, EmergencyNotificationHelper.CHANNEL_ID)
             .setSmallIcon(resolveSmallIcon())
@@ -144,7 +214,24 @@ public class MyFirebaseMessagingService extends MessagingService {
             return;
         }
 
-        notificationManager.notify(resolveNotificationId(remoteMessage), builder.build());
+        notificationManager.notify(notificationId, builder.build());
+    }
+
+    private Intent buildAlertIntent(
+        RemoteMessage remoteMessage,
+        String title,
+        String body,
+        int notificationId,
+        String resolvedJobId
+    ) {
+        Intent alertIntent = new Intent(this, AlertActivity.class);
+        alertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        alertIntent.putExtra(AlertActivity.EXTRA_NOTIFICATION_ID, notificationId);
+        alertIntent.putExtra(AlertActivity.EXTRA_TITLE, title);
+        alertIntent.putExtra(AlertActivity.EXTRA_BODY, body);
+        alertIntent.putExtra(AlertActivity.EXTRA_JOB_ID, isBlank(resolvedJobId) ? resolveJobId(remoteMessage) : resolvedJobId);
+        alertIntent.putExtra(AlertActivity.EXTRA_DEEP_LINK_PATH, value(remoteMessage.getData(), "deepLinkPath"));
+        return alertIntent;
     }
 
     private int pendingIntentFlags() {
@@ -172,12 +259,19 @@ public class MyFirebaseMessagingService extends MessagingService {
         return intent;
     }
 
-    private int resolveNotificationId(RemoteMessage remoteMessage) {
+    private int resolveNotificationId(RemoteMessage remoteMessage, String stableJobId) {
+        if (!isBlank(stableJobId)) {
+            return stableNotificationIdForJob(stableJobId);
+        }
         String messageId = remoteMessage.getMessageId();
         if (!isBlank(messageId)) {
             return messageId.hashCode();
         }
         return NOTIFICATION_ID.incrementAndGet();
+    }
+
+    private int stableNotificationIdForJob(String jobId) {
+        return ("job:" + String(jobId).trim()).hashCode();
     }
 
     private int resolveSmallIcon() {
@@ -201,6 +295,12 @@ public class MyFirebaseMessagingService extends MessagingService {
 
         String fromData = value(remoteMessage.getData(), "body");
         return isBlank(fromData) ? FALLBACK_BODY : fromData;
+    }
+
+    private String resolveJobId(RemoteMessage remoteMessage) {
+        String fromJobId = value(remoteMessage.getData(), "jobId");
+        if (!isBlank(fromJobId)) return fromJobId;
+        return value(remoteMessage.getData(), "requestId");
     }
 
     private boolean isAppInForeground() {

@@ -18,13 +18,21 @@ const MobileDashboard = () => {
   const handleDownloadAndroidApp = async () => {
     if (isDownloadingApp) return;
     setIsDownloadingApp(true);
+    const downloadPath = "/api/public/android-app/download";
+    const downloadUrl = apiUrl(downloadPath);
     const statusUrl = apiUrl("/api/public/android-app/status");
 
     try {
+      const headRes = await fetch(downloadUrl, { method: "HEAD" });
+      if (headRes.ok) {
+        window.location.assign(downloadUrl);
+        return;
+      }
+
       const statusRes = await fetch(statusUrl, { method: "GET" });
       const statusPayload = await statusRes.json().catch(() => ({} as any));
       const isAvailable = Boolean(statusPayload?.available);
-      if (!statusRes.ok || !isAvailable) {
+      if (!isAvailable) {
         toast.error("Android app package is not available yet.", {
           description: String(
             statusPayload?.error ||
@@ -34,14 +42,11 @@ const MobileDashboard = () => {
         return;
       }
 
-      const downloadPath = String(
-        statusPayload?.downloadUrl || "/api/public/android-app/download"
-      ).trim();
-      const downloadUrl = /^https?:\/\//i.test(downloadPath)
-        ? downloadPath
-        : apiUrl(downloadPath);
-
-      window.location.assign(downloadUrl);
+      const resolvedDownloadPath = String(statusPayload?.downloadUrl || downloadPath).trim();
+      const resolvedDownloadUrl = /^https?:\/\//i.test(resolvedDownloadPath)
+        ? resolvedDownloadPath
+        : apiUrl(resolvedDownloadPath);
+      window.location.assign(resolvedDownloadUrl);
     } catch (error) {
       console.error("Android app download check failed:", error);
       toast.error("Could not start Android app download.");

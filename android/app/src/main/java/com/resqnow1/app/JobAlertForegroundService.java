@@ -133,6 +133,14 @@ public class JobAlertForegroundService extends Service {
         startForeground(notificationId, notification);
         NotificationManagerCompat.from(this).notify(notificationId, notification);
 
+        // Ensure full-screen emergency UI is shown even when app is backgrounded/locked.
+        try {
+            alertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(alertIntent);
+        } catch (Exception ignored) {
+            // Some OEMs can block direct activity launch from background; notification fallback remains active.
+        }
+
         activeNotificationId = notificationId;
         activeJobId = jobId;
 

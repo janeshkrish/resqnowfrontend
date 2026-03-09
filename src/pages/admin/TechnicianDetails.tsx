@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUrl } from "@/lib/api";
 import { Technician } from "@/types/technician";
 import { mapTechnicianData } from "@/utils/technicianMappers";
 import { io } from "socket.io-client";
@@ -37,6 +37,14 @@ const TechnicianDetails = () => {
   const [isRejecting, setIsRejecting] = useState(false);
   const [decisionReason, setDecisionReason] = useState("");
   const [approvalAudit, setApprovalAudit] = useState<any[]>([]);
+
+  const resolveDocumentUrl = (value?: string) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
+    if (raw.startsWith("/api/")) return apiUrl(raw);
+    return raw.startsWith("/") ? raw : `/${raw}`;
+  };
 
   useEffect(() => {
     const fetchTechnicianDetails = async () => {
@@ -217,18 +225,20 @@ const TechnicianDetails = () => {
                   { label: "Shop Front", src: technician.documents?.garage_front, icon: MapPin },
                   { label: "Tools", src: technician.documents?.tools_photo, icon: Wrench },
                   { label: "Facilities", src: technician.documents?.facilities_photo, icon: Briefcase },
-                ].map((item, i) => (
+                ].map((item, i) => {
+                  const imageSrc = resolveDocumentUrl(item.src);
+                  return (
                   <div key={i} className="border rounded-lg p-2 text-center">
                     <div className="mb-2 h-24 bg-muted/50 rounded flex items-center justify-center overflow-hidden">
-                      {item.src ? (
-                        <img src={item.src} alt={item.label} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => window.open(item.src, '_blank')} />
+                      {imageSrc ? (
+                        <img src={imageSrc} alt={item.label} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => window.open(imageSrc, "_blank", "noopener,noreferrer")} />
                       ) : (
                         <item.icon className="h-8 w-8 text-slate-300" />
                       )}
                     </div>
                     <p className="text-xs font-medium">{item.label}</p>
                   </div>
-                ))}
+                )})}
               </div>
             </CardContent>
           </Card>

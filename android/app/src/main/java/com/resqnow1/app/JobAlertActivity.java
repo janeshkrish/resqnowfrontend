@@ -1,10 +1,14 @@
-package com.resqnow1.app;
+﻿package com.resqnow1.app;
 
 import android.app.KeyguardManager;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -17,20 +21,32 @@ public class JobAlertActivity extends AppCompatActivity {
     public static final String EXTRA_DEEP_LINK_PATH = "extra_deep_link_path";
     public static final String EXTRA_ALERT_ACTION = "extra_alert_action";
 
+    private static final String ALERT_ACTION_ACCEPT = "accept";
+    private static final String ALERT_ACTION_REJECT = "reject";
+
     private static volatile JobAlertActivity activeAlertActivity = null;
 
     private int notificationId = -1;
     private String jobId = "";
     private String deepLinkPath = "";
     private String alertAction = "";
+    private String title = "Emergency Job Alert";
+    private String body = "A new emergency service request is waiting.";
+    private boolean handledAction = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         activeAlertActivity = this;
         configureLockScreenBehavior();
+        setContentView(R.layout.activity_alert);
+        setFinishOnTouchOutside(false);
         hydrateFromIntent();
-        openExistingJobCardUi();
+        bindUi();
+
+        if (ALERT_ACTION_ACCEPT.equals(alertAction) || ALERT_ACTION_REJECT.equals(alertAction)) {
+            handleAlertAction(alertAction);
+        }
     }
 
     @Override
@@ -38,7 +54,11 @@ public class JobAlertActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         hydrateFromIntent();
-        openExistingJobCardUi();
+        bindUi();
+
+        if (ALERT_ACTION_ACCEPT.equals(alertAction) || ALERT_ACTION_REJECT.equals(alertAction)) {
+            handleAlertAction(alertAction);
+        }
     }
 
     @Override
@@ -92,20 +112,73 @@ public class JobAlertActivity extends AppCompatActivity {
         android.content.Intent intent = getIntent();
         if (intent == null) return;
         notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
+        title = stringExtra(intent, EXTRA_TITLE);
+        body = stringExtra(intent, EXTRA_BODY);
         jobId = stringExtra(intent, EXTRA_JOB_ID);
         deepLinkPath = stringExtra(intent, EXTRA_DEEP_LINK_PATH);
         alertAction = stringExtra(intent, EXTRA_ALERT_ACTION).toLowerCase();
+
+        if (isBlank(title)) {
+            title = "Emergency Job Alert";
+        }
+        if (isBlank(body)) {
+            body = "A new emergency service request is waiting.";
+        }
     }
 
-    private void openExistingJobCardUi() {
+    private void bindUi() {
+        TextView alertTitleView = findViewById(R.id.alertTitle);
+        TextView alertBodyView = findViewById(R.id.alertBody);
+        TextView alertJobMetaView = findViewById(R.id.alertJobMeta);
+        Button acceptButton = findViewById(R.id.alertAcceptButton);
+        Button rejectButton = findViewById(R.id.alertRejectButton);
+
+        if (alertTitleView != null) {
+            alertTitleView.setText(title);
+        }
+        if (alertBodyView != null) {
+            alertBodyView.setText(body);
+        }
+        if (alertJobMetaView != null) {
+            alertJobMetaView.setText(
+                isBlank(jobId)
+                    ? "Immediate response required"
+                    : ("Job #" + jobId + " - Immediate response required")
+            );
+        }
+        if (acceptButton != null) {
+            acceptButton.setOnClickListener(v -> handleAlertAction(ALERT_ACTION_ACCEPT));
+        }
+        if (rejectButton != null) {
+            rejectButton.setOnClickListener(v -> handleAlertAction(ALERT_ACTION_REJECT));
+        }
+    }
+
+    private void handleAlertAction(String action) {
+        if (handledAction) return;
+        handledAction = true;
         cancelEmergencyNotification();
         stopForegroundAlertService();
-        launchMainActivity();
-        finish();
+
+        String normalizedAction = String.valueOf(action == null ? "" : action).trim().toLowerCase();
+        if (ALERT_ACTION_ACCEPT.equals(normalizedAction)) {
+            playAcceptConfirmationTone();
+        }
+
+        launchMainActivity(normalizedAction);
+        finishAlertActivity();
     }
 
-    private void launchMainActivity() {
-        String inAppPath = buildInAppPath();
+    private void finishAlertActivity() {
+        try {
+            finishAndRemoveTask();
+        } catch (Exception ignored) {
+            finish();
+        }
+    }
+
+    private void launchMainActivity(String action) {
+        String inAppPath = buildInAppPath(action);
         String appUrl = buildAppUrl(inAppPath);
 
         android.content.Intent intent = new android.content.Intent(this, MainActivity.class);
@@ -118,12 +191,15 @@ public class JobAlertActivity extends AppCompatActivity {
         intent.setData(Uri.parse(appUrl));
         intent.putExtra("launch_from_emergency_alert", true);
         intent.putExtra("alert_source", "system");
+        if (!isBlank(action)) {
+            intent.putExtra("alertAction", action);
+        }
         if (!isBlank(jobId)) intent.putExtra("jobId", jobId);
         intent.putExtra("deepLinkPath", inAppPath);
         startActivity(intent);
     }
 
-    private String buildInAppPath() {
+    private String buildInAppPath(String action) {
         String normalizedPath;
         if (!isBlank(deepLinkPath)) {
             normalizedPath = deepLinkPath.trim();
@@ -136,7 +212,7 @@ public class JobAlertActivity extends AppCompatActivity {
             normalizedPath = "/technician/dashboard";
         }
 
-        return appendSystemAlertQuery(appendAlertActionQuery(normalizedPath));
+        return appendSystemAlertQuery(appendAlertActionQuery(normalizedPath, action));
     }
 
     private String appendSystemAlertQuery(String path) {
@@ -151,9 +227,9 @@ public class JobAlertActivity extends AppCompatActivity {
         return normalizedPath + join + "alertSource=system";
     }
 
-    private String appendAlertActionQuery(String path) {
-        if (isBlank(alertAction)) return path;
-        String normalizedAction = alertAction.trim().toLowerCase();
+    private String appendAlertActionQuery(String path, String action) {
+        if (isBlank(action)) return path;
+        String normalizedAction = action.trim().toLowerCase();
         if (!normalizedAction.equals("accept") && !normalizedAction.equals("reject")) {
             return path;
         }
@@ -198,6 +274,25 @@ public class JobAlertActivity extends AppCompatActivity {
         }
     }
 
+    private void playAcceptConfirmationTone() {
+        ToneGenerator toneGenerator = null;
+        try {
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
+            toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 120);
+            toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 180);
+        } catch (Exception ignored) {
+            // best-effort only
+        } finally {
+            if (toneGenerator != null) {
+                try {
+                    toneGenerator.release();
+                } catch (Exception ignored) {
+                    // no-op
+                }
+            }
+        }
+    }
+
     private String stringExtra(android.content.Intent intent, String key) {
         if (intent == null || key == null) return "";
         String value = intent.getStringExtra(key);
@@ -208,3 +303,4 @@ public class JobAlertActivity extends AppCompatActivity {
         return value == null || value.trim().isEmpty();
     }
 }
+

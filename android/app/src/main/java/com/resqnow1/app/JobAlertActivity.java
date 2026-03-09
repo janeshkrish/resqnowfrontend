@@ -7,8 +7,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -30,23 +28,16 @@ public class JobAlertActivity extends AppCompatActivity {
     private String jobId = "";
     private String deepLinkPath = "";
     private String alertAction = "";
-    private String title = "Emergency Job Alert";
-    private String body = "A new emergency service request is waiting.";
     private boolean handledAction = false;
+    private boolean relayedToMainApp = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         activeAlertActivity = this;
         configureLockScreenBehavior();
-        setContentView(R.layout.activity_alert);
-        setFinishOnTouchOutside(false);
         hydrateFromIntent();
-        bindUi();
-
-        if (ALERT_ACTION_ACCEPT.equals(alertAction) || ALERT_ACTION_REJECT.equals(alertAction)) {
-            handleAlertAction(alertAction);
-        }
+        relayToMainApp();
     }
 
     @Override
@@ -54,11 +45,8 @@ public class JobAlertActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         hydrateFromIntent();
-        bindUi();
-
-        if (ALERT_ACTION_ACCEPT.equals(alertAction) || ALERT_ACTION_REJECT.equals(alertAction)) {
-            handleAlertAction(alertAction);
-        }
+        relayedToMainApp = false;
+        relayToMainApp();
     }
 
     @Override
@@ -90,6 +78,13 @@ public class JobAlertActivity extends AppCompatActivity {
 
     @SuppressWarnings("deprecation")
     private void configureLockScreenBehavior() {
+        getWindow().addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+        );
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
@@ -97,61 +92,30 @@ public class JobAlertActivity extends AppCompatActivity {
             if (keyguardManager != null) {
                 keyguardManager.requestDismissKeyguard(this, null);
             }
-        } else {
-            getWindow().addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                    | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-            );
         }
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     private void hydrateFromIntent() {
         android.content.Intent intent = getIntent();
         if (intent == null) return;
         notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
-        title = stringExtra(intent, EXTRA_TITLE);
-        body = stringExtra(intent, EXTRA_BODY);
         jobId = stringExtra(intent, EXTRA_JOB_ID);
         deepLinkPath = stringExtra(intent, EXTRA_DEEP_LINK_PATH);
         alertAction = stringExtra(intent, EXTRA_ALERT_ACTION).toLowerCase();
-
-        if (isBlank(title)) {
-            title = "Emergency Job Alert";
-        }
-        if (isBlank(body)) {
-            body = "A new emergency service request is waiting.";
-        }
     }
 
-    private void bindUi() {
-        TextView alertTitleView = findViewById(R.id.alertTitle);
-        TextView alertBodyView = findViewById(R.id.alertBody);
-        TextView alertJobMetaView = findViewById(R.id.alertJobMeta);
-        Button acceptButton = findViewById(R.id.alertAcceptButton);
-        Button rejectButton = findViewById(R.id.alertRejectButton);
+    private void relayToMainApp() {
+        if (relayedToMainApp) return;
+        relayedToMainApp = true;
 
-        if (alertTitleView != null) {
-            alertTitleView.setText(title);
+        String normalizedAction = String.valueOf(alertAction == null ? "" : alertAction).trim().toLowerCase();
+        if (ALERT_ACTION_ACCEPT.equals(normalizedAction) || ALERT_ACTION_REJECT.equals(normalizedAction)) {
+            handleAlertAction(normalizedAction);
+            return;
         }
-        if (alertBodyView != null) {
-            alertBodyView.setText(body);
-        }
-        if (alertJobMetaView != null) {
-            alertJobMetaView.setText(
-                isBlank(jobId)
-                    ? "Immediate response required"
-                    : ("Job #" + jobId + " - Immediate response required")
-            );
-        }
-        if (acceptButton != null) {
-            acceptButton.setOnClickListener(v -> handleAlertAction(ALERT_ACTION_ACCEPT));
-        }
-        if (rejectButton != null) {
-            rejectButton.setOnClickListener(v -> handleAlertAction(ALERT_ACTION_REJECT));
-        }
+
+        launchMainActivity("");
+        finishAlertActivity();
     }
 
     private void handleAlertAction(String action) {
@@ -230,7 +194,7 @@ public class JobAlertActivity extends AppCompatActivity {
     private String appendAlertActionQuery(String path, String action) {
         if (isBlank(action)) return path;
         String normalizedAction = action.trim().toLowerCase();
-        if (!normalizedAction.equals("accept") && !normalizedAction.equals("reject")) {
+        if (!normalizedAction.equals(ALERT_ACTION_ACCEPT) && !normalizedAction.equals(ALERT_ACTION_REJECT)) {
             return path;
         }
 

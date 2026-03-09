@@ -40,6 +40,11 @@ public class MyFirebaseMessagingService extends MessagingService {
             return;
         }
 
+        if (isAcceptedAssignmentPayload(remoteMessage)) {
+            dismissEmergencyAlert(remoteMessage);
+            return;
+        }
+
         if (isEmergencyPayload(remoteMessage)) {
             launchEmergencyForegroundAlert(remoteMessage);
             return;
@@ -76,6 +81,16 @@ public class MyFirebaseMessagingService extends MessagingService {
 
         String event = value(remoteMessage.getData(), "event");
         return EVENT_JOB_REVOKED.equalsIgnoreCase(event);
+    }
+
+    private boolean isAcceptedAssignmentPayload(RemoteMessage remoteMessage) {
+        String event = value(remoteMessage.getData(), "event");
+        if (!EVENT_JOB_ASSIGNED.equalsIgnoreCase(event)) {
+            return false;
+        }
+
+        String status = value(remoteMessage.getData(), "status");
+        return "accepted".equalsIgnoreCase(status);
     }
 
     private boolean hasRenderableContent(RemoteMessage remoteMessage) {

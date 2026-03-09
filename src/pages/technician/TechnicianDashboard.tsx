@@ -755,12 +755,26 @@ const TechnicianDashboard = () => {
         await hydrateIncomingJobFromDeepLink();
       }
 
-      await refreshActiveJob();
+      const refreshedActiveJob = await refreshActiveJob();
 
       if (routeAction === "accept") {
         setIncomingJob(null);
         setIncomingJobUnavailable(false);
         setShowJobModal(false);
+        navigate("/technician/active-job", {
+          replace: true,
+          state: {
+            jobId: normalizedJobId,
+            job:
+              refreshedActiveJob &&
+              String(refreshedActiveJob?.id || "").trim() === normalizedJobId
+                ? refreshedActiveJob
+                : { id: normalizedJobId, status: "accepted" },
+            alertAction: "accept",
+            alertSource: "system",
+          },
+        });
+        return;
       }
 
       if (location.search || location.state) {
@@ -823,8 +837,20 @@ const TechnicianDashboard = () => {
         };
       });
 
-      await refreshActiveJob();
+      const refreshedActiveJob = await refreshActiveJob();
       startLocationTracking();
+      navigate("/technician/active-job", {
+        state: {
+          jobId: normalizedJobId,
+          job:
+            refreshedActiveJob &&
+            String(refreshedActiveJob?.id || "").trim() === normalizedJobId
+              ? refreshedActiveJob
+              : { id: normalizedJobId, status: "accepted" },
+          alertAction: "accept",
+          alertSource: "system",
+        },
+      });
     } catch (e: any) {
       const statusCode = Number(e?.status || 0);
       if (statusCode === 409) {

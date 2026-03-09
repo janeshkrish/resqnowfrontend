@@ -141,6 +141,7 @@ export const useRealtimeTechnicianRequests = (
     };
 
     socket.on('job_offer', handleNewRequest);
+    socket.on('JOB_ALERT', handleNewRequest);
     socket.on('job:assigned', handleNewRequest);
     socket.on('job_assigned', handleNewRequest);
     socket.on('job:status_update', handleRequestUpdate);
@@ -151,6 +152,7 @@ export const useRealtimeTechnicianRequests = (
 
     return () => {
       socket.off('job_offer', handleNewRequest);
+      socket.off('JOB_ALERT', handleNewRequest);
       socket.off('job:assigned', handleNewRequest);
       socket.off('job_assigned', handleNewRequest);
       socket.off('job:status_update', handleRequestUpdate);

@@ -73,7 +73,7 @@ const JobNotificationModal = () => {
     };
 
     const handleRevoked = (data: Record<string, unknown>) => {
-      const revokedId = String(data?.requestId || data?.id || '').trim();
+      const revokedId = String(data?.requestId || data?.jobId || data?.id || '').trim();
       if (!revokedId) return;
       const currentOffer = jobRequestRef.current;
       if (!currentOffer || String(currentOffer.id) !== revokedId) return;
@@ -83,11 +83,15 @@ const JobNotificationModal = () => {
     };
 
     socket.on('job_offer', handleNewJob);
+    socket.on('JOB_ALERT', handleNewJob);
     socket.on('job:revoked', handleRevoked);
+    socket.on('JOB_TAKEN', handleRevoked);
 
     return () => {
       socket.off('job_offer', handleNewJob);
+      socket.off('JOB_ALERT', handleNewJob);
       socket.off('job:revoked', handleRevoked);
+      socket.off('JOB_TAKEN', handleRevoked);
     };
   }, [socket, isDashboardRoute, acceptedJobId]);
 

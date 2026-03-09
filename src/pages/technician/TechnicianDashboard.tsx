@@ -304,7 +304,7 @@ const TechnicianDashboard = () => {
 
 
     // New: Listen for Broadcast Offers
-    socket.on("job_offer", async (offerData) => {
+    const handleJobOffer = async (offerData: any) => {
       console.log("New Job Offer Received!", offerData);
       const rawRequestId = offerData?.requestId ?? offerData?.id;
       const requestId = rawRequestId != null ? String(rawRequestId).trim() : "";
@@ -366,12 +366,15 @@ const TechnicianDashboard = () => {
       setShowJobModal(true);
 
       playAlertSound();
-    });
+    };
+
+    socket.on("job_offer", handleJobOffer);
+    socket.on("JOB_ALERT", handleJobOffer);
 
     // New: Listen for Revocations (Job Taken)
-    socket.on("job:revoked", (data) => {
+    const handleRevoked = (data: any) => {
       console.log("Job Offer Revoked/Taken", data);
-      const revokedRequestId = String(data?.requestId || data?.id || "").trim();
+      const revokedRequestId = String(data?.requestId || data?.jobId || data?.id || "").trim();
       if (!revokedRequestId) return;
       const currentOffer = incomingJobRef.current;
       if (!currentOffer || String(currentOffer.id) !== revokedRequestId) return;
@@ -379,7 +382,10 @@ const TechnicianDashboard = () => {
       setIncomingJobUnavailable(true);
       setShowJobModal(true);
       toast.warning(JOB_TAKEN_MESSAGE);
-    });
+    };
+
+    socket.on("job:revoked", handleRevoked);
+    socket.on("JOB_TAKEN", handleRevoked);
 
     // ... (rest of listeners)
 
@@ -527,8 +533,10 @@ const TechnicianDashboard = () => {
     return () => {
       socket.off("job:assigned", handleAssignedJob);
       socket.off("job_assigned", handleAssignedJob);
-      socket.off("job_offer");
-      socket.off("job:revoked");
+      socket.off("job_offer", handleJobOffer);
+      socket.off("JOB_ALERT", handleJobOffer);
+      socket.off("job:revoked", handleRevoked);
+      socket.off("JOB_TAKEN", handleRevoked);
       socket.off("job:status_update");
       socket.off("job:list_update");
       socket.off("dashboard:stats_update");

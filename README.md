@@ -47,7 +47,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 
 1.  **Clone the repository**
 
-    ```bash
+    ```bash.
     git clone <your-repo-url>
     cd resqnow
     ```

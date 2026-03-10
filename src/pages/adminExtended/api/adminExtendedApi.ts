@@ -145,7 +145,10 @@ export type FinanceTransactionRow = {
   requestId?: number | null;
   user: string;
   technician: string;
+  upiId?: string | null;
   amount: number;
+  technicianAmount: number;
+  paymentToTechnicianStatus: "pending" | "completed" | string;
   status: string;
   date: string;
 };
@@ -307,6 +310,16 @@ export async function getFinanceTransactions(params: {
     "/finance/transactions",
     { params }
   );
+  return data;
+}
+
+export async function markTechnicianPaymentCompleted(transactionId: number) {
+  const { data } = await adminApi.post<{
+    success: boolean;
+    transactionId: number;
+    paymentToTechnicianStatus: "completed";
+    alreadyCompleted?: boolean;
+  }>(`/pay-technician/${transactionId}`);
   return data;
 }
 

@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertOctagon, Download, FileSearch, Landmark, ReceiptIndianRupee } from "lucide-react";
 import { io, Socket } from "socket.io-client";
@@ -14,6 +14,7 @@ import {
   getFinanceTransactions,
   getFlaggedPayments,
   FinanceTransactionRow,
+  markTechnicianPaymentCompleted,
 } from "./api/adminExtendedApi";
 
 const PAGE_LIMIT = 10;
@@ -99,6 +100,19 @@ export default function AdminExtendedFinancePage() {
     enabled: openModal === "audit",
   });
 
+  const payTechnicianMutation = useMutation({
+    mutationFn: markTechnicianPaymentCompleted,
+    onSuccess: (result) => {
+      toast.success(
+        result.alreadyCompleted
+          ? "Payment to technician is already completed."
+          : "Payment to technician marked as completed."
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "finance"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const onExportCsv = async () => {
     try {
       setExporting(true);
@@ -117,6 +131,11 @@ export default function AdminExtendedFinancePage() {
     }
   };
 
+  const markTechnicianPayment = payTechnicianMutation.mutate;
+  const activePayoutTransactionId = payTechnicianMutation.isPending
+    ? Number(payTechnicianMutation.variables || 0)
+    : null;
+
   const columns = useMemo(
     () => [
       {
@@ -126,11 +145,11 @@ export default function AdminExtendedFinancePage() {
       },
       {
         key: "requestId",
-        header: "REQUEST ID",
+        header: "Request ID",
         render: (row: FinanceTransactionRow) => {
           const requestId = Number(row.requestId);
           if (!Number.isInteger(requestId) || requestId <= 0) {
-            return "—";
+            return "-";
           }
           return <span className="font-semibold text-slate-900">#{requestId}</span>;
         },
@@ -146,9 +165,45 @@ export default function AdminExtendedFinancePage() {
         render: (row: FinanceTransactionRow) => row.technician || "Unassigned",
       },
       {
+        key: "upiId",
+        header: "UPI ID",
+        render: (row: FinanceTransactionRow) => row.upiId || "-",
+      },
+      {
         key: "amount",
         header: "Amount",
         render: (row: FinanceTransactionRow) => <span className="font-medium">{formatCurrency(row.amount)}</span>,
+      },
+      {
+        key: "technicianAmount",
+        header: "Technician Amount",
+        render: (row: FinanceTransactionRow) => <span className="font-medium">{formatCurrency(row.technicianAmount)}</span>,
+      },
+      {
+        key: "paymentToTechnicianStatus",
+        header: "Payment To Technician Status",
+        render: (row: FinanceTransactionRow) => {
+          const payoutStatus = String(row.paymentToTechnicianStatus || "pending").toLowerCase();
+          if (payoutStatus === "completed") {
+            return (
+              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                Completed
+              </span>
+            );
+          }
+
+          const isMarking = activePayoutTransactionId === Number(row.transactionId);
+          return (
+            <button
+              type="button"
+              onClick={() => markTechnicianPayment(Number(row.transactionId))}
+              disabled={isMarking}
+              className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isMarking ? "Updating..." : "Mark as Completed"}
+            </button>
+          );
+        },
       },
       {
         key: "status",
@@ -176,7 +231,7 @@ export default function AdminExtendedFinancePage() {
         render: (row: FinanceTransactionRow) => formatDate(row.date),
       },
     ],
-    []
+    [activePayoutTransactionId, markTechnicianPayment]
   );
 
   const summary = summaryQuery.data;
@@ -238,7 +293,7 @@ export default function AdminExtendedFinancePage() {
         <input
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
-          placeholder="Search by transaction ID, user, or technician"
+          placeholder="Search by transaction ID, user, technician, or UPI"
           className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
         />
         <select
@@ -254,6 +309,8 @@ export default function AdminExtendedFinancePage() {
           <option value="pending">Pending</option>
           <option value="processing">Processing</option>
           <option value="failed">Failed</option>
+          <option value="payment_pending">Payment Pending</option>
+          <option value="payment_completed">Payment Completed</option>
         </select>
       </div>
 
@@ -295,7 +352,7 @@ export default function AdminExtendedFinancePage() {
           {(flaggedQuery.data?.data || []).map((item) => (
             <div key={`flag-${item.transactionId}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
               <p className="font-semibold text-slate-900">
-                #{item.transactionId} • {formatCurrency(item.amount)}
+                #{item.transactionId} / {formatCurrency(item.amount)}
               </p>
               <p className="text-slate-600">
                 {item.user} / {item.technician}
@@ -332,4 +389,3 @@ export default function AdminExtendedFinancePage() {
     </section>
   );
 }
-

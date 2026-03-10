@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Users, UserPlus, LogOut, Settings } from "lucide-react";
+import { Users, UserPlus, LogOut, Settings, CircleDollarSign } from "lucide-react";
 
 const AdminSidebar = () => {
     const location = useLocation();
@@ -28,6 +28,14 @@ const AdminSidebar = () => {
                 >
                     <UserPlus size={20} />
                     <span>Add Technician</span>
+                </Link>
+                <Link
+                    to="/admin/extended/finance"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive("/admin/extended/finance") ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
+                        }`}
+                >
+                    <CircleDollarSign size={20} />
+                    <span>Finance Dashboard</span>
                 </Link>
             </nav>
             <div className="p-4 border-t border-slate-700">

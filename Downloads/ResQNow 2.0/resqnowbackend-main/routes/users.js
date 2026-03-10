@@ -1,0 +1,776 @@
+import { Router } from "express";
+import * as db from "../db.js";
+import * as mail from "../services/mailer.js";
+import { socketService } from "../services/socket.js";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import { getAdminCredentials, signAdminToken, verifyUser } from "../middleware/auth.js";
+
+const router = Router();
+
+
+const JWT_SECRET = String(process.env.JWT_SECRET || "").trim();
+
+function signUserToken(userId, email) {
+  if (!JWT_SECRET) {
+    throw new Error("JWT is not configured.");
+  }
+  return jwt.sign({ userId, email, type: "user", role: "user" }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+const DEFAULT_USER_SETTINGS = Object.freeze({
+  appearance: {
+    theme: "system",
+    force_dark_mode: false
+  },
+  notifications: {
+    service_updates_email: true,
+    marketing_email: true,
+    push_alerts: false
+  },
+  navigation: {
+    mobile_bottom_nav_enabled: true,
+    auto_hide_bottom_nav: true
+  },
+  privacy: {
+    email_visibility: "verified_only"
+  }
+});
+
+const isPlainObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+
+const parseSettings = (value) => {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return isPlainObject(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return isPlainObject(value) ? value : {};
+};
+
+const normalizeUserSettings = (existingValue, patchValue = null) => {
+  const existing = parseSettings(existingValue);
+  const patch = parseSettings(patchValue);
+
+  const merged = {
+    appearance: {
+      ...DEFAULT_USER_SETTINGS.appearance,
+      ...(isPlainObject(existing.appearance) ? existing.appearance : {}),
+      ...(isPlainObject(patch.appearance) ? patch.appearance : {})
+    },
+    notifications: {
+      ...DEFAULT_USER_SETTINGS.notifications,
+      ...(isPlainObject(existing.notifications) ? existing.notifications : {}),
+      ...(isPlainObject(patch.notifications) ? patch.notifications : {})
+    },
+    navigation: {
+      ...DEFAULT_USER_SETTINGS.navigation,
+      ...(isPlainObject(existing.navigation) ? existing.navigation : {}),
+      ...(isPlainObject(patch.navigation) ? patch.navigation : {})
+    },
+    privacy: {
+      ...DEFAULT_USER_SETTINGS.privacy,
+      ...(isPlainObject(existing.privacy) ? existing.privacy : {}),
+      ...(isPlainObject(patch.privacy) ? patch.privacy : {})
+    }
+  };
+
+  if (!["light", "dark", "system"].includes(String(merged.appearance.theme || ""))) {
+    merged.appearance.theme = "system";
+  }
+  merged.appearance.force_dark_mode = !!merged.appearance.force_dark_mode;
+  merged.notifications.service_updates_email = !!merged.notifications.service_updates_email;
+  merged.notifications.marketing_email = !!merged.notifications.marketing_email;
+  merged.notifications.push_alerts = !!merged.notifications.push_alerts;
+  merged.navigation.mobile_bottom_nav_enabled = merged.navigation.mobile_bottom_nav_enabled !== false;
+  merged.navigation.auto_hide_bottom_nav = merged.navigation.auto_hide_bottom_nav !== false;
+
+  return merged;
+};
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function toPositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function buildRequestId(req) {
+  const incoming = String(req.get("x-request-id") || "").trim();
+  if (incoming) return incoming;
+  return `otp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function maskEmail(email) {
+  const value = String(email || "").trim();
+  if (!value || !value.includes("@")) return "";
+  const [name, domain] = value.split("@");
+  if (!name || !domain) return "";
+  if (name.length < 3) return `${name[0] || "*"}***@${domain}`;
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function secureEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ""), "utf8");
+  const rightBuffer = Buffer.from(String(right || ""), "utf8");
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function isAdminCredentialMatch(normalizedEmail, password) {
+  const { email: adminEmail, password: adminPassword } = getAdminCredentials();
+  const normalizedAdminEmail = String(adminEmail || "").trim().toLowerCase();
+  const configuredAdminPassword = String(adminPassword || "");
+
+  if (!normalizedAdminEmail || !configuredAdminPassword) return false;
+  if (normalizedEmail !== normalizedAdminEmail) return false;
+  return secureEqual(password, configuredAdminPassword);
+}
+
+const OTP_TTL_MINUTES = toPositiveInt(process.env.OTP_TTL_MINUTES, 5);
+const OTP_MAX_REQUESTS_PER_HOUR = 3;
+const OTP_COOLDOWN_SECONDS = 60;
+const OTP_HOUR_WINDOW_SECONDS = 60 * 60;
+const OTP_DEBUG_ROUTE_ENABLED = String(process.env.OTP_DEBUG_ROUTE_ENABLED || "").toLowerCase() === "true";
+const OTP_DEBUG_TOKEN = String(process.env.OTP_DEBUG_TOKEN || "").trim();
+
+function toEpochMs(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  const ms = date.getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+async function enforceOtpRateLimit(pool, normalizedEmail) {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // Ensure a row exists for this email before locking it.
+    await connection.execute(
+      `INSERT INTO otp_rate_limits (email, otp_request_count, otp_last_request_time, otp_window_start_time)
+       VALUES (?, 0, NULL, NULL)
+       ON DUPLICATE KEY UPDATE email = VALUES(email)`,
+      [normalizedEmail]
+    );
+
+    const [rows] = await connection.query(
+      `SELECT otp_request_count, otp_last_request_time, otp_window_start_time
+       FROM otp_rate_limits
+       WHERE email = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [normalizedEmail]
+    );
+
+    const row = rows[0] || {};
+    let count = Number(row.otp_request_count || 0);
+    const lastRequestMs = toEpochMs(row.otp_last_request_time);
+    let windowStartMs = toEpochMs(row.otp_window_start_time);
+
+    if (windowStartMs == null) {
+      windowStartMs = lastRequestMs ?? nowMs;
+    }
+
+    if (lastRequestMs != null) {
+      const secondsSinceLastRequest = Math.floor((nowMs - lastRequestMs) / 1000);
+      if (secondsSinceLastRequest < OTP_COOLDOWN_SECONDS) {
+        const retryAfterSeconds = OTP_COOLDOWN_SECONDS - secondsSinceLastRequest;
+        await connection.rollback();
+        return {
+          allowed: false,
+          retryAfterSeconds,
+          error: `Please wait ${retryAfterSeconds} seconds before requesting another OTP.`,
+        };
+      }
+    }
+
+    const windowElapsedSeconds = Math.floor((nowMs - windowStartMs) / 1000);
+    if (windowElapsedSeconds >= OTP_HOUR_WINDOW_SECONDS) {
+      count = 0;
+      windowStartMs = nowMs;
+    }
+
+    if (count >= OTP_MAX_REQUESTS_PER_HOUR) {
+      const retryAfterSeconds = Math.max(1, OTP_HOUR_WINDOW_SECONDS - windowElapsedSeconds);
+      await connection.rollback();
+      return {
+        allowed: false,
+        retryAfterSeconds,
+        error: "Too many OTP requests. Please try again later.",
+      };
+    }
+
+    const nextCount = count + 1;
+    await connection.execute(
+      `UPDATE otp_rate_limits
+       SET otp_request_count = ?, otp_last_request_time = ?, otp_window_start_time = ?
+       WHERE email = ?`,
+      [nextCount, now, new Date(windowStartMs), normalizedEmail]
+    );
+
+    await connection.commit();
+    return {
+      allowed: true,
+      requestCount: nextCount,
+      lastRequestTime: now,
+    };
+  } catch (error) {
+    try {
+      await connection.rollback();
+    } catch {
+      // ignore rollback errors; original error is more important.
+    }
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function handleSendOtp(req, res, { debug = false } = {}) {
+  const requestId = buildRequestId(req);
+  const startedAt = Date.now();
+  const clientIp = req.ip || req.connection?.remoteAddress || "unknown";
+
+  try {
+    const { name, email, password } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    const trimmedName = (name || "").trim();
+
+    if (debug) {
+      console.log("[OTP][DEBUG] Incoming request", {
+        requestId,
+        clientIp,
+        hasName: !!trimmedName,
+        hasEmail: !!normalizedEmail,
+        hasPassword: !!password,
+        email: maskEmail(normalizedEmail),
+        headers: {
+          origin: req.get("origin") || null,
+          userAgent: req.get("user-agent") || null,
+        },
+      });
+    } else {
+      console.log("[OTP] Request received", {
+        requestId,
+        clientIp,
+        email: maskEmail(normalizedEmail),
+      });
+    }
+
+    if (!trimmedName || !normalizedEmail || !password) {
+      return res.status(400).json({ error: "Name, email and password are required." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters." });
+    }
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Invalid email format." });
+    }
+
+    const existingUser = await db.query("SELECT id FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
+    if (existingUser.length > 0) {
+      return res.status(409).json({ error: "This email is already registered. Please log in." });
+    }
+
+    const pool = await db.getPool();
+    const rateLimit = await enforceOtpRateLimit(pool, normalizedEmail);
+    if (!rateLimit.allowed) {
+      if (rateLimit.retryAfterSeconds) {
+        res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
+      }
+      return res.status(429).json({
+        success: false,
+        error: rateLimit.error,
+      });
+    }
+
+    const mailerCheck = await mail.verifyMailerConnectionDetailed({ requestId });
+    if (!mailerCheck.ok) {
+      console.error("[OTP] Mailer verification failed", {
+        requestId,
+        clientIp,
+        email: maskEmail(normalizedEmail),
+        reason: mailerCheck.reason,
+        snapshot: mailerCheck.snapshot,
+        error: mailerCheck.error || null,
+      });
+      return res.status(500).json({
+        success: false,
+        error: "Unable to send OTP email right now. Please try again shortly.",
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+
+    const [insertResult] = await pool.execute(
+      "INSERT INTO otp_requests (email, otp_hash, expires_at) VALUES (?, ?, ?)",
+      [normalizedEmail, otpHash, expiresAt]
+    );
+    const otpRequestId = insertResult.insertId;
+
+    try {
+      await mail.sendMail({
+        to: normalizedEmail,
+        subject: "Your OTP for ResQNow",
+        html: `Hello ${trimmedName},<br><br>Your OTP for verification is: <b>${otp}</b><br><br>It expires in ${OTP_TTL_MINUTES} minutes.<br><br>Regards,<br>ResQNow Team`,
+      });
+    } catch (sendError) {
+      const smtpError = mail.getSmtpErrorDetails(sendError);
+      console.error("[OTP] SMTP send failed", {
+        requestId,
+        clientIp,
+        email: maskEmail(normalizedEmail),
+        otpRequestId,
+        smtpError,
+      });
+      try {
+        await pool.execute("DELETE FROM otp_requests WHERE id = ? LIMIT 1", [otpRequestId]);
+      } catch (cleanupError) {
+        console.error("[OTP] Failed to cleanup OTP row after SMTP failure", {
+          requestId,
+          otpRequestId,
+          cleanupError: cleanupError?.stack || cleanupError?.message || cleanupError,
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        error: "Unable to deliver OTP email at the moment. Please try again.",
+      });
+    }
+
+    const durationMs = Date.now() - startedAt;
+    console.log("[OTP] Sent successfully", {
+      requestId,
+      clientIp,
+      email: maskEmail(normalizedEmail),
+      durationMs,
+    });
+
+    const responsePayload = {
+      success: true,
+      message: "OTP sent to your email.",
+    };
+
+    if (debug) {
+      responsePayload.debug = {
+        requestId,
+        durationMs,
+        mailer: mailerCheck.snapshot,
+      };
+    }
+
+    return res.status(200).json(responsePayload);
+  } catch (error) {
+    console.error("[OTP] send-otp route failed", {
+      requestId,
+      clientIp,
+      error: error?.stack || error?.message || error,
+    });
+    const responsePayload = {
+      success: false,
+      error: "Internal server error while processing OTP request.",
+    };
+    if (debug) {
+      responsePayload.debug = {
+        requestId,
+        message: error?.message || String(error),
+      };
+    }
+    return res.status(500).json(responsePayload);
+  }
+}
+
+// 1. Send OTP (Step 1 of Registration)
+router.post("/send-otp", async (req, res) => {
+  return handleSendOtp(req, res, { debug: false });
+});
+
+// Temporary production debug endpoint for OTP mail flow.
+router.post("/send-otp-debug", async (req, res) => {
+  if (!OTP_DEBUG_ROUTE_ENABLED) {
+    return res.status(404).json({ error: "Not found." });
+  }
+  if (OTP_DEBUG_TOKEN && req.get("x-debug-token") !== OTP_DEBUG_TOKEN) {
+    return res.status(403).json({ error: "Forbidden." });
+  }
+  return handleSendOtp(req, res, { debug: true });
+});
+
+// 2. Verify OTP and Create User (Step 2 of Registration)
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp, name, password } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    const clientIp = req.ip || req.connection.remoteAddress;
+
+    console.log(`[AUTH OTP-VERIFY] Attempt from ${clientIp} for ${normalizedEmail}`);
+
+    if (!normalizedEmail || !otp || !name || !password) {
+      console.warn(`[AUTH OTP-VERIFY] Missing fields from ${clientIp}`);
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const pool = await db.getPool();
+
+    // Verify OTP
+    const [otps] = await pool.query(
+      "SELECT * FROM otp_requests WHERE email = ? AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
+      [normalizedEmail]
+    );
+
+    if (otps.length === 0) {
+      console.warn(`[AUTH OTP-VERIFY] Invalid or expired OTP from ${clientIp} for ${normalizedEmail}`);
+      return res.status(400).json({ error: "Invalid or expired OTP." });
+    }
+
+    const validOtp = await bcrypt.compare(otp, otps[0].otp_hash);
+    if (!validOtp) {
+      console.warn(`[AUTH OTP-VERIFY] Wrong OTP from ${clientIp} for ${normalizedEmail}`);
+      return res.status(400).json({ error: "Invalid OTP." });
+    }
+
+    // Double check user existence
+    const [existing] = await pool.query("SELECT id FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
+    if (existing.length > 0) {
+      console.warn(`[AUTH OTP-VERIFY] User already exists from ${clientIp} for ${normalizedEmail}`);
+      return res.status(409).json({ error: "User already registered." });
+    }
+
+    // Create User
+    const passwordHash = await bcrypt.hash(password, 10);
+    const [result] = await pool.execute(
+      "INSERT INTO users (full_name, email, password_hash, role, is_verified, status) VALUES (?, ?, ?, 'user', 1, 'approved')",
+      [name, normalizedEmail, passwordHash]
+    );
+
+    const userId = result.insertId;
+    const token = signUserToken(userId, normalizedEmail);
+
+    // Cleanup OTPs
+    await pool.execute("DELETE FROM otp_requests WHERE email = ?", [normalizedEmail]);
+
+    console.log(`[AUTH OTP-VERIFY] ✅ Success - User created for ${normalizedEmail} from ${clientIp}`);
+
+    res.status(201).json({
+      token,
+      user: {
+        id: userId,
+        name: name,
+        email: normalizedEmail,
+        isVerified: true
+      }
+    });
+
+  } catch (err) {
+    console.error("[Verify OTP Error]", err);
+    res.status(500).json({ error: "Verification failed." });
+  }
+});
+
+// 3. Login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    const rawPassword = String(password || "");
+    const clientIp = req.ip || req.connection.remoteAddress;
+
+    console.log(`[AUTH LOGIN] Attempt from ${clientIp} for ${normalizedEmail}`);
+
+    if (!normalizedEmail || !rawPassword) {
+      console.warn(`[AUTH LOGIN] Missing credentials from ${clientIp}`);
+      return res.status(400).json({ error: "Email and password are required." });
+    }
+
+    if (isAdminCredentialMatch(normalizedEmail, rawPassword)) {
+      const token = signAdminToken(normalizedEmail);
+      console.log(`[AUTH LOGIN] Admin login success from ${clientIp} for ${normalizedEmail}`);
+      return res.json({
+        token,
+        role: "admin",
+        user: {
+          id: "admin",
+          name: "Admin",
+          email: normalizedEmail,
+          isVerified: true,
+          role: "admin",
+        },
+      });
+    }
+
+    const [user] = await db.query("SELECT * FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
+
+    if (!user) {
+      console.warn(`[AUTH LOGIN] User not found: ${normalizedEmail} from ${clientIp}`);
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    // Check Verify
+    if (!user.is_verified) {
+      console.warn(`[AUTH LOGIN] User not verified: ${normalizedEmail} from ${clientIp}`);
+      return res.status(403).json({ error: "Account not verified." });
+    }
+
+    if (!user.password_hash) {
+      console.warn(`[AUTH LOGIN] User has no password (Google auth only): ${normalizedEmail} from ${clientIp}`);
+      return res.status(401).json({ error: "Please login with Google." });
+    }
+
+    const valid = await bcrypt.compare(rawPassword, user.password_hash);
+    if (!valid) {
+      console.warn(`[AUTH LOGIN] Invalid password for ${normalizedEmail} from ${clientIp}`);
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    const token = signUserToken(user.id, user.email);
+    console.log(`[AUTH LOGIN] ✅ Success for ${normalizedEmail} from ${clientIp}`);
+
+    res.json({
+      token,
+      role: "user",
+      user: {
+        id: user.id,
+        name: user.full_name,
+        email: user.email,
+        isVerified: true,
+        role: "user",
+      },
+    });
+
+  } catch (err) {
+    console.error("[User Login Error]", err);
+    return res.status(500).json({ error: "Login failed." });
+  }
+});
+
+
+// 4. Update Profile
+router.put('/:id', verifyUser, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { name, phone, birthday, gender } = req.body;
+
+    // Security check: Ensure token user matches param user (or is admin - omitted for now)
+    if (String(req.user.userId || req.user.id) !== String(userId)) {
+      return res.status(403).json({ error: "Forbidden: Cannot update other users." });
+    }
+
+    const updates = [];
+    const values = [];
+
+    if (name) {
+      updates.push("full_name = ?");
+      values.push(name);
+    }
+    if (phone !== undefined) {
+      updates.push("phone = ?");
+      values.push(phone);
+    }
+    if (birthday !== undefined) {
+      updates.push("birthday = ?");
+      values.push(birthday);
+    }
+    if (gender !== undefined) {
+      updates.push("gender = ?");
+      values.push(gender);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields to update." });
+    }
+
+    values.push(userId);
+
+    const sql = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
+
+    // console.log("Executing Update:", sql, values); // Debug
+
+    const pool = await db.getPool();
+    await pool.execute(sql, values);
+
+    // Fetch updated user to return
+    const [rows] = await pool.query("SELECT id, full_name, email, phone, birthday, gender, is_verified, subscription, google_id FROM users WHERE id = ?", [userId]);
+    const updatedUser = rows[0];
+
+    res.json({
+      message: "Profile updated successfully.",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.full_name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        birthday: updatedUser.birthday,
+        gender: updatedUser.gender,
+        isVerified: !!updatedUser.is_verified,
+        subscription: updatedUser.subscription,
+        googleId: updatedUser.google_id
+      }
+    });
+
+  } catch (err) {
+    console.error("[Update Profile Error]", err);
+    res.status(500).json({ error: "Failed to update profile." });
+  }
+});
+
+router.get('/me/settings', verifyUser, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const pool = await db.getPool();
+    const [rows] = await pool.query("SELECT settings FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    return res.json(normalizeUserSettings(rows[0]?.settings));
+  } catch (err) {
+    console.error("[Get User Settings Error]", err);
+    return res.status(500).json({ error: "Failed to fetch settings." });
+  }
+});
+
+router.patch('/me/settings', verifyUser, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    if (!isPlainObject(req.body)) {
+      return res.status(400).json({ error: "Invalid settings payload." });
+    }
+
+    const pool = await db.getPool();
+    const [rows] = await pool.query("SELECT settings FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const settings = normalizeUserSettings(rows[0]?.settings, req.body);
+    await pool.execute("UPDATE users SET settings = ? WHERE id = ?", [JSON.stringify(settings), userId]);
+
+    socketService.notifyUser(userId, "user:settings_update", settings);
+
+    return res.json({
+      success: true,
+      settings
+    });
+  } catch (err) {
+    console.error("[Update User Settings Error]", err);
+    return res.status(500).json({ error: "Failed to update settings." });
+  }
+});
+
+router.post('/reviews', verifyUser, async (req, res) => {
+  try {
+    const authUserId = req.user.userId || req.user.id;
+    const technician_id = req.body?.technician_id ?? req.body?.technicianId;
+    const request_id = req.body?.request_id ?? req.body?.requestId ?? null;
+    const rating = req.body?.rating;
+    const comment = req.body?.comment;
+
+    if (!authUserId) {
+      return res.status(401).json({ error: "Unauthorized user context." });
+    }
+
+    const normalizedTechnicianId = Number(technician_id);
+    const normalizedRating = Number(rating);
+    const normalizedRequestId =
+      request_id === null || request_id === undefined || String(request_id).trim() === ""
+        ? null
+        : Number(request_id);
+
+    if (!technician_id || !rating) {
+      return res.status(400).json({ error: "Missing required fields for review." });
+    }
+    if (!Number.isFinite(normalizedTechnicianId) || normalizedTechnicianId <= 0) {
+      return res.status(400).json({ error: "Invalid technician id." });
+    }
+    if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
+      return res.status(400).json({ error: "Rating must be between 1 and 5." });
+    }
+    if (normalizedRequestId !== null && (!Number.isFinite(normalizedRequestId) || normalizedRequestId <= 0)) {
+      return res.status(400).json({ error: "Invalid request id." });
+    }
+
+    const pool = await db.getPool();
+    if (normalizedRequestId !== null) {
+      const [requestRows] = await pool.query(
+        "SELECT id, user_id, technician_id, status FROM service_requests WHERE id = ? LIMIT 1",
+        [normalizedRequestId]
+      );
+      if (requestRows.length === 0) {
+        return res.status(404).json({ error: "Service request not found." });
+      }
+      const request = requestRows[0];
+      if (String(request.user_id) !== String(authUserId)) {
+        return res.status(403).json({ error: "You can only review your own request." });
+      }
+      if (String(request.technician_id) !== String(normalizedTechnicianId)) {
+        return res.status(400).json({ error: "Technician mismatch for this request." });
+      }
+      if (!['completed', 'paid'].includes(String(request.status || '').toLowerCase())) {
+        return res.status(400).json({ error: "Review allowed only after completion/payment." });
+      }
+    }
+
+    const [existing] = await pool.query(
+      "SELECT id FROM reviews WHERE user_id = ? AND technician_id = ? AND service_request_id = ? LIMIT 1",
+      [authUserId, normalizedTechnicianId, normalizedRequestId]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Review already submitted for this request." });
+    }
+
+    const [userRows] = await pool.query("SELECT full_name FROM users WHERE id = ? LIMIT 1", [authUserId]);
+    const reviewerName = userRows[0]?.full_name || "Customer";
+
+    const [insertResult] = await pool.execute(
+      "INSERT INTO reviews (user_id, technician_id, rating, comment, service_request_id) VALUES (?, ?, ?, ?, ?)",
+      [authUserId, normalizedTechnicianId, normalizedRating, comment || '', normalizedRequestId]
+    );
+
+    // Update technician average rating
+    const [rows] = await pool.query("SELECT AVG(rating) as avg_rating FROM reviews WHERE technician_id = ?", [normalizedTechnicianId]);
+    const avg = rows[0]?.avg_rating || 0;
+
+    await pool.execute("UPDATE technicians SET rating = ? WHERE id = ?", [avg.toFixed(1), normalizedTechnicianId]);
+
+    // Notify technician dynamically
+    const newReview = {
+      id: insertResult.insertId,
+      user_id: authUserId,
+      technician_id: normalizedTechnicianId,
+      rating: normalizedRating,
+      comment,
+      created_at: new Date(),
+      reviewer_name: reviewerName
+    };
+    socketService.notifyTechnician(normalizedTechnicianId, 'technician:new_review', newReview);
+
+    res.json({
+      success: true,
+      message: "Review submitted successfully",
+      data: {
+        reviewId: insertResult.insertId,
+        technicianId: normalizedTechnicianId,
+        requestId: normalizedRequestId,
+        rating: normalizedRating,
+      }
+    });
+
+  } catch (err) {
+    console.error("Submit review error:", err);
+    res.status(500).json({ error: "Failed to submit review", details: err.sqlMessage || err.message });
+  }
+});
+
+export default router;
+

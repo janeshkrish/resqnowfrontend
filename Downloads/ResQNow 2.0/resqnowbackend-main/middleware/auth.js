@@ -1,0 +1,96 @@
+import jwt from "jsonwebtoken";
+
+function getJwtSecret() {
+  const secret = String(process.env.JWT_SECRET || "").trim();
+  if (!secret) {
+    throw new Error("JWT_SECRET is not configured.");
+  }
+  return secret;
+}
+
+function resolveTokenRole(payload) {
+  return String(payload?.role || payload?.type || "").trim().toLowerCase();
+}
+
+export function verifyTechnician(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) {
+    console.log("[Auth] No token provided");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), getJwtSecret());
+    const role = resolveTokenRole(payload);
+    if (role !== "technician") {
+      console.log(`[Auth] Forbidden: Expected technician, got ${role || "unknown"}`);
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    req.technicianId = payload.id || payload.technicianId;
+    req.technicianEmail = payload.email;
+    next();
+  } catch (err) {
+    console.log("[Auth] Token verification failed:", err.message);
+    if (err.message === "JWT_SECRET is not configured.") {
+      return res.status(500).json({ error: "Server auth is not configured." });
+    }
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
+
+export function verifyUser(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), getJwtSecret());
+    const role = resolveTokenRole(payload);
+    if (role && role !== "user" && role !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    req.user = payload;
+    next();
+  } catch (err) {
+    if (err.message === "JWT_SECRET is not configured.") {
+      return res.status(500).json({ error: "Server auth is not configured." });
+    }
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
+
+export function verifyAdmin(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), getJwtSecret());
+    const role = resolveTokenRole(payload);
+    if (role !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    req.admin = payload;
+    req.adminEmail = payload.email;
+    next();
+  } catch (err) {
+    if (err.message === "JWT_SECRET is not configured.") {
+      return res.status(500).json({ error: "Server auth is not configured." });
+    }
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
+
+export function getAdminCredentials() {
+  return {
+    email: process.env.ADMIN_EMAIL || "",
+    password: process.env.ADMIN_PASSWORD || "",
+  };
+}
+
+export function signTechnicianToken(id, email) {
+  return jwt.sign({ id, email, type: "technician", role: "technician" }, getJwtSecret(), { expiresIn: "7d" });
+}
+
+export function signAdminToken(email) {
+  return jwt.sign({ email, type: "admin", role: "admin" }, getJwtSecret(), { expiresIn: "1d" });
+}

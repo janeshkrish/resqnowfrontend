@@ -1,0 +1,748 @@
+import { Router } from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import * as db from "../db.js";
+import * as mail from "../services/mailer.js";
+import { addClient } from "../sse.js";
+import { getAdminCredentials, signAdminToken, verifyAdmin } from "../middleware/auth.js";
+import { getFrontendUrl } from "../config/network.js";
+import { canonicalizeServiceDomain, canonicalizeVehicleFamily } from "../services/serviceNormalization.js";
+import { runDispatchMatrixAudit } from "../services/dispatchMatrixAudit.js";
+import { getDashboard, getAdminAuditLogs } from "../controllers/adminController.js";
+import {
+  getRequests,
+  assignRequest,
+  escalateRequest,
+  markHighPriority,
+  closeRequest,
+} from "../controllers/requestController.js";
+import {
+  getTechnicians,
+  toggleTechnicianVisibility,
+  addTechnicianNote,
+} from "../controllers/technicianController.js";
+import {
+  getFinanceSummary,
+  getFinanceTransactions,
+  exportFinanceCsv,
+  getFlaggedPayments,
+} from "../controllers/financeController.js";
+import { getAnalytics } from "../controllers/analyticsController.js";
+import {
+  createComplaint,
+  getComplaints,
+  assignComplaint,
+  resolveComplaint,
+  addComplaintInternalNote,
+} from "../controllers/complaintController.js";
+import {
+  adminExtendedEmergencyMessage,
+  adminExtendedSystemAnnouncement,
+  adminExtendedTechnicianBroadcast,
+} from "../services/adminExtendedNotifier.js";
+import {
+  ADMIN_NOTIFICATION_TYPES,
+  ADMIN_NOTIFICATION_TYPE_FILTER_VALUES,
+  normalizeAdminNotificationType,
+} from "../services/adminNotificationTypes.js";
+
+const router = Router();
+const JWT_SECRET = String(process.env.JWT_SECRET || "").trim();
+
+router.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  const { email: adminEmail, password: adminPassword } = getAdminCredentials();
+  if (!adminEmail || !adminPassword) {
+    return res.status(503).json({ error: "Admin login is not configured." });
+  }
+  if ((email || "").trim().toLowerCase() !== adminEmail.trim().toLowerCase() || password !== adminPassword) {
+    return res.status(401).json({ error: "Invalid email or password." });
+  }
+  const token = signAdminToken(adminEmail);
+  return res.json({
+    token,
+    admin: { email: adminEmail, name: "Admin", role: "admin", id: "admin" },
+  });
+});
+
+// Protect every admin endpoint except /login.
+router.use((req, res, next) => {
+  return verifyAdmin(req, res, next);
+});
+
+// --- Admin Extended SaaS API contract (/api/admin/*) ---
+router.get("/dashboard", getDashboard);
+
+router.get("/requests", getRequests);
+router.post("/assign", assignRequest);
+router.post("/escalate", escalateRequest);
+router.post("/requests/high-priority", markHighPriority);
+router.post("/close", closeRequest);
+router.post("/requests/close", closeRequest);
+
+router.get("/technicians", getTechnicians);
+router.post("/technician/toggle", toggleTechnicianVisibility);
+router.post("/technician/note", addTechnicianNote);
+
+router.get("/finance/summary", getFinanceSummary);
+router.get("/finance", getFinanceTransactions);
+router.get("/finance/transactions", getFinanceTransactions);
+router.get("/finance/export", exportFinanceCsv);
+router.get("/finance/flagged", getFlaggedPayments);
+router.get("/finance/audit-logs", getAdminAuditLogs);
+
+router.get("/analytics", getAnalytics);
+
+router.post("/complaints", createComplaint);
+router.get("/complaints", getComplaints);
+router.post("/complaints/assign", assignComplaint);
+router.post("/complaints/resolve", resolveComplaint);
+router.post("/complaints/internal-note", addComplaintInternalNote);
+
+const ADMIN_NOTIFICATION_TYPE_PLACEHOLDERS = ADMIN_NOTIFICATION_TYPE_FILTER_VALUES
+  .map(() => "?")
+  .join(", ");
+
+function resolveAdminId(req) {
+  return String(req.adminEmail || req.admin?.email || "admin");
+}
+
+function normalizeTechnicianIds(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((id) => Number(String(id || "").replace(/#/g, "").trim()))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )
+  );
+}
+
+async function persistAdminSystemAlert(title, message) {
+  const pool = await db.getPool();
+  const [insertResult] = await pool.execute(
+    `INSERT INTO notifications (type, title, message, is_read)
+     VALUES (?, ?, ?, 0)`,
+    [ADMIN_NOTIFICATION_TYPES.SYSTEM_ALERT, title, message]
+  );
+  return Number(insertResult.insertId);
+}
+
+async function sendAdminSystemAnnouncement(req, res) {
+  const title = String(req.body?.title || "").trim();
+  const message = String(req.body?.message || "").trim();
+  if (!title || !message) {
+    return res.status(400).json({ error: "title and message are required." });
+  }
+
+  const payload = await adminExtendedSystemAnnouncement({
+    adminId: resolveAdminId(req),
+    title,
+    message,
+    metadata: req.body?.metadata || null,
+  });
+  const notificationId = await persistAdminSystemAlert(title, message);
+  return res.status(201).json({ success: true, notificationId, payload });
+}
+
+async function sendAdminTechnicianBroadcast(req, res) {
+  const title = String(req.body?.title || "").trim();
+  const message = String(req.body?.message || "").trim();
+  const technicianIds = normalizeTechnicianIds(req.body?.technicianIds);
+
+  if (!title || !message) {
+    return res.status(400).json({ error: "title and message are required." });
+  }
+  if (technicianIds.length === 0) {
+    return res.status(400).json({ error: "At least one technicianId is required." });
+  }
+
+  const payload = await adminExtendedTechnicianBroadcast({
+    adminId: resolveAdminId(req),
+    title,
+    message,
+    metadata: req.body?.metadata || null,
+    technicianIds,
+  });
+  const notificationId = await persistAdminSystemAlert(title, message);
+  return res.status(201).json({ success: true, notificationId, payload });
+}
+
+async function sendAdminEmergencyMessage(req, res) {
+  const title = String(req.body?.title || "").trim();
+  const message = String(req.body?.message || "").trim();
+  if (!title || !message) {
+    return res.status(400).json({ error: "title and message are required." });
+  }
+
+  const payload = await adminExtendedEmergencyMessage({
+    adminId: resolveAdminId(req),
+    title,
+    message,
+    metadata: {
+      ...(req.body?.metadata || {}),
+      priority: "HIGH",
+      sound: true,
+    },
+  });
+  const notificationId = await persistAdminSystemAlert(title, message);
+  return res.status(201).json({ success: true, notificationId, payload });
+}
+
+router.post("/notifications/broadcast", async (req, res) => {
+  try {
+    const type = String(req.body?.type || "system").trim().toLowerCase();
+    if (type === "technician") {
+      return await sendAdminTechnicianBroadcast(req, res);
+    }
+    if (type === "emergency") {
+      return await sendAdminEmergencyMessage(req, res);
+    }
+    return await sendAdminSystemAnnouncement(req, res);
+  } catch (error) {
+    console.error("[Admin notifications broadcast]", error);
+    return res.status(500).json({ error: "Failed to broadcast notification." });
+  }
+});
+
+router.post("/notifications/system", async (req, res) => {
+  try {
+    return await sendAdminSystemAnnouncement(req, res);
+  } catch (error) {
+    console.error("[Admin notifications system]", error);
+    return res.status(500).json({ error: "Failed to send system announcement." });
+  }
+});
+
+router.post("/notifications/technician", async (req, res) => {
+  try {
+    return await sendAdminTechnicianBroadcast(req, res);
+  } catch (error) {
+    console.error("[Admin notifications technician]", error);
+    return res.status(500).json({ error: "Failed to send technician broadcast." });
+  }
+});
+
+router.post("/notifications/emergency", async (req, res) => {
+  try {
+    return await sendAdminEmergencyMessage(req, res);
+  } catch (error) {
+    console.error("[Admin notifications emergency]", error);
+    return res.status(500).json({ error: "Failed to send emergency message." });
+  }
+});
+
+// --- Notifications ---
+
+// 1. Get notifications stream (SSE)
+router.get("/notifications/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  addClient(res);
+
+  req.on("close", () => {
+    // Client handling is done in sse.js, but we can log here if needed
+  });
+});
+
+// 2. Get notification count (unread)
+router.get("/notifications/count", async (_req, res) => {
+  try {
+    const pool = await db.getPool();
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM notifications
+       WHERE is_read = 0
+         AND LOWER(COALESCE(type, '')) IN (${ADMIN_NOTIFICATION_TYPE_PLACEHOLDERS})`,
+      ADMIN_NOTIFICATION_TYPE_FILTER_VALUES
+    );
+    const unreadCount = Number(rows?.[0]?.count || 0);
+
+    const [pendingRows] = await pool.query("SELECT COUNT(*) as count FROM technicians WHERE status = 'pending'");
+    const pendingApplications = Number(pendingRows?.[0]?.count || 0);
+
+    return res.json({ count: unreadCount, pendingApplications });
+  } catch (err) {
+    console.error("[Admin notifications count]", err);
+    return res.status(500).json({ error: "Failed to fetch notification count." });
+  }
+});
+
+// 3. Get list of notifications (pagination)
+router.get("/notifications", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit || "10"), 10) || 10, 1), 100);
+    const offset = Math.max(Number.parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+
+    const pool = await db.getPool();
+    const [rows] = await pool.query(
+      `SELECT *
+       FROM notifications
+       WHERE LOWER(COALESCE(type, '')) IN (${ADMIN_NOTIFICATION_TYPE_PLACEHOLDERS})
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...ADMIN_NOTIFICATION_TYPE_FILTER_VALUES, limit, offset]
+    );
+
+    const mappedRows = (rows || []).map((row) => ({
+      ...row,
+      type: normalizeAdminNotificationType(row.type) || row.type,
+    }));
+
+    return res.json(mappedRows);
+  } catch (err) {
+    console.error("[Admin notifications list]", err);
+    return res.status(500).json({ error: "Failed to fetch notifications." });
+  }
+});
+
+// 4. Mark as read
+router.post("/notifications/:id/read", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid notification id." });
+    }
+
+    const pool = await db.getPool();
+    const [updateResult] = await pool.execute(
+      `UPDATE notifications
+       SET is_read = 1
+       WHERE id = ?
+         AND LOWER(COALESCE(type, '')) IN (${ADMIN_NOTIFICATION_TYPE_PLACEHOLDERS})`,
+      [id, ...ADMIN_NOTIFICATION_TYPE_FILTER_VALUES]
+    );
+    if (Number(updateResult?.affectedRows || 0) === 0) {
+      return res.status(404).json({ error: "Notification not found." });
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[Admin notification read]", err);
+    return res.status(500).json({ error: "Failed to mark notification as read." });
+  }
+});
+
+router.delete("/notifications/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid notification id." });
+    }
+
+    const pool = await db.getPool();
+    const [deleteResult] = await pool.execute(
+      `DELETE FROM notifications
+       WHERE id = ?
+         AND LOWER(COALESCE(type, '')) IN (${ADMIN_NOTIFICATION_TYPE_PLACEHOLDERS})`,
+      [id, ...ADMIN_NOTIFICATION_TYPE_FILTER_VALUES]
+    );
+    if (Number(deleteResult?.affectedRows || 0) === 0) {
+      return res.status(404).json({ error: "Notification not found." });
+    }
+    return res.json({ success: true, id });
+  } catch (err) {
+    console.error("[Admin notification delete]", err);
+    return res.status(500).json({ error: "Failed to delete notification." });
+  }
+});
+
+router.get("/dispatch-audit/:requestId", async (req, res) => {
+  try {
+    const requestId = Number(req.params.requestId);
+    if (!Number.isFinite(requestId)) {
+      return res.status(400).json({ error: "Invalid request id." });
+    }
+
+    const pool = await db.getPool();
+    const [reqRows] = await pool.query("SELECT * FROM service_requests WHERE id = ? LIMIT 1", [requestId]);
+    const requestRow = reqRows?.[0];
+    if (!requestRow) {
+      return res.status(404).json({ error: "Service request not found." });
+    }
+
+    const [technicianRows] = await pool.query("SELECT * FROM technicians");
+    const [offerRows] = await pool.query(
+      "SELECT technician_id, status, sent_at, expires_at FROM dispatch_offers WHERE service_request_id = ?",
+      [requestId]
+    );
+    const offerMap = new Map((offerRows || []).map((o) => [String(o.technician_id), o]));
+
+    const { jobDispatchService } = await import("../services/jobDispatchService.js");
+    const { criteria, analysis, reasonCounts } = jobDispatchService.analyzeTechnicians(
+      {
+        id: requestRow.id,
+        location_lat: requestRow.location_lat,
+        location_lng: requestRow.location_lng,
+        service_type: requestRow.service_type,
+        vehicle_type: requestRow.vehicle_type,
+        address: requestRow.address
+      },
+      technicianRows,
+      null
+    );
+
+    const enriched = analysis
+      .map((row) => {
+        const offer = offerMap.get(String(row.technicianId));
+        return {
+          technician_id: row.technicianId,
+          name: row.name,
+          status: row.status,
+          is_active: row.is_active,
+          is_available: row.is_available,
+          service_type: row.service_type,
+          vehicle_types: row.vehicle_types,
+          service_area_range: row.service_area_range,
+          distance_km: Number.isFinite(Number(row.distanceKm)) ? Number(Number(row.distanceKm).toFixed(2)) : null,
+          eligible: row.eligible,
+          reject_reasons: row.reasons,
+          matched_domain: row.matchedDomain,
+          matched_vehicle: row.matchedVehicle,
+          technician_domains: row.technicianDomains,
+          technician_vehicles: row.technicianVehicles,
+          dispatch_offer_status: offer?.status || null,
+          dispatch_offer_sent_at: offer?.sent_at || null,
+          dispatch_offer_expires_at: offer?.expires_at || null
+        };
+      })
+      .sort((a, b) => {
+        if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
+        const da = Number.isFinite(Number(a.distance_km)) ? Number(a.distance_km) : Number.POSITIVE_INFINITY;
+        const dbv = Number.isFinite(Number(b.distance_km)) ? Number(b.distance_km) : Number.POSITIVE_INFINITY;
+        return da - dbv;
+      });
+
+    const summary = {
+      total_technicians: enriched.length,
+      eligible_count: enriched.filter((r) => r.eligible).length,
+      rejected_count: enriched.filter((r) => !r.eligible).length,
+      rejection_reason_counts: reasonCounts
+    };
+
+    return res.json({
+      request: {
+        id: requestRow.id,
+        status: requestRow.status,
+        service_type: requestRow.service_type,
+        vehicle_type: requestRow.vehicle_type,
+        canonical_service_domain: canonicalizeServiceDomain(String(requestRow.service_type || "").replace(/^(car|bike|ev|commercial)-/i, "")),
+        canonical_vehicle_type: canonicalizeVehicleFamily(requestRow.vehicle_type || String(requestRow.service_type || "").split("-")[0]),
+        address: requestRow.address,
+        location_lat: requestRow.location_lat,
+        location_lng: requestRow.location_lng,
+        created_at: requestRow.created_at
+      },
+      criteria,
+      summary,
+      technicians: enriched
+    });
+  } catch (err) {
+    console.error("[Admin dispatch audit]", err);
+    return res.status(500).json({ error: "Failed to generate dispatch audit." });
+  }
+});
+
+router.get("/dispatch-matrix-audit", async (req, res) => {
+  try {
+    const parseList = (value) =>
+      String(value || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+    const parseBool = (value, fallback = false) => {
+      if (value == null || value === "") return fallback;
+      const normalized = String(value).trim().toLowerCase();
+      return normalized === "1" || normalized === "true" || normalized === "yes";
+    };
+
+    const serviceDomains = parseList(req.query.service_domains);
+    const vehicleTypes = parseList(req.query.vehicle_types);
+    const simulateReady = parseBool(req.query.simulate_ready, false);
+    const includePassing = parseBool(req.query.include_passing, true);
+
+    const report = await runDispatchMatrixAudit({
+      serviceDomains: serviceDomains.length > 0 ? serviceDomains : undefined,
+      vehicleTypes: vehicleTypes.length > 0 ? vehicleTypes : undefined,
+      simulateReady,
+    });
+
+    if (!includePassing) {
+      return res.json({
+        ...report,
+        matrix: report.missing_coverage,
+      });
+    }
+
+    return res.json(report);
+  } catch (err) {
+    console.error("[Admin dispatch matrix audit]", err);
+    return res.status(500).json({ error: "Failed to generate dispatch matrix audit." });
+  }
+});
+
+router.post("/dispatch-retry/:requestId", async (req, res) => {
+  try {
+    const requestId = Number(req.params.requestId);
+    if (!Number.isFinite(requestId)) {
+      return res.status(400).json({ error: "Invalid request id." });
+    }
+
+    const pool = await db.getPool();
+    const [reqRows] = await pool.query("SELECT * FROM service_requests WHERE id = ? LIMIT 1", [requestId]);
+    const requestRow = reqRows?.[0];
+    if (!requestRow) {
+      return res.status(404).json({ error: "Service request not found." });
+    }
+
+    if (requestRow.technician_id) {
+      return res.status(400).json({ error: "Request already assigned to a technician." });
+    }
+    if (String(requestRow.status || "").toLowerCase() !== "pending") {
+      return res.status(400).json({ error: "Only pending requests can be re-dispatched." });
+    }
+
+    const [beforeOffers] = await pool.query(
+      "SELECT id, technician_id, status, sent_at FROM dispatch_offers WHERE service_request_id = ?",
+      [requestId]
+    );
+    const beforeOfferIds = new Set((beforeOffers || []).map((o) => Number(o.id)));
+
+    const { jobDispatchService } = await import("../services/jobDispatchService.js");
+    const candidates = await jobDispatchService.findTopTechnicians(requestRow, null);
+    await jobDispatchService.dispatchJob(requestRow, candidates);
+
+    const [afterOffers] = await pool.query(
+      "SELECT id, technician_id, status, sent_at FROM dispatch_offers WHERE service_request_id = ? ORDER BY id DESC",
+      [requestId]
+    );
+    const newlyCreatedOffers = (afterOffers || []).filter((o) => !beforeOfferIds.has(Number(o.id)));
+
+    return res.json({
+      success: true,
+      request: {
+        id: requestRow.id,
+        status: requestRow.status,
+        service_type: requestRow.service_type,
+        vehicle_type: requestRow.vehicle_type,
+      },
+      candidates_found: candidates.length,
+      offers_before: (beforeOffers || []).length,
+      offers_after: (afterOffers || []).length,
+      new_offers_created: newlyCreatedOffers.length,
+      new_offers: newlyCreatedOffers.map((o) => ({
+        id: o.id,
+        technician_id: o.technician_id,
+        status: o.status,
+        sent_at: o.sent_at,
+      })),
+    });
+  } catch (err) {
+    console.error("[Admin dispatch retry]", err);
+    return res.status(500).json({ error: "Failed to retry dispatch." });
+  }
+});
+
+// --- Technician management (admin only) ---
+
+router.get("/technicians", async (req, res) => {
+  try {
+    const status = (req.query.status || "").toLowerCase();
+    let rows;
+    if (status === "pending" || status === "approved" || status === "rejected") {
+      rows = await db.query("SELECT * FROM technicians WHERE status = ? ORDER BY created_at DESC", [status]);
+    } else {
+      rows = await db.query("SELECT * FROM technicians ORDER BY created_at DESC");
+    }
+    // Using simple mapping here to avoid dependency on rowToTechnician from technicians.js
+    // Or we could duplicate the mapper or move it to a shared util.
+    // For now, let's just return raw rows or minimal map, frontend expects specific fields.
+    // Actually, let's replicate the mapper roughly or select specific fields.
+    return res.json(rows);
+  } catch (err) {
+    console.error("[Admin technicians list]", err);
+    return res.status(500).json({ error: "Failed to fetch technicians." });
+  }
+});
+
+router.put("/technicians/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { name, email, phone, service_type, status } = req.body;
+    const trimmedName = (name || "").trim();
+    const normalizedEmail = (email || "").trim().toLowerCase();
+
+    if (!trimmedName || !normalizedEmail) {
+      return res.status(400).json({ error: "Name and email are required." });
+    }
+
+    const pool = await db.getPool();
+
+    // Check if technician exists
+    const [existing] = await pool.query("SELECT id FROM technicians WHERE id = ?", [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: "Technician not found." });
+    }
+
+    // Check unique email if changed
+    const [emailCheck] = await pool.query("SELECT id FROM technicians WHERE email = ? AND id != ?", [normalizedEmail, id]);
+    if (emailCheck.length > 0) {
+      return res.status(409).json({ error: "Email already in use by another technician." });
+    }
+
+    await pool.execute(
+      "UPDATE technicians SET name = ?, email = ?, phone = ?, service_type = ?, status = ? WHERE id = ?",
+      [trimmedName, normalizedEmail, phone, service_type, status, id]
+    );
+
+    return res.json({ message: "Technician updated successfully.", id });
+  } catch (err) {
+    console.error("[Admin update technician]", err);
+    return res.status(500).json({ error: "Failed to update technician." });
+  }
+});
+
+router.delete("/technicians/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const pool = await db.getPool();
+    const [result] = await pool.execute("DELETE FROM technicians WHERE id = ?", [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Technician not found." });
+    }
+    return res.json({ message: "Technician deleted successfully." });
+  } catch (err) {
+    console.error("[Admin delete technician]", err);
+    return res.status(500).json({ error: "Failed to delete technician." });
+  }
+});
+
+// --- User management (admin only) ---
+
+router.get("/users", async (req, res) => {
+  try {
+    const rows = await db.query(
+      "SELECT id, full_name, email, email_confirmed, created_at FROM users ORDER BY created_at DESC"
+    );
+    return res.json(rows.map((r) => ({
+      id: r.id,
+      full_name: r.full_name,
+      email: r.email,
+      email_confirmed: Boolean(r.email_confirmed),
+      created_at: r.created_at,
+    })));
+  } catch (err) {
+    console.error("[Admin users list]", err);
+    return res.status(500).json({ error: "Failed to fetch users." });
+  }
+});
+
+router.post("/users", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    const trimmedName = (name || "").trim();
+    if (!trimmedName || !normalizedEmail || !password) {
+      return res.status(400).json({ error: "Name, email and password are required." });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
+    const existing = await db.query("SELECT id FROM users WHERE email = ? LIMIT 1", [normalizedEmail]);
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "A user with this email already exists." });
+    }
+    const password_hash = await bcrypt.hash(password, 10);
+    const pool = await db.getPool();
+    const [insertResult] = await pool.execute(
+      "INSERT INTO users (full_name, email, password_hash, status) VALUES (?, ?, ?, 'approved')",
+      [trimmedName, normalizedEmail, password_hash]
+    );
+    const insertId = insertResult.insertId;
+    if (insertId != null) {
+      if (!JWT_SECRET) {
+        return res.status(503).json({ error: "JWT is not configured." });
+      }
+      const confirmationToken = jwt.sign({ userId: insertId, email: normalizedEmail }, JWT_SECRET, { expiresIn: "1d" });
+      const confirmationUrl = `${getFrontendUrl()}/confirm-email?token=${encodeURIComponent(confirmationToken)}`;
+      try {
+        await mail.sendMail({
+          to: normalizedEmail,
+          subject: "Confirm Your Email for ResQNow",
+          html: `Hello ${trimmedName},<br><br>An admin created an account for you. Please click the link below to confirm your email:<br><br><a href="${confirmationUrl}">Confirm Email</a><br><br>This link expires in 24 hours.<br><br>Regards,<br>ResQNow Team`,
+        });
+      } catch (mailErr) {
+        console.error("[Admin add user confirmation email failed]", mailErr?.message || mailErr);
+      }
+    }
+    return res.status(201).json({
+      id: insertId,
+      full_name: trimmedName,
+      email: normalizedEmail,
+      message: "User created. A confirmation email has been sent.",
+    });
+  } catch (err) {
+    console.error("[Admin add user]", err);
+    return res.status(500).json({ error: "Failed to create user." });
+  }
+});
+
+router.put("/users/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { name, password } = req.body;
+    const trimmedName = (name || "").trim();
+
+    if (!trimmedName) {
+      return res.status(400).json({ error: "Name is required." });
+    }
+
+    const pool = await db.getPool();
+    const [existing] = await pool.query("SELECT id FROM users WHERE id = ?", [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (password && password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
+
+    if (password) {
+      const password_hash = await bcrypt.hash(password, 10);
+      await pool.execute(
+        "UPDATE users SET full_name = ?, password_hash = ? WHERE id = ?",
+        [trimmedName, password_hash, id]
+      );
+    } else {
+      await pool.execute(
+        "UPDATE users SET full_name = ? WHERE id = ?",
+        [trimmedName, id]
+      );
+    }
+
+    return res.json({ message: "User updated successfully.", id, full_name: trimmedName });
+  } catch (err) {
+    console.error("[Admin update user]", err);
+    return res.status(500).json({ error: "Failed to update user." });
+  }
+});
+
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const pool = await db.getPool();
+    const [result] = await pool.execute("DELETE FROM users WHERE id = ?", [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    return res.status(200).json({ message: "User deleted." });
+  } catch (err) {
+    console.error("[Admin delete user]", err);
+    return res.status(500).json({ error: "Failed to delete user." });
+  }
+});
+
+export default router;

@@ -1,0 +1,235 @@
+# ResQNow Backend
+
+Production-ready Node.js + Express backend for the ResQNow roadside assistance platform.
+
+## Description
+
+This service handles user authentication, technician onboarding, dispatch workflows, payments, invoices, notifications, and public utility APIs.
+
+## Features
+
+- JWT auth for users, technicians, and admins
+- Google OAuth sign-in callback flow
+- Technician onboarding and approval lifecycle
+- Service request creation, matching, assignment, and status transitions
+- Razorpay payments for booking, registration, subscriptions, and dues
+- Invoice PDF generation and email notifications
+- Real-time updates with Socket.IO
+- Public APIs for stats, contact form, and reverse geocoding
+- Health and readiness probes for deployment platforms
+
+## Installation
+
+1. Clone repository.
+2. Enter backend directory:
+
+```bash
+cd resqnowbackend
+```
+
+3. Install dependencies:
+
+```bash
+npm install
+```
+
+4. Configure environment variables in `.env`.
+
+## Environment Variables
+
+### Required
+
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `DB_SSL` (set `true` for managed cloud DBs)
+- `JWT_SECRET`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `EMAIL_USER` *(Gmail address; for other providers supply the full sender address)*
+- `EMAIL_PASS` *(use an app-specific password for Gmail/Google Workspace accounts)*
+- `SMTP_HOST` and `SMTP_PORT` *(optional – both must be set together; if omitted the code falls back to the Gmail service)*
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
+- `RAZORPAY_PAYOUT_ACCOUNT_NUMBER`
+- `RAZORPAY_PAYOUT_KEY_ID` *(optional, defaults to `RAZORPAY_KEY_ID`)*
+- `RAZORPAY_PAYOUT_KEY_SECRET` *(optional, defaults to `RAZORPAY_KEY_SECRET`)*
+- `RECON_WORKER_EMBEDDED` *(optional, defaults to `true`)*
+- `RECONCILIATION_CRON` *(optional, defaults to hourly `0 * * * *`)*
+- `RECON_ALERT_EMAIL` *(optional, falls back to `ADMIN_EMAIL`)*
+- `RECON_SLACK_WEBHOOK_URL` *(optional, for reconciliation discrepancy alerts)*
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_CALLBACK_URL` *(must equal `https://<backend-public-url>/auth/google/callback`)*
+- `FRONTEND_URL`
+- `REDIS_URL` *(required for queue-based dispatch)*
+
+> Example email block for `.env`:
+> ```
+> EMAIL_USER=youremail@gmail.com
+> EMAIL_PASS=my-app-password
+> # optional custom SMTP
+> SMTP_HOST=smtp.gmail.com
+> SMTP_PORT=587
+> ```
+> Never store your normal login password; create an app password in Google Security settings.
+
+### Production (Render + Vercel)
+
+- `BACKEND_URL=https://resqnowbackend.onrender.com`
+- `BACKEND_PUBLIC_URL=https://resqnowbackend.onrender.com`
+- `FRONTEND_URL=https://resqnow.org`
+- `FRONTEND_PUBLIC_URL=https://resqnow.org`
+
+> **Google OAuth setup:** make sure the _full_ callback URI is configured in Google Cloud (not just the domain).
+> Example authorized redirect URI in Cloud Console:
+> `https://resqnowbackend.onrender.com/auth/google/callback`
+> and match the value of `GOOGLE_CALLBACK_URL` below.
+
+- `GOOGLE_CALLBACK_URL=https://resqnowbackend.onrender.com/auth/google/callback`
+- `CORS_ALLOWED_ORIGINS=https://resqnow.org,https://www.resqnow.org`
+
+## Run
+
+### Development
+
+```bash
+npm run dev
+```
+
+### Build Check
+
+```bash
+npm run build
+```
+
+### Production
+
+```bash
+npm start
+```
+
+### Dispatch Worker (BullMQ)
+
+Run a dedicated queue worker process:
+
+```bash
+npm run worker:dispatch
+```
+
+For Render with a separate worker service:
+- Web service command: `npm start`
+- Worker service command: `npm run worker:dispatch`
+- Set `DISPATCH_WORKER_EMBEDDED=false` on the web service to avoid running duplicate embedded workers.
+
+### Payout Worker (BullMQ)
+
+Run a dedicated payout worker process:
+
+```bash
+npm run worker:payout
+```
+
+For Render with a separate worker service:
+- Web service command: `npm start`
+- Worker service command: `npm run worker:payout`
+- Set `PAYOUT_WORKER_EMBEDDED=false` on the web service to avoid running duplicate embedded workers.
+
+### Reconciliation Worker (BullMQ)
+
+Run a dedicated reconciliation worker process:
+
+```bash
+npm run worker:reconciliation
+```
+
+For Render with a separate worker service:
+- Web service command: `npm start`
+- Worker service command: `npm run worker:reconciliation`
+- Set `RECON_WORKER_EMBEDDED=false` on the web service.
+- Reconciliation schedule defaults to hourly (`RECONCILIATION_CRON=0 * * * *`).
+
+## API Endpoint Overview
+
+Base prefix: `/api`
+
+- `POST /api/admin/login`
+- `GET /api/admin/analytics`
+- `GET /api/admin/notifications`
+- `GET /api/auth/google/url`
+- `GET /api/auth/google/callback`
+- `GET /api/auth/verify`
+- `GET /api/auth/me`
+- `POST /api/users/send-otp`
+- `POST /api/users/verify-otp`
+- `POST /api/users/login`
+- `POST /api/technicians/register`
+- `POST /api/technicians/login`
+- `GET /api/technicians/public-list`
+- `GET /api/technicians/nearby`
+- `GET /api/service-requests`
+- `POST /api/service-requests`
+- `POST /api/service-requests/:id/payment-order`
+- `POST /api/payments/create-order`
+- `POST /api/payments/confirm`
+- `POST /api/payments/webhook`
+- `POST /api/payments/razorpay/webhook`
+- `GET /api/payments/monitoring/health`
+- `POST /api/payments/reconciliation/run`
+- `POST /api/payments/reconciliation/run-sync`
+- `GET /api/payments/reconciliation/summary`
+- `GET /api/payments/reconciliation/discrepancies`
+- `GET /api/payments/config`
+- `GET /api/public/stats`
+- `POST /api/public/contact`
+- `GET /health`
+- `GET /ready`
+
+## Folder Structure
+
+```text
+resqnowbackend/
+  config/         # CORS, origin policy, URL helpers
+  middleware/     # Auth middlewares and token helpers
+  routes/         # Route modules (auth, users, technicians, payments, etc.)
+  services/       # Business/domain services
+  uploads/        # Optional static assets (legacy/non-critical)
+  scripts/        # Build and maintenance scripts
+  db.js           # MySQL connection pool + schema assurance
+  index.js        # App bootstrap, startup, routes, health checks
+  loadEnv.js      # Environment file loader
+```
+
+## Testing Instructions
+
+No dedicated automated test suite is currently committed.
+
+Run validation commands:
+
+```bash
+npm run build
+npx depcheck
+```
+
+Runtime smoke checks:
+
+```bash
+npm start
+# then verify /health and /ready
+npm run worker:payout
+```
+
+## Contribution Guide
+
+1. Create a feature branch.
+2. Keep changes scoped and backward-compatible where possible.
+3. Run `npm run build` before opening PR.
+4. Update docs for any endpoint or env changes.
+5. Open PR with change summary and validation notes.
+
+## License
+
+UNLICENSED (private project).

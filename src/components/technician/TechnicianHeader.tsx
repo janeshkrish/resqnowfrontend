@@ -14,48 +14,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User, Settings } from "lucide-react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
-import { apiUrl } from "@/lib/api";
-
-import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
-// Duplicate import removed
 
 const TechnicianHeader = () => {
-  const { technician, isAuthenticated, logout, token, isOnline, setIsOnline } = useTechnicianAuth();
+  const { technician, isAuthenticated, logout } = useTechnicianAuth();
   const { clearAcceptedJobId } = useTechnicianJob();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Use effect to fetch current status if needed, or just assume offline on load
-  //Ideally we should fetch this from backend
 
   const handleLogout = () => {
     clearAcceptedJobId();
     logout();
     navigate("/technician/login");
-  };
-
-  const toggleAvailability = async (checked: boolean) => {
-    try {
-      const response = await fetch(apiUrl("/api/technicians/me/status"), {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ active: checked })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setIsOnline(checked);
-        toast.success(checked ? "You are now Online" : "You are now Offline");
-      } else {
-        toast.error("Failed to update status");
-      }
-    } catch (error) {
-      console.error("Status update error", error);
-      toast.error("Network error");
-    }
   };
 
   const getInitials = (name: string) => {
@@ -106,18 +75,6 @@ const TechnicianHeader = () => {
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
             <>
-              {/* Online/Offline Toggle Pillar */}
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${isOnline ? 'bg-green-50 border-green-200' : 'bg-muted border-border'} transition-colors`}>
-                <span className={`text-[11px] uppercase tracking-widest font-black ${isOnline ? "text-green-700" : "text-muted-foreground/80"}`}>
-                  {isOnline ? "Online" : "Offline"}
-                </span>
-                <Switch
-                  checked={isOnline}
-                  onCheckedChange={toggleAvailability}
-                  className="scale-90 data-[state=checked]:bg-green-600"
-                />
-              </div>
-
               {/* Profile Avatar Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

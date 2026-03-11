@@ -169,13 +169,20 @@ const ActiveJob = () => {
 
     try {
       const idToUse = job.requestId || job.id;
-      const response = await fetch(apiUrl(`/api/service-requests/${idToUse}/technician-status`), {
-        method: 'PATCH',
+      const isCompletionFlow = normalizedNextStatus === 'completed';
+      const response = await fetch(
+        isCompletionFlow
+          ? apiUrl('/api/jobs/complete')
+          : apiUrl(`/api/service-requests/${idToUse}/technician-status`),
+        {
+        method: isCompletionFlow ? 'POST' : 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ status: normalizedNextStatus })
+        body: isCompletionFlow
+          ? JSON.stringify({ jobId: idToUse })
+          : JSON.stringify({ status: normalizedNextStatus })
       });
 
       const data = await response.json();
@@ -329,7 +336,7 @@ const ActiveJob = () => {
           {status === 'arrived' && (
             <Button
               className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-              onClick={() => updateStatus('payment_pending')}
+              onClick={() => updateStatus('completed')}
               disabled={isLoading}
             >
               {isLoading ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle className="mr-2 h-5 w-5" />}

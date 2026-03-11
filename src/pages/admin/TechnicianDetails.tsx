@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,22 +12,82 @@ import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/
 import TechnicianReviews from "@/components/rating/TechnicianReviews";
 import {
   User,
-  Mail,
-  Phone,
   MapPin,
-  Map,
   Globe,
   Briefcase,
   Star,
   CheckCircle,
   XCircle,
   Loader2,
-  FileText,
-  Key,
   Clock,
   Smartphone,
-  Wrench
+  Wrench,
+  Plus,
+  Trash2
 } from "lucide-react";
+
+type EditableServiceCostRow = {
+  service_name: string;
+  vehicle_type_pricing: string;
+  visit_charge: string;
+  service_charge: string;
+  delivery_charge: string;
+  labour_min: string;
+  labour_max: string;
+  extra_km_charge: string;
+};
+
+type EditableTechnicianForm = {
+  shop_name: string;
+  proprietor_name: string;
+  contact: string;
+  address: string;
+  services: string;
+  service_costs: EditableServiceCostRow[];
+  documents: {
+    profile_photo: string;
+    garage_front: string;
+    tools_photo: string;
+    facilities_photo: string;
+  };
+};
+
+const EMPTY_SERVICE_COST_ROW: EditableServiceCostRow = {
+  service_name: "",
+  vehicle_type_pricing: "",
+  visit_charge: "",
+  service_charge: "",
+  delivery_charge: "",
+  labour_min: "",
+  labour_max: "",
+  extra_km_charge: "",
+};
+
+const toEditableServiceCostRows = (value: any): EditableServiceCostRow[] => {
+  const rows: any[] = [];
+  if (Array.isArray(value)) {
+    rows.push(...value);
+  } else if (value && typeof value === "object") {
+    Object.entries(value).forEach(([serviceName, config]) => {
+      if (config && typeof config === "object") {
+        rows.push({ service_name: serviceName, ...config });
+      } else {
+        rows.push({ service_name: serviceName, service_charge: config });
+      }
+    });
+  }
+
+  return rows.map((row) => ({
+    service_name: String(row?.service_name || row?.service_domain || "").trim(),
+    vehicle_type_pricing: String(row?.vehicle_type_pricing || row?.vehicle_type || "").trim(),
+    visit_charge: String(row?.visit_charge ?? row?.visitCharge ?? row?.base_charge ?? ""),
+    service_charge: String(row?.service_charge ?? row?.serviceCharge ?? row?.amount ?? row?.price ?? ""),
+    delivery_charge: String(row?.delivery_charge ?? row?.deliveryCharge ?? ""),
+    labour_min: String(row?.labour_min ?? row?.labourMin ?? ""),
+    labour_max: String(row?.labour_max ?? row?.labourMax ?? ""),
+    extra_km_charge: String(row?.extra_km_charge ?? row?.extraKmCharge ?? ""),
+  }));
+};
 
 const TechnicianDetails = () => {
   const { technicianId } = useParams<{ technicianId: string }>();
@@ -35,8 +95,23 @@ const TechnicianDetails = () => {
   const [loading, setLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [decisionReason, setDecisionReason] = useState("");
   const [approvalAudit, setApprovalAudit] = useState<any[]>([]);
+  const [editForm, setEditForm] = useState<EditableTechnicianForm>({
+    shop_name: "",
+    proprietor_name: "",
+    contact: "",
+    address: "",
+    services: "",
+    service_costs: [],
+    documents: {
+      profile_photo: "",
+      garage_front: "",
+      tools_photo: "",
+      facilities_photo: "",
+    },
+  });
 
   const resolveDocumentUrl = (value?: string) => {
     const raw = String(value || "").trim();
@@ -46,25 +121,41 @@ const TechnicianDetails = () => {
     return raw.startsWith("/") ? raw : `/${raw}`;
   };
 
-  useEffect(() => {
-    const fetchTechnicianDetails = async () => {
-      if (!technicianId) return;
-      try {
-        const res = await apiFetch(`/api/technicians/${technicianId}`, { method: "GET", admin: true });
-        if (!res.ok) {
-          setTechnician(null);
-          return;
-        }
-        const data = await res.json();
-        setTechnician(mapTechnicianData(data));
-      } catch {
-        toast.error("Failed to load technician details");
-      } finally {
-        setLoading(false);
+  const fetchTechnicianDetails = useCallback(async () => {
+    if (!technicianId) return;
+    try {
+      const res = await apiFetch(`/api/technicians/${technicianId}`, { method: "GET", admin: true });
+      if (!res.ok) {
+        setTechnician(null);
+        return;
       }
-    };
-    fetchTechnicianDetails();
+      const data = await res.json();
+      const mapped = mapTechnicianData(data);
+      setTechnician(mapped);
+      setEditForm({
+        shop_name: mapped.name || "",
+        proprietor_name: mapped.proprietor_name || "",
+        contact: mapped.phone || "",
+        address: mapped.address || "",
+        services: Array.isArray(mapped.specialties) ? mapped.specialties.join(", ") : "",
+        service_costs: toEditableServiceCostRows(mapped.service_costs),
+        documents: {
+          profile_photo: String(mapped.documents?.profile_photo || ""),
+          garage_front: String(mapped.documents?.garage_front || ""),
+          tools_photo: String(mapped.documents?.tools_photo || ""),
+          facilities_photo: String(mapped.documents?.facilities_photo || ""),
+        },
+      });
+    } catch {
+      toast.error("Failed to load technician details");
+    } finally {
+      setLoading(false);
+    }
   }, [technicianId]);
+
+  useEffect(() => {
+    fetchTechnicianDetails();
+  }, [fetchTechnicianDetails]);
 
   useEffect(() => {
     const fetchApprovalAudit = async () => {
@@ -162,6 +253,84 @@ const TechnicianDetails = () => {
     }
   };
 
+  const handleServiceCostChange = (
+    index: number,
+    field: keyof EditableServiceCostRow,
+    value: string
+  ) => {
+    setEditForm((prev) => {
+      const nextRows = [...prev.service_costs];
+      nextRows[index] = { ...nextRows[index], [field]: value };
+      return { ...prev, service_costs: nextRows };
+    });
+  };
+
+  const addServiceCostRow = () => {
+    setEditForm((prev) => ({
+      ...prev,
+      service_costs: [...prev.service_costs, { ...EMPTY_SERVICE_COST_ROW }]
+    }));
+  };
+
+  const removeServiceCostRow = (index: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      service_costs: prev.service_costs.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSaveChanges = async () => {
+    if (!technicianId) return;
+    setIsSaving(true);
+    try {
+      const toNumberOrNull = (value: string) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+      };
+
+      const payload = {
+        shop_name: editForm.shop_name.trim(),
+        proprietor_name: editForm.proprietor_name.trim(),
+        contact: editForm.contact.trim(),
+        address: editForm.address.trim(),
+        services: editForm.services
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        service_costs: editForm.service_costs
+          .map((row) => ({
+            service_name: row.service_name.trim(),
+            vehicle_type_pricing: row.vehicle_type_pricing.trim() || null,
+            visit_charge: toNumberOrNull(row.visit_charge),
+            service_charge: toNumberOrNull(row.service_charge),
+            delivery_charge: toNumberOrNull(row.delivery_charge),
+            labour_min: toNumberOrNull(row.labour_min),
+            labour_max: toNumberOrNull(row.labour_max),
+            extra_km_charge: toNumberOrNull(row.extra_km_charge),
+          }))
+          .filter((row) => row.service_name),
+        verification_images: { ...editForm.documents },
+      };
+
+      const res = await apiFetch(`/api/admin/update-technician/${technicianId}`, {
+        method: "PUT",
+        admin: true,
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to update technician.");
+      }
+
+      toast.success("Technician updated successfully");
+      await fetchTechnicianDetails();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update technician.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container py-8">
@@ -200,17 +369,23 @@ const TechnicianDetails = () => {
           <h1 className="text-2xl font-bold">Technician Profile</h1>
           <p className="text-muted-foreground">Review application details and make decisions</p>
         </div>
-        <Badge
-          variant={
-            technician.verification_status === "pending" ? "secondary" :
-              technician.verification_status === "verified" ? "success" : "destructive"
-          }
-          className="text-sm py-1 px-3"
-        >
-          {technician.verification_status === "pending" && "Pending"}
-          {technician.verification_status === "verified" && "Approved"}
-          {technician.verification_status === "rejected" && "Rejected"}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            variant={
+              technician.verification_status === "pending" ? "secondary" :
+                technician.verification_status === "verified" ? "success" : "destructive"
+            }
+            className="text-sm py-1 px-3"
+          >
+            {technician.verification_status === "pending" && "Pending"}
+            {technician.verification_status === "verified" && "Approved"}
+            {technician.verification_status === "rejected" && "Rejected"}
+          </Badge>
+          <Button onClick={handleSaveChanges} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save Changes
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -221,12 +396,12 @@ const TechnicianDetails = () => {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: "Profile", src: technician.documents?.profile_photo, icon: User },
-                  { label: "Shop Front", src: technician.documents?.garage_front, icon: MapPin },
-                  { label: "Tools", src: technician.documents?.tools_photo, icon: Wrench },
-                  { label: "Facilities", src: technician.documents?.facilities_photo, icon: Briefcase },
+                  { key: "profile_photo", label: "Profile", icon: User },
+                  { key: "garage_front", label: "Shop Front", icon: MapPin },
+                  { key: "tools_photo", label: "Tools", icon: Wrench },
+                  { key: "facilities_photo", label: "Facilities", icon: Briefcase },
                 ].map((item, i) => {
-                  const imageSrc = resolveDocumentUrl(item.src);
+                  const imageSrc = resolveDocumentUrl(editForm.documents[item.key as keyof EditableTechnicianForm["documents"]]);
                   return (
                   <div key={i} className="border rounded-lg p-2 text-center">
                     <div className="mb-2 h-24 bg-muted/50 rounded flex items-center justify-center overflow-hidden">
@@ -237,6 +412,21 @@ const TechnicianDetails = () => {
                       )}
                     </div>
                     <p className="text-xs font-medium">{item.label}</p>
+                    <input
+                      type="text"
+                      className="mt-2 w-full rounded border border-input bg-transparent px-2 py-1 text-[11px]"
+                      placeholder="Image URL / path"
+                      value={editForm.documents[item.key as keyof EditableTechnicianForm["documents"]] || ""}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          documents: {
+                            ...prev.documents,
+                            [item.key]: e.target.value
+                          }
+                        }))
+                      }
+                    />
                   </div>
                 )})}
               </div>
@@ -249,12 +439,41 @@ const TechnicianDetails = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div><p className="text-sm text-muted-foreground">Shop Name</p><p className="font-medium">{technician.name}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Proprietor Name</p><p className="font-medium">{technician.proprietor_name || "-"}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Contact</p><p className="font-medium">{technician.phone} / {technician.email}</p></div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Shop Name</p>
+                    <input
+                      className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                      value={editForm.shop_name}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, shop_name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Proprietor Name</p>
+                    <input
+                      className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                      value={editForm.proprietor_name}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, proprietor_name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Contact Number</p>
+                    <input
+                      className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                      value={editForm.contact}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, contact: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Email: {technician.email}</p>
+                  </div>
                 </div>
                 <div className="space-y-4">
-                  <div><p className="text-sm text-muted-foreground">Address</p><p className="font-medium">{technician.address}</p></div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Address</p>
+                    <textarea
+                      className="w-full min-h-[96px] rounded border border-input bg-transparent px-3 py-2 text-sm"
+                      value={editForm.address}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, address: e.target.value }))}
+                    />
+                  </div>
                   <div><p className="text-sm text-muted-foreground">Location</p><p className="font-medium">{technician.district}, {technician.state} ({technician.locality})</p></div>
                   <div><p className="text-sm text-muted-foreground">Experience</p><p className="font-medium">{technician.experience} Years (Range: {technician.serviceAreaRange}km)</p></div>
                 </div>
@@ -295,33 +514,144 @@ const TechnicianDetails = () => {
           <Card>
             <CardHeader><CardTitle>Service Configuration</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {(technician.specialties || []).map((s, i) => <Badge key={i}>{s}</Badge>)}
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground mb-1">Services (comma separated)</p>
+                <input
+                  className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                  value={editForm.services}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, services: e.target.value }))}
+                  placeholder="battery, flat_tire, fuel"
+                />
               </div>
+
               <div className="flex flex-wrap gap-2 mb-4">
-                {Object.entries(technician.vehicle_types || {})
-                  .filter(([, enabled]) => Boolean(enabled))
-                  .map(([vehicleKey]) => <Badge key={vehicleKey} variant="outline">{vehicleKey}</Badge>)}
-                {Object.entries(technician.vehicle_types || {}).filter(([, enabled]) => Boolean(enabled)).length === 0 && (
-                  <span className="text-sm text-muted-foreground">Vehicle types not configured</span>
+                {editForm.services
+                  .split(",")
+                  .map((service) => service.trim())
+                  .filter(Boolean)
+                  .map((service) => (
+                    <Badge key={service}>{service}</Badge>
+                  ))}
+              </div>
+
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium">Service Pricing</p>
+                <Button type="button" variant="outline" size="sm" onClick={addServiceCostRow}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Service Price
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {editForm.service_costs.length === 0 && (
+                  <div className="rounded border border-dashed p-4 text-sm text-muted-foreground">
+                    No service pricing configured. Add at least one service pricing row.
+                  </div>
                 )}
-              </div>
-              <div className="space-y-4">
-                {technician.service_costs && Array.isArray(technician.service_costs) && technician.service_costs.map((sc: any, idx: number) => (
-                  <div key={idx} className="border rounded p-3 bg-muted text-sm">
-                    <p className="font-bold text-muted-foreground">{sc.service_name}</p>
-                    <div className="grid grid-cols-2 gap-2 mt-2 text-muted-foreground">
-                      {Object.entries(sc).filter(([k]) => k !== 'service_name').map(([k, v]) => (
-                        <div key={k}><span className="capitalize">{k.replace(/_/g, ' ')}:</span> <span className="font-medium text-foreground">{String(v)}</span></div>
-                      ))}
+
+                {editForm.service_costs.map((row, idx) => (
+                  <div key={`service-cost-${idx}`} className="rounded border p-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Service Domain</p>
+                        <input
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.service_name}
+                          onChange={(e) => handleServiceCostChange(idx, "service_name", e.target.value)}
+                          placeholder="battery"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Vehicle Type</p>
+                        <input
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.vehicle_type_pricing}
+                          onChange={(e) => handleServiceCostChange(idx, "vehicle_type_pricing", e.target.value)}
+                          placeholder="2w / 4w / both"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-3 md:grid-cols-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Visit Charge</p>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.visit_charge}
+                          onChange={(e) => handleServiceCostChange(idx, "visit_charge", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Service Charge</p>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.service_charge}
+                          onChange={(e) => handleServiceCostChange(idx, "service_charge", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Delivery Charge</p>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.delivery_charge}
+                          onChange={(e) => handleServiceCostChange(idx, "delivery_charge", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Extra KM Charge</p>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.extra_km_charge}
+                          onChange={(e) => handleServiceCostChange(idx, "extra_km_charge", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-3 md:grid-cols-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Labour Min</p>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.labour_min}
+                          onChange={(e) => handleServiceCostChange(idx, "labour_min", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Labour Max</p>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
+                          value={row.labour_max}
+                          onChange={(e) => handleServiceCostChange(idx, "labour_max", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => removeServiceCostRow(idx)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove
+                      </Button>
                     </div>
                   </div>
                 ))}
-                {technician.service_costs && !Array.isArray(technician.service_costs) && typeof technician.service_costs === "object" && (
-                  <div className="border rounded p-3 bg-muted text-sm">
-                    <pre className="whitespace-pre-wrap break-words text-muted-foreground">{JSON.stringify(technician.service_costs, null, 2)}</pre>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

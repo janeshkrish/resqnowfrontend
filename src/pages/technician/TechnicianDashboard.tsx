@@ -595,12 +595,15 @@ const TechnicianDashboard = () => {
 
       const useAcceptEndpoint =
         status === "accepted" && options?.useAcceptEndpoint !== false;
+      const useCompleteEndpoint = status === "completed";
       const endpoint = useAcceptEndpoint
         ? apiUrl("/api/jobs/accept")
+        : useCompleteEndpoint
+          ? apiUrl("/api/jobs/complete")
         : apiUrl(`/api/service-requests/${normalizedJobId}/technician-status`);
 
-      const method = useAcceptEndpoint ? 'POST' : 'PATCH';
-      const body = useAcceptEndpoint ? { jobId: normalizedJobId } : { status };
+      const method = useAcceptEndpoint || useCompleteEndpoint ? 'POST' : 'PATCH';
+      const body = useAcceptEndpoint || useCompleteEndpoint ? { jobId: normalizedJobId } : { status };
 
       const res = await fetch(endpoint, {
         method,
@@ -1168,6 +1171,11 @@ const TechnicianDashboard = () => {
       ? null
       : Number(activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge))
     : null;
+  const activeJobDialablePhone = String(
+    activeJob?.contact_phone ?? activeJob?.phoneNumber ?? activeJob?.user?.phone ?? ""
+  )
+    .trim()
+    .replace(/[^\d+]/g, "");
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
   if (!technician) return <Navigate to="/technician/login" replace />;
@@ -1208,24 +1216,6 @@ const TechnicianDashboard = () => {
     <div className="min-h-screen bg-[#f3f4f6] pb-24 md:pb-8 selection:bg-primary/20 relative">
       <div className="container max-w-md mx-auto px-4 pt-6 pb-24 space-y-5">
 
-        {/* Offline Warning Banner */}
-        {!isOnline && !isBusy && (
-          <div onClick={() => handleToggleAvailability(true)} className="bg-card dark:bg-slate-900 rounded-3xl p-4 flex items-center justify-between shadow-sm border border-border cursor-pointer active:scale-[0.98] transition-all">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center border border-border">
-                <AlertCircle className="w-6 h-6 text-slate-400" />
-              </div>
-              <div className="flex flex-col">
-                <p className="font-bold text-foreground leading-tight mb-0.5">You are Offline</p>
-                <p className="text-[11px] text-muted-foreground/80 leading-snug">Tap to go online and get jobs</p>
-              </div>
-            </div>
-            <div className="h-8 px-4 bg-green-50 text-green-700 rounded-full flex items-center justify-center font-bold text-xs uppercase tracking-wide border border-green-200">
-              Go Online
-            </div>
-          </div>
-        )}
-
         {/* 1. MAP SECTION (NOW AT THE TOP) */}
         {!activeJob && (
           <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-sm border border-border overflow-hidden relative">
@@ -1258,6 +1248,24 @@ const TechnicianDashboard = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {!activeJob && (
+          <div className="flex justify-center">
+            <div className="w-[220px] bg-card dark:bg-slate-900 border border-border rounded-[20px] shadow-[0_4px_10px_rgba(0,0,0,0.08)] px-4 py-3 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Status</span>
+                <span className={`text-sm font-black ${isOnline ? "text-green-700" : "text-slate-500"}`}>
+                  {isOnline ? "ONLINE" : "OFFLINE"}
+                </span>
+              </div>
+              <Switch
+                checked={isOnline}
+                onCheckedChange={handleToggleAvailability}
+                className="data-[state=checked]:bg-green-600"
+              />
             </div>
           </div>
         )}
@@ -1421,9 +1429,11 @@ const TechnicianDashboard = () => {
               <div className="space-y-3">
                 {activeJob.status !== 'pending' && activeJob.status !== 'paid' && (
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" asChild>
-                      <a href={`tel:${activeJob.contact_phone}`}><PhoneCall className="w-4 h-4 mr-2" /> <span className="font-bold">Call</span></a>
-                    </Button>
+                    {activeJobDialablePhone && (
+                      <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" asChild>
+                        <a href={`tel:${activeJobDialablePhone}`}><PhoneCall className="w-4 h-4 mr-2" /> <span className="font-bold">Call</span></a>
+                      </Button>
+                    )}
                     <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" onClick={openNavigation}>
                       <Navigation className="w-4 h-4 mr-2" /> <span className="font-bold">Nav</span>
                     </Button>
@@ -1463,7 +1473,7 @@ const TechnicianDashboard = () => {
                 )}
 
                 {activeJob.status === 'in-progress' && (
-                  <Button className="w-full h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('payment_pending')}>
+                  <Button className="w-full h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('completed')}>
                     COMPLETE WORK
                   </Button>
                 )}

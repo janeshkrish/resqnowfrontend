@@ -99,6 +99,10 @@ const snapSheetHeight = (value: number) =>
 
 const normalizeRequestStatus = (value: unknown) => {
   const raw = String(value || "").trim().toLowerCase();
+  if (raw === "accepted" || raw === "technician_assigned") return "assigned";
+  if (raw === "on_the_way" || raw === "on-the-way" || raw === "en_route") return "en-route";
+  if (raw === "service_started" || raw === "service-started" || raw === "service started") return "in-progress";
+  if (raw === "processing") return "in-progress";
   if (raw === "awaiting_payment") return "payment_pending";
   if (raw === "in_progress") return "in-progress";
   return raw || "pending";

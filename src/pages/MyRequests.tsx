@@ -84,23 +84,34 @@ const MyRequests = () => {
 
     fetchRequests();
 
-    // Poll every 3 seconds for smoother review/payment state updates
-    const intervalId = setInterval(fetchRequests, 3000);
+    // Poll every 2 seconds to keep request progress updates near real-time.
+    const intervalId = setInterval(fetchRequests, 2000);
 
     return () => clearInterval(intervalId);
 
   }, [user]);
 
   const getStatusBadge = (status: string | null) => {
-    switch (status) {
+    const normalized = String(status || "").trim().toLowerCase();
+    switch (normalized) {
       case 'pending':
         return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> Pending</Badge>;
+      case 'accepted':
+      case 'technician_assigned':
       case 'assigned':
         return <Badge className="bg-blue-500 gap-1"><Wrench className="h-3 w-3" /> Assigned</Badge>;
+      case 'on_the_way':
+      case 'on-the-way':
+      case 'en_route':
       case 'en-route':
         return <Badge className="bg-amber-500 gap-1"><Car className="h-3 w-3" /> En Route</Badge>;
+      case 'service_started':
+      case 'in_progress':
       case 'in-progress':
         return <Badge className="bg-purple-500 gap-1"><Wrench className="h-3 w-3" /> In Progress</Badge>;
+      case 'awaiting_payment':
+      case 'payment_pending':
+        return <Badge className="bg-yellow-500 gap-1"><Clock className="h-3 w-3" /> Waiting for payment</Badge>;
       case 'completed':
         return <Badge className="bg-green-500 gap-1"><CheckCircle className="h-3 w-3" /> Completed</Badge>;
       case 'paid':

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
 import { toast } from 'sonner';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface RequestData {
   id: string;
@@ -45,8 +46,8 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
   const [technician, setTechnician] = useState<TechnicianData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
   const lastTechnicianIdRef = useRef<string | null>(null);
+  const { user } = useAuth();
 
   const fetchRequest = async () => {
     if (!requestId) return;
@@ -104,12 +105,21 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
     // Initialize Socket.IO
     const socketBaseUrl = getRequiredApiBaseUrl();
-    const socket = io(socketBaseUrl);
-    socketRef.current = socket;
+    const socket = io(socketBaseUrl, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+      auth: { token: localStorage.getItem('resqnow_user_token') || undefined },
+    });
+    let handleStatusUpdate: ((data: any) => void) | null = null;
+    let handleLocationUpdate: ((data: any) => void) | null = null;
 
     socket.on("connect", () => {
       console.log("Socket connected for tracking");
       setIsConnected(true);
+      if (user?.id) {
+        socket.emit("join_user_room", user.id);
+      }
       if (requestId) {
         socket.emit("join_request_room", requestId);
       }
@@ -121,7 +131,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
     if (requestId) {
       // Listen for status updates from backend (notifyUser/notifyTechnician)
-      socket.on("job:status_update", (data: any) => {
+      handleStatusUpdate = (data: any) => {
         console.log("Status update received:", data);
         if (String(data.requestId) === String(requestId) || String(data.id) === String(requestId)) {
           // Pull full request to ensure normalized fields (joined data, timestamps)
@@ -136,10 +146,12 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             return { ...prev, ...data } as any;
           });
         }
-      });
+      };
+      socket.on("job:status_update", handleStatusUpdate);
+      socket.on(`job_update_${requestId}`, handleStatusUpdate);
 
       // Listen for technician location updates
-      const handleLocationUpdate = (data: any) => {
+      handleLocationUpdate = (data: any) => {
         console.log("Tracking location update:", data);
         const eventRequestId = data?.requestId != null ? String(data.requestId) : "";
         if (eventRequestId && String(eventRequestId) !== String(requestId)) return;
@@ -163,21 +175,38 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
     }
 
     return () => {
+      if (handleStatusUpdate) {
+        socket.off("job:status_update", handleStatusUpdate);
+        if (requestId) socket.off(`job_update_${requestId}`, handleStatusUpdate);
+      }
+      if (handleLocationUpdate) {
+        socket.off("location_update", handleLocationUpdate);
+        socket.off("technician:location_update", handleLocationUpdate);
+      }
       socket.disconnect();
     };
-  }, [requestId]);
+  }, [requestId, user?.id]);
 
-  // Polling Fallback (every 5 seconds) to handle missed socket events or connection issues
+  // Polling fallback (2 seconds) to keep user timeline in near-real-time if sockets miss an event.
   useEffect(() => {
-    // Stop polling only when the request is fully paid
-    if (!requestId || request?.status === 'paid') return;
+    const normalizedStatus = String(request?.status || "").trim().toLowerCase();
+    const normalizedPaymentStatus = String(request?.payment_status || "").trim().toLowerCase();
+    if (
+      !requestId ||
+      normalizedStatus === "paid" ||
+      normalizedStatus === "completed" ||
+      normalizedPaymentStatus === "paid" ||
+      normalizedPaymentStatus === "completed"
+    ) {
+      return;
+    }
 
     const interval = setInterval(() => {
       fetchRequest();
-    }, 5000);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [requestId, request?.status]);
+  }, [requestId, request?.status, request?.payment_status]);
 
   const refresh = () => {
     setIsLoading(true);

@@ -23,7 +23,7 @@ const JobNotificationModal = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUnavailable, setIsUnavailable] = useState(false);
   const jobRequestRef = useRef<JobRequest | null>(null);
-  const { token, technician } = useTechnicianAuth();
+  const { token } = useTechnicianAuth();
   const { acceptedJobId, setAcceptedJobId } = useTechnicianJob();
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,21 +120,33 @@ const JobNotificationModal = () => {
 
       const data = await response.json().catch(() => ({}));
       if (data.success) {
-        const acceptedJobId = String(data?.request?.id || requestId).trim();
-        const role = String((technician as any)?.role || 'technician').trim().toLowerCase();
+        const acceptedRequest = data?.request || data?.job || null;
+        const acceptedJobId = String(acceptedRequest?.id || requestId).trim();
+        if (!acceptedJobId || acceptedJobId === 'undefined') {
+          throw new Error('Accepted job id missing in response');
+        }
         toast.success('Job Accepted!');
         setOpen(false);
         setJobRequest(null);
         setIsUnavailable(false);
         setAcceptedJobId(acceptedJobId);
-        if (role === 'technician') {
-          navigate('/technician/dashboard', {
-            replace: true,
-            state: { acceptedJobId },
-          });
-        } else {
-          navigate('/', { replace: true });
-        }
+        navigate('/technician/active-job', {
+          replace: true,
+          state: {
+            jobId: acceptedJobId,
+            job: acceptedRequest
+              ? {
+                  ...acceptedRequest,
+                  id: acceptedJobId,
+                  status: normalizeTechnicianStatus(
+                    acceptedRequest?.status || acceptedRequest?.job_status || 'accepted'
+                  ),
+                }
+              : { id: acceptedJobId, status: 'accepted' },
+            alertAction: 'accept',
+            alertSource: 'modal',
+          },
+        });
       } else {
         if (response.status === 409) {
           setIsUnavailable(true);

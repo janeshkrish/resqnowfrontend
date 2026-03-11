@@ -97,6 +97,19 @@ const snapSheetHeight = (value: number) =>
     Math.abs(current - value) < Math.abs(closest - value) ? current : closest
   );
 
+const normalizeRequestStatus = (value: unknown) => {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "awaiting_payment") return "payment_pending";
+  if (raw === "in_progress") return "in-progress";
+  return raw || "pending";
+};
+
+const normalizeRequestPaymentStatus = (value: unknown) => {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "completed" || raw === "paid") return "paid";
+  return raw || "pending";
+};
+
 type PaymentQuoteResponse = {
   success?: boolean;
   breakdown?: {
@@ -184,8 +197,8 @@ const RequestTracking = () => {
   }, [request?.started_at, request?.completed_at, request?.status]);
 
   useEffect(() => {
-    const status = String(request?.status || "").toLowerCase();
-    const paymentStatus = String(request?.payment_status || "").toLowerCase();
+    const status = normalizeRequestStatus(request?.status);
+    const paymentStatus = normalizeRequestPaymentStatus(request?.payment_status);
     if ((status === "completed" || status === "payment_pending") && paymentStatus === "pending") {
       setShowPayment(true);
       return;
@@ -545,9 +558,9 @@ const RequestTracking = () => {
     }
   };
 
-  const status = String(request?.status || "pending").toLowerCase();
-  const paymentStatus = String(request?.payment_status || "").toLowerCase();
-  const paymentCompleted = paymentStatus === "completed" || status === "paid";
+  const status = normalizeRequestStatus(request?.status || "pending");
+  const paymentStatus = normalizeRequestPaymentStatus(request?.payment_status);
+  const paymentCompleted = paymentStatus === "paid" || status === "paid" || status === "completed";
   const statusMeta = STATUS_COPY[status] || {
     title: "Request status updated",
     subtitle: "Your request is being processed."

@@ -136,6 +136,7 @@ const MyRequests = () => {
       case "in_progress":
         return "in_progress";
       case "payment_pending":
+      case "awaiting_payment":
       case "completed":
       case "job_completed":
       case "paid":
@@ -157,6 +158,7 @@ const MyRequests = () => {
         return "paid";
       case "pending":
       case "payment_pending":
+      case "awaiting_payment":
         return "payment_pending";
       default:
         return rawPaymentStatus || "payment_pending";

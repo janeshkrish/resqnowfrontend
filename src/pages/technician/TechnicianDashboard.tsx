@@ -595,15 +595,12 @@ const TechnicianDashboard = () => {
 
       const useAcceptEndpoint =
         status === "accepted" && options?.useAcceptEndpoint !== false;
-      const useCompleteEndpoint = status === "completed";
       const endpoint = useAcceptEndpoint
         ? apiUrl("/api/jobs/accept")
-        : useCompleteEndpoint
-          ? apiUrl("/api/jobs/complete")
         : apiUrl(`/api/service-requests/${normalizedJobId}/technician-status`);
 
-      const method = useAcceptEndpoint || useCompleteEndpoint ? 'POST' : 'PATCH';
-      const body = useAcceptEndpoint || useCompleteEndpoint ? { jobId: normalizedJobId } : { status };
+      const method = useAcceptEndpoint ? 'POST' : 'PATCH';
+      const body = useAcceptEndpoint ? { jobId: normalizedJobId } : { status };
 
       const res = await fetch(endpoint, {
         method,
@@ -626,12 +623,6 @@ const TechnicianDashboard = () => {
         throw error;
       }
       const data = await res.json();
-
-      if (status === 'completed') {
-        const earned = Number(data?.request?.amount ?? activeJob?.amount ?? 0);
-        setLastEarned(Number.isNaN(earned) ? 0 : earned);
-        setShowCompletionModal(true);
-      }
       return data;
     } catch (e: any) {
       const statusCode = Number(e?.status || 0);
@@ -917,8 +908,12 @@ const TechnicianDashboard = () => {
   const handleStatusChange = async (newStatus: string) => {
     if (!activeJob) return;
     try {
-      await updateJobStatus(newStatus, activeJob.id);
-      if (newStatus === 'completed') {
+      const data = await updateJobStatus(newStatus, activeJob.id);
+      const resolvedStatus = normalizeTechnicianStatus(data?.status ?? newStatus);
+      if (resolvedStatus === 'completed' || resolvedStatus === 'paid') {
+        const earned = Number(data?.request?.amount ?? activeJob?.amount ?? 0);
+        setLastEarned(Number.isNaN(earned) ? 0 : earned);
+        setShowCompletionModal(true);
         toast.success("Job Completed! Great work.");
         clearAcceptedJobId();
         setActiveJob(null);
@@ -926,8 +921,8 @@ const TechnicianDashboard = () => {
         stopLocationTracking();
         if (isOnline) startLocationTracking();
       } else {
-        setActiveJob(prev => ({ ...prev, status: newStatus }));
-        toast.success(`Status updated to: ${newStatus}`);
+        setActiveJob(prev => (prev ? { ...prev, status: resolvedStatus } : prev));
+        toast.success(`Status updated to: ${resolvedStatus}`);
       }
     } catch (e) { }
   };

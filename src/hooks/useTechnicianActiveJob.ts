@@ -81,7 +81,7 @@ const normalizeJob = (job: any) => {
     pickupLongitude,
     destinationLatitude,
     destinationLongitude,
-    amount: amount ?? job.amount ?? 0,
+    amount,
     address,
     contact_name: customerName ?? toOptionalString(job.contact_name),
     contact_phone: phoneNumber ?? toOptionalPhone(job.contact_phone),

@@ -169,27 +169,24 @@ const ActiveJob = () => {
 
     try {
       const idToUse = job.requestId || job.id;
-      const isCompletionFlow = normalizedNextStatus === 'completed';
       const response = await fetch(
-        isCompletionFlow
-          ? apiUrl('/api/jobs/complete')
-          : apiUrl(`/api/service-requests/${idToUse}/technician-status`),
+        apiUrl(`/api/service-requests/${idToUse}/technician-status`),
         {
-        method: isCompletionFlow ? 'POST' : 'PATCH',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: isCompletionFlow
-          ? JSON.stringify({ jobId: idToUse })
-          : JSON.stringify({ status: normalizedNextStatus })
+        body: JSON.stringify({ status: normalizedNextStatus })
       });
 
       const data = await response.json();
       if (data.success || response.ok) {
-        toast.success(`Status updated to: ${formatTechnicianStatus(normalizedNextStatus)}`);
+        const resolvedStatus = normalizeTechnicianStatus(data?.status ?? normalizedNextStatus);
+        setStatus(resolvedStatus);
+        toast.success(`Status updated to: ${formatTechnicianStatus(resolvedStatus)}`);
 
-        if (normalizedNextStatus === 'completed') {
+        if (resolvedStatus === 'completed' || resolvedStatus === 'paid') {
           setTimeout(() => {
             navigate('/technician/dashboard');
             toast.success('Job marked as completed.');
@@ -248,7 +245,7 @@ const ActiveJob = () => {
   const hasServiceOrVehicle = Boolean(displayService || displayVehicle);
   const displayPhoneText = toOptionalString(job.phoneNumber ?? job.contact_phone ?? job.user?.phone);
   const dialablePhone = toOptionalPhone(displayPhoneText);
-  const displayAmount = toOptionalNumber(job.amount ?? job.service_charge ?? job.serviceCharge) || 0;
+  const displayAmount = toOptionalNumber(job.amount ?? job.service_charge ?? job.serviceCharge);
   const customerLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
   const customerLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
   const hasCustomerLocation = Number.isFinite(customerLat) && Number.isFinite(customerLng);
@@ -266,7 +263,7 @@ const ActiveJob = () => {
         <div className="absolute top-4 left-4 right-4 bg-card dark:bg-slate-900/90 backdrop-blur p-4 rounded-lg shadow-md border flex justify-between items-center">
           <div>
             <p className="text-xs text-muted-foreground">EST. EARNINGS</p>
-            <p className="font-bold text-lg">Rs {displayAmount}</p>
+            <p className="font-bold text-lg">{displayAmount != null ? `Rs ${displayAmount}` : 'Not Available'}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">PLATFORM DUE</p>
@@ -301,7 +298,6 @@ const ActiveJob = () => {
               ) : (
                 <p className="text-sm font-medium">Not Available</p>
               )}
-              {displayPhoneText && <p className="text-xs text-muted-foreground mt-1">Phone: {displayPhoneText}</p>}
             </div>
           </div>
           {dialablePhone && (

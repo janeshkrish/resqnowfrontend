@@ -147,6 +147,7 @@ export type FinanceTransactionRow = {
   technician: string;
   upiId?: string | null;
   amount: number;
+  platformFee?: number;
   technicianAmount: number;
   paymentToTechnicianStatus: "pending" | "completed" | string;
   status: string;

@@ -23,6 +23,9 @@ export function normalizeTechnicianStatus(status: unknown): TechnicianStatus {
     "en_route": "en-route",
     "in_progress": "in-progress",
     "payment-pending": "payment_pending",
+    "awaiting_payment": "payment_pending",
+    "awaiting-payment": "payment_pending",
+    "awaiting payment": "payment_pending",
   };
   const normalized = map[raw] || raw;
   return (TECHNICIAN_STATUS_FLOW as readonly string[]).includes(normalized)

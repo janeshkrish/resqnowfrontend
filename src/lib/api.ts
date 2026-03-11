@@ -390,8 +390,8 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/technicians/me/notifications" && method === "GET") return json([]);
   if (path === "/api/technicians/me/financials" && method === "GET") return json({ total_earnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0), pending_dues: 0 });
   if (path === "/api/technicians/me/dues" && method === "GET") return json({ total: 0 });
-  if (path === "/api/technicians/me/active-job" && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
-  if (/^\/api\/technician\/active-job\/[^/]+$/.test(path) && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
+  if (path === "/api/technicians/me/active-job" && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
+  if (/^\/api\/technician\/active-job\/[^/]+$/.test(path) && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
   if (path === "/api/technicians/me/profile" && method === "PATCH") return json({ success: true });
   if (path === "/api/technicians/me/payout-transactions" && method === "GET") return json([]);
   if (path === "/api/technicians/me/location" && method === "PATCH") return json({ success: true });

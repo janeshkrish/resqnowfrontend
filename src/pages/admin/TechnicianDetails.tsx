@@ -96,6 +96,7 @@ const TechnicianDetails = () => {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPricingEditMode, setIsPricingEditMode] = useState(false);
   const [decisionReason, setDecisionReason] = useState("");
   const [approvalAudit, setApprovalAudit] = useState<any[]>([]);
   const [editForm, setEditForm] = useState<EditableTechnicianForm>({
@@ -146,6 +147,7 @@ const TechnicianDetails = () => {
           facilities_photo: String(mapped.documents?.facilities_photo || ""),
         },
       });
+      setIsPricingEditMode(false);
     } catch {
       toast.error("Failed to load technician details");
     } finally {
@@ -277,6 +279,48 @@ const TechnicianDetails = () => {
       ...prev,
       service_costs: prev.service_costs.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleSavePricing = async () => {
+    if (!technicianId) return;
+    setIsSaving(true);
+    try {
+      const toNumberOrNull = (value: string) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+      };
+
+      const service_costs = editForm.service_costs
+        .map((row) => ({
+          service_name: row.service_name.trim(),
+          vehicle_type_pricing: row.vehicle_type_pricing.trim() || null,
+          visit_charge: toNumberOrNull(row.visit_charge),
+          service_charge: toNumberOrNull(row.service_charge),
+          delivery_charge: toNumberOrNull(row.delivery_charge),
+          labour_min: toNumberOrNull(row.labour_min),
+          labour_max: toNumberOrNull(row.labour_max),
+          extra_km_charge: toNumberOrNull(row.extra_km_charge),
+        }))
+        .filter((row) => row.service_name);
+
+      const res = await apiFetch(`/api/admin/technician/${technicianId}/pricing`, {
+        method: "PUT",
+        admin: true,
+        body: JSON.stringify({ service_costs }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to update pricing.");
+      }
+
+      toast.success("Pricing updated successfully");
+      setIsPricingEditMode(false);
+      await fetchTechnicianDetails();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update pricing.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveChanges = async () => {
@@ -536,10 +580,38 @@ const TechnicianDetails = () => {
 
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium">Service Pricing</p>
-                <Button type="button" variant="outline" size="sm" onClick={addServiceCostRow}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Service Price
-                </Button>
+                <div className="flex items-center gap-2">
+                  {!isPricingEditMode ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setIsPricingEditMode(true)}>
+                      Edit Pricing
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditForm((prev) => ({
+                            ...prev,
+                            service_costs: toEditableServiceCostRows(technician?.service_costs),
+                          }));
+                          setIsPricingEditMode(false);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="button" size="sm" onClick={handleSavePricing} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Save Changes
+                      </Button>
+                    </>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={addServiceCostRow} disabled={!isPricingEditMode}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Service Price
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -559,6 +631,7 @@ const TechnicianDetails = () => {
                           value={row.service_name}
                           onChange={(e) => handleServiceCostChange(idx, "service_name", e.target.value)}
                           placeholder="battery"
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                       <div>
@@ -568,6 +641,7 @@ const TechnicianDetails = () => {
                           value={row.vehicle_type_pricing}
                           onChange={(e) => handleServiceCostChange(idx, "vehicle_type_pricing", e.target.value)}
                           placeholder="2w / 4w / both"
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                     </div>
@@ -581,6 +655,7 @@ const TechnicianDetails = () => {
                           className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
                           value={row.visit_charge}
                           onChange={(e) => handleServiceCostChange(idx, "visit_charge", e.target.value)}
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                       <div>
@@ -591,6 +666,7 @@ const TechnicianDetails = () => {
                           className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
                           value={row.service_charge}
                           onChange={(e) => handleServiceCostChange(idx, "service_charge", e.target.value)}
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                       <div>
@@ -601,6 +677,7 @@ const TechnicianDetails = () => {
                           className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
                           value={row.delivery_charge}
                           onChange={(e) => handleServiceCostChange(idx, "delivery_charge", e.target.value)}
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                       <div>
@@ -611,6 +688,7 @@ const TechnicianDetails = () => {
                           className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
                           value={row.extra_km_charge}
                           onChange={(e) => handleServiceCostChange(idx, "extra_km_charge", e.target.value)}
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                     </div>
@@ -624,6 +702,7 @@ const TechnicianDetails = () => {
                           className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
                           value={row.labour_min}
                           onChange={(e) => handleServiceCostChange(idx, "labour_min", e.target.value)}
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                       <div>
@@ -634,6 +713,7 @@ const TechnicianDetails = () => {
                           className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
                           value={row.labour_max}
                           onChange={(e) => handleServiceCostChange(idx, "labour_max", e.target.value)}
+                          disabled={!isPricingEditMode || isSaving}
                         />
                       </div>
                     </div>
@@ -645,6 +725,7 @@ const TechnicianDetails = () => {
                         variant="ghost"
                         className="text-destructive hover:text-destructive"
                         onClick={() => removeServiceCostRow(idx)}
+                        disabled={!isPricingEditMode || isSaving}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Remove

@@ -435,10 +435,25 @@ const TechnicianDashboard = () => {
     // Listen for real-time job list updates
     socket.on('job:list_update', async (data: any) => {
       console.log('Real-time job list update received:', data);
+      const requestId = String(data?.requestId || data?.id || "").trim();
+      const action = String(data?.action || "").trim().toLowerCase();
+
+      if (
+        requestId &&
+        activeJobIdRef.current &&
+        requestId === activeJobIdRef.current &&
+        ["updated", "revoked", "removed", "completed"].includes(action)
+      ) {
+        refreshActiveJob();
+      }
 
       // Fetch updated job list
       try {
-        const jobListRes = await apiFetch("/api/technicians/requests", { technician: true });
+        const [jobListRes, notificationsRes] = await Promise.all([
+          apiFetch("/api/technicians/requests", { technician: true }),
+          apiFetch("/api/technicians/me/notifications", { technician: true }),
+        ]);
+
         if (jobListRes.ok) {
           const updatedJobs = await jobListRes.json();
           if (Array.isArray(updatedJobs)) {
@@ -457,6 +472,11 @@ const TechnicianDashboard = () => {
             });
           }
         }
+
+        if (notificationsRes.ok) {
+          const notificationRows = await notificationsRes.json();
+          setNotifications(Array.isArray(notificationRows) ? notificationRows : []);
+        }
       } catch (err) {
         console.warn('Failed to fetch updated job list:', err);
       }
@@ -465,18 +485,37 @@ const TechnicianDashboard = () => {
     socket.on('job:status_update', async (data: any) => {
       const requestId = String(data?.requestId || data?.id || "");
       if (!requestId) return;
+      const normalizedStatus = normalizeTechnicianStatus(data?.status);
 
       if (activeJobIdRef.current && requestId === activeJobIdRef.current && data?.status) {
-        setActiveJob((prev: any) => prev ? { ...prev, status: normalizeTechnicianStatus(data.status) } : prev);
+        setActiveJob((prev: any) => prev ? { ...prev, status: normalizedStatus } : prev);
       }
 
-      if (['paid', 'completed', 'cancelled'].includes(String(data?.status || ''))) {
+      if (
+        incomingJobRef.current &&
+        String(incomingJobRef.current.id || "").trim() === requestId &&
+        normalizedStatus !== "pending"
+      ) {
+        stopAlertSound();
+        setIncomingJob(null);
+        setIncomingJobUnavailable(false);
+        setShowJobModal(false);
+      }
+
+      if (['paid', 'completed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
+        if (acceptedJobIdRef.current && acceptedJobIdRef.current === requestId) {
+          clearAcceptedJobId();
+        }
+      }
+
+      if (['payment_pending', 'paid', 'completed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
         try {
-          const [activeJobRes, statsRes, historyRes, financialsRes] = await Promise.all([
+          const [activeJobRes, statsRes, historyRes, financialsRes, notificationsRes] = await Promise.all([
             apiFetch("/api/technicians/me/active-job", { technician: true }),
             apiFetch("/api/technicians/dashboard-stats", { technician: true }),
             apiFetch("/api/technicians/requests", { technician: true }),
             apiFetch("/api/technicians/me/financials", { technician: true }),
+            apiFetch("/api/technicians/me/notifications", { technician: true }),
           ]);
 
           if (activeJobRes.ok) {
@@ -499,6 +538,10 @@ const TechnicianDashboard = () => {
           if (financialsRes.ok) {
             const finData = await financialsRes.json();
             setFinancials(finData);
+          }
+          if (notificationsRes.ok) {
+            const notificationsData = await notificationsRes.json();
+            setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
           }
         } catch (err) {
           console.warn("Failed to sync dashboard after status update:", err);
@@ -547,7 +590,7 @@ const TechnicianDashboard = () => {
       stopLocationTracking();
       clearInterval(pollInterval);
     };
-  }, [technician?.id, refreshActiveJob]); // Close socket effect
+  }, [technician?.id, refreshActiveJob, clearAcceptedJobId]); // Close socket effect
 
 
 
@@ -734,10 +777,27 @@ const TechnicianDashboard = () => {
       }
 
       if (routeAction === "reject") {
+        let canReject = false;
+        try {
+          const offerRes = await apiFetch(
+            `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-offer`,
+            { technician: true }
+          );
+          const offerBody = await offerRes.json().catch(() => ({} as any));
+          const offerStatus = String(offerBody?.request?.offer_status || "").trim().toLowerCase();
+          canReject = offerRes.ok && offerBody?.available === true && offerStatus === "pending";
+        } catch {
+          canReject = false;
+        }
+
         try {
           stopAlertSound();
-          await updateJobStatus("rejected", normalizedJobId);
-          toast.info("Job Rejected");
+          if (canReject) {
+            await updateJobStatus("rejected", normalizedJobId);
+            toast.info("Job Rejected");
+          } else {
+            toast.info("Job offer is already closed.");
+          }
         } catch (error: any) {
           const statusCode = Number(error?.status || 0);
           if (statusCode !== 404 && statusCode !== 409) {
@@ -884,6 +944,21 @@ const TechnicianDashboard = () => {
       setIncomingJob(null);
       setIncomingJobUnavailable(false);
       setShowJobModal(false);
+      return;
+    }
+
+    const currentActiveJobId = String(activeJob?.id || "").trim();
+    const currentActiveStatus = normalizeTechnicianStatus(activeJob?.status);
+    if (
+      currentActiveJobId &&
+      currentActiveJobId === normalizedJobId &&
+      !["pending", "assigned"].includes(currentActiveStatus)
+    ) {
+      stopAlertSound();
+      setIncomingJob(null);
+      setIncomingJobUnavailable(false);
+      setShowJobModal(false);
+      toast.info("This job can no longer be rejected.");
       return;
     }
 

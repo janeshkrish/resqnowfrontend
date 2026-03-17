@@ -128,10 +128,19 @@ export type TechnicianRow = {
   technicianId: number;
   name: string;
   status: "Online" | "Offline";
+  loginStatus: "Logged In" | "Logged Out" | string;
   activeJobs: number;
   rating: number;
   visibility: boolean;
   adminNote: string;
+  lastLoginAt: string | null;
+  lastLogoutAt: string | null;
+  lastSeenAt: string | null;
+  currentSessionStartedAt: string | null;
+  currentSessionHours: number;
+  loggedInHours24h: number;
+  loggedInHoursTotal: number;
+  inactivityAlertSentAt: string | null;
 };
 
 export type FinanceSummary = {
@@ -274,6 +283,7 @@ export async function getAdminTechnicians(params: {
   limit: number;
   search?: string;
   status?: string;
+  loginStatus?: string;
   visibility?: string;
 }) {
   const { data } = await adminApi.get<{ data: TechnicianRow[]; pagination: Pagination }>("/technicians", {
@@ -293,6 +303,14 @@ export async function toggleAdminTechnicianVisibility(payload: {
 
 export async function addAdminTechnicianNote(payload: { technicianId: number; note: string }) {
   const { data } = await adminApi.post("/technician/note", payload);
+  return data;
+}
+
+export async function sendAdminTechnicianLoginReminder(payload: {
+  technicianId: number;
+  message?: string;
+}) {
+  const { data } = await adminApi.post("/technician/send-login-reminder", payload);
   return data;
 }
 

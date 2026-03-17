@@ -18,6 +18,14 @@ export const useTechnicianAuth = () => {
           if (techData) {
             setTechnician(techData);
             localStorage.setItem("resqnow_technician", JSON.stringify(techData));
+            try {
+              await technicianAuthService.heartbeat({
+                source: "auth_restore",
+                path: window.location.pathname,
+              });
+            } catch (heartbeatError) {
+              console.warn("[TechnicianAuth] restore heartbeat failed:", heartbeatError);
+            }
           } else {
             localStorage.removeItem("resqnow_technician");
           }
@@ -31,6 +39,40 @@ export const useTechnicianAuth = () => {
     };
     checkTechnicianAuth();
   }, []);
+
+  useEffect(() => {
+    if (!technician?.id) return;
+
+    let disposed = false;
+    const sendHeartbeat = () => {
+      if (disposed) return;
+      technicianAuthService.heartbeat({
+        path: window.location.pathname,
+      }).catch((heartbeatError) => {
+        console.warn("[TechnicianAuth] heartbeat failed:", heartbeatError);
+      });
+    };
+
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, 60_000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        sendHeartbeat();
+      }
+    };
+    const onFocus = () => sendHeartbeat();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [technician?.id]);
 
   const login = async (email: string, password: string, options?: { signal?: AbortSignal }) => {
     const technicianData = await technicianAuthService.login(email, password, options);

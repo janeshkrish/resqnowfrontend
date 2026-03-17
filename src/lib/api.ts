@@ -368,10 +368,54 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     return json(data);
   }
   if (path === "/api/technicians/login" && method === "POST") {
-    const technician = getTechnicians().find((item) => String(item.email || "").toLowerCase() === String(body.email || "").toLowerCase()) || getTechnicians()[0];
-    return technician ? json({ token: DEMO_TECH_TOKEN, technician }) : json({ error: "Not found" }, 404);
+    const technicians = getTechnicians();
+    const found =
+      technicians.find((item) => String(item.email || "").toLowerCase() === String(body.email || "").toLowerCase()) ||
+      technicians[0];
+    if (!found) return json({ error: "Not found" }, 404);
+    const updated = technicians.map((item) =>
+      String(item.id) === String(found.id)
+        ? {
+            ...item,
+            is_logged_in: true,
+            last_login_at: nowIso(),
+            last_seen_at: nowIso(),
+            login_reminder_sent_at: null,
+          }
+        : item
+    );
+    setTechnicians(updated);
+    const technician = updated.find((item) => String(item.id) === String(found.id)) || found;
+    return json({ token: DEMO_TECH_TOKEN, technician });
   }
   if (path === "/api/technicians/register" && method === "POST") return json({ token: DEMO_TECH_TOKEN, id: `tech-${Date.now()}`, name: body.name || "New Technician", email: body.email || "new@resqnow.app" });
+  if (path === "/api/technicians/logout" && method === "POST") {
+    const technicians = getTechnicians();
+    if (technicians.length > 0) {
+      technicians[0] = {
+        ...technicians[0],
+        is_logged_in: false,
+        last_logout_at: nowIso(),
+        last_seen_at: nowIso(),
+      };
+      setTechnicians(technicians);
+    }
+    return json({ success: true });
+  }
+  if (path === "/api/technicians/activity/heartbeat" && method === "POST") {
+    const technicians = getTechnicians();
+    if (technicians.length > 0) {
+      technicians[0] = {
+        ...technicians[0],
+        is_logged_in: true,
+        last_seen_at: nowIso(),
+        last_login_at: technicians[0].last_login_at || nowIso(),
+        login_reminder_sent_at: null,
+      };
+      setTechnicians(technicians);
+    }
+    return json({ success: true, seenAt: nowIso() });
+  }
   if (path === "/api/technicians/me" && method === "GET") return json(getTechnicians()[0] || null);
   if (path === "/api/technicians/me/status" && method === "GET") return json({ is_active: true, success: true });
   if (path === "/api/technicians/me/status" && method === "PATCH") return json({ is_active: Boolean(body.active), success: true });

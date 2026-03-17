@@ -46,6 +46,10 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
     longitude: data.longitude != null ? Number(data.longitude) : null,
     is_active: !!data.is_active,
     is_available: !!data.is_available,
+    is_logged_in: !!data.is_logged_in,
+    last_login_at: data.last_login_at ? String(data.last_login_at) : null,
+    last_logout_at: data.last_logout_at ? String(data.last_logout_at) : null,
+    last_seen_at: data.last_seen_at ? String(data.last_seen_at) : null,
     settings: {
       appearance: {
         theme: ["light", "dark", "system"].includes(String(settingsAppearance.theme || ""))
@@ -141,7 +145,32 @@ export const technicianAuthService = {
     };
   },
 
+  heartbeat: async (metadata?: Record<string, unknown>) => {
+    const res = await apiFetch(`${BASE}/activity/heartbeat`, {
+      method: "POST",
+      technician: true,
+      body: JSON.stringify({
+        source: "web",
+        metadata: metadata || null,
+      }),
+    });
+    return res.ok;
+  },
+
   logout: async () => {
+    try {
+      await apiFetch(`${BASE}/logout`, {
+        method: "POST",
+        technician: true,
+        body: JSON.stringify({
+          reason: "user_logout",
+          source: "web",
+        }),
+      });
+    } catch (error) {
+      console.warn("[Technician logout] backend logout tracking failed:", error);
+    }
+
     setTechnicianToken(null);
     localStorage.removeItem("resqnow_technician");
     if (typeof window !== "undefined") {

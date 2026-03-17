@@ -2,16 +2,46 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Eye, EyeOff, FilePenLine } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import DataTable from "./components/DataTable";
 import Modal from "./components/Modal";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import {
   TechnicianRow,
   addAdminTechnicianNote,
   getAdminTechnicians,
+  sendAdminTechnicianLoginReminder,
   toggleAdminTechnicianVisibility,
 } from "./api/adminExtendedApi";
 
 const PAGE_LIMIT = 10;
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+};
+
+const formatLastSeen = (value: string | null | undefined) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.round((diffMinutes / 60) * 10) / 10;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round((diffHours / 24) * 10) / 10;
+  return `${diffDays}d ago`;
+};
+
+const formatHours = (value: number | null | undefined) => {
+  const parsed = Number(value || 0);
+  if (!Number.isFinite(parsed)) return "0.00 h";
+  return `${parsed.toFixed(2)} h`;
+};
 
 export default function AdminExtendedTechniciansPage() {
   const queryClient = useQueryClient();
@@ -19,6 +49,7 @@ export default function AdminExtendedTechniciansPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [loginStatusFilter, setLoginStatusFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
   const [page, setPage] = useState(1);
 
@@ -34,14 +65,49 @@ export default function AdminExtendedTechniciansPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  useEffect(() => {
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "technicians"] });
+    };
+    const onInactivityAlert = (payload: { technicianId?: number; message?: string }) => {
+      toast.warning(`Login alert sent${payload?.technicianId ? ` (#${payload.technicianId})` : ""}`, {
+        description: payload?.message || "Technician was inactive and received a login reminder.",
+      });
+      refresh();
+    };
+
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket: Socket = io(socketBaseUrl, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+      auth: { token: getAdminToken() || undefined },
+    });
+
+    socket.on("admin:technician_activity_update", refresh);
+    socket.on("admin:technician_inactivity_alert", onInactivityAlert);
+    socket.on("admin:technician_activity_cycle", refresh);
+
+    const fallbackRefreshId = window.setInterval(refresh, 60000);
+
+    return () => {
+      window.clearInterval(fallbackRefreshId);
+      socket.off("admin:technician_activity_update", refresh);
+      socket.off("admin:technician_inactivity_alert", onInactivityAlert);
+      socket.off("admin:technician_activity_cycle", refresh);
+      socket.disconnect();
+    };
+  }, [queryClient]);
+
   const techniciansQuery = useQuery({
-    queryKey: ["admin", "technicians", page, PAGE_LIMIT, search, statusFilter, visibilityFilter],
+    queryKey: ["admin", "technicians", page, PAGE_LIMIT, search, statusFilter, loginStatusFilter, visibilityFilter],
     queryFn: () =>
       getAdminTechnicians({
         page,
         limit: PAGE_LIMIT,
         search,
         status: statusFilter,
+        loginStatus: loginStatusFilter,
         visibility: visibilityFilter,
       }),
   });
@@ -70,6 +136,15 @@ export default function AdminExtendedTechniciansPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const reminderMutation = useMutation({
+    mutationFn: sendAdminTechnicianLoginReminder,
+    onSuccess: () => {
+      toast.success("Login reminder sent.");
+      refreshTechnicians();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const openModal = (type: "toggle" | "note", technician: TechnicianRow) => {
     setModalType(type);
     setSelectedTech(technician);
@@ -80,6 +155,16 @@ export default function AdminExtendedTechniciansPage() {
     setModalType(null);
     setSelectedTech(null);
     setNote("");
+  };
+
+  const sendLoginReminder = (technician: TechnicianRow) => {
+    if (technician.loginStatus === "Logged In") {
+      toast.info("Technician is already logged in.");
+      return;
+    }
+    reminderMutation.mutate({
+      technicianId: technician.technicianId,
+    });
   };
 
   const submitModal = () => {
@@ -121,7 +206,7 @@ export default function AdminExtendedTechniciansPage() {
       },
       {
         key: "status",
-        header: "Status",
+        header: "Availability",
         render: (row: TechnicianRow) => (
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
@@ -135,9 +220,65 @@ export default function AdminExtendedTechniciansPage() {
         ),
       },
       {
+        key: "loginStatus",
+        header: "Login Status",
+        render: (row: TechnicianRow) => (
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+              row.loginStatus === "Logged In"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-amber-200 bg-amber-50 text-amber-700"
+            }`}
+          >
+            {row.loginStatus || "Logged Out"}
+          </span>
+        ),
+      },
+      {
         key: "activeJobs",
         header: "Active Jobs",
         render: (row: TechnicianRow) => row.activeJobs,
+      },
+      {
+        key: "lastLoginAt",
+        header: "Last Login",
+        render: (row: TechnicianRow) => formatDateTime(row.lastLoginAt),
+      },
+      {
+        key: "lastLogoutAt",
+        header: "Last Logout",
+        render: (row: TechnicianRow) => formatDateTime(row.lastLogoutAt),
+      },
+      {
+        key: "lastSeenAt",
+        header: "Last Seen",
+        render: (row: TechnicianRow) => (
+          <div className="space-y-0.5">
+            <p>{formatLastSeen(row.lastSeenAt)}</p>
+            <p className="text-xs text-slate-500">{formatDateTime(row.lastSeenAt)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "loggedInHours24h",
+        header: "Logged Hours (24h)",
+        render: (row: TechnicianRow) => formatHours(row.loggedInHours24h),
+      },
+      {
+        key: "loggedInHoursTotal",
+        header: "Logged Hours (Total)",
+        render: (row: TechnicianRow) => formatHours(row.loggedInHoursTotal),
+      },
+      {
+        key: "currentSessionHours",
+        header: "Current Session",
+        render: (row: TechnicianRow) =>
+          row.loginStatus === "Logged In" ? formatHours(row.currentSessionHours) : "-",
+      },
+      {
+        key: "inactivityAlertSentAt",
+        header: "Last Login Alert",
+        render: (row: TechnicianRow) => formatDateTime(row.inactivityAlertSentAt),
       },
       {
         key: "rating",
@@ -186,21 +327,31 @@ export default function AdminExtendedTechniciansPage() {
             >
               <FilePenLine className="h-3.5 w-3.5" /> Add Note
             </button>
+            <button
+              type="button"
+              onClick={() => sendLoginReminder(row)}
+              disabled={row.loginStatus === "Logged In" || reminderMutation.isPending}
+              className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Send Login Reminder
+            </button>
           </div>
         ),
       },
     ],
-    []
+    [reminderMutation.isPending]
   );
 
   return (
     <section className="space-y-4">
       <header>
         <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Technician Oversight</h1>
-        <p className="text-sm text-slate-500">Monitor availability, visibility, ratings, and admin notes.</p>
+        <p className="text-sm text-slate-500">
+          Monitor availability, login activity, last seen timestamps, logged hours, visibility, and admin notes.
+        </p>
       </header>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1.8fr_1fr_1fr]">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <input
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
@@ -230,6 +381,18 @@ export default function AdminExtendedTechniciansPage() {
           <option value="all">All Visibility</option>
           <option value="visible">Visible</option>
           <option value="hidden">Hidden</option>
+        </select>
+        <select
+          value={loginStatusFilter}
+          onChange={(event) => {
+            setLoginStatusFilter(event.target.value);
+            setPage(1);
+          }}
+          className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+        >
+          <option value="all">All Login Status</option>
+          <option value="logged_in">Logged In</option>
+          <option value="logged_out">Logged Out</option>
         </select>
       </div>
 

@@ -40,6 +40,10 @@ export type Technician = {
   longitude?: number | null;
   is_active?: boolean;
   is_available?: boolean;
+  is_logged_in?: boolean;
+  last_login_at?: string | null;
+  last_logout_at?: string | null;
+  last_seen_at?: string | null;
   settings?: {
     appearance?: {
       theme?: "light" | "dark" | "system";

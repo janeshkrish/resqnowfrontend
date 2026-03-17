@@ -1,7 +1,8 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock3, ShieldCheck, UserRound } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import {
   Area,
   AreaChart,
@@ -16,6 +17,7 @@ import {
   TechnicianLoginSessionRow,
   getAdminTechnicianLoginActivity,
 } from "./api/adminExtendedApi";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
 
@@ -138,6 +140,7 @@ const formatAlertType = (alert: TechnicianLoginAlertRow) =>
     .trim() || "Alert";
 
 export default function AdminExtendedTechnicianActivityPage() {
+  const queryClient = useQueryClient();
   const params = useParams<{ technicianId: string }>();
   const technicianId = Number(params.technicianId);
   const validTechnicianId = Number.isInteger(technicianId) && technicianId > 0;
@@ -145,6 +148,11 @@ export default function AdminExtendedTechnicianActivityPage() {
   const activityQuery = useQuery({
     queryKey: ["admin", "technician-login-activity", technicianId],
     enabled: validTechnicianId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: validTechnicianId ? 20000 : false,
+    refetchIntervalInBackground: true,
     queryFn: () =>
       getAdminTechnicianLoginActivity(technicianId, {
         sessionLimit: 500,
@@ -152,9 +160,47 @@ export default function AdminExtendedTechnicianActivityPage() {
       }),
   });
 
+  useEffect(() => {
+    if (!validTechnicianId) return;
+
+    const refresh = () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "technician-login-activity", technicianId],
+      });
+    };
+
+    const onActivityUpdate = (payload: { technicianId?: number | string } | null | undefined) => {
+      if (Number(payload?.technicianId) !== technicianId) return;
+      refresh();
+    };
+
+    const onInactivityAlert = (payload: { technicianId?: number | string } | null | undefined) => {
+      if (Number(payload?.technicianId) !== technicianId) return;
+      refresh();
+    };
+
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket: Socket = io(socketBaseUrl, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+      auth: { token: getAdminToken() || undefined },
+    });
+
+    socket.on("admin:technician_activity_update", onActivityUpdate);
+    socket.on("admin:technician_inactivity_alert", onInactivityAlert);
+
+    return () => {
+      socket.off("admin:technician_activity_update", onActivityUpdate);
+      socket.off("admin:technician_inactivity_alert", onInactivityAlert);
+      socket.disconnect();
+    };
+  }, [validTechnicianId, technicianId, queryClient]);
+
   const technician = activityQuery.data?.technician;
   const sessions = activityQuery.data?.sessions || [];
   const alerts = activityQuery.data?.alerts || [];
+  const generatedAt = activityQuery.data?.generatedAt || null;
 
   const sessionStats = useMemo(() => {
     const activeCount = sessions.filter((session) => session.isActive).length;
@@ -209,6 +255,12 @@ export default function AdminExtendedTechnicianActivityPage() {
           <p className="text-sm text-slate-500">
             Clear session timeline and reminders for technician #{technicianId}. Times are shown in {LOCAL_TIME_ZONE}.
           </p>
+          <p className="text-xs text-slate-500">
+            Live mode: auto-refresh every 20 seconds and instant refresh on activity events.
+          </p>
+          <p className="text-xs text-slate-500">
+            Last DB sync: {formatDateTime(generatedAt)} {activityQuery.isFetching ? "(refreshing...)" : ""}
+          </p>
         </div>
       </header>
 
@@ -252,6 +304,11 @@ export default function AdminExtendedTechnicianActivityPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Last Seen</p>
           <p className="mt-2 text-lg font-semibold text-slate-900">{formatRelativeTime(technician?.lastSeenAt)}</p>
           <p className="text-sm text-slate-500">{formatDateTime(technician?.lastSeenAt)}</p>
+          {!technician?.lastSeenAt && sessions.length === 0 ? (
+            <p className="mt-2 text-xs text-amber-700">
+              No login/heartbeat records found in DB yet for this technician.
+            </p>
+          ) : null}
           <div className="mt-3 space-y-1 text-xs text-slate-600">
             <p>Last login: {formatDateTime(technician?.lastLoginAt)}</p>
             <p>Last logout: {formatDateTime(technician?.lastLogoutAt)}</p>

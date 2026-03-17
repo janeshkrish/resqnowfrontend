@@ -16,17 +16,32 @@ import {
 
 const PAGE_LIMIT = 10;
 
-const formatDateTime = (value: string | null | undefined) => {
-  if (!value) return "-";
+const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+
+const parseDate = (value: string | null | undefined) => {
+  if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const formatLastSeen = (value: string | null | undefined) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+const formatDateTime = (value: string | null | undefined) => {
+  const date = parseDate(value);
+  if (!date) return "Never";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  });
+};
+
+const formatRelativeTime = (value: string | null | undefined) => {
+  const date = parseDate(value);
+  if (!date) return "Never";
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
   if (diffMinutes < 1) return "Just now";
@@ -195,137 +210,135 @@ export default function AdminExtendedTechniciansPage() {
   const columns = useMemo(
     () => [
       {
-        key: "technicianId",
-        header: "Technician ID",
-        render: (row: TechnicianRow) => <span className="font-semibold text-slate-900">#{row.technicianId}</span>,
-      },
-      {
-        key: "name",
-        header: "Name",
-        render: (row: TechnicianRow) => row.name,
-      },
-      {
-        key: "status",
-        header: "Availability",
-        render: (row: TechnicianRow) => (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
-              row.status === "Online"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-slate-200 bg-slate-50 text-slate-700"
-            }`}
-          >
-            {row.status}
-          </span>
-        ),
-      },
-      {
-        key: "loginStatus",
-        header: "Login Status",
-        render: (row: TechnicianRow) => (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
-              row.loginStatus === "Logged In"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-amber-200 bg-amber-50 text-amber-700"
-            }`}
-          >
-            {row.loginStatus || "Logged Out"}
-          </span>
-        ),
-      },
-      {
-        key: "activeJobs",
-        header: "Active Jobs",
-        render: (row: TechnicianRow) => row.activeJobs,
-      },
-      {
-        key: "lastLoginAt",
-        header: "Last Login",
-        render: (row: TechnicianRow) => formatDateTime(row.lastLoginAt),
-      },
-      {
-        key: "lastLogoutAt",
-        header: "Last Logout",
-        render: (row: TechnicianRow) => formatDateTime(row.lastLogoutAt),
-      },
-      {
-        key: "lastSeenAt",
-        header: "Last Seen",
+        key: "technician",
+        header: "Technician",
+        className: "min-w-[140px]",
         render: (row: TechnicianRow) => (
           <div className="space-y-0.5">
-            <p>{formatLastSeen(row.lastSeenAt)}</p>
-            <p className="text-xs text-slate-500">{formatDateTime(row.lastSeenAt)}</p>
+            <p className="font-semibold text-slate-900">{row.name}</p>
+            <p className="text-xs text-slate-500">#{row.technicianId}</p>
+            <p className="text-xs text-slate-500">
+              Jobs: {row.activeJobs} | Rating: {row.rating?.toFixed(1) || "0.0"}
+            </p>
           </div>
         ),
       },
       {
-        key: "loggedInHours24h",
-        header: "Logged Hours (24h)",
-        render: (row: TechnicianRow) => formatHours(row.loggedInHours24h),
+        key: "state",
+        header: "State",
+        className: "min-w-[130px]",
+        render: (row: TechnicianRow) => (
+          <div className="flex flex-col gap-1.5">
+            <span
+              className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-medium ${
+                row.status === "Online"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-slate-50 text-slate-700"
+              }`}
+            >
+              {row.status}
+            </span>
+            <span
+              className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-medium ${
+                row.loginStatus === "Logged In"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
+            >
+              {row.loginStatus || "Logged Out"}
+            </span>
+            <span
+              className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-medium ${
+                row.visibility
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }`}
+            >
+              {row.visibility ? "Visible" : "Hidden"}
+            </span>
+          </div>
+        ),
       },
       {
-        key: "loggedInHoursTotal",
-        header: "Logged Hours (Total)",
-        render: (row: TechnicianRow) => formatHours(row.loggedInHoursTotal),
+        key: "activity",
+        header: "Activity",
+        className: "min-w-[210px]",
+        render: (row: TechnicianRow) => (
+          <div className="space-y-1.5">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Last Seen</p>
+              <p className="text-sm text-slate-900">{formatRelativeTime(row.lastSeenAt)}</p>
+              <p className="text-xs text-slate-500">{formatDateTime(row.lastSeenAt)}</p>
+            </div>
+            <div className="space-y-1 text-xs text-slate-700">
+              <p>
+                <span className="font-medium">Login:</span> {formatDateTime(row.lastLoginAt)}
+              </p>
+              <p>
+                <span className="font-medium">Logout:</span> {formatDateTime(row.lastLogoutAt)}
+              </p>
+            </div>
+          </div>
+        ),
       },
       {
-        key: "currentSessionHours",
-        header: "Current Session",
-        render: (row: TechnicianRow) =>
-          row.loginStatus === "Logged In" ? formatHours(row.currentSessionHours) : "-",
+        key: "hours",
+        header: "Hours",
+        className: "min-w-[120px]",
+        render: (row: TechnicianRow) => (
+          <div className="space-y-1 text-xs text-slate-700">
+            <p>
+              <span className="font-medium">Current:</span>{" "}
+              {row.loginStatus === "Logged In" ? formatHours(row.currentSessionHours) : "0.00 h"}
+            </p>
+            <p>
+              <span className="font-medium">24h:</span> {formatHours(row.loggedInHours24h)}
+            </p>
+            <p>
+              <span className="font-medium">Total:</span> {formatHours(row.loggedInHoursTotal)}
+            </p>
+          </div>
+        ),
       },
       {
         key: "inactivityAlertSentAt",
-        header: "Last Login Alert",
-        render: (row: TechnicianRow) => formatDateTime(row.inactivityAlertSentAt),
-      },
-      {
-        key: "rating",
-        header: "Rating",
-        render: (row: TechnicianRow) => row.rating?.toFixed(1) || "0.0",
-      },
-      {
-        key: "visibility",
-        header: "Visibility",
+        header: "Last Alert",
+        className: "min-w-[150px]",
         render: (row: TechnicianRow) => (
-          <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
-              row.visibility
-                ? "border-blue-200 bg-blue-50 text-blue-700"
-                : "border-rose-200 bg-rose-50 text-rose-700"
-            }`}
-          >
-            {row.visibility ? "Visible" : "Hidden"}
-          </span>
+          <div className="space-y-0.5">
+            <p className="text-sm text-slate-900">{formatRelativeTime(row.inactivityAlertSentAt)}</p>
+            <p className="text-xs text-slate-500">{formatDateTime(row.inactivityAlertSentAt)}</p>
+          </div>
         ),
       },
       {
         key: "adminNote",
         header: "Admin Note",
+        className: "min-w-[140px] max-w-[220px]",
         render: (row: TechnicianRow) => (
-          <span className="line-clamp-2 max-w-[220px] text-sm text-slate-600">{row.adminNote || "-"}</span>
+          <span className="line-clamp-3 text-sm text-slate-600">{row.adminNote || "No note"}</span>
         ),
       },
       {
         key: "actions",
         header: "Actions",
+        className: "min-w-[110px]",
         render: (row: TechnicianRow) => (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-col items-start gap-1.5">
             <button
               type="button"
               onClick={() => openModal("toggle", row)}
               className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium hover:bg-slate-100"
             >
               {row.visibility ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              Toggle Visibility
+              {row.visibility ? "Hide" : "Show"}
             </button>
             <button
               type="button"
               onClick={() => openModal("note", row)}
               className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium hover:bg-slate-100"
             >
-              <FilePenLine className="h-3.5 w-3.5" /> Add Note
+              <FilePenLine className="h-3.5 w-3.5" /> Note
             </button>
             <button
               type="button"
@@ -333,7 +346,7 @@ export default function AdminExtendedTechniciansPage() {
               disabled={row.loginStatus === "Logged In" || reminderMutation.isPending}
               className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Send Login Reminder
+              Remind
             </button>
           </div>
         ),
@@ -347,16 +360,17 @@ export default function AdminExtendedTechniciansPage() {
       <header>
         <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Technician Oversight</h1>
         <p className="text-sm text-slate-500">
-          Monitor availability, login activity, last seen timestamps, logged hours, visibility, and admin notes.
+          Monitor accurate login/logout activity, last seen, logged hours, visibility, and reminders.
         </p>
+        <p className="mt-1 text-xs text-slate-500">Times are shown in {LOCAL_TIME_ZONE}.</p>
       </header>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <input
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder="Search by ID, name or email"
-          className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+          className="h-10 min-w-[240px] flex-1 rounded-lg border border-slate-200 px-3 text-sm"
         />
         <select
           value={statusFilter}
@@ -364,7 +378,7 @@ export default function AdminExtendedTechniciansPage() {
             setStatusFilter(event.target.value);
             setPage(1);
           }}
-          className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+          className="h-10 min-w-[170px] rounded-lg border border-slate-200 px-3 text-sm"
         >
           <option value="all">All Statuses</option>
           <option value="online">Online</option>
@@ -376,7 +390,7 @@ export default function AdminExtendedTechniciansPage() {
             setVisibilityFilter(event.target.value);
             setPage(1);
           }}
-          className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+          className="h-10 min-w-[170px] rounded-lg border border-slate-200 px-3 text-sm"
         >
           <option value="all">All Visibility</option>
           <option value="visible">Visible</option>
@@ -388,7 +402,7 @@ export default function AdminExtendedTechniciansPage() {
             setLoginStatusFilter(event.target.value);
             setPage(1);
           }}
-          className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+          className="h-10 min-w-[170px] rounded-lg border border-slate-200 px-3 text-sm"
         >
           <option value="all">All Login Status</option>
           <option value="logged_in">Logged In</option>

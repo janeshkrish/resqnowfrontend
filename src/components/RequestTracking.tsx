@@ -123,6 +123,8 @@ type PaymentQuoteResponse = {
     original_platform_fee?: number;
     discount_amount?: number;
     platform_fee?: number;
+    payment_fee_percent?: number;
+    payment_fee?: number;
     total_amount?: number;
   };
   coupon?: {
@@ -677,6 +679,10 @@ const RequestTracking = () => {
           originalPlatformFee: Number(quoteBreakdown.original_platform_fee || 0),
           discountAmount: Number(quoteBreakdown.discount_amount || 0),
           platformFee: Number(quoteBreakdown.platform_fee || 0),
+          paymentFeePercent: Number(
+            quoteBreakdown.payment_fee_percent ?? pricingConfig?.payment_fee_percent ?? 0.02
+          ),
+          paymentFee: Number(quoteBreakdown.payment_fee || 0),
           totalAmount: Number(quoteBreakdown.total_amount || requestAmount),
         }
       : null;
@@ -1009,6 +1015,7 @@ const RequestTracking = () => {
           isProcessing={isProcessingPayment}
           paymentMethod={selectedPaymentMethod}
           platformFeePercent={pricingConfig?.platform_fee_percent}
+          paymentFeePercent={pricingConfig?.payment_fee_percent}
           currency={currency}
           breakdown={summaryBreakdown}
           showCouponSection={true}
@@ -1093,6 +1100,7 @@ const RequestTracking = () => {
         isProcessing={isProcessingPayment}
         paymentMethod={selectedPaymentMethod}
         platformFeePercent={pricingConfig?.platform_fee_percent}
+        paymentFeePercent={pricingConfig?.payment_fee_percent}
         currency={currency}
         breakdown={summaryBreakdown}
         showCouponSection={true}

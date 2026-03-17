@@ -23,6 +23,7 @@ export type SubscriptionPlanConfig = {
 export type PricingConfig = {
   currency: string;
   platform_fee_percent: number;
+  payment_fee_percent: number;
   welcome_coupon_code: string;
   welcome_coupon_discount_percent: number;
   welcome_coupon_max_uses_per_user: number;
@@ -38,6 +39,7 @@ export type PricingConfig = {
 const DEFAULT_PRICING_CONFIG: PricingConfig = {
   currency: "INR",
   platform_fee_percent: 0.1,
+  payment_fee_percent: 0.02,
   welcome_coupon_code: "RESQ10",
   welcome_coupon_discount_percent: 0.1,
   welcome_coupon_max_uses_per_user: 2,
@@ -164,6 +166,7 @@ function normalizeConfig(raw: unknown): PricingConfig {
   return {
     currency: String(data.currency || DEFAULT_PRICING_CONFIG.currency).toUpperCase(),
     platform_fee_percent: toNumber(data.platform_fee_percent, DEFAULT_PRICING_CONFIG.platform_fee_percent, true),
+    payment_fee_percent: toNumber(data.payment_fee_percent, DEFAULT_PRICING_CONFIG.payment_fee_percent, true),
     welcome_coupon_code: String(
       extra.welcome_coupon_code || DEFAULT_PRICING_CONFIG.welcome_coupon_code
     )

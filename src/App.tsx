@@ -41,6 +41,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPaymentLogs from "./pages/admin/AdminPaymentLogs";
+import AdminPayouts from "./pages/admin/AdminPayouts";
 import ApproveTechnician from "./pages/admin/ApproveTechnician";
 import RejectTechnician from "./pages/admin/RejectTechnician";
 import TechnicianManagement from "./pages/admin/TechnicianManagement";
@@ -299,6 +300,7 @@ const App = () => {
                             <Route path="applications" element={<TechnicianApplications />} />
                             <Route path="analytics" element={<AdminAnalytics />} />
                             <Route path="payments" element={<AdminPaymentLogs />} />
+                            <Route path="payouts" element={<AdminPayouts />} />
                             <Route path="settings" element={<AdminSettings />} />
                             <Route path="technician/:technicianId" element={<TechnicianDetails />} />
                           </Route>

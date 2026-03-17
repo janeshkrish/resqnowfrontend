@@ -9,6 +9,8 @@ import ActiveJobMap from '@/components/technician/ActiveJobMap';
 import { apiUrl } from '@/lib/api';
 import { normalizeTechnicianStatus, formatTechnicianStatus } from '@/utils/technicianStatus';
 import { useTechnicianActiveJob } from '@/hooks/useTechnicianActiveJob';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 const EMPTY_VALUE_TOKENS = new Set(['not available', 'n/a', 'na', 'null', 'undefined', 'no phone number']);
 
@@ -123,38 +125,102 @@ const ActiveJob = () => {
 
   // 3. Geolocation Logic
   useEffect(() => {
-    let watchId: number;
-    if (navigator.geolocation) {
+    if (!job) return;
+
+    let watchId: string | number | null = null;
+    let cancelled = false;
+    let permissionNotified = false;
+
+    const applyLocationUpdate = (latitude: number, longitude: number) => {
+      if (cancelled) return;
+      setCurrentLocation({ lat: latitude, lng: longitude });
+
+      fetch(apiUrl('/api/technicians/me/location'), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ latitude, longitude })
+      }).catch(console.error);
+
+      if (socket && job) {
+        socket.emit('technician:location_update', {
+          technicianId: technician?.id,
+          lat: latitude,
+          lng: longitude,
+          requestId: job.requestId || job.id
+        });
+      }
+    };
+
+    const ensureNativePermission = async () => {
+      try {
+        const current = await Geolocation.checkPermissions();
+        const status = String(
+          (current as any).location || (current as any).coarseLocation || (current as any).fineLocation || ''
+        ).toLowerCase();
+        if (status === 'granted') return true;
+        const requested = await Geolocation.requestPermissions();
+        const nextStatus = String(
+          (requested as any).location || (requested as any).coarseLocation || (requested as any).fineLocation || ''
+        ).toLowerCase();
+        return nextStatus === 'granted';
+      } catch (error) {
+        console.warn('Native geolocation permission error:', error);
+        return false;
+      }
+    };
+
+    const startNativeWatch = async () => {
+      const granted = await ensureNativePermission();
+      if (!granted) {
+        if (!permissionNotified) {
+          permissionNotified = true;
+          toast.error('Location permission is required to track this job.');
+        }
+        return;
+      }
+
+      watchId = await Geolocation.watchPosition(
+        { enableHighAccuracy: true, timeout: 10000 },
+        (position, error) => {
+          if (error) {
+            console.warn('Native geolocation error:', error);
+            return;
+          }
+          if (!position) return;
+          applyLocationUpdate(position.coords.latitude, position.coords.longitude);
+        }
+      );
+    };
+
+    const startWebWatch = () => {
+      if (!navigator.geolocation) return;
       watchId = navigator.geolocation.watchPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          setCurrentLocation({ lat: latitude, lng: longitude });
-
-          fetch(apiUrl('/api/technicians/me/location'), {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ latitude, longitude })
-          }).catch(console.error);
-
-          if (socket && job) {
-            socket.emit('technician:location_update', {
-              technicianId: technician?.id,
-              lat: latitude,
-              lng: longitude,
-              requestId: job.requestId || job.id
-            });
-          }
+          applyLocationUpdate(position.coords.latitude, position.coords.longitude);
         },
         (err) => console.error('Geolocation error:', err),
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
+    };
+
+    if (Capacitor.isNativePlatform()) {
+      void startNativeWatch();
+    } else {
+      startWebWatch();
     }
 
     return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
+      cancelled = true;
+      if (Capacitor.isNativePlatform()) {
+        if (watchId != null) {
+          Geolocation.clearWatch({ id: watchId as string }).catch(() => {});
+        }
+      } else if (typeof watchId === 'number') {
+        navigator.geolocation.clearWatch(watchId);
+      }
     };
   }, [job, socket, technician?.id, token]);
 

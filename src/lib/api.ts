@@ -118,6 +118,7 @@ const defaultUsers = () => [
 const MOCK_PRICING_CONFIG = {
   currency: "INR",
   platform_fee_percent: 0.1,
+  payment_fee_percent: 0.02,
   welcome_coupon_code: "RESQ10",
   welcome_coupon_discount_percent: 0.1,
   welcome_coupon_max_uses_per_user: 2,
@@ -181,6 +182,36 @@ const getVehicles = () =>
     { id: 1, type: "car", make: "Hyundai", model: "i20", license_plate: "KA01DEMO1", status: "ready" },
   ]);
 const setVehicles = (value: AnyRecord[]) => writeStore("resqnow_mock_vehicles", value);
+const defaultWallets = () => {
+  const technicians = getTechnicians();
+  return technicians.map((tech, idx) => {
+    const numericId =
+      Number(String(tech.id || "").replace(/[^\d]/g, "")) || idx + 1;
+    const totalEarned = Number(tech.total_earnings || 0);
+    const totalPaidOut = Number(tech.total_paid_out || Math.round(totalEarned * 0.4));
+    const withdrawableBalance = Math.max(0, totalEarned - totalPaidOut);
+    return {
+      walletId: idx + 1,
+      technicianId: numericId,
+      technicianName: tech.name || `Technician ${numericId}`,
+      technicianEmail: tech.email || "",
+      upiId: tech.payment_details?.upi_id || tech.upi_id || "",
+      currency: "INR",
+      withdrawableBalance,
+      totalEarned,
+      totalPaidOut,
+      onHoldBalance: 0,
+      lastTransactionAt: tech.updated_at || nowIso(),
+      walletUpdatedAt: tech.updated_at || nowIso(),
+    };
+  });
+};
+const getWallets = () => readStore("resqnow_mock_wallets", defaultWallets());
+const setWallets = (value: AnyRecord[]) => writeStore("resqnow_mock_wallets", value);
+const getPayoutHistory = () => readStore("resqnow_mock_payout_history", []);
+const setPayoutHistory = (value: AnyRecord[]) => writeStore("resqnow_mock_payout_history", value);
+const getRefunds = () => readStore("resqnow_mock_refunds", []);
+const setRefunds = (value: AnyRecord[]) => writeStore("resqnow_mock_refunds", value);
 
 const ensureUserProfile = (patch: AnyRecord = {}) => {
   const base = getUserProfile() || {
@@ -215,6 +246,20 @@ const withTechnician = (request: AnyRecord) => {
 
 const requestById = (id: string) =>
   getRequests().find((item) => String(item.id) === String(id)) || null;
+
+const mockPaymentById = (paymentId: number) => {
+  const requests = getRequests();
+  const idx = Number(paymentId) - 1;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= requests.length) return null;
+  const request = requests[idx];
+  return {
+    paymentId,
+    request,
+    totalAmount: Number(request?.amount || request?.service_charge || 0),
+    paymentMethod: String(request?.payment_method || "razorpay"),
+    paymentStatus: String(request?.payment_status || "completed"),
+  };
+};
 
 const upsertRequest = (request: AnyRecord) => {
   const requests = getRequests();
@@ -347,6 +392,336 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/admin/notifications/count" && method === "GET") return json({ count: 1, pendingApplications: getTechnicians().filter((item) => item.verification_status === "pending").length });
   if (path === "/api/admin/notifications" && method === "GET") return json([{ id: 1, title: "New technician application", message: "City Bike Clinic submitted documents.", type: "technician_application", is_read: 0, created_at: nowIso() }].slice(Number(q.get("offset") || 0), Number(q.get("offset") || 0) + Number(q.get("limit") || 5)));
   if (/^\/api\/admin\/notifications\/\d+\/read$/.test(path) && method === "POST") return json({ success: true });
+  if (path === "/api/admin/finance/wallets" && method === "GET") {
+    const page = Math.max(Number(q.get("page") || 1), 1);
+    const limit = Math.min(Math.max(Number(q.get("limit") || 20), 1), 100);
+    const search = String(q.get("search") || "").trim().toLowerCase();
+    const onlyPositive = ["1", "true", "yes"].includes(String(q.get("onlyPositiveBalance") || "").toLowerCase());
+    let rows = getWallets();
+    if (search) {
+      rows = rows.filter((row) => {
+        return (
+          String(row.technicianId).includes(search) ||
+          String(row.technicianName || "").toLowerCase().includes(search) ||
+          String(row.technicianEmail || "").toLowerCase().includes(search) ||
+          String(row.upiId || "").toLowerCase().includes(search)
+        );
+      });
+    }
+    if (onlyPositive) {
+      rows = rows.filter((row) => Number(row.withdrawableBalance || 0) > 0);
+    }
+    const total = rows.length;
+    const offset = (page - 1) * limit;
+    const pageRows = rows.slice(offset, offset + limit);
+    return json({
+      data: pageRows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
+  }
+  if (path === "/api/admin/finance/payouts" && method === "GET") {
+    const page = Math.max(Number(q.get("page") || 1), 1);
+    const limit = Math.min(Math.max(Number(q.get("limit") || 20), 1), 100);
+    const search = String(q.get("search") || "").trim().toLowerCase();
+    let rows = getPayoutHistory();
+    if (search) {
+      rows = rows.filter((row) => {
+        return (
+          String(row.payoutReference || "").toLowerCase().includes(search) ||
+          String(row.externalReference || "").toLowerCase().includes(search) ||
+          String(row.technicianName || "").toLowerCase().includes(search) ||
+          String(row.technicianId || "").includes(search)
+        );
+      });
+    }
+    rows = rows.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.processedAt || 0).getTime();
+      const timeB = new Date(b.createdAt || b.processedAt || 0).getTime();
+      const safeA = Number.isFinite(timeA) ? timeA : 0;
+      const safeB = Number.isFinite(timeB) ? timeB : 0;
+      return safeB - safeA;
+    });
+    const total = rows.length;
+    const offset = (page - 1) * limit;
+    const pageRows = rows.slice(offset, offset + limit);
+    return json({
+      data: pageRows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
+  }
+  if (path === "/api/admin/finance/payouts" && method === "POST") {
+    const technicianId = Number(body.technicianId || 0);
+    if (!Number.isFinite(technicianId) || technicianId <= 0) {
+      return json({ error: "Invalid technician id." }, 400);
+    }
+    const wallets = getWallets();
+    const walletIndex = wallets.findIndex((row) => Number(row.technicianId) === technicianId);
+    if (walletIndex === -1) {
+      return json({ error: "Technician not found." }, 404);
+    }
+    const wallet = wallets[walletIndex];
+    const requestedAmount = body.amount == null || body.amount === "" ? null : Number(body.amount);
+    const payoutAmount = requestedAmount == null ? Number(wallet.withdrawableBalance || 0) : Number(requestedAmount);
+    if (!Number.isFinite(payoutAmount) || payoutAmount <= 0) {
+      return json({ error: "No withdrawable balance available for payout." }, 409);
+    }
+    if (payoutAmount > Number(wallet.withdrawableBalance || 0)) {
+      return json({ error: "Requested payout exceeds withdrawable balance." }, 409);
+    }
+    const idempotencyKey = String(body.idempotencyKey || "").trim();
+    const payoutHistory = getPayoutHistory();
+    if (idempotencyKey) {
+      const existing = payoutHistory.find((row) => String(row.idempotencyKey || "") === idempotencyKey);
+      if (existing) {
+        return json({
+          success: true,
+          payoutId: existing.id,
+          technicianId,
+          amount: existing.amount,
+          alreadyProcessed: true,
+          idempotencyReused: true,
+          wallet: {
+            total_earned: wallet.totalEarned,
+            withdrawable_balance: wallet.withdrawableBalance,
+            total_paid_out: wallet.totalPaidOut,
+            on_hold_balance: wallet.onHoldBalance,
+            currency: wallet.currency,
+          },
+        });
+      }
+    }
+    const now = nowIso();
+    const payoutId = Date.now();
+    const payoutReference = `PAYOUT-${payoutId}`;
+    const nextWallet = {
+      ...wallet,
+      withdrawableBalance: Math.max(0, Number(wallet.withdrawableBalance || 0) - payoutAmount),
+      totalPaidOut: Number(wallet.totalPaidOut || 0) + payoutAmount,
+      lastTransactionAt: now,
+      walletUpdatedAt: now,
+    };
+    wallets[walletIndex] = nextWallet;
+    setWallets(wallets);
+
+    const payoutRow = {
+      id: payoutId,
+      payoutReference,
+      idempotencyKey: idempotencyKey || null,
+      technicianId,
+      technicianName: wallet.technicianName,
+      upiId: wallet.upiId || null,
+      amount: payoutAmount,
+      currency: wallet.currency || "INR",
+      status: "paid",
+      payoutMethod: body.payoutMethod || "manual_upi",
+      externalReference: body.externalReference || null,
+      destinationReference: wallet.upiId || null,
+      notes: body.notes || null,
+      processedBy: "demo-admin",
+      processedAt: now,
+      createdAt: now,
+    };
+    setPayoutHistory([payoutRow, ...payoutHistory]);
+
+    return json({
+      success: true,
+      payoutId,
+      technicianId,
+      amount: payoutAmount,
+      alreadyProcessed: false,
+      idempotencyReused: false,
+      wallet: {
+        total_earned: nextWallet.totalEarned,
+        withdrawable_balance: nextWallet.withdrawableBalance,
+        total_paid_out: nextWallet.totalPaidOut,
+        on_hold_balance: nextWallet.onHoldBalance,
+        currency: nextWallet.currency,
+      },
+    });
+  }
+  const refundHistoryMatch = path.match(/^\/api\/admin\/finance\/refunds\/(\d+)$/);
+  if (refundHistoryMatch && method === "GET") {
+    const paymentId = Number(refundHistoryMatch[1]);
+    if (!Number.isFinite(paymentId) || paymentId <= 0) {
+      return json({ error: "Invalid transaction id." }, 400);
+    }
+    const payment = mockPaymentById(paymentId);
+    if (!payment) {
+      return json({ error: "Transaction not found." }, 404);
+    }
+    const refunds = getRefunds().filter((row) => Number(row.payment_id) === paymentId);
+    const refundedAmount = roundMoney(refunds.reduce((sum, row) => sum + Number(row.amount || 0), 0));
+    const totalAmount = roundMoney(payment.totalAmount || 0);
+    const remainingRefundable = roundMoney(Math.max(0, totalAmount - refundedAmount));
+    const refundStatus =
+      refundedAmount <= 0
+        ? "none"
+        : refundedAmount >= totalAmount
+          ? "fully_refunded"
+          : "partially_refunded";
+    return json({
+      paymentId,
+      totalAmount,
+      refundedAmount,
+      remainingRefundable,
+      refundStatus,
+      paymentStatus: payment.paymentStatus,
+      paymentMethod: payment.paymentMethod,
+      paymentToTechnicianStatus: "pending",
+      refunds: refunds.map((row) => ({
+        id: Number(row.id),
+        refundReference: row.refund_reference,
+        idempotencyKey: row.idempotency_key || null,
+        paymentId,
+        serviceRequestId: row.service_request_id,
+        technicianId: row.technician_id || null,
+        walletTransactionId: row.wallet_transaction_id || null,
+        amount: roundMoney(row.amount || 0),
+        technicianAdjustmentAmount: roundMoney(row.technician_adjustment_amount || 0),
+        status: row.status || "processed",
+        reason: row.reason || null,
+        externalReference: row.external_reference || null,
+        requestedBy: row.requested_by || null,
+        processedAt: row.processed_at || null,
+        createdAt: row.created_at || null,
+        metadata: row.metadata || null,
+      })),
+    });
+  }
+  const refundMatch = path.match(/^\/api\/admin\/finance\/refund\/(\d+)$/);
+  if (refundMatch && method === "POST") {
+    const paymentId = Number(refundMatch[1]);
+    if (!Number.isFinite(paymentId) || paymentId <= 0) {
+      return json({ error: "Invalid transaction id." }, 400);
+    }
+    const payment = mockPaymentById(paymentId);
+    if (!payment) {
+      return json({ error: "Transaction not found." }, 404);
+    }
+    const refunds = getRefunds();
+    const idempotencyKey = String(body.idempotencyKey || "").trim();
+    if (idempotencyKey) {
+      const existing = refunds.find((row) => String(row.idempotency_key || "") === idempotencyKey);
+      if (existing) {
+        return json({
+          success: true,
+          alreadyProcessed: true,
+          refundId: Number(existing.id),
+          paymentId,
+          refundedAmount: roundMoney(existing.amount || 0),
+          totalRefundedAmount: null,
+          refundStatus: existing.status || "processed",
+          technicianAdjustmentAmount: roundMoney(existing.technician_adjustment_amount || 0),
+          gatewayRefundId: existing.external_reference || null,
+        });
+      }
+    }
+
+    const amountInput = body.refundAmount == null || body.refundAmount === "" ? null : Number(body.refundAmount);
+    if (amountInput != null && (!Number.isFinite(amountInput) || amountInput <= 0)) {
+      return json({ error: "Invalid refund amount." }, 400);
+    }
+
+    const existingRefunds = refunds.filter((row) => Number(row.payment_id) === paymentId);
+    const alreadyRefunded = roundMoney(existingRefunds.reduce((sum, row) => sum + Number(row.amount || 0), 0));
+    const totalAmount = roundMoney(payment.totalAmount || 0);
+    const remaining = roundMoney(Math.max(0, totalAmount - alreadyRefunded));
+    const targetRefundAmount = amountInput == null ? remaining : roundMoney(amountInput);
+    if (targetRefundAmount <= 0) {
+      return json({ error: "Refund amount must be greater than zero." }, 409);
+    }
+    if (targetRefundAmount > remaining) {
+      return json({ error: "Refund amount exceeds the remaining refundable amount." }, 409);
+    }
+
+    const now = nowIso();
+    const refundId = Date.now();
+    const refundReference = `REFUND-${refundId}`;
+    const gatewayRefundId = `rf_${refundId}`;
+    const record = {
+      id: refundId,
+      refund_reference: refundReference,
+      idempotency_key: idempotencyKey || null,
+      payment_id: paymentId,
+      service_request_id: payment.request?.id || null,
+      technician_id: payment.request?.technician_id || null,
+      wallet_transaction_id: null,
+      amount: targetRefundAmount,
+      technician_adjustment_amount: 0,
+      status: "processed",
+      reason: String(body.reason || "").trim() || null,
+      external_reference: gatewayRefundId,
+      requested_by: "demo-admin",
+      processed_at: now,
+      created_at: now,
+      metadata: { gateway: "razorpay" },
+    };
+    refunds.unshift(record);
+    setRefunds(refunds);
+
+    const nextRefundedAmount = roundMoney(alreadyRefunded + targetRefundAmount);
+    const refundStatus = nextRefundedAmount >= totalAmount ? "fully_refunded" : "partially_refunded";
+    if (payment.request) {
+      upsertRequest({
+        ...payment.request,
+        payment_status: refundStatus === "fully_refunded" ? "refunded" : "partially_refunded",
+      });
+    }
+
+    return json({
+      success: true,
+      refundId,
+      paymentId,
+      refundedAmount: targetRefundAmount,
+      totalRefundedAmount: nextRefundedAmount,
+      refundStatus,
+      technicianAdjustmentAmount: 0,
+      gatewayRefundId,
+      alreadyProcessed: false,
+    });
+  }
+  if (path === "/api/admin/finance/payout-queue/export" && method === "GET") {
+    const wallets = getWallets().filter((row) => Number(row.withdrawableBalance || 0) > 0);
+    const headers = [
+      "technician_id",
+      "technician_name",
+      "technician_email",
+      "upi_id",
+      "currency",
+      "withdrawable_balance",
+      "total_earned",
+      "total_paid_out",
+      "last_transaction_at",
+    ];
+    const lines = [headers.join(",")];
+    wallets.forEach((row) => {
+      lines.push([
+        row.technicianId,
+        row.technicianName,
+        row.technicianEmail,
+        row.upiId || "",
+        row.currency || "INR",
+        row.withdrawableBalance,
+        row.totalEarned,
+        row.totalPaidOut,
+        row.lastTransactionAt || "",
+      ].join(","));
+    });
+    return new Response(`${lines.join("\n")}\n`, {
+      status: 200,
+      headers: { "Content-Type": "text/csv; charset=utf-8" },
+    });
+  }
   const adminTechnicianActivityMatch = path.match(/^\/api\/admin\/technician\/([^/]+)\/login-activity$/);
   if (adminTechnicianActivityMatch && method === "GET") {
     const requestedId = String(adminTechnicianActivityMatch[1] || "").trim();
@@ -584,7 +959,16 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     });
     return json({ success: true, request_id: request.id, ...quote });
   }
-  if (path === "/api/payments/create-service-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: Number(body.amount || 500) * 100, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: Number(body.amount || 500) });
+  if (path === "/api/payments/create-service-order" && method === "POST") {
+    return json(
+      {
+        error: "Deprecated endpoint. Use /api/payments/create-order with requestId.",
+        deprecated: true,
+        replacement: "/api/payments/create-order",
+      },
+      410
+    );
+  }
   if (path === "/api/payments/create-order" && method === "POST") {
     const request = requestById(String(body.requestId || ""));
     if (!request) return json({ error: "Request not found" }, 404);
@@ -616,6 +1000,8 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
       original_platform_fee: quote.breakdown.original_platform_fee,
       discount_amount: quote.breakdown.discount_amount,
       platform_fee: quote.breakdown.platform_fee,
+      payment_fee_percent: quote.breakdown.payment_fee_percent,
+      payment_fee: quote.breakdown.payment_fee,
       platform_fee_percent: quote.breakdown.platform_fee_percent,
       total_amount: quote.breakdown.total_amount,
       coupon: quote.coupon,

@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
 import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
@@ -27,6 +29,31 @@ type PaymentRecord = {
     request_paid_consistent?: boolean;
     payment_method_consistent?: boolean;
   };
+};
+
+type RefundHistoryEntry = {
+  id: number;
+  refundReference: string;
+  amount: number;
+  status: string;
+  technicianAdjustmentAmount: number;
+  externalReference?: string | null;
+  requestedBy?: string | null;
+  processedAt?: string | null;
+  createdAt?: string | null;
+  reason?: string | null;
+};
+
+type RefundHistoryResponse = {
+  paymentId: number;
+  totalAmount: number;
+  refundedAmount: number;
+  remainingRefundable: number;
+  refundStatus: string;
+  paymentStatus: string | null;
+  paymentMethod: string | null;
+  paymentToTechnicianStatus: string | null;
+  refunds: RefundHistoryEntry[];
 };
 
 type DispatchAuditTechnician = {
@@ -66,6 +93,15 @@ const AdminPaymentLogs = () => {
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [dispatchAudit, setDispatchAudit] = useState<DispatchAuditResponse | null>(null);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundRecord, setRefundRecord] = useState<PaymentRecord | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  const [refundHistory, setRefundHistory] = useState<RefundHistoryResponse | null>(null);
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+
+  const formatCurrency = (value: number | null | undefined) => `Rs ${Number(value || 0).toFixed(2)}`;
 
   const fetchOverview = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -79,6 +115,24 @@ const AdminPaymentLogs = () => {
       if (!silent) toast.error(err.message || "Failed to load payment logs");
     } finally {
       if (!silent) setLoading(false);
+    }
+  };
+
+  const fetchRefundHistory = async (paymentId: number, silent = false) => {
+    if (!silent) setRefundLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/finance/refunds/${paymentId}`, { method: "GET", admin: true });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || "Failed to load refund history");
+      }
+      const data = await res.json();
+      setRefundHistory(data);
+    } catch (err: any) {
+      if (!silent) toast.error(err.message || "Failed to load refund history");
+      setRefundHistory(null);
+    } finally {
+      if (!silent) setRefundLoading(false);
     }
   };
 
@@ -145,6 +199,77 @@ const AdminPaymentLogs = () => {
       toast.error(err.message || "Failed to fetch diagnostics");
     } finally {
       setDiagLoading(false);
+    }
+  };
+
+  const openRefundDialog = (record: PaymentRecord) => {
+    setRefundRecord(record);
+    setRefundAmount("");
+    setRefundReason("");
+    setRefundHistory(null);
+    setRefundDialogOpen(true);
+    if (record?.payment_id) {
+      fetchRefundHistory(record.payment_id);
+    }
+  };
+
+  const closeRefundDialog = () => {
+    if (refundSubmitting) return;
+    setRefundDialogOpen(false);
+    setRefundRecord(null);
+    setRefundAmount("");
+    setRefundReason("");
+    setRefundHistory(null);
+  };
+
+  const handleRefundSubmit = async () => {
+    if (!refundRecord) return;
+    const amountInput = refundAmount.trim();
+    let amount: number | null = null;
+    if (amountInput) {
+      const parsed = Number(amountInput);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        toast.error("Enter a valid refund amount.");
+        return;
+      }
+      amount = parsed;
+      if (
+        refundHistory?.remainingRefundable != null &&
+        amount > Number(refundHistory.remainingRefundable || 0)
+      ) {
+        toast.error("Refund amount exceeds remaining refundable balance.");
+        return;
+      }
+    }
+
+    setRefundSubmitting(true);
+    try {
+      const res = await apiFetch(`/api/admin/finance/refund/${refundRecord.payment_id}`, {
+        method: "POST",
+        admin: true,
+        body: JSON.stringify({
+          refundAmount: amount,
+          reason: refundReason.trim(),
+          useGateway: true,
+        }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        const gatewayInfo = body?.gatewayRefundId ? ` Gateway refund id: ${body.gatewayRefundId}` : "";
+        throw new Error(`${body?.error || "Failed to process refund."}${gatewayInfo}`);
+      }
+
+      toast.success(
+        body?.refundStatus
+          ? `Refund processed (${body.refundStatus}).`
+          : "Refund processed successfully."
+      );
+      await fetchRefundHistory(refundRecord.payment_id, true);
+      fetchOverview(true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process refund.");
+    } finally {
+      setRefundSubmitting(false);
     }
   };
 
@@ -270,6 +395,7 @@ const AdminPaymentLogs = () => {
                     <th className="text-left py-2 pr-4">Technician</th>
                     <th className="text-left py-2 pr-4">State</th>
                     <th className="text-left py-2">Checks</th>
+                    <th className="text-left py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -287,11 +413,24 @@ const AdminPaymentLogs = () => {
                           <Badge variant={r.checks?.payment_method_consistent ? "default" : "destructive"}>method-sync</Badge>
                         </div>
                       </td>
+                      <td className="py-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openRefundDialog(r)}
+                          disabled={
+                            String(r.payment_method || "").toLowerCase() === "cash" ||
+                            Number(r.payment_total_amount || 0) <= 0
+                          }
+                        >
+                          Refund
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-4 text-muted-foreground">No payment records found.</td>
+                      <td colSpan={8} className="py-4 text-muted-foreground">No payment records found.</td>
                     </tr>
                   )}
                 </tbody>
@@ -300,6 +439,125 @@ const AdminPaymentLogs = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={refundDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeRefundDialog();
+          else setRefundDialogOpen(true);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Refund payment #{refundRecord?.payment_id ?? "-"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Total Paid</p>
+                <p className="text-base font-semibold">
+                  {formatCurrency(refundHistory?.totalAmount ?? refundRecord?.payment_total_amount)}
+                </p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Refunded</p>
+                <p className="text-base font-semibold">
+                  {formatCurrency(refundHistory?.refundedAmount ?? 0)}
+                </p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Remaining</p>
+                <p className="text-base font-semibold">
+                  {formatCurrency(refundHistory?.remainingRefundable ?? (refundRecord?.payment_total_amount || 0))}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Refund amount (leave empty for full refund)</div>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                placeholder="e.g. 499.00"
+              />
+              {refundHistory && (
+                <p className="text-xs text-muted-foreground">
+                  Remaining refundable: {formatCurrency(refundHistory.remainingRefundable)}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Reason (optional)</div>
+              <Textarea
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                rows={3}
+                placeholder="Reason for refund"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Refund history</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => refundRecord && fetchRefundHistory(refundRecord.payment_id)}
+                  disabled={refundLoading}
+                >
+                  {refundLoading ? "Refreshing..." : "Refresh"}
+                </Button>
+              </div>
+              {refundLoading ? (
+                <p className="text-sm text-muted-foreground">Loading refund history...</p>
+              ) : refundHistory?.refunds?.length ? (
+                <div className="overflow-x-auto border rounded">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-muted/40">
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-2">Reference</th>
+                        <th className="text-left py-2 px-2">Amount</th>
+                        <th className="text-left py-2 px-2">Status</th>
+                        <th className="text-left py-2 px-2">Tech Reversal</th>
+                        <th className="text-left py-2 px-2">Gateway ID</th>
+                        <th className="text-left py-2 px-2">Processed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {refundHistory.refunds.map((refund) => (
+                        <tr key={refund.id} className="border-b last:border-b-0">
+                          <td className="py-2 px-2">{refund.refundReference || refund.id}</td>
+                          <td className="py-2 px-2">{formatCurrency(refund.amount)}</td>
+                          <td className="py-2 px-2">{refund.status || "-"}</td>
+                          <td className="py-2 px-2">{formatCurrency(refund.technicianAdjustmentAmount || 0)}</td>
+                          <td className="py-2 px-2">{refund.externalReference || "-"}</td>
+                          <td className="py-2 px-2">{refund.processedAt || refund.createdAt || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No refunds recorded yet.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-end">
+            <Button variant="outline" onClick={closeRefundDialog} disabled={refundSubmitting}>
+              Close
+            </Button>
+            <Button onClick={handleRefundSubmit} disabled={refundSubmitting || !refundRecord}>
+              {refundSubmitting ? "Processing..." : "Process refund"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

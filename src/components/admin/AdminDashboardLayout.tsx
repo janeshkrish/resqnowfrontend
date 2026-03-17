@@ -7,6 +7,7 @@ import {
   Settings,
   BarChart3,
   CreditCard,
+  HandCoins,
   Home,
   LogOut,
   Bell,
@@ -255,6 +256,19 @@ const AdminDashboardLayout = () => {
             >
               <CreditCard className="w-5 h-5 mr-3" />
               {!isSidebarCollapsed && <span>Payments</span>}
+            </Link>
+
+            <Link
+              to="/admin/payouts"
+              className={cn(
+                "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
+                isActive("/admin/payouts")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <HandCoins className="w-5 h-5 mr-3" />
+              {!isSidebarCollapsed && <span>Payouts</span>}
             </Link>
 
             <Link

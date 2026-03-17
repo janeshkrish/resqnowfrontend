@@ -40,9 +40,11 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
 
   const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
   const platformFeePercent = pricingConfig?.platform_fee_percent ?? 0.10;
+  const paymentFeePercent = pricingConfig?.payment_fee_percent ?? 0.02;
   const payNowDiscountPercent = Math.max(0, Number(pricingConfig?.pay_now_discount_percent ?? 0));
   const platformFee = roundMoney(servicePrice * platformFeePercent);
-  const totalAmount = roundMoney(servicePrice + platformFee);
+  const paymentFee = roundMoney(servicePrice * paymentFeePercent);
+  const totalAmount = roundMoney(servicePrice + platformFee + paymentFee);
 
   const ensureRazorpayLoaded = async () => {
     if ((window as any).Razorpay) return true;
@@ -181,6 +183,10 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
             <div className="mt-2 flex items-center justify-between text-sm text-white/90">
               <span>Platform fee</span>
               <span className="font-semibold">{currency} {platformFee.toFixed(2)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm text-white/90">
+              <span>Payment fee</span>
+              <span className="font-semibold">{currency} {paymentFee.toFixed(2)}</span>
             </div>
             <div className="mt-3 h-px bg-white/20" />
             <div className="mt-3 flex items-end justify-between">
@@ -371,6 +377,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
         baseAmount={servicePrice}
         isProcessing={isProcessing}
         platformFeePercent={platformFeePercent}
+        paymentFeePercent={paymentFeePercent}
         currency={currency}
       />
     </div>

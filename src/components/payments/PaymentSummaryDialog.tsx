@@ -24,6 +24,8 @@ type PaymentBreakdown = {
   originalPlatformFee: number;
   discountAmount: number;
   platformFee: number;
+  paymentFeePercent?: number;
+  paymentFee?: number;
   totalAmount: number;
   currency?: string;
 };
@@ -41,6 +43,7 @@ interface PaymentSummaryDialogProps {
   isProcessing: boolean;
   paymentMethod?: "online" | "cash";
   platformFeePercent?: number;
+  paymentFeePercent?: number;
   currency?: string;
   breakdown?: PaymentBreakdown | null;
   showCouponSection?: boolean;
@@ -62,6 +65,7 @@ export function PaymentSummaryDialog({
   isProcessing,
   paymentMethod = "online",
   platformFeePercent = 0.1,
+  paymentFeePercent = 0.02,
   currency = "INR",
   breakdown = null,
   showCouponSection = false,
@@ -83,7 +87,15 @@ export function PaymentSummaryDialog({
       ? platformFeePercent
       : 0.1;
   const fallbackPlatformFee = roundMoney(numericBaseAmount * feePercent);
-  const fallbackTotal = roundMoney(numericBaseAmount + fallbackPlatformFee);
+  const paymentPercent =
+    Number.isFinite(Number(breakdown?.paymentFeePercent))
+      ? Number(breakdown?.paymentFeePercent)
+      :
+    Number.isFinite(paymentFeePercent) && paymentFeePercent >= 0
+      ? paymentFeePercent
+      : 0.02;
+  const fallbackPaymentFee = roundMoney(numericBaseAmount * paymentPercent);
+  const fallbackTotal = roundMoney(numericBaseAmount + fallbackPlatformFee + fallbackPaymentFee);
 
   const resolvedBase = Number.isFinite(Number(breakdown?.baseAmount))
     ? Number(breakdown?.baseAmount)
@@ -100,6 +112,9 @@ export function PaymentSummaryDialog({
   const resolvedPlatformFee = Number.isFinite(Number(breakdown?.platformFee))
     ? Number(breakdown?.platformFee)
     : fallbackPlatformFee;
+  const resolvedPaymentFee = Number.isFinite(Number(breakdown?.paymentFee))
+    ? Number(breakdown?.paymentFee)
+    : fallbackPaymentFee;
   const resolvedTotalAmount = Number.isFinite(Number(breakdown?.totalAmount))
     ? Number(breakdown?.totalAmount)
     : fallbackTotal;
@@ -168,6 +183,15 @@ export function PaymentSummaryDialog({
                 </p>
               </div>
               <span className="font-medium">{formatAmount(resolvedPlatformFee)}</span>
+            </div>
+            <div className="mt-2 flex items-start justify-between text-sm">
+              <div>
+                <p className="text-muted-foreground">Payment fee</p>
+                <p className="text-[11px] text-muted-foreground/80">
+                  {Math.round(paymentPercent * 100)}% gateway and convenience charge
+                </p>
+              </div>
+              <span className="font-medium">{formatAmount(resolvedPaymentFee)}</span>
             </div>
             {hasDiscount && (
               <>

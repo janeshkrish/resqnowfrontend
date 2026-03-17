@@ -17,6 +17,7 @@ import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
 import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 
 // Restored imports for widgets
 import TechnicianJobHistory from "@/components/technician/TechnicianJobHistory";
@@ -59,6 +60,7 @@ const TechnicianDashboard = () => {
   const acceptedJobIdRef = useRef<string | null>(acceptedJobId);
   const incomingJobRef = useRef<JobRequest | null>(incomingJob);
   const handledRouteJobRef = useRef<string | null>(null);
+  const locationPermissionRef = useRef<"granted" | "denied" | null>(null);
 
   const stopAlertSound = () => {
     if (!audioRef.current) return;
@@ -82,6 +84,7 @@ const TechnicianDashboard = () => {
 
   const playAcceptConfirmationSound = () => {
     try {
+      if (isNativePlatform) return;
       const AudioContextClass =
         (window as any).AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
@@ -1100,28 +1103,97 @@ const TechnicianDashboard = () => {
   };
 
   const startLocationTracking = () => {
-    if (navigator.geolocation && !trackingInterval.current) {
+    if (trackingInterval.current) return;
+
+    const applyLocationUpdate = (latitude: number, longitude: number) => {
+      setCurrentLocation({ lat: latitude, lng: longitude });
+      socketRef.current?.emit("technician:location_update", {
+        technicianId: technician?.id,
+        lat: latitude,
+        lng: longitude
+      });
+      apiFetch('/api/technicians/me/location', {
+        method: 'PATCH',
+        technician: true,
+        body: JSON.stringify({ latitude, longitude })
+      }).catch(console.error);
+    };
+
+    const ensureNativePermission = async () => {
+      if (!isNativePlatform) return true;
+      if (locationPermissionRef.current === "granted") return true;
+      try {
+        const current = await Geolocation.checkPermissions();
+        const status = String(
+          (current as any).location || (current as any).coarseLocation || (current as any).fineLocation || ""
+        ).toLowerCase();
+        if (status === "granted") {
+          locationPermissionRef.current = "granted";
+          return true;
+        }
+        const requested = await Geolocation.requestPermissions();
+        const nextStatus = String(
+          (requested as any).location || (requested as any).coarseLocation || (requested as any).fineLocation || ""
+        ).toLowerCase();
+        locationPermissionRef.current = nextStatus === "granted" ? "granted" : "denied";
+        return locationPermissionRef.current === "granted";
+      } catch (error) {
+        console.warn("Location permission check failed", error);
+        locationPermissionRef.current = "denied";
+        return false;
+      }
+    };
+
+    const fetchNativeLocation = async () => {
+      try {
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+        const { latitude, longitude } = position.coords;
+        applyLocationUpdate(latitude, longitude);
+      } catch (err) {
+        console.warn("Native geolocation error", err);
+      }
+    };
+
+    const fetchWebLocation = () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          applyLocationUpdate(latitude, longitude);
+        },
+        (err) => console.warn("Web geolocation error", err),
+        { enableHighAccuracy: true }
+      );
+    };
+
+    const start = async () => {
+      if (isNativePlatform) {
+        const granted = await ensureNativePermission();
+        if (!granted) {
+          toast.error("Location permission is required to accept jobs.");
+          return;
+        }
+      }
+
       trackingInterval.current = setInterval(() => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            setCurrentLocation({ lat: latitude, lng: longitude });
-            socketRef.current?.emit("technician:location_update", {
-              technicianId: technician?.id,
-              lat: latitude,
-              lng: longitude
-            });
-            apiFetch('/api/technicians/me/location', {
-              method: 'PATCH',
-              technician: true,
-              body: JSON.stringify({ latitude, longitude })
-            }).catch(console.error);
-          },
-          (err) => console.error(err),
-          { enableHighAccuracy: true }
-        );
-      }, 5000); // Every 5s
-    }
+        if (isNativePlatform) {
+          void fetchNativeLocation();
+        } else {
+          fetchWebLocation();
+        }
+      }, 5000);
+
+      if (isNativePlatform) {
+        void fetchNativeLocation();
+      } else {
+        fetchWebLocation();
+      }
+    };
+
+    void start();
   };
 
   const stopLocationTracking = () => {

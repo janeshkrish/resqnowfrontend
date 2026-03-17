@@ -208,10 +208,59 @@ export type FinanceTransactionRow = {
   upiId?: string | null;
   amount: number;
   platformFee?: number;
+  paymentFee?: number;
+  platformRevenue?: number;
   technicianAmount: number;
-  paymentToTechnicianStatus: "pending" | "completed" | string;
+  paymentToTechnicianStatus: "pending" | "processing" | "completed" | "not_applicable" | string;
   status: string;
   date: string;
+};
+
+export type PayoutQueueRow = {
+  walletId: number;
+  technicianId: number;
+  technicianName: string;
+  technicianEmail: string;
+  upiId?: string | null;
+  currency: string;
+  withdrawableBalance: number;
+  totalEarned: number;
+  totalPaidOut: number;
+  lastTransactionAt?: string | null;
+};
+
+export type TechnicianWalletBalanceRow = {
+  walletId: number;
+  technicianId: number;
+  technicianName: string;
+  technicianEmail: string;
+  upiId?: string | null;
+  currency: string;
+  withdrawableBalance: number;
+  totalEarned: number;
+  totalPaidOut: number;
+  onHoldBalance: number;
+  lastTransactionAt?: string | null;
+  walletUpdatedAt?: string | null;
+};
+
+export type PayoutHistoryRow = {
+  id: number;
+  payoutReference: string;
+  idempotencyKey?: string | null;
+  technicianId: number;
+  technicianName: string;
+  upiId?: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  payoutMethod?: string | null;
+  externalReference?: string | null;
+  destinationReference?: string | null;
+  notes?: string | null;
+  processedBy?: string | null;
+  processedAt?: string | null;
+  createdAt: string;
 };
 
 export type AnalyticsPayload = {
@@ -400,8 +449,75 @@ export async function markTechnicianPaymentCompleted(transactionId: number) {
     transactionId: number;
     paymentToTechnicianStatus: "completed";
     alreadyCompleted?: boolean;
+    payoutId?: number | null;
   }>(`/pay-technician/${transactionId}`);
   return data;
+}
+
+export async function getTechnicianWalletBalances(params: {
+  page: number;
+  limit: number;
+  search?: string;
+  onlyPositiveBalance?: boolean;
+}) {
+  const { data } = await adminApi.get<{ data: TechnicianWalletBalanceRow[]; pagination: Pagination }>(
+    "/finance/wallets",
+    { params }
+  );
+  return data;
+}
+
+export async function triggerWalletPayout(payload: {
+  technicianId: number;
+  amount?: number | null;
+  payoutMethod?: string;
+  notes?: string;
+  externalReference?: string;
+  idempotencyKey?: string;
+}) {
+  const { data } = await adminApi.post<{
+    success: boolean;
+    payoutId: number;
+    technicianId: number;
+    amount: number;
+    alreadyProcessed?: boolean;
+    idempotencyReused?: boolean;
+    wallet?: {
+      total_earned: number;
+      withdrawable_balance: number;
+      total_paid_out: number;
+      on_hold_balance: number;
+      currency: string;
+    };
+  }>("/finance/payouts", payload);
+  return data;
+}
+
+export async function getPayoutHistory(params: {
+  page: number;
+  limit: number;
+  search?: string;
+}) {
+  const { data } = await adminApi.get<{ data: PayoutHistoryRow[]; pagination: Pagination }>(
+    "/finance/payouts",
+    { params }
+  );
+  return data;
+}
+
+export async function getPayoutQueue(limit = 500) {
+  const { data } = await adminApi.get<{ data: PayoutQueueRow[]; total: number }>("/finance/payout-queue", {
+    params: { limit },
+  });
+  return data;
+}
+
+export async function exportPayoutQueueCsv(limit = 500) {
+  const response = await adminApi.get("/finance/payout-queue/export", {
+    params: { limit },
+    responseType: "blob",
+  });
+  return response.data as Blob;
 }
 
 export async function exportFinanceCsv(days = 30) {

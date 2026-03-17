@@ -347,6 +347,76 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/admin/notifications/count" && method === "GET") return json({ count: 1, pendingApplications: getTechnicians().filter((item) => item.verification_status === "pending").length });
   if (path === "/api/admin/notifications" && method === "GET") return json([{ id: 1, title: "New technician application", message: "City Bike Clinic submitted documents.", type: "technician_application", is_read: 0, created_at: nowIso() }].slice(Number(q.get("offset") || 0), Number(q.get("offset") || 0) + Number(q.get("limit") || 5)));
   if (/^\/api\/admin\/notifications\/\d+\/read$/.test(path) && method === "POST") return json({ success: true });
+  const adminTechnicianActivityMatch = path.match(/^\/api\/admin\/technician\/([^/]+)\/login-activity$/);
+  if (adminTechnicianActivityMatch && method === "GET") {
+    const requestedId = String(adminTechnicianActivityMatch[1] || "").trim();
+    const technicians = getTechnicians();
+    const technician =
+      technicians.find((item) => String(item.id) === requestedId) ||
+      technicians.find((item) => String(item.id).replace(/^tech-/i, "") === requestedId) ||
+      technicians[0] ||
+      null;
+    if (!technician) {
+      return json({ error: "Technician not found." }, 404);
+    }
+    const now = nowIso();
+    const lastLoginAt = technician.last_login_at || null;
+    const lastLogoutAt = technician.last_logout_at || null;
+    const lastSeenAt = technician.last_seen_at || lastLogoutAt || lastLoginAt || null;
+    const isLoggedIn = Boolean(technician.is_logged_in);
+
+    return json({
+      technician: {
+        technicianId: Number(String(technician.id || "").replace(/[^\d]/g, "")) || 1,
+        name: technician.name || "Technician",
+        email: technician.email || "",
+        approvalStatus: technician.verification_status === "verified" ? "approved" : "pending",
+        availabilityStatus: technician.is_active ? "Online" : "Offline",
+        loginStatus: isLoggedIn ? "Logged In" : "Logged Out",
+        visibility: true,
+        lastLoginAt,
+        lastLogoutAt,
+        lastSeenAt,
+        inactivityAlertSentAt: technician.login_reminder_sent_at || null,
+        currentSessionStartedAt: isLoggedIn ? lastLoginAt : null,
+        currentSessionHours: 0,
+        loggedInHours24h: 0,
+        loggedInHours7d: 0,
+        loggedInHoursTotal: 0,
+      },
+      sessions: lastLoginAt
+        ? [
+            {
+              sessionId: 1,
+              loginAt: lastLoginAt,
+              lastSeenAt: lastSeenAt || now,
+              logoutAt: lastLogoutAt,
+              isActive: !lastLogoutAt && isLoggedIn,
+              endedReason: lastLogoutAt ? "logout" : null,
+              source: "demo",
+              durationSeconds: 0,
+              durationHours: 0,
+              metadata: null,
+              createdAt: lastLoginAt,
+              updatedAt: lastSeenAt || now,
+            },
+          ]
+        : [],
+      alerts: technician.login_reminder_sent_at
+        ? [
+            {
+              alertId: 1,
+              alertType: "login_inactivity_reminder",
+              status: "sent",
+              message: "Demo mode reminder record.",
+              sentAt: technician.login_reminder_sent_at,
+              createdAt: technician.login_reminder_sent_at,
+              metadata: null,
+            },
+          ]
+        : [],
+    });
+  }
 
   if (path === "/api/technicians/list" && method === "GET") {
     const status = String(q.get("status") || "").toLowerCase();

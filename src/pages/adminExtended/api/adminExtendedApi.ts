@@ -143,6 +143,56 @@ export type TechnicianRow = {
   inactivityAlertSentAt: string | null;
 };
 
+export type TechnicianLoginActivityDetails = {
+  technicianId: number;
+  name: string;
+  email: string;
+  approvalStatus: string;
+  availabilityStatus: "Online" | "Offline" | string;
+  loginStatus: "Logged In" | "Logged Out" | string;
+  visibility: boolean;
+  lastLoginAt: string | null;
+  lastLogoutAt: string | null;
+  lastSeenAt: string | null;
+  inactivityAlertSentAt: string | null;
+  currentSessionStartedAt: string | null;
+  currentSessionHours: number;
+  loggedInHours24h: number;
+  loggedInHours7d: number;
+  loggedInHoursTotal: number;
+};
+
+export type TechnicianLoginSessionRow = {
+  sessionId: number;
+  loginAt: string | null;
+  lastSeenAt: string | null;
+  logoutAt: string | null;
+  isActive: boolean;
+  endedReason: string | null;
+  source: string | null;
+  durationSeconds: number;
+  durationHours: number;
+  metadata: Record<string, unknown> | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type TechnicianLoginAlertRow = {
+  alertId: number;
+  alertType: string;
+  status: string;
+  message: string;
+  sentAt: string | null;
+  createdAt: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+export type TechnicianLoginActivityResponse = {
+  technician: TechnicianLoginActivityDetails;
+  sessions: TechnicianLoginSessionRow[];
+  alerts: TechnicianLoginAlertRow[];
+};
+
 export type FinanceSummary = {
   todayRevenue: number;
   pendingPayments: number;
@@ -311,6 +361,17 @@ export async function sendAdminTechnicianLoginReminder(payload: {
   message?: string;
 }) {
   const { data } = await adminApi.post("/technician/send-login-reminder", payload);
+  return data;
+}
+
+export async function getAdminTechnicianLoginActivity(
+  technicianId: number,
+  params: { sessionLimit?: number; alertLimit?: number } = {}
+) {
+  const { data } = await adminApi.get<TechnicianLoginActivityResponse>(
+    `/technician/${technicianId}/login-activity`,
+    { params }
+  );
   return data;
 }
 

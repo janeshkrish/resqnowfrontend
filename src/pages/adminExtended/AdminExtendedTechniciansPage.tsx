@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Eye, EyeOff, FilePenLine } from "lucide-react";
+import { Link } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import DataTable from "./components/DataTable";
 import Modal from "./components/Modal";
@@ -348,6 +349,12 @@ export default function AdminExtendedTechniciansPage() {
             >
               Remind
             </button>
+            <Link
+              to={`/admin/extended/technicians/${row.technicianId}/activity`}
+              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+            >
+              View Activity
+            </Link>
           </div>
         ),
       },

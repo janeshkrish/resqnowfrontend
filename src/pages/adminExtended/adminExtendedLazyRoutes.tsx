@@ -6,6 +6,7 @@ const AdminExtendedDashboardPage = lazy(() => import("./AdminExtendedDashboardPa
 const AdminExtendedRequestsPage = lazy(() => import("./AdminExtendedRequestsPage"));
 const AdminExtendedCommandCenterPage = lazy(() => import("./AdminExtendedCommandCenterPage"));
 const AdminExtendedTechniciansPage = lazy(() => import("./AdminExtendedTechniciansPage"));
+const AdminExtendedTechnicianActivityPage = lazy(() => import("./AdminExtendedTechnicianActivityPage"));
 const AdminExtendedFinancePage = lazy(() => import("./AdminExtendedFinancePage"));
 const AdminExtendedAnalyticsPage = lazy(() => import("./AdminExtendedAnalyticsPage"));
 const AdminExtendedComplaintsPage = lazy(() => import("./AdminExtendedComplaintsPage"));
@@ -21,6 +22,7 @@ export const adminExtendedLazyRoutes: RouteObject[] = [
       { path: "requests", element: <AdminExtendedRequestsPage /> },
       { path: "command-center", element: <AdminExtendedCommandCenterPage /> },
       { path: "technicians", element: <AdminExtendedTechniciansPage /> },
+      { path: "technicians/:technicianId/activity", element: <AdminExtendedTechnicianActivityPage /> },
       { path: "finance", element: <AdminExtendedFinancePage /> },
       { path: "analytics", element: <AdminExtendedAnalyticsPage /> },
       { path: "complaints", element: <AdminExtendedComplaintsPage /> },

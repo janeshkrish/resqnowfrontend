@@ -93,7 +93,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
     GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
 
     FRONTEND_URL=http://localhost:8080
-    VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key;.
+    VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key;
     ```
 
 ### Running the App

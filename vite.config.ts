@@ -27,6 +27,12 @@ export default defineConfig(({ mode }) => {
       "i"
     )
     : /$a/;
+  const liveStreamRuntimePattern = escapedApiBaseUrl
+    ? new RegExp(
+      `^${escapedApiBaseUrl}/api/(admin|admin-extended)/notifications/stream(?:$|[/?].*)`,
+      "i"
+    )
+    : /$a/;
   const razorpayScriptRuntimePattern = /^https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js(?:\?.*)?$/i;
 
   return {
@@ -97,6 +103,11 @@ export default defineConfig(({ mode }) => {
               urlPattern: paymentNoCacheRuntimePattern,
               handler: "NetworkOnly",
               method: "POST",
+            },
+            {
+              urlPattern: liveStreamRuntimePattern,
+              handler: "NetworkOnly",
+              method: "GET",
             },
             {
               urlPattern: razorpayScriptRuntimePattern,

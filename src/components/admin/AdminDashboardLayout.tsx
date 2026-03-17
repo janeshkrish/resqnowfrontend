@@ -15,7 +15,7 @@ import {
   ChevronRight,
   Shield
 } from "lucide-react";
-import { apiFetch, apiUrl, FRONTEND_ONLY_MODE } from "@/lib/api";
+import { apiFetch, FRONTEND_ONLY_MODE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -33,8 +33,10 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { io, Socket } from "socket.io-client";
 
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 
 const AdminDashboardLayout = () => {
   const { logoutAdmin } = useAdminAuth();
@@ -51,35 +53,38 @@ const AdminDashboardLayout = () => {
 
   // 1. Initial Fetch & SSE Setup
   useEffect(() => {
-    fetchNotifications(0, true);
-    fetchUnreadCount();
-
-    if (FRONTEND_ONLY_MODE) return;
-
-    // SSE Connection
-    const eventSource = new EventSource(apiUrl("/api/admin/notifications/stream"));
-
-    eventSource.onmessage = (event) => {
-      try {
-        if (event.data === ": heartbeat") return;
-        const data = JSON.parse(event.data);
-        if (data.type === "notification") {
-          // Add new notification to top
-          setNotifications(prev => [data.data, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          // Also update sidebar count if it's a technician application
-          const notificationType = String(data.data?.type || "").trim().toLowerCase();
-          if (notificationType === "technician_application" || notificationType === "new_technician_application") {
-            setPendingCount(prev => prev + 1);
-          }
-        }
-      } catch (err) {
-        console.error("SSE Parse Error", err);
-      }
+    const refreshNotifications = () => {
+      setOffset(0);
+      void fetchNotifications(0, true);
+      void fetchUnreadCount();
     };
 
+    refreshNotifications();
+
+    const pollId = window.setInterval(refreshNotifications, 60000);
+    if (FRONTEND_ONLY_MODE) {
+      return () => {
+        window.clearInterval(pollId);
+      };
+    }
+
+    const socketBaseUrl = getRequiredApiBaseUrl();
+    const socket: Socket = io(socketBaseUrl, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+      auth: { token: getAdminToken() || undefined },
+    });
+
+    socket.on("admin:notification", refreshNotifications);
+    socket.on("connect_error", (error) => {
+      console.warn("[Admin notifications] realtime connection failed", error.message);
+    });
+
     return () => {
-      eventSource.close();
+      window.clearInterval(pollId);
+      socket.off("admin:notification", refreshNotifications);
+      socket.disconnect();
     };
   }, []);
 

@@ -1125,7 +1125,12 @@ export async function apiFetch(
 ): Promise<Response> {
   const { admin, technician, headers = {}, ...rest } = options;
   const h = new Headers(headers);
-  h.set("Content-Type", "application/json");
+  const method = String(rest.method || "GET").trim().toUpperCase();
+  const hasRequestBody = rest.body != null && method !== "GET" && method !== "HEAD";
+
+  if (hasRequestBody && !(rest.body instanceof FormData) && !h.has("Content-Type")) {
+    h.set("Content-Type", "application/json");
+  }
 
   if (admin) {
     const token = getAdminToken();

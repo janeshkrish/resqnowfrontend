@@ -46,6 +46,56 @@ const formatCurrency = (value: number) =>
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "-";
 
+const stripHtml = (value: string) =>
+  String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const buildApiErrorMessage = (response: Response, rawText: string, fallback: string) => {
+  const text = stripHtml(rawText);
+  const missingRouteMatch = text.match(/Cannot\s+(GET|POST|PUT|PATCH|DELETE)\s+([^\s]+)/i);
+
+  if (missingRouteMatch) {
+    return `The deployed backend is missing ${missingRouteMatch[2]}. Deploy the latest backend and retry.`;
+  }
+
+  if (text) {
+    return text;
+  }
+
+  return `${fallback} (HTTP ${response.status})`;
+};
+
+const readJsonResponse = async <T,>(response: Response, fallbackError: string): Promise<T> => {
+  const rawText = await response.text();
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  const isJson = contentType.includes("application/json");
+
+  let parsedBody: any = null;
+  if (isJson && rawText) {
+    try {
+      parsedBody = JSON.parse(rawText);
+    } catch {
+      parsedBody = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      parsedBody?.error ||
+      parsedBody?.message ||
+      buildApiErrorMessage(response, rawText, fallbackError)
+    );
+  }
+
+  if (!isJson) {
+    throw new Error(buildApiErrorMessage(response, rawText, fallbackError));
+  }
+
+  return (parsedBody ?? {}) as T;
+};
+
 const AdminPayouts = () => {
   const [wallets, setWallets] = useState<WalletRow[]>([]);
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
@@ -78,10 +128,10 @@ const AdminPayouts = () => {
         method: "GET",
         admin: true,
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body?.error || "Failed to fetch wallet balances.");
-      }
+      const body = await readJsonResponse<{ data?: WalletRow[] }>(
+        res,
+        "Failed to fetch wallet balances."
+      );
       setWallets(Array.isArray(body?.data) ? body.data : []);
     } catch (err) {
       const message = (err as Error)?.message || "Failed to fetch wallet balances.";
@@ -102,10 +152,10 @@ const AdminPayouts = () => {
         method: "GET",
         admin: true,
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body?.error || "Failed to fetch payout history.");
-      }
+      const body = await readJsonResponse<{ data?: PayoutRow[] }>(
+        res,
+        "Failed to fetch payout history."
+      );
       setPayouts(Array.isArray(body?.data) ? body.data : []);
     } catch (err) {
       const message = (err as Error)?.message || "Failed to fetch payout history.";
@@ -141,10 +191,10 @@ const AdminPayouts = () => {
           notes: `Manual payout for technician #${wallet.technicianId}`,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body?.error || "Failed to mark payout as paid.");
-      }
+      const body = await readJsonResponse<{ alreadyProcessed?: boolean }>(
+        res,
+        "Failed to mark payout as paid."
+      );
       toast.success(body?.alreadyProcessed ? "Payout already recorded." : "Payout recorded.");
       refreshAll();
     } catch (err) {
@@ -162,8 +212,8 @@ const AdminPayouts = () => {
         admin: true,
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || "Failed to export payout queue.");
+        const rawText = await res.text().catch(() => "");
+        throw new Error(buildApiErrorMessage(res, rawText, "Failed to export payout queue."));
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

@@ -188,6 +188,7 @@ export type TechnicianLoginAlertRow = {
 };
 
 export type TechnicianLoginActivityResponse = {
+  generatedAt?: string;
   technician: TechnicianLoginActivityDetails;
   sessions: TechnicianLoginSessionRow[];
   alerts: TechnicianLoginAlertRow[];

@@ -97,7 +97,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
           // 3. Registration Listeners (token and refresh)
           const onRegister = PushNotifications.addListener('registration', async (token: Token) => {
             if (cancelled) return;
-            console.log("[Native Push] registration event, token=", token.value);
+            console.log("[Native Push] registration event received");
             if (!token.value) {
               console.warn("[Native Push] empty token received, ignoring");
               return;

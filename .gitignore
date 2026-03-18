@@ -6,7 +6,6 @@ dev-dist/
 .env
 .env.*
 !.env.example
-.env.example
 
 # Netlify local state
 .netlify/

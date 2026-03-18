@@ -6,7 +6,7 @@ import { Navigation, DollarSign, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { apiFetch, apiUrl } from '@/lib/api';
+import { apiFetch, readJsonSafely } from '@/lib/api';
 import { useTechnicianJob } from '@/contexts/TechnicianJobContext';
 import { normalizeTechnicianStatus } from '@/utils/technicianStatus';
 
@@ -29,6 +29,14 @@ const JobNotificationModal = () => {
   const location = useLocation();
   const isDashboardRoute = location.pathname.startsWith('/technician/dashboard');
   const JOB_TAKEN_MESSAGE = 'This job has already been taken by another technician.';
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     jobRequestRef.current = jobRequest;
@@ -106,19 +114,20 @@ const JobNotificationModal = () => {
       toast.error('Invalid job request id');
       return;
     }
+    if (!token) {
+      toast.error('Your technician session has expired. Please log in again.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(apiUrl('/api/jobs/accept'), {
+      const response = await apiFetch('/api/jobs/accept', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        technician: true,
         body: JSON.stringify({ jobId: requestId })
       });
-
-      const data = await response.json().catch(() => ({}));
+      const data = (await readJsonSafely<any>(response)) || {};
+      if (!isMountedRef.current) return;
       if (data.success) {
         const acceptedRequest = data?.request || data?.job || null;
         const acceptedJobId = String(acceptedRequest?.id || requestId).trim();
@@ -161,7 +170,9 @@ const JobNotificationModal = () => {
       console.error('Accept error:', error);
       toast.error('Network error');
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 

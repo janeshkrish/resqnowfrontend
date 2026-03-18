@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch, readJsonSafely } from "@/lib/api";
 import { useSocket } from "@/contexts/SocketContext";
 import { normalizeTechnicianStatus } from "@/utils/technicianStatus";
 
@@ -119,6 +119,14 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
   const [activeJob, setActiveJob] = useState<any | null>(null);
   const [dues, setDues] = useState(0);
   const { socket } = useSocket();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const refreshActiveJob = useCallback(async () => {
     if (!technicianId) return;
@@ -132,9 +140,11 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
       for (const path of candidatePaths) {
         const res = await apiFetch(path, { technician: true });
         if (!res.ok) continue;
-        const data = await res.json();
+        const data = await readJsonSafely(res);
         const normalized = normalizeJob(data);
-        setActiveJob(normalized);
+        if (isMountedRef.current) {
+          setActiveJob(normalized);
+        }
         return normalized;
       }
     } catch {
@@ -147,8 +157,10 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
     try {
       const res = await apiFetch("/api/technicians/me/dues", { technician: true });
       if (!res.ok) return;
-      const data = await res.json();
-      setDues(Number(data?.total || 0));
+      const data = await readJsonSafely(res);
+      if (isMountedRef.current) {
+        setDues(Number(data?.total || 0));
+      }
     } catch {
       // ignore transient failures
     }
@@ -156,11 +168,13 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
 
   useEffect(() => {
     if (!technicianId) return;
-    refreshActiveJob();
-    refreshDues();
+    const runRefresh = async () => {
+      await Promise.allSettled([refreshActiveJob(), refreshDues()]);
+    };
+
+    void runRefresh();
     const id = setInterval(() => {
-      refreshActiveJob();
-      refreshDues();
+      void runRefresh();
     }, autoRefreshMs);
     return () => clearInterval(id);
   }, [technicianId, autoRefreshMs, refreshActiveJob, refreshDues]);

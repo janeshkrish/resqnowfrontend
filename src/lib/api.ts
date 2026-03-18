@@ -1151,6 +1151,18 @@ export async function apiFetch(
   }
 }
 
+export async function readJsonSafely<T = AnyRecord>(response: Response): Promise<T | null> {
+  if (!response) return null;
+
+  try {
+    const raw = await response.text();
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function setTechnicianToken(token: string | null) {
   if (!isBrowser) return;
   if (token) localStorage.setItem("resqnow_technician_token", token);

@@ -11,7 +11,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
-import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from "@/lib/api";
+import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl, readJsonSafely } from "@/lib/api";
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
@@ -61,6 +61,14 @@ const TechnicianDashboard = () => {
   const incomingJobRef = useRef<JobRequest | null>(incomingJob);
   const handledRouteJobRef = useRef<string | null>(null);
   const locationPermissionRef = useRef<"granted" | "denied" | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const stopAlertSound = () => {
     if (!audioRef.current) return;
@@ -642,34 +650,37 @@ const TechnicianDashboard = () => {
       const useAcceptEndpoint =
         status === "accepted" && options?.useAcceptEndpoint !== false;
       const endpoint = useAcceptEndpoint
-        ? apiUrl("/api/jobs/accept")
-        : apiUrl(`/api/service-requests/${normalizedJobId}/technician-status`);
+        ? "/api/jobs/accept"
+        : `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-status`;
 
       const method = useAcceptEndpoint ? 'POST' : 'PATCH';
       const body = useAcceptEndpoint ? { jobId: normalizedJobId } : { status };
 
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("resqnow_technician_token")}`
-        },
+        technician: true,
         ...(body ? { body: JSON.stringify(body) } : {})
       });
+      const data = await readJsonSafely<any>(res);
       if (!res.ok) {
-        let errData: any = {};
-        try {
-          errData = await res.json();
-        } catch {
-          errData = {};
-        }
-        const error = new Error(errData.error || errData.message || "Failed");
+        const error = new Error(data?.error || data?.message || "Failed");
         (error as any).status = res.status;
-        (error as any).code = errData.code || null;
+        (error as any).code = data?.code || null;
         throw error;
       }
-      const data = await res.json();
-      return data;
+      return (
+        data || {
+          success: true,
+          request: {
+            id: normalizedJobId,
+            status,
+          },
+          job: {
+            id: normalizedJobId,
+            status,
+          },
+        }
+      );
     } catch (e: any) {
       const statusCode = Number(e?.status || 0);
       // 409 on accept is handled by the caller so we can keep modal state visible and disabled.
@@ -682,6 +693,7 @@ const TechnicianDashboard = () => {
 
   useEffect(() => {
     if (!technician?.id) return;
+    let cancelled = false;
 
     const params = new URLSearchParams(location.search);
     const routeState = (location.state || {}) as {
@@ -712,7 +724,8 @@ const TechnicianDashboard = () => {
         `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-offer`,
         { technician: true }
       );
-      const offerData = await offerRes.json().catch(() => ({} as any));
+      const offerData = (await readJsonSafely<any>(offerRes)) || {};
+      if (cancelled || !isMountedRef.current) return;
 
       const offerRequest = offerData?.request || {};
       const location = offerRequest?.location || {};
@@ -754,6 +767,7 @@ const TechnicianDashboard = () => {
     };
 
     const syncRouteState = async () => {
+      const shouldStop = () => cancelled || !isMountedRef.current;
       const currentJobId = String(activeJob?.id || "").trim();
       const currentStatus = normalizeTechnicianStatus(activeJob?.status);
       const isSameJob = currentJobId === normalizedJobId;
@@ -765,9 +779,11 @@ const TechnicianDashboard = () => {
         try {
           stopAlertSound();
           await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+          if (shouldStop()) return;
           playAcceptConfirmationSound();
           toast.success("Job Accepted!");
         } catch (error: any) {
+          if (shouldStop()) return;
           const statusCode = Number(error?.status || 0);
           if (statusCode === 409) {
             setIncomingJobUnavailable(true);
@@ -786,12 +802,13 @@ const TechnicianDashboard = () => {
             `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-offer`,
             { technician: true }
           );
-          const offerBody = await offerRes.json().catch(() => ({} as any));
+          const offerBody = (await readJsonSafely<any>(offerRes)) || {};
           const offerStatus = String(offerBody?.request?.offer_status || "").trim().toLowerCase();
           canReject = offerRes.ok && offerBody?.available === true && offerStatus === "pending";
         } catch {
           canReject = false;
         }
+        if (shouldStop()) return;
 
         try {
           stopAlertSound();
@@ -807,20 +824,24 @@ const TechnicianDashboard = () => {
             throw error;
           }
         }
+        if (shouldStop()) return;
         setIncomingJob(null);
         setIncomingJobUnavailable(false);
         setShowJobModal(false);
       }
 
       if (routeAction === "accept" || isAlreadyAccepted) {
+        if (shouldStop()) return;
         setAcceptedJobId(normalizedJobId);
       }
 
       if (!routeAction && !isAlreadyAccepted) {
         await hydrateIncomingJobFromDeepLink();
+        if (shouldStop()) return;
       }
 
       const refreshedActiveJob = await refreshActiveJob();
+      if (shouldStop()) return;
 
       if (routeAction === "accept") {
         setIncomingJob(null);
@@ -848,9 +869,13 @@ const TechnicianDashboard = () => {
     };
 
     syncRouteState().catch((error) => {
+      if (cancelled || !isMountedRef.current) return;
       console.error("Failed to sync dashboard route job state", error);
       toast.error("Unable to restore accepted job automatically.");
     });
+    return () => {
+      cancelled = true;
+    };
   }, [
     technician?.id,
     location.search,
@@ -876,8 +901,10 @@ const TechnicianDashboard = () => {
       setIsJobActionLoading(true);
       stopAlertSound();
       await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+      if (!isMountedRef.current) return;
       playAcceptConfirmationSound();
       toast.success("Job Accepted!");
+      const sourceIncomingJob = incomingJobRef.current;
       setIncomingJob(null);
       setIncomingJobUnavailable(false);
       setShowJobModal(false);
@@ -888,21 +915,22 @@ const TechnicianDashboard = () => {
         if (prev && String(prev.id) === normalizedJobId) {
           return { ...prev, status: 'accepted' };
         }
-        if (!incomingJob) return prev;
+        if (!sourceIncomingJob) return prev;
         return {
-          id: incomingJob.id,
+          id: sourceIncomingJob.id,
           status: 'accepted',
-          service_type: incomingJob.serviceType,
-          vehicle_type: incomingJob.vehicleType,
-          contact_name: incomingJob.customerName,
-          amount: incomingJob.amount != null && !Number.isNaN(Number(incomingJob.amount)) ? Number(incomingJob.amount) : null,
-          distance: incomingJob.distance ?? null,
-          location: incomingJob.location,
-          address: incomingJob.location?.address || "",
+          service_type: sourceIncomingJob.serviceType,
+          vehicle_type: sourceIncomingJob.vehicleType,
+          contact_name: sourceIncomingJob.customerName,
+          amount: sourceIncomingJob.amount != null && !Number.isNaN(Number(sourceIncomingJob.amount)) ? Number(sourceIncomingJob.amount) : null,
+          distance: sourceIncomingJob.distance ?? null,
+          location: sourceIncomingJob.location,
+          address: sourceIncomingJob.location?.address || "",
         };
       });
 
       const refreshedActiveJob = await refreshActiveJob();
+      if (!isMountedRef.current) return;
       startLocationTracking();
       navigate("/technician/active-job", {
         state: {
@@ -919,6 +947,7 @@ const TechnicianDashboard = () => {
     } catch (e: any) {
       const statusCode = Number(e?.status || 0);
       if (statusCode === 409) {
+        if (!isMountedRef.current) return;
         setIncomingJobUnavailable(true);
         setShowJobModal(true);
         toast.error(JOB_TAKEN_MESSAGE);
@@ -926,7 +955,9 @@ const TechnicianDashboard = () => {
       }
       console.error(e);
     } finally {
-      setIsJobActionLoading(false);
+      if (isMountedRef.current) {
+        setIsJobActionLoading(false);
+      }
     }
   };
 

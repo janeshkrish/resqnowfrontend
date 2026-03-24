@@ -14,6 +14,8 @@ export const TECHNICIAN_STATUS_FLOW = [
 
 export type TechnicianStatus = (typeof TECHNICIAN_STATUS_FLOW)[number];
 
+export const TECHNICIAN_COMPLETION_STATUSES = ["paid", "completed"] as const;
+
 export function normalizeTechnicianStatus(status: unknown): TechnicianStatus {
   const raw = String(status || "").trim().toLowerCase();
   const map: Record<string, TechnicianStatus> = {
@@ -37,5 +39,10 @@ export function formatTechnicianStatus(status: unknown): string {
   const s = normalizeTechnicianStatus(status);
   if (s === "payment_pending") return "payment pending";
   return s.replace(/-/g, " ");
+}
+
+export function isTechnicianCompletionStatus(status: unknown): boolean {
+  const normalized = normalizeTechnicianStatus(status);
+  return (TECHNICIAN_COMPLETION_STATUSES as readonly string[]).includes(normalized);
 }
 

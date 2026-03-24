@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MapPin, Phone, User, Navigation, CheckCircle, Loader2, XCircle } from 'lucide-react';
@@ -6,8 +6,13 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { toast } from 'sonner';
 import ActiveJobMap from '@/components/technician/ActiveJobMap';
+import TechnicianJobCompletion from '@/components/technician/TechnicianJobCompletion';
 import { apiUrl } from '@/lib/api';
-import { normalizeTechnicianStatus, formatTechnicianStatus } from '@/utils/technicianStatus';
+import {
+  formatTechnicianStatus,
+  isTechnicianCompletionStatus,
+  normalizeTechnicianStatus,
+} from '@/utils/technicianStatus';
 import { useTechnicianActiveJob } from '@/hooks/useTechnicianActiveJob';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
@@ -50,7 +55,23 @@ const ActiveJob = () => {
   const [status, setStatus] = useState(normalizeTechnicianStatus(state?.job?.status || 'accepted'));
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [lastEarned, setLastEarned] = useState(0);
+  const celebratedCompletionJobIdRef = useRef<string | null>(null);
   const job = activeJob || state?.job || null;
+
+  const openCompletionModal = (jobId: string, amount: number, message = 'Customer payment received. Job completed.') => {
+    const normalizedJobId = String(jobId || '').trim();
+    if (!normalizedJobId || celebratedCompletionJobIdRef.current === normalizedJobId) {
+      return;
+    }
+
+    celebratedCompletionJobIdRef.current = normalizedJobId;
+    const earned = Number(amount);
+    setLastEarned(Number.isFinite(earned) && earned > 0 ? earned : 0);
+    setShowCompletionModal(true);
+    toast.success(message);
+  };
 
   // 1. Keep local status in sync with active job status
   useEffect(() => {
@@ -62,6 +83,26 @@ const ActiveJob = () => {
       setStatus(normalizeTechnicianStatus(job.status));
     }
   }, [job?.status, state?.job, navigate]);
+
+  useEffect(() => {
+    const completionJobId = String(job?.requestId || job?.id || state?.job?.requestId || state?.job?.id || '').trim();
+    if (!completionJobId) return;
+
+    const resolvedStatus = normalizeTechnicianStatus(job?.status ?? status);
+    if (!isTechnicianCompletionStatus(resolvedStatus)) return;
+
+    const earned = Number(job?.amount ?? state?.job?.amount ?? 0);
+    openCompletionModal(completionJobId, earned);
+  }, [
+    job?.amount,
+    job?.id,
+    job?.requestId,
+    job?.status,
+    state?.job?.amount,
+    state?.job?.id,
+    state?.job?.requestId,
+    status,
+  ]);
 
   // 2. Pay Dues Handler
   const handlePayDues = async () => {
@@ -250,13 +291,11 @@ const ActiveJob = () => {
       if (data.success || response.ok) {
         const resolvedStatus = normalizeTechnicianStatus(data?.status ?? normalizedNextStatus);
         setStatus(resolvedStatus);
-        toast.success(`Status updated to: ${formatTechnicianStatus(resolvedStatus)}`);
-
-        if (resolvedStatus === 'completed' || resolvedStatus === 'paid') {
-          setTimeout(() => {
-            navigate('/technician/dashboard');
-            toast.success('Job marked as completed.');
-          }, 2000);
+        if (isTechnicianCompletionStatus(resolvedStatus)) {
+          const earned = Number(data?.request?.amount ?? job?.amount ?? 0);
+          openCompletionModal(String(idToUse || ''), earned, 'Job completed successfully.');
+        } else {
+          toast.success(`Status updated to: ${formatTechnicianStatus(resolvedStatus)}`);
         }
         refreshActiveJob();
       } else {
@@ -272,18 +311,7 @@ const ActiveJob = () => {
     }
   };
 
-  // 5. Terminal state redirect
-  useEffect(() => {
-    if (status === 'paid' || status === 'completed') {
-      toast.success('Transaction completed!');
-      const timer = setTimeout(() => {
-        navigate('/technician/dashboard');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [status, navigate]);
-
-  // 6. Navigation Logic
+  // 5. Navigation Logic
   const handleStartNavigation = () => {
     if (!job) return;
     const destLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
@@ -425,6 +453,15 @@ const ActiveJob = () => {
           )}
         </div>
       </div>
+      {showCompletionModal && (
+        <TechnicianJobCompletion
+          amount={lastEarned}
+          onClose={() => {
+            setShowCompletionModal(false);
+            navigate('/technician/dashboard', { replace: true });
+          }}
+        />
+      )}
     </div>
   );
 };

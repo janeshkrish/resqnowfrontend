@@ -14,7 +14,11 @@ import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
 import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl, readJsonSafely } from "@/lib/api";
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
-import { formatTechnicianStatus, normalizeTechnicianStatus } from "@/utils/technicianStatus";
+import {
+  formatTechnicianStatus,
+  isTechnicianCompletionStatus,
+  normalizeTechnicianStatus,
+} from "@/utils/technicianStatus";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
@@ -57,11 +61,13 @@ const TechnicianDashboard = () => {
   const isOnlineRef = useRef(false);
   const activeJobIdRef = useRef<string | null>(null);
   const activeJobStatusRef = useRef<string>("");
+  const activeJobAmountRef = useRef<number>(0);
   const acceptedJobIdRef = useRef<string | null>(acceptedJobId);
   const incomingJobRef = useRef<JobRequest | null>(incomingJob);
   const handledRouteJobRef = useRef<string | null>(null);
   const locationPermissionRef = useRef<"granted" | "denied" | null>(null);
   const isMountedRef = useRef(true);
+  const celebratedCompletionJobRef = useRef<string | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -175,7 +181,8 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     activeJobIdRef.current = activeJob?.id ? String(activeJob.id) : null;
     activeJobStatusRef.current = activeJob?.status ? normalizeTechnicianStatus(activeJob.status) : "";
-  }, [activeJob?.id, activeJob?.status]);
+    activeJobAmountRef.current = Number(activeJob?.amount || 0);
+  }, [activeJob?.id, activeJob?.status, activeJob?.amount]);
 
   useEffect(() => {
     acceptedJobIdRef.current = acceptedJobId || null;
@@ -184,6 +191,19 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     incomingJobRef.current = incomingJob;
   }, [incomingJob]);
+
+  const triggerCompletionCelebration = (jobId: string, amount: number, message = "Job Completed! Great work.") => {
+    const normalizedJobId = String(jobId || "").trim();
+    if (!normalizedJobId || celebratedCompletionJobRef.current === normalizedJobId) {
+      return;
+    }
+
+    celebratedCompletionJobRef.current = normalizedJobId;
+    const earned = Number(amount);
+    setLastEarned(Number.isFinite(earned) && earned > 0 ? earned : 0);
+    setShowCompletionModal(true);
+    toast.success(message);
+  };
 
   useEffect(() => {
     const status = normalizeTechnicianStatus(activeJob?.status);
@@ -497,6 +517,18 @@ const TechnicianDashboard = () => {
       const requestId = String(data?.requestId || data?.id || "");
       if (!requestId) return;
       const normalizedStatus = normalizeTechnicianStatus(data?.status);
+      const matchesTrackedJob =
+        (activeJobIdRef.current && requestId === activeJobIdRef.current) ||
+        (acceptedJobIdRef.current && acceptedJobIdRef.current === requestId);
+
+      if (matchesTrackedJob && isTechnicianCompletionStatus(normalizedStatus)) {
+        const earnedAmount = Number(data?.amount ?? activeJobAmountRef.current ?? 0);
+        triggerCompletionCelebration(requestId, earnedAmount, "Customer payment received. Job completed.");
+        stopLocationTracking();
+        if (isOnlineRef.current) {
+          startLocationTracking();
+        }
+      }
 
       if (activeJobIdRef.current && requestId === activeJobIdRef.current && data?.status) {
         setActiveJob((prev: any) => prev ? { ...prev, status: normalizedStatus } : prev);
@@ -1019,11 +1051,9 @@ const TechnicianDashboard = () => {
     try {
       const data = await updateJobStatus(newStatus, activeJob.id);
       const resolvedStatus = normalizeTechnicianStatus(data?.status ?? newStatus);
-      if (resolvedStatus === 'completed' || resolvedStatus === 'paid') {
+      if (isTechnicianCompletionStatus(resolvedStatus)) {
         const earned = Number(data?.request?.amount ?? activeJob?.amount ?? 0);
-        setLastEarned(Number.isNaN(earned) ? 0 : earned);
-        setShowCompletionModal(true);
-        toast.success("Job Completed! Great work.");
+        triggerCompletionCelebration(String(activeJob.id || ""), earned);
         clearAcceptedJobId();
         setActiveJob(null);
         setStats(prev => ({ ...prev, jobs: prev.jobs + 1 }));

@@ -123,6 +123,24 @@ const readJsonResponse = async <T,>(response: Response, fallbackError: string): 
 const nextIdempotencyKey = () =>
   globalThis.crypto?.randomUUID?.() || `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
+const buildWalletUpiLink = (wallet: WalletRow) => {
+  const upiId = String(wallet.upiId || "").trim();
+  const payeeName = String(wallet.upiName || wallet.technicianName || "").trim();
+  const amount = Number(wallet.withdrawableBalance || 0);
+
+  if (!upiId || !payeeName || !Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: payeeName,
+    am: amount.toFixed(2),
+  });
+
+  return `upi://pay?${params.toString()}`;
+};
+
 const AdminPayouts = () => {
   const [wallets, setWallets] = useState<WalletRow[]>([]);
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
@@ -251,6 +269,16 @@ const AdminPayouts = () => {
     } finally {
       setPayingId(null);
     }
+  };
+
+  const openWalletUpiLink = (wallet: WalletRow) => {
+    const upiLink = buildWalletUpiLink(wallet);
+    if (!upiLink) {
+      toast.error("UPI details are missing for this technician.");
+      return;
+    }
+    window.open(upiLink, "_self");
+    toast.success("UPI payment link opened.");
   };
 
   const openUpiLink = async (request: WithdrawalRequestRow) => {
@@ -581,7 +609,7 @@ const AdminPayouts = () => {
                     <th className="py-2 pr-4 text-left">Total Earned</th>
                     <th className="py-2 pr-4 text-left">Paid Out</th>
                     <th className="py-2 pr-4 text-left">Last Activity</th>
-                    <th className="py-2 text-left">Fallback</th>
+                    <th className="py-2 text-left">Fallback Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -606,14 +634,24 @@ const AdminPayouts = () => {
                       <td className="py-2 pr-4">{formatDate(row.lastTransactionAt || row.walletUpdatedAt)}</td>
                       <td className="py-2">
                         {row.withdrawableBalance > 0 ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => markLegacyPayoutAsPaid(row)}
-                            disabled={payingId === row.technicianId}
-                          >
-                            {payingId === row.technicianId ? "Processing..." : "Direct Payout"}
-                          </Button>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openWalletUpiLink(row)}
+                              disabled={!row.upiId}
+                            >
+                              Pay with UPI
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => markLegacyPayoutAsPaid(row)}
+                              disabled={payingId === row.technicianId}
+                            >
+                              {payingId === row.technicianId ? "Processing..." : "Mark as Paid"}
+                            </Button>
+                          </div>
                         ) : (
                           <Badge variant="secondary">No payout due</Badge>
                         )}

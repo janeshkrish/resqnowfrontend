@@ -19,6 +19,7 @@ import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { toast } from 'sonner';
 import ActiveJobMap from '@/components/technician/ActiveJobMap';
 import TechnicianJobCompletion from '@/components/technician/TechnicianJobCompletion';
+import CancelledJobCard, { CancelledJobDetails } from '@/components/technician/CancelledJobCard';
 import { apiUrl } from '@/lib/api';
 import {
   formatTechnicianStatus,
@@ -77,8 +78,32 @@ const ActiveJob = () => {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [lastEarned, setLastEarned] = useState(0);
+  const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
+  const [hasResolvedActiveJob, setHasResolvedActiveJob] = useState(false);
   const celebratedCompletionJobIdRef = useRef<string | null>(null);
-  const job = activeJob || state?.job || null;
+  const jobSnapshotRef = useRef<any | null>(state?.job || null);
+  const job = activeJob ?? (!hasResolvedActiveJob ? state?.job || null : null);
+
+  const isCancelledStatus = (value: unknown) => {
+    const raw = String(value || '').trim().toLowerCase();
+    return raw === 'cancelled_by_user' || normalizeTechnicianStatus(raw) === 'cancelled';
+  };
+
+  const buildCancelledJobDetails = (source: any): CancelledJobDetails | null => {
+    const requestId = String(source?.requestId ?? source?.id ?? '').trim();
+    if (!requestId) return null;
+
+    return {
+      id: requestId,
+      contactName: toOptionalString(
+        source?.customerName ?? source?.contact_name ?? source?.customer_name ?? source?.user?.name
+      ),
+      address: toOptionalString(source?.address ?? source?.location?.address),
+      cancellationReason: toOptionalString(source?.cancellation_reason ?? source?.reason),
+      serviceType: toOptionalString(source?.serviceType ?? source?.service_type ?? source?.service?.type),
+      cancelledAt: toOptionalString(source?.cancelled_at ?? source?.cancelledAt ?? source?.updated_at),
+    };
+  };
 
   const openCompletionModal = (jobId: string, amount: number, message = 'Customer payment received. Job completed.') => {
     const normalizedJobId = String(jobId || '').trim();
@@ -93,16 +118,47 @@ const ActiveJob = () => {
     toast.success(message);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncActiveJob = async () => {
+      try {
+        await refreshActiveJob();
+      } finally {
+        if (!cancelled) {
+          setHasResolvedActiveJob(true);
+        }
+      }
+    };
+
+    void syncActiveJob();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshActiveJob]);
+
+  useEffect(() => {
+    if (!job) return;
+    jobSnapshotRef.current = job;
+    if (isCancelledStatus(job.status)) {
+      const details = buildCancelledJobDetails(job);
+      if (details) {
+        setCancelledJob(details);
+      }
+    }
+  }, [job]);
+
   // 1. Keep local status in sync with active job status
   useEffect(() => {
-    if (!job && !state?.job) {
+    if (!job && !cancelledJob && hasResolvedActiveJob) {
       navigate('/technician/dashboard');
       return;
     }
     if (job?.status) {
       setStatus(normalizeTechnicianStatus(job.status));
     }
-  }, [job?.status, state?.job, navigate]);
+  }, [cancelledJob, hasResolvedActiveJob, job, job?.status, navigate]);
 
   useEffect(() => {
     const completionJobId = String(job?.requestId || job?.id || state?.job?.requestId || state?.job?.id || '').trim();
@@ -123,6 +179,12 @@ const ActiveJob = () => {
     state?.job?.requestId,
     status,
   ]);
+
+  const visibleCancelledJob =
+    cancelledJob ||
+    (jobSnapshotRef.current && isCancelledStatus(jobSnapshotRef.current?.status)
+      ? buildCancelledJobDetails(jobSnapshotRef.current)
+      : null);
 
   // 2. Pay Dues Handler
   const handlePayDues = async () => {
@@ -347,6 +409,19 @@ const ActiveJob = () => {
     window.open(url, '_blank');
 
   };
+
+  if (visibleCancelledJob) {
+    return (
+      <div className="min-h-screen bg-[#f3f4f6] pb-8">
+        <div className="mx-auto max-w-md px-4 py-4">
+          <CancelledJobCard
+            job={visibleCancelledJob}
+            onViewDetails={() => navigate('/technician/history', { replace: true })}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (!job) return <div className="p-8 text-center">Loading job details...</div>;
 

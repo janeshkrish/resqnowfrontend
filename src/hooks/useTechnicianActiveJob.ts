@@ -66,6 +66,8 @@ const normalizeJob = (job: any) => {
   );
   const serviceDescription = toOptionalString(job.service?.description ?? job.description);
   const amount = toOptionalNumber(job.amount ?? job.service_charge ?? job.serviceCharge);
+  const cancellationReason = toOptionalString(job.cancellation_reason ?? job.reason);
+  const cancelledAt = toOptionalString(job.cancelled_at ?? job.cancelledAt);
 
   return {
     ...job,
@@ -83,6 +85,8 @@ const normalizeJob = (job: any) => {
     destinationLongitude,
     amount,
     address,
+    cancellation_reason: cancellationReason,
+    cancelled_at: cancelledAt,
     contact_name: customerName ?? toOptionalString(job.contact_name),
     contact_phone: phoneNumber ?? toOptionalPhone(job.contact_phone),
     service_type: serviceType ?? toOptionalString(job.service_type),
@@ -115,8 +119,10 @@ const normalizeJob = (job: any) => {
   };
 };
 
+type NormalizedTechnicianJob = NonNullable<ReturnType<typeof normalizeJob>>;
+
 export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15000) => {
-  const [activeJob, setActiveJob] = useState<any | null>(null);
+  const [activeJob, setActiveJob] = useState<NormalizedTechnicianJob | null>(null);
   const [dues, setDues] = useState(0);
   const { socket } = useSocket();
   const isMountedRef = useRef(true);
@@ -196,7 +202,43 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
         const previousRequestId = String(prev.requestId || prev.id || "");
         if (previousRequestId !== requestId) return prev;
         const nextStatus = normalizeTechnicianStatus(data?.status);
-        return { ...prev, status: nextStatus, jobStatus: nextStatus };
+        const nextAmount = toOptionalNumber(data?.amount ?? data?.service_charge ?? data?.serviceCharge);
+        const nextAddress = toOptionalString(data?.address ?? data?.location?.address);
+        const nextLat = toOptionalNumber(data?.location?.lat ?? data?.location_lat);
+        const nextLng = toOptionalNumber(data?.location?.lng ?? data?.location_lng);
+        const nextCustomerName = toOptionalString(
+          data?.customerName ?? data?.customer_name ?? data?.contact_name ?? data?.user?.name
+        );
+        const nextPhone = toOptionalPhone(
+          data?.phoneNumber ?? data?.phone_number ?? data?.contact_phone ?? data?.user?.phone
+        );
+        const nextCancellationReason = toOptionalString(
+          data?.cancellation_reason ?? data?.reason ?? prev?.cancellation_reason
+        );
+
+        return {
+          ...prev,
+          status: nextStatus,
+          jobStatus: nextStatus,
+          amount: nextAmount ?? prev.amount,
+          address: nextAddress ?? prev.address,
+          cancellation_reason: nextCancellationReason ?? prev.cancellation_reason ?? null,
+          location_lat: nextLat ?? prev.location_lat,
+          location_lng: nextLng ?? prev.location_lng,
+          location: {
+            ...(prev.location && typeof prev.location === "object" ? prev.location : {}),
+            lat: nextLat ?? prev.location?.lat ?? prev.location_lat ?? null,
+            lng: nextLng ?? prev.location?.lng ?? prev.location_lng ?? null,
+            address: nextAddress ?? prev.location?.address ?? prev.address ?? null,
+          },
+          contact_name: nextCustomerName ?? prev.contact_name,
+          contact_phone: nextPhone ?? prev.contact_phone,
+          user: {
+            ...(prev.user && typeof prev.user === "object" ? prev.user : {}),
+            name: nextCustomerName ?? prev.user?.name ?? prev.contact_name ?? null,
+            phone: nextPhone ?? prev.user?.phone ?? prev.contact_phone ?? null,
+          },
+        };
       });
       if (["paid", "completed", "job_completed", "cancelled", "rejected"].includes(String(data?.status || "").toLowerCase())) {
         refreshActiveJob();

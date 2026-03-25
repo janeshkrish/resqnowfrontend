@@ -34,6 +34,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import LiveTrackingMap from "@/components/user/LiveTrackingMap";
+import AmountCard from "@/components/user/AmountCard";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -608,8 +609,11 @@ const RequestTracking = () => {
   })();
 
   const stageProgress = Math.round((stageIndex / (JOURNEY_STAGES.length - 1)) * 100);
-  const requestAmount = Number(request?.amount || request?.service_charge || 0);
-  const amountLabel = Number.isFinite(requestAmount) ? requestAmount.toFixed(2) : "0.00";
+  const requestAmountRaw = Number(request?.amount ?? request?.service_charge ?? Number.NaN);
+  const estimatedAmount =
+    Number.isFinite(requestAmountRaw) && requestAmountRaw > 0 ? requestAmountRaw : null;
+  const requestAmount = Number.isFinite(requestAmountRaw) ? requestAmountRaw : 0;
+  const amountLabel = requestAmount.toFixed(2);
 
   const quoteBreakdown = paymentQuote?.breakdown;
   const quoteCoupon = paymentQuote?.coupon;
@@ -826,43 +830,50 @@ const RequestTracking = () => {
               </div>
 
               {technician ? (
-                <div className="mt-4 rounded-2xl border border-border p-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 ring-1 ring-border">
-                      <AvatarImage src={technician.avatar_url} />
-                      <AvatarFallback>{(technician.name || "T")[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-bold text-foreground">{technician.name}</h3>
-                      <div className="mt-0.5 flex items-center text-[11px] font-medium text-muted-foreground">
-                        <Star className="mr-1 h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                        <span className="mr-1 text-foreground">{technicianRatingLabel}</span>
-                        <span>| {Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
+                <>
+                  <AmountCard
+                    amount={estimatedAmount}
+                    currency={currency}
+                    className="mt-4"
+                  />
+                  <div className="mt-4 rounded-2xl border border-border p-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12 ring-1 ring-border">
+                        <AvatarImage src={technician.avatar_url} />
+                        <AvatarFallback>{(technician.name || "T")[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-sm font-bold text-foreground">{technician.name}</h3>
+                        <div className="mt-0.5 flex items-center text-[11px] font-medium text-muted-foreground">
+                          <Star className="mr-1 h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                          <span className="mr-1 text-foreground">{technicianRatingLabel}</span>
+                          <span>| {Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-10 w-10 rounded-full border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                          asChild
+                        >
+                          <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
+                            <MessageSquare className="h-4 w-4" />
+                          </a>
+                        </Button>
+                        <Button
+                          size="icon"
+                          className="h-10 w-10 rounded-full bg-orange-600 text-white hover:bg-orange-500"
+                          asChild
+                        >
+                          <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
+                            <Phone className="h-4 w-4 fill-current" />
+                          </a>
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-10 w-10 rounded-full border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100"
-                        asChild
-                      >
-                        <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
-                          <MessageSquare className="h-4 w-4" />
-                        </a>
-                      </Button>
-                      <Button
-                        size="icon"
-                        className="h-10 w-10 rounded-full bg-orange-600 text-white hover:bg-orange-500"
-                        asChild
-                      >
-                        <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
-                          <Phone className="h-4 w-4 fill-current" />
-                        </a>
-                      </Button>
-                    </div>
                   </div>
-                </div>
+                </>
               ) : status === "pending" ? (
                 <div className="mt-4 rounded-2xl border border-border bg-muted/50 p-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -1074,6 +1085,7 @@ const RequestTracking = () => {
               <h2 className="text-xl font-bold">{statusMeta.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{statusMeta.subtitle}</p>
             </div>
+            <AmountCard amount={estimatedAmount} currency={currency} />
             {showPayment && !paymentCompleted && (
               <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 p-4 text-white">
                 <p className="text-xs uppercase tracking-[0.12em] text-white/70">Amount due</p>

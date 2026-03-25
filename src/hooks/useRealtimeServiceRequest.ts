@@ -19,8 +19,9 @@ interface RequestData {
   started_at?: string | null;
   completed_at?: string | null;
   price?: number;
-  amount?: number;
-  service_charge?: number | string;
+  amount?: number | string | null;
+  service_charge?: number | string | null;
+  cancellation_reason?: string | null;
 }
 
 interface TechnicianData {

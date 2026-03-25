@@ -926,7 +926,12 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (requestCancelMatch && method === "PATCH") {
     const req = requestById(requestCancelMatch[1]);
     if (!req) return json({ error: "Not found" }, 404);
-    const next = { ...req, status: "cancelled" };
+    const next = {
+      ...req,
+      status: "cancelled",
+      cancellation_reason: String(body.reason || "").trim() || null,
+      cancelled_at: nowIso(),
+    };
     upsertRequest(next);
     return json({ success: true, request: withTechnician(next) });
   }

@@ -11,6 +11,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
+import CancelledJobCard, { CancelledJobDetails } from "@/components/technician/CancelledJobCard";
 import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl, readJsonSafely } from "@/lib/api";
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
@@ -48,6 +49,7 @@ const TechnicianDashboard = () => {
   const [reviews, setReviews] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
   const isNativePlatform = Capacitor.isNativePlatform();
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
@@ -62,6 +64,7 @@ const TechnicianDashboard = () => {
   const activeJobIdRef = useRef<string | null>(null);
   const activeJobStatusRef = useRef<string>("");
   const activeJobAmountRef = useRef<number>(0);
+  const activeJobSnapshotRef = useRef<any | null>(null);
   const acceptedJobIdRef = useRef<string | null>(acceptedJobId);
   const incomingJobRef = useRef<JobRequest | null>(incomingJob);
   const handledRouteJobRef = useRef<string | null>(null);
@@ -156,6 +159,52 @@ const TechnicianDashboard = () => {
     };
   };
 
+  const buildCancelledJobDetails = (source: any, payload?: any): CancelledJobDetails | null => {
+    const requestId = String(payload?.requestId ?? payload?.id ?? source?.requestId ?? source?.id ?? "").trim();
+    if (!requestId) return null;
+
+    const contactName = String(
+      payload?.contact_name ??
+        payload?.customerName ??
+        payload?.customer_name ??
+        payload?.user?.name ??
+        source?.contact_name ??
+        source?.customerName ??
+        source?.customer_name ??
+        source?.user?.name ??
+        ""
+    ).trim();
+    const address = String(
+      payload?.location?.address ??
+        payload?.address ??
+        source?.location?.address ??
+        source?.address ??
+        ""
+    ).trim();
+    const serviceType = String(
+      payload?.service_type ??
+        payload?.serviceType ??
+        source?.service_type ??
+        source?.serviceType ??
+        ""
+    ).trim();
+    const cancellationReason = String(
+      payload?.cancellation_reason ??
+        payload?.reason ??
+        source?.cancellation_reason ??
+        source?.reason ??
+        ""
+    ).trim();
+
+    return {
+      id: requestId,
+      contactName: contactName || null,
+      address: address || null,
+      serviceType: serviceType || null,
+      cancellationReason: cancellationReason || null,
+    };
+  };
+
   useEffect(() => {
     // Initialize audio ref once
     audioRef.current = new Audio("https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3");
@@ -182,7 +231,15 @@ const TechnicianDashboard = () => {
     activeJobIdRef.current = activeJob?.id ? String(activeJob.id) : null;
     activeJobStatusRef.current = activeJob?.status ? normalizeTechnicianStatus(activeJob.status) : "";
     activeJobAmountRef.current = Number(activeJob?.amount || 0);
+    activeJobSnapshotRef.current = activeJob ?? null;
   }, [activeJob?.id, activeJob?.status, activeJob?.amount]);
+
+  useEffect(() => {
+    const normalizedStatus = normalizeTechnicianStatus(activeJob?.status);
+    if (activeJob?.id && normalizedStatus !== "cancelled") {
+      setCancelledJob(null);
+    }
+  }, [activeJob?.id, activeJob?.status]);
 
   useEffect(() => {
     acceptedJobIdRef.current = acceptedJobId || null;
@@ -324,6 +381,7 @@ const TechnicianDashboard = () => {
       stopAlertSound();
       setIncomingJob(null); // Clear offer if any
       setIncomingJobUnavailable(false);
+      setCancelledJob(null);
       const normalized = normalizeIncomingAssignedJob(jobData);
       setActiveJob(normalized);
       setShowJobModal(false);
@@ -392,6 +450,7 @@ const TechnicianDashboard = () => {
         amount: offerData?.amount != null && !Number.isNaN(Number(offerData?.amount)) ? Number(offerData.amount) : 0
       };
       (jobRequest as any).eta = offerData.eta ?? null;
+      setCancelledJob(null);
       setIncomingJob(jobRequest);
       setIncomingJobUnavailable(false);
       setShowJobModal(true);
@@ -530,8 +589,28 @@ const TechnicianDashboard = () => {
         }
       }
 
+      if (matchesTrackedJob && normalizedStatus === "cancelled") {
+        const cancelledDetails = buildCancelledJobDetails(activeJobSnapshotRef.current, data);
+        if (cancelledDetails) {
+          setCancelledJob(cancelledDetails);
+        }
+        stopLocationTracking();
+        if (isOnlineRef.current) {
+          startLocationTracking();
+        }
+      }
+
       if (activeJobIdRef.current && requestId === activeJobIdRef.current && data?.status) {
-        setActiveJob((prev: any) => prev ? { ...prev, status: normalizedStatus } : prev);
+        setActiveJob((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                status: normalizedStatus,
+                cancellation_reason:
+                  data?.cancellation_reason ?? data?.reason ?? prev.cancellation_reason ?? null,
+              }
+            : prev
+        );
       }
 
       if (
@@ -562,9 +641,12 @@ const TechnicianDashboard = () => {
           ]);
 
           if (activeJobRes.ok) {
-            const latestActiveJob = await activeJobRes.json();
-            setActiveJob(latestActiveJob || null);
-            refreshActiveJob();
+            const latestActiveJob = await readJsonSafely<any>(activeJobRes);
+            setActiveJob(
+              latestActiveJob ? normalizeIncomingAssignedJob({ request: latestActiveJob }) : null
+            );
+          } else {
+            setActiveJob(null);
           }
           if (statsRes.ok) {
             const statsData = await statsRes.json();
@@ -941,6 +1023,7 @@ const TechnicianDashboard = () => {
       setIncomingJobUnavailable(false);
       setShowJobModal(false);
       setAcceptedJobId(normalizedJobId);
+      setCancelledJob(null);
 
       // Fix: Update activeJob state reliably even if incomingJob is null
       setActiveJob((prev: any) => {
@@ -1379,6 +1462,13 @@ const TechnicianDashboard = () => {
   )
     .trim()
     .replace(/[^\d+]/g, "");
+  const activeJobStatus = normalizeTechnicianStatus(activeJob?.status);
+  const visibleCancelledJob =
+    activeJob && activeJobStatus === "cancelled"
+      ? buildCancelledJobDetails(activeJob, activeJob)
+      : cancelledJob;
+  const showActiveJobCard = Boolean(activeJob) && activeJobStatus !== "cancelled";
+  const showIdleDashboard = !showActiveJobCard && !visibleCancelledJob;
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
   if (!technician) return <Navigate to="/technician/login" replace />;
@@ -1402,7 +1492,7 @@ const TechnicianDashboard = () => {
   };
 
   // Derived state for "Busy"
-  const isBusy = activeJob && activeJob.status !== 'completed' && activeJob.status !== 'cancelled' && activeJob.status !== 'rejected';
+  const isBusy = Boolean(showActiveJobCard && !["completed", "cancelled", "rejected"].includes(activeJobStatus));
 
   // Enhanced Toggle Handler
   const handleToggleAvailability = (checked: boolean) => {
@@ -1420,7 +1510,7 @@ const TechnicianDashboard = () => {
       <div className="container max-w-md mx-auto px-4 pt-6 pb-24 space-y-5">
 
         {/* 1. MAP SECTION (NOW AT THE TOP) */}
-        {!activeJob && (
+        {showIdleDashboard && (
           <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-sm border border-border overflow-hidden relative">
             {/* Map Placeholder when no active job */}
             <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-[400]">
@@ -1455,7 +1545,7 @@ const TechnicianDashboard = () => {
           </div>
         )}
 
-        {!activeJob && (
+        {showIdleDashboard && (
           <div className="flex justify-center">
             <div className="w-[220px] bg-card dark:bg-slate-900 border border-border rounded-[20px] shadow-[0_4px_10px_rgba(0,0,0,0.08)] px-4 py-3 flex items-center justify-between">
               <div className="flex flex-col">
@@ -1474,7 +1564,7 @@ const TechnicianDashboard = () => {
         )}
 
         {/* 2. QUICK MENU GRID SECTION */}
-        {!activeJob && (
+        {showIdleDashboard && (
           <div className="grid grid-cols-2 gap-3">
             <Link to="/technician/earnings" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
               <div className="h-10 w-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-3 group-hover:scale-110 transition-transform">
@@ -1535,14 +1625,14 @@ const TechnicianDashboard = () => {
         )}
 
         {/* 3. BUSINESS ANALYTICS GRAPH (NEW POSITION) */}
-        {!activeJob && Array.isArray(earningsHistory) && earningsHistory.length > 0 && (
+        {showIdleDashboard && Array.isArray(earningsHistory) && earningsHistory.length > 0 && (
           <div className="mb-4">
             <TechnicianEarningsChart data={earningsHistory} />
           </div>
         )}
 
         {/* ACTIVE JOB HERO CARD */}
-        {activeJob ? (
+        {showActiveJobCard ? (
           <div className="bg-card dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-border relative mb-4">
 
             {/* Live Map Header */}
@@ -1696,6 +1786,15 @@ const TechnicianDashboard = () => {
               </div>
             </div>
           </div>
+        ) : visibleCancelledJob ? (
+          <CancelledJobCard
+            job={visibleCancelledJob}
+            className="mb-4"
+            onViewDetails={() => {
+              setCancelledJob(null);
+              navigate("/technician/history");
+            }}
+          />
         ) : null}
 
         <TechnicianJobModal

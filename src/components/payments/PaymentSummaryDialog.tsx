@@ -132,12 +132,15 @@ export function PaymentSummaryDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isProcessing && !open && onClose()}>
       <DialogContent
-        className="w-[calc(100%-1.5rem)] max-w-[420px] gap-0 overflow-hidden rounded-[1.75rem] border-none p-0 shadow-2xl"
-        style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
+        className="flex w-[calc(100%-0.75rem)] max-h-[calc(100vh-1rem)] max-w-[420px] flex-col gap-0 overflow-hidden rounded-[1.25rem] border-none p-0 shadow-2xl sm:w-[calc(100%-1.5rem)] sm:rounded-[1.75rem]"
+        style={{
+          fontFamily: '"Plus Jakarta Sans", Inter, sans-serif',
+          maxHeight: "calc(100dvh - 1rem)",
+        }}
       >
         <DialogHeader
           className={cn(
-            "px-5 pb-5 pt-6 text-white",
+            "shrink-0 px-4 pb-4 pt-5 text-white sm:px-5 sm:pb-5 sm:pt-6",
             isCash
               ? "bg-gradient-to-br from-zinc-700 via-zinc-800 to-slate-900"
               : "bg-gradient-to-br from-orange-500 via-orange-600 to-slate-900"
@@ -160,16 +163,21 @@ export function PaymentSummaryDialog({
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
               Total Payable
             </p>
-            <div className="mt-1 flex items-end gap-2">
-              <span className="text-3xl font-black">{formatAmount(resolvedTotalAmount)}</span>
-              <span className="mb-1 text-[11px] font-semibold text-white/75">
+            <div className="mt-1 flex flex-wrap items-end gap-x-2 gap-y-1">
+              <span className="break-words text-[2rem] font-black leading-none sm:text-3xl">
+                {formatAmount(resolvedTotalAmount)}
+              </span>
+              <span className="text-[11px] font-semibold text-white/75 sm:mb-1">
                 incl. platform fee
               </span>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 px-5 py-5">
+        <div
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <div className="rounded-2xl border border-border bg-muted/30 p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Service amount</span>
@@ -214,18 +222,18 @@ export function PaymentSummaryDialog({
 
           {showCouponSection && (
             <div className="rounded-2xl border border-orange-200 bg-orange-50/60 p-3">
-              <div className="mb-2 flex items-center gap-2">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
                 <TicketPercent className="h-4 w-4 text-orange-600" />
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-700">
                   Apply Coupon
                 </p>
                 {couponAppliedCode && (
-                  <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="ml-auto max-w-full rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                     Applied: {couponAppliedCode}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   value={couponCodeInput}
                   onChange={(event) => onCouponCodeInputChange?.(event.target.value.toUpperCase())}
@@ -238,7 +246,7 @@ export function PaymentSummaryDialog({
                   variant="secondary"
                   onClick={onApplyCoupon}
                   disabled={isProcessing || isApplyingCoupon || !couponCodeInput.trim()}
-                  className="h-10 shrink-0 bg-orange-600 text-white hover:bg-orange-500"
+                  className="h-10 w-full shrink-0 bg-orange-600 text-white hover:bg-orange-500 sm:w-auto"
                 >
                   {isApplyingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
                 </Button>
@@ -283,13 +291,13 @@ export function PaymentSummaryDialog({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-700">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-700">
             <ReceiptText className="h-3.5 w-3.5" />
             <span>Detailed receipt is available in your completed request.</span>
-            <CircleDollarSign className="ml-auto h-3.5 w-3.5" />
+            <CircleDollarSign className="h-3.5 w-3.5 sm:ml-auto" />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
             <Button variant="outline" onClick={onClose} disabled={isProcessing} className="h-11 rounded-xl">
               Back
             </Button>

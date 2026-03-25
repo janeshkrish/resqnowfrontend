@@ -1,7 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { MapPin, Phone, User, Navigation, CheckCircle, Loader2, XCircle } from 'lucide-react';
+import {
+  Car,
+  CheckCircle,
+  Clock3,
+  CreditCard,
+  Loader2,
+  MapPin,
+  Navigation,
+  PhoneCall,
+  User,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
 import { useSocket } from '@/contexts/SocketContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { toast } from 'sonner';
@@ -43,6 +55,14 @@ const buildVehicleDetails = (job: any) => {
   const vehicleType = toOptionalString(job?.vehicle?.type ?? job?.vehicle_type);
   const vehicleModel = toOptionalString(job?.vehicle?.model ?? job?.vehicle_model);
   return [vehicleType, vehicleModel].filter(Boolean).join(' ').trim() || null;
+};
+
+const formatMoney = (value: number | null, maximumFractionDigits = 0) => {
+  if (!Number.isFinite(Number(value))) return 'Rs --';
+  return `Rs ${new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  }).format(Number(value))}`;
 };
 
 const ActiveJob = () => {
@@ -312,7 +332,7 @@ const ActiveJob = () => {
   };
 
   // 5. Navigation Logic
-  const handleStartNavigation = () => {
+  const openNavigation = () => {
     if (!job) return;
     const destLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
     const destLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
@@ -326,9 +346,6 @@ const ActiveJob = () => {
     const url = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${destLat},${destLng}`;
     window.open(url, '_blank');
 
-    if (status === 'accepted' || status === 'assigned') {
-      updateStatus('en-route');
-    }
   };
 
   if (!job) return <div className="p-8 text-center">Loading job details...</div>;
@@ -343,114 +360,237 @@ const ActiveJob = () => {
   const customerLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
   const customerLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
   const hasCustomerLocation = Number.isFinite(customerLat) && Number.isFinite(customerLng);
+  const jobAddress = toOptionalString(job.address ?? job.location?.address ?? state?.job?.address) || 'Location not available';
+  const estimatedDistanceKm =
+    currentLocation && Number.isFinite(customerLat) && Number.isFinite(customerLng)
+      ? Math.sqrt(
+          Math.pow(currentLocation.lat - Number(customerLat), 2) +
+            Math.pow(currentLocation.lng - Number(customerLng), 2)
+        ) * 111
+      : null;
+  const etaMinutes = estimatedDistanceKm !== null ? Math.max(3, Math.ceil((estimatedDistanceKm / 30) * 60)) : null;
+  const actionGridClass = dialablePhone ? 'grid-cols-2' : 'grid-cols-1';
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] relative">
-      <div className="flex-grow bg-border relative">
-        <div className="absolute inset-0">
-          <ActiveJobMap
-            technicianLocation={currentLocation || { lat: 28.6139, lng: 77.209 }}
-            customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
-          />
-        </div>
+    <div className="min-h-screen bg-[#f3f4f6] pb-8">
+      <div className="mx-auto max-w-md px-4 py-4">
+        <div className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/60">
+          <div className="relative h-[240px] w-full bg-muted/40">
+            <ActiveJobMap
+              technicianLocation={currentLocation || { lat: 28.6139, lng: 77.209 }}
+              customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
+            />
 
-        <div className="absolute top-4 left-4 right-4 bg-card dark:bg-slate-900/90 backdrop-blur p-4 rounded-lg shadow-md border flex justify-between items-center">
-          <div>
-            <p className="text-xs text-muted-foreground">EST. EARNINGS</p>
-            <p className="font-bold text-lg">{displayAmount != null ? `Rs ${displayAmount}` : 'Not Available'}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">PLATFORM DUE</p>
-            <p className="font-bold text-red-600">Rs {dues}</p>
-            {dues > 0 && (
-              <Button size="sm" variant="outline" className="h-6 text-xs mt-1" onClick={handlePayDues}>
-                Pay Now
-              </Button>
-            )}
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">STATUS</p>
-            <p className="font-bold capitalize">{formatTechnicianStatus(status)}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-card dark:bg-slate-900 border-t rounded-t-xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] p-6 space-y-6 z-10">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-              <User size={24} />
+            <div className="absolute left-4 top-4 z-[400]">
+              <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/95 px-4 py-2 shadow-lg backdrop-blur-sm">
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">
+                  {formatTechnicianStatus(status)}
+                </span>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-lg">Customer: {displayUser}</h3>
-              {hasServiceOrVehicle ? (
-                <p className="text-sm font-medium">
-                  {displayService || 'Not Available'}
-                  <span className="text-muted-foreground mx-1">&bull;</span>
-                  {displayVehicle || 'Not Available'}
+
+            <div className="absolute right-4 top-4 z-[400] flex flex-col gap-2">
+              <div className="rounded-2xl bg-zinc-900/90 px-3 py-2 shadow-lg backdrop-blur-md">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-400">Payout</p>
+                <p className="mt-1 text-lg font-black text-white">{formatMoney(displayAmount, 0)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={dues > 0 ? handlePayDues : undefined}
+                disabled={dues <= 0}
+                className={`rounded-2xl border px-3 py-2 text-left shadow-lg backdrop-blur-sm ${
+                  dues > 0
+                    ? 'border-red-200 bg-red-50/95 text-red-700'
+                    : 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
+                }`}
+              >
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em]">
+                  Platform Due
                 </p>
-              ) : (
-                <p className="text-sm font-medium">Not Available</p>
+                <p className="mt-1 text-sm font-black">{formatMoney(dues, 0)}</p>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-5 p-5">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-foreground">
+                {displayService || 'Active Job'}
+              </h1>
+              <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                <div className="mt-0.5 rounded-full bg-muted p-1 text-slate-500">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                <p className="leading-snug">{jobAddress}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border bg-muted p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-blue-600 shadow-sm">
+                    <Wallet className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Earnings</p>
+                    <p className="text-sm font-black text-foreground">{formatMoney(displayAmount, 0)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-muted p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-indigo-600 shadow-sm">
+                    <Clock3 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">ETA</p>
+                    <p className="text-sm font-black text-foreground">
+                      {etaMinutes !== null ? `${etaMinutes} min` : '--'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-muted p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-red-500 shadow-sm">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Platform Due</p>
+                    <p className={`text-sm font-black ${dues > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {formatMoney(dues, 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-muted p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-slate-600 shadow-sm">
+                    <Navigation className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Distance</p>
+                    <p className="text-sm font-black text-foreground">
+                      {estimatedDistanceKm !== null ? `${estimatedDistanceKm.toFixed(1)} km` : '--'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-t border-border pt-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                  <User className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Customer</p>
+                  <p className="truncate text-sm font-bold text-foreground">{displayUser}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                  <Car className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Vehicle</p>
+                  <p className="truncate text-sm font-bold text-foreground">{displayVehicle || 'Not Available'}</p>
+                </div>
+              </div>
+            </div>
+
+            {hasServiceOrVehicle && (
+              <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Service Notes</p>
+                <p className="mt-1 text-sm font-semibold text-slate-700">
+                  {displayService || 'Not Available'}
+                  {displayVehicle ? ` - ${displayVehicle}` : ''}
+                </p>
+              </div>
+            )}
+
+            <div className={`grid gap-3 ${actionGridClass}`}>
+              {dialablePhone ? (
+                <Button
+                  variant="outline"
+                  className="h-12 rounded-xl border-border bg-card text-muted-foreground shadow-sm"
+                  asChild
+                >
+                  <a href={`tel:${dialablePhone}`} aria-label="Call customer">
+                    <PhoneCall className="mr-2 h-4 w-4" />
+                    <span className="font-bold">Call</span>
+                  </a>
+                </Button>
+              ) : null}
+
+              <Button
+                variant="outline"
+                className="h-12 rounded-xl border-border bg-card text-muted-foreground shadow-sm"
+                onClick={openNavigation}
+              >
+                <Navigation className="mr-2 h-4 w-4" />
+                <span className="font-bold">Navigate</span>
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {(status === 'accepted' || status === 'assigned') && (
+                <Button
+                  className="h-14 w-full rounded-2xl bg-blue-600 text-lg font-black tracking-wide text-white shadow-xl shadow-blue-600/20 hover:bg-blue-700"
+                  onClick={() => updateStatus('en-route')}
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Navigation className="mr-2 h-5 w-5" />}
+                  START JOURNEY
+                </Button>
+              )}
+
+              {status === 'en-route' && (
+                <Button
+                  className="h-14 w-full rounded-2xl bg-indigo-600 text-lg font-black tracking-wide text-white shadow-xl shadow-indigo-600/20 hover:bg-indigo-700"
+                  onClick={() => updateStatus('arrived')}
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <MapPin className="mr-2 h-5 w-5" />}
+                  I&apos;VE ARRIVED
+                </Button>
+              )}
+
+              {status === 'arrived' && (
+                <Button
+                  className="h-14 w-full rounded-2xl bg-zinc-900 text-lg font-black tracking-wide text-white shadow-xl shadow-zinc-900/20 hover:bg-zinc-800"
+                  onClick={() => updateStatus('completed')}
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle className="mr-2 h-5 w-5" />}
+                  COMPLETE WORK
+                </Button>
+              )}
+
+              {status === 'payment_pending' && (
+                <div className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                  <span className="font-bold text-orange-700">Waiting for customer payment...</span>
+                </div>
+              )}
+
+              {!['payment_pending', 'completed', 'paid'].includes(status) && (
+                <Button
+                  variant="outline"
+                  className="h-11 w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => updateStatus('cancelled')}
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Cancel Job
+                </Button>
               )}
             </div>
           </div>
-          {dialablePhone && (
-            <Button asChild className="h-12 px-4">
-              <a href={`tel:${dialablePhone}`} aria-label="Call customer">
-                <Phone className="h-5 w-5 mr-2" />
-                Call Customer
-              </a>
-            </Button>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          {(status === 'accepted' || status === 'assigned') && (
-            <Button className="w-full h-12 text-lg" onClick={handleStartNavigation} disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin mr-2" /> : <Navigation className="mr-2 h-5 w-5" />}
-              Start Navigation
-            </Button>
-          )}
-
-          {status === 'en-route' && (
-            <Button
-              className="w-full h-12 text-lg bg-orange-500 hover:bg-orange-600"
-              onClick={() => updateStatus('arrived')}
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="animate-spin mr-2" /> : <MapPin className="mr-2 h-5 w-5" />}
-              I Have Arrived
-            </Button>
-          )}
-
-          {status === 'arrived' && (
-            <Button
-              className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-              onClick={() => updateStatus('completed')}
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle className="mr-2 h-5 w-5" />}
-              Complete Work
-            </Button>
-          )}
-
-          {status === 'payment_pending' && (
-            <div className="w-full p-4 bg-yellow-50 text-yellow-800 rounded-lg text-center font-medium border border-yellow-200">
-              <Loader2 className="inline-block animate-spin mr-2 w-4 h-4" />
-              Waiting for customer payment...
-            </div>
-          )}
-
-          {!['payment_pending', 'completed', 'paid'].includes(status) && (
-            <Button
-              variant="ghost"
-              className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
-              onClick={() => updateStatus('cancelled')}
-            >
-              <XCircle className="mr-2 h-4 w-4" />
-              Cancel Job
-            </Button>
-          )}
         </div>
       </div>
       {showCompletionModal && (

@@ -99,7 +99,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
             : [12.9716, 77.5946];
 
     return (
-        <div className="w-full h-[400px] rounded-xl relative overflow-hidden z-0">
+        <div className="relative z-0 h-full min-h-[240px] w-full overflow-hidden rounded-xl">
             <MapContainer
                 center={center}
                 zoom={13}

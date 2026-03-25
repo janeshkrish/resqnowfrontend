@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiUrl } from "@/lib/api";
+import { apiFetch, apiUrl, readJsonSafely } from "@/lib/api";
 
 const adminApi = axios.create({
   baseURL: apiUrl("/api/admin"),
@@ -141,6 +141,20 @@ export type TechnicianRow = {
   loggedInHours24h: number;
   loggedInHoursTotal: number;
   inactivityAlertSentAt: string | null;
+};
+
+export type BroadcastTechnician = {
+  id: number;
+  category?: string;
+  categories?: string[];
+  region?: string;
+  status?: string;
+};
+
+export type BroadcastTechnicianFilters = {
+  categories?: string[];
+  region?: string;
+  status?: string;
 };
 
 export type TechnicianLoginActivityDetails = {
@@ -614,6 +628,89 @@ export async function sendTechnicianBroadcast(payload: {
 }) {
   const { data } = await adminApi.post("/notifications/technician", payload);
   return data;
+}
+
+const normalizeBroadcastTechnician = (value: any): BroadcastTechnician | null => {
+  const rawId = Number(value?.id ?? value?.technicianId);
+  if (!Number.isInteger(rawId) || rawId <= 0) return null;
+
+  const categoryValues = Array.isArray(value?.categories)
+    ? value.categories
+    : Array.isArray(value?.specialties)
+      ? value.specialties
+      : typeof value?.category === "string"
+        ? value.category.split(",")
+        : [];
+
+  const categories = categoryValues
+    .map((item: unknown) => String(item || "").trim())
+    .filter(Boolean);
+
+  const region = String(
+    value?.region ??
+      value?.city ??
+      value?.zone ??
+      value?.area ??
+      value?.location?.city ??
+      value?.location?.zone ??
+      value?.location?.area ??
+      ""
+  ).trim();
+
+  const status = String(
+    value?.status ??
+      value?.availability_status ??
+      (typeof value?.is_active === "boolean" ? (value.is_active ? "online" : "offline") : "")
+  )
+    .trim()
+    .toLowerCase();
+
+  return {
+    id: rawId,
+    category: categories[0] || (typeof value?.category === "string" ? value.category.trim() : ""),
+    categories,
+    region,
+    status,
+  };
+};
+
+export async function getBroadcastTechnicians(
+  filters: BroadcastTechnicianFilters = {}
+): Promise<BroadcastTechnician[]> {
+  const params = new URLSearchParams();
+  if (filters.categories?.length) {
+    params.set("category", filters.categories.join(","));
+  }
+  if (filters.region) {
+    params.set("region", filters.region);
+  }
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  const path = params.size ? `/api/technicians?${params.toString()}` : "/api/technicians";
+
+  try {
+    const response = await apiFetch(path, { admin: true });
+    if (!response.ok) {
+      const body = await readJsonSafely<{ error?: string; message?: string }>(response);
+      throw new Error(body?.error || body?.message || "Unable to load technicians.");
+    }
+
+    const data = await readJsonSafely<any>(response);
+    const technicians = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+
+    return technicians
+      .map((item: unknown) => normalizeBroadcastTechnician(item))
+      .filter((item: BroadcastTechnician | null): item is BroadcastTechnician => Boolean(item));
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      error?.message ||
+      "Unable to load technicians.";
+    throw new Error(message);
+  }
 }
 
 export async function sendEmergencyMessage(payload: { title: string; message: string }) {

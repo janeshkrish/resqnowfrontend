@@ -240,7 +240,11 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
           },
         };
       });
-      if (["paid", "completed", "job_completed", "cancelled", "rejected"].includes(String(data?.status || "").toLowerCase())) {
+      if (
+        ["paid", "completed", "job_completed", "cancelled", "cancelled_by_user", "rejected"].includes(
+          String(data?.status || "").toLowerCase()
+        )
+      ) {
         refreshActiveJob();
         refreshDues();
       }

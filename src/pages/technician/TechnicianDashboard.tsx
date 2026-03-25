@@ -50,6 +50,7 @@ const TechnicianDashboard = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
+  const [isCancelled, setIsCancelled] = useState(false);
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
   const isNativePlatform = Capacitor.isNativePlatform();
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
@@ -152,11 +153,17 @@ const TechnicianDashboard = () => {
       amount,
       distance: raw.distance ?? incomingJob?.distance ?? activeJob?.distance ?? null,
       eta: raw.eta ?? incomingJob?.eta ?? activeJob?.eta ?? null,
+      cancelled_at: raw.cancelled_at ?? raw.cancelledAt ?? activeJob?.cancelled_at ?? null,
       location: { lat, lng, address },
       location_lat: lat,
       location_lng: lng,
       address,
     };
+  };
+
+  const isCancelledStatus = (status: unknown) => {
+    const raw = String(status || "").trim().toLowerCase();
+    return raw === "cancelled_by_user" || normalizeTechnicianStatus(raw) === "cancelled";
   };
 
   const buildCancelledJobDetails = (source: any, payload?: any): CancelledJobDetails | null => {
@@ -195,6 +202,15 @@ const TechnicianDashboard = () => {
         source?.reason ??
         ""
     ).trim();
+    const cancelledAt = String(
+      payload?.cancelled_at ??
+        payload?.cancelledAt ??
+        payload?.updated_at ??
+        source?.cancelled_at ??
+        source?.cancelledAt ??
+        source?.updated_at ??
+        ""
+    ).trim();
 
     return {
       id: requestId,
@@ -202,6 +218,7 @@ const TechnicianDashboard = () => {
       address: address || null,
       serviceType: serviceType || null,
       cancellationReason: cancellationReason || null,
+      cancelledAt: cancelledAt || null,
     };
   };
 
@@ -231,15 +248,21 @@ const TechnicianDashboard = () => {
     activeJobIdRef.current = activeJob?.id ? String(activeJob.id) : null;
     activeJobStatusRef.current = activeJob?.status ? normalizeTechnicianStatus(activeJob.status) : "";
     activeJobAmountRef.current = Number(activeJob?.amount || 0);
-    activeJobSnapshotRef.current = activeJob ?? null;
+    if (activeJob) {
+      activeJobSnapshotRef.current = activeJob;
+    }
   }, [activeJob?.id, activeJob?.status, activeJob?.amount]);
 
   useEffect(() => {
-    const normalizedStatus = normalizeTechnicianStatus(activeJob?.status);
-    if (activeJob?.id && normalizedStatus !== "cancelled") {
+    if (activeJob?.id && !isCancelledStatus(activeJob?.status)) {
       setCancelledJob(null);
     }
   }, [activeJob?.id, activeJob?.status]);
+
+  useEffect(() => {
+    const nextIsCancelled = Boolean(cancelledJob) || isCancelledStatus(activeJob?.status);
+    setIsCancelled(nextIsCancelled);
+  }, [activeJob?.status, cancelledJob]);
 
   useEffect(() => {
     acceptedJobIdRef.current = acceptedJobId || null;
@@ -589,7 +612,7 @@ const TechnicianDashboard = () => {
         }
       }
 
-      if (matchesTrackedJob && normalizedStatus === "cancelled") {
+      if (matchesTrackedJob && isCancelledStatus(data?.status)) {
         const cancelledDetails = buildCancelledJobDetails(activeJobSnapshotRef.current, data);
         if (cancelledDetails) {
           setCancelledJob(cancelledDetails);
@@ -716,6 +739,19 @@ const TechnicianDashboard = () => {
       clearInterval(pollInterval);
     };
   }, [technician?.id, refreshActiveJob, clearAcceptedJobId]); // Close socket effect
+
+  useEffect(() => {
+    const trackedJobId = String(activeJob?.id || acceptedJobId || "").trim();
+    if (!trackedJobId || cancelledJob || activeJob) return;
+    const historyMatch = Array.isArray(jobHistory)
+      ? jobHistory.find((job: any) => String(job?.id || job?.requestId || "").trim() === trackedJobId)
+      : null;
+    if (!historyMatch || !isCancelledStatus(historyMatch?.status)) return;
+    const cancelledDetails = buildCancelledJobDetails(activeJobSnapshotRef.current ?? historyMatch, historyMatch);
+    if (cancelledDetails) {
+      setCancelledJob(cancelledDetails);
+    }
+  }, [jobHistory, activeJob, acceptedJobId, cancelledJob]);
 
 
 
@@ -1464,11 +1500,12 @@ const TechnicianDashboard = () => {
     .replace(/[^\d+]/g, "");
   const activeJobStatus = normalizeTechnicianStatus(activeJob?.status);
   const visibleCancelledJob =
-    activeJob && activeJobStatus === "cancelled"
+    activeJob && isCancelledStatus(activeJob?.status)
       ? buildCancelledJobDetails(activeJob, activeJob)
       : cancelledJob;
-  const showActiveJobCard = Boolean(activeJob) && activeJobStatus !== "cancelled";
-  const showIdleDashboard = !showActiveJobCard && !visibleCancelledJob;
+  const showCancelledJobCard = Boolean(isCancelled && visibleCancelledJob);
+  const showActiveJobCard = Boolean(activeJob) && !showCancelledJobCard;
+  const showIdleDashboard = !showActiveJobCard && !showCancelledJobCard;
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
   if (!technician) return <Navigate to="/technician/login" replace />;
@@ -1786,7 +1823,7 @@ const TechnicianDashboard = () => {
               </div>
             </div>
           </div>
-        ) : visibleCancelledJob ? (
+        ) : showCancelledJobCard && visibleCancelledJob ? (
           <CancelledJobCard
             job={visibleCancelledJob}
             className="mb-4"

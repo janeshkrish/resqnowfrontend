@@ -21,6 +21,8 @@ interface RequestData {
   price?: number;
   amount?: number | string | null;
   service_charge?: number | string | null;
+  finalAmount?: number | string | null;
+  final_amount?: number | string | null;
   cancellation_reason?: string | null;
 }
 

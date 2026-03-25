@@ -8,6 +8,7 @@ export interface AmountCardProps {
   title?: string;
   loadingLabel?: string;
   helperText?: string;
+  badgeText?: string | null;
   className?: string;
 }
 
@@ -23,7 +24,7 @@ const formatAmount = (amount: number, currency: string) => {
       maximumFractionDigits: 2,
     }).format(amount);
   } catch {
-    return `₹${amount.toFixed(amount % 1 === 0 ? 0 : 2)}`;
+    return `\u20b9${amount.toFixed(amount % 1 === 0 ? 0 : 2)}`;
   }
 };
 
@@ -33,10 +34,13 @@ const AmountCard = ({
   title = DEFAULT_TITLE,
   loadingLabel = DEFAULT_LOADING_LABEL,
   helperText = "Live estimate from your current service request.",
+  badgeText,
   className,
 }: AmountCardProps) => {
   const hasAmount = Number.isFinite(amount) && Number(amount) > 0;
   const resolvedAmount = hasAmount ? formatAmount(Number(amount), currency) : loadingLabel;
+  const resolvedBadgeText =
+    badgeText === undefined ? (hasAmount ? "Live" : "Updating") : badgeText;
 
   return (
     <Card
@@ -62,16 +66,18 @@ const AmountCard = ({
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{helperText}</p>
           </div>
 
-          <Badge
-            className={cn(
-              "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
-              hasAmount
-                ? "border-orange-200 bg-white text-orange-700 hover:bg-white"
-                : "border-slate-200 bg-white text-slate-500 hover:bg-white"
-            )}
-          >
-            {hasAmount ? "Live" : "Updating"}
-          </Badge>
+          {resolvedBadgeText ? (
+            <Badge
+              className={cn(
+                "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
+                hasAmount
+                  ? "border-orange-200 bg-white text-orange-700 hover:bg-white"
+                  : "border-slate-200 bg-white text-slate-500 hover:bg-white"
+              )}
+            >
+              {resolvedBadgeText}
+            </Badge>
+          ) : null}
         </div>
       </CardContent>
     </Card>

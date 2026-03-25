@@ -162,6 +162,7 @@ const RequestTracking = () => {
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [couponMessage, setCouponMessage] = useState<CouponMessageState | null>(null);
+  const [finalAmount, setFinalAmount] = useState<number | null>(null);
   const [sheetHeightVh, setSheetHeightVh] = useState(60);
   const sheetDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
@@ -315,6 +316,13 @@ const RequestTracking = () => {
     // Deliberately excluding appliedCouponCode to avoid repeated dialog refetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPaymentSummary, request?.id]);
+
+  useEffect(() => {
+    const nextFinalAmount = Number(request?.finalAmount ?? request?.final_amount ?? Number.NaN);
+    if (finalAmount === null && Number.isFinite(nextFinalAmount) && nextFinalAmount > 0) {
+      setFinalAmount(nextFinalAmount);
+    }
+  }, [request?.finalAmount, request?.final_amount, finalAmount]);
 
   const formatElapsedTime = () => {
     const secs = elapsedSeconds;
@@ -610,10 +618,12 @@ const RequestTracking = () => {
 
   const stageProgress = Math.round((stageIndex / (JOURNEY_STAGES.length - 1)) * 100);
   const requestAmountRaw = Number(request?.amount ?? request?.service_charge ?? Number.NaN);
-  const estimatedAmount =
-    Number.isFinite(requestAmountRaw) && requestAmountRaw > 0 ? requestAmountRaw : null;
-  const requestAmount = Number.isFinite(requestAmountRaw) ? requestAmountRaw : 0;
+  const requestAmount =
+    Number.isFinite(requestAmountRaw) && requestAmountRaw > 0
+      ? requestAmountRaw
+      : finalAmount ?? 0;
   const amountLabel = requestAmount.toFixed(2);
+  const shouldShowAmount = finalAmount !== null && status !== "completed";
 
   const quoteBreakdown = paymentQuote?.breakdown;
   const quoteCoupon = paymentQuote?.coupon;
@@ -831,11 +841,16 @@ const RequestTracking = () => {
 
               {technician ? (
                 <>
-                  <AmountCard
-                    amount={estimatedAmount}
-                    currency={currency}
-                    className="mt-4"
-                  />
+                  {shouldShowAmount ? (
+                    <AmountCard
+                      amount={finalAmount}
+                      currency={currency}
+                      title="Final Amount"
+                      helperText="Confirmed service amount before payment."
+                      badgeText={null}
+                      className="mt-4"
+                    />
+                  ) : null}
                   <div className="mt-4 rounded-2xl border border-border p-3">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-12 w-12 ring-1 ring-border">
@@ -1085,7 +1100,15 @@ const RequestTracking = () => {
               <h2 className="text-xl font-bold">{statusMeta.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{statusMeta.subtitle}</p>
             </div>
-            <AmountCard amount={estimatedAmount} currency={currency} />
+            {shouldShowAmount ? (
+              <AmountCard
+                amount={finalAmount}
+                currency={currency}
+                title="Final Amount"
+                helperText="Confirmed service amount before payment."
+                badgeText={null}
+              />
+            ) : null}
             {showPayment && !paymentCompleted && (
               <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 p-4 text-white">
                 <p className="text-xs uppercase tracking-[0.12em] text-white/70">Amount due</p>

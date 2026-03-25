@@ -799,6 +799,56 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     const technicians = getTechnicians();
     return json(normalized ? technicians.filter((item) => item.verification_status === normalized) : technicians);
   }
+  if (path === "/api/technicians" && method === "GET") {
+    const requestedCategories = String(q.get("category") || "")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    const requestedRegion = String(q.get("region") || "").trim().toLowerCase();
+    const requestedStatus = String(q.get("status") || "").trim().toLowerCase();
+
+    const mapSpecialtyToCategory = (specialty: string) => {
+      const normalized = String(specialty || "").trim().toLowerCase();
+      if (normalized.includes("tow")) return "towing";
+      if (normalized.includes("battery")) return "battery_jumpstart";
+      if (normalized.includes("fuel")) return "fuel_delivery";
+      if (normalized.includes("lock")) return "lockout_assistance";
+      if (normalized.includes("tyre") || normalized.includes("tire") || normalized.includes("puncture")) {
+        return "tire_change";
+      }
+      return "";
+    };
+
+    const technicians = getTechnicians()
+      .map((item) => {
+        const categories = Array.isArray(item.specialties)
+          ? item.specialties.map((specialty) => mapSpecialtyToCategory(specialty)).filter(Boolean)
+          : [];
+        const activeJobs = getRequests().filter(
+          (request) =>
+            String(request.technician_id || "") === String(item.id || "") &&
+            ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(
+              String(request.status || "").toLowerCase()
+            )
+        ).length;
+        const statusLabel = !item.is_active ? "offline" : activeJobs > 0 ? "busy" : "online";
+
+        return {
+          id: Number(String(item.id || "").replace(/[^\d]/g, "")) || 0,
+          name: item.name,
+          category: categories[0] || "",
+          categories,
+          region: "Bengaluru",
+          status: statusLabel,
+        };
+      })
+      .filter((item) => item.id > 0)
+      .filter((item) => (requestedCategories.length ? requestedCategories.some((category) => item.categories.includes(category)) : true))
+      .filter((item) => (requestedRegion ? item.region.toLowerCase() === requestedRegion : true))
+      .filter((item) => (requestedStatus ? item.status === requestedStatus : true));
+
+    return json(technicians);
+  }
   if (path === "/api/technicians/nearby" && method === "GET") {
     const lat = Number(q.get("lat") || 12.9716);
     const lng = Number(q.get("lng") || 77.5946);

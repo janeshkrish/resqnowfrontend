@@ -19,15 +19,22 @@ export const TECHNICIAN_COMPLETION_STATUSES = ["paid", "completed"] as const;
 export function normalizeTechnicianStatus(status: unknown): TechnicianStatus {
   const raw = String(status || "").trim().toLowerCase();
   const map: Record<string, TechnicianStatus> = {
+    requested: "pending",
     "on-the-way": "en-route",
     "on_the_way": "en-route",
     "on the way": "en-route",
     "en_route": "en-route",
+    service_started: "in-progress",
+    "service-started": "in-progress",
+    "service started": "in-progress",
     "in_progress": "in-progress",
+    completed_pending_payment: "payment_pending",
+    payment_in_progress: "payment_pending",
     "payment-pending": "payment_pending",
     "awaiting_payment": "payment_pending",
     "awaiting-payment": "payment_pending",
     "awaiting payment": "payment_pending",
+    cancelled_by_user: "cancelled",
   };
   const normalized = map[raw] || raw;
   return (TECHNICIAN_STATUS_FLOW as readonly string[]).includes(normalized)

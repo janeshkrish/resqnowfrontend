@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, BellRing, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, BellRing, Loader2, Send, Trash2, Users } from "lucide-react";
 import {
   deleteAdminNotification,
+  getBroadcastTechnicians,
   getAdminNotifications,
   sendEmergencyMessage,
   sendSystemAnnouncement,
@@ -16,18 +17,128 @@ const parseTechnicianIds = (value: string) =>
     .map((id) => Number(id.replace("#", "").trim()))
     .filter((id) => Number.isInteger(id) && id > 0);
 
+const TECHNICIAN_CATEGORY_OPTIONS = [
+  { label: "Towing", value: "towing" },
+  { label: "Battery Jumpstart", value: "battery_jumpstart" },
+  { label: "Fuel Delivery", value: "fuel_delivery" },
+  { label: "Lockout Assistance", value: "lockout_assistance" },
+  { label: "Tire Change", value: "tire_change" },
+] as const;
+
+const TECHNICIAN_STATUS_OPTIONS = [
+  { label: "Online", value: "online" },
+  { label: "Offline", value: "offline" },
+  { label: "Busy", value: "busy" },
+] as const;
+
+type TechnicianFilters = {
+  selectAll: boolean;
+  categories: string[];
+  region: string;
+  status: string;
+};
+
 export default function AdminExtendedNotificationsPage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [technicianIdsText, setTechnicianIdsText] = useState("");
+  const [filters, setFilters] = useState<TechnicianFilters>({
+    selectAll: false,
+    categories: [],
+    region: "",
+    status: "",
+  });
+  const [filteredTechnicians, setFilteredTechnicians] = useState<number[]>([]);
+  const [isFilteringTechnicians, setIsFilteringTechnicians] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
+  const manualTechnicianIdsRef = useRef("");
 
   const technicianIds = useMemo(() => parseTechnicianIds(technicianIdsText), [technicianIdsText]);
+  const isFilterActive = useMemo(
+    () =>
+      filters.selectAll ||
+      filters.categories.length > 0 ||
+      Boolean(filters.region) ||
+      Boolean(filters.status),
+    [filters]
+  );
 
   const notificationsQuery = useQuery({
     queryKey: ["admin", "notifications", "list"],
     queryFn: () => getAdminNotifications({ limit: 100, offset: 0 }),
   });
+
+  const technicianDirectoryQuery = useQuery({
+    queryKey: ["admin", "notifications", "technician-directory"],
+    queryFn: () => getBroadcastTechnicians(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const regionOptions = useMemo(() => {
+    const regions = new Set<string>();
+    for (const technician of technicianDirectoryQuery.data || []) {
+      const region = String(technician.region || "").trim();
+      if (region) regions.add(region);
+    }
+    return Array.from(regions).sort((left, right) => left.localeCompare(right));
+  }, [technicianDirectoryQuery.data]);
+
+  useEffect(() => {
+    if (!isFilterActive) {
+      setFilteredTechnicians([]);
+      setFilterError(null);
+      setTechnicianIdsText(manualTechnicianIdsRef.current);
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncFilteredTechnicians = async () => {
+      setIsFilteringTechnicians(true);
+      setFilterError(null);
+
+      try {
+        const technicians = await getBroadcastTechnicians(
+          filters.selectAll
+            ? {}
+            : {
+                categories: filters.categories,
+                region: filters.region,
+                status: filters.status,
+              }
+        );
+
+        if (cancelled) return;
+
+        const ids = Array.from(
+          new Set(
+            technicians
+              .map((technician) => Number(technician.id))
+              .filter((id) => Number.isInteger(id) && id > 0)
+          )
+        );
+
+        setFilteredTechnicians(ids);
+        setTechnicianIdsText(ids.join(", "));
+      } catch (error) {
+        if (cancelled) return;
+        setFilteredTechnicians([]);
+        setTechnicianIdsText("");
+        setFilterError((error as Error).message || "Unable to filter technicians.");
+      } finally {
+        if (!cancelled) {
+          setIsFilteringTechnicians(false);
+        }
+      }
+    };
+
+    void syncFilteredTechnicians();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters, isFilterActive]);
 
   const systemMutation = useMutation({
     mutationFn: sendSystemAnnouncement,
@@ -67,6 +178,20 @@ export default function AdminExtendedNotificationsPage() {
 
   const sending =
     systemMutation.isPending || technicianMutation.isPending || emergencyMutation.isPending;
+  const selectedTechnicianCount = isFilterActive ? filteredTechnicians.length : technicianIds.length;
+
+  const updateFilter = <K extends keyof TechnicianFilters>(key: K, value: TechnicianFilters[K]) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleCategory = (category: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      categories: prev.categories.includes(category)
+        ? prev.categories.filter((item) => item !== category)
+        : [...prev.categories, category],
+    }));
+  };
 
   const sendBroadcast = (type: "system" | "technician" | "emergency") => {
     if (!title.trim()) {
@@ -139,11 +264,123 @@ export default function AdminExtendedNotificationsPage() {
             <label className="text-sm font-medium text-slate-700">Technician IDs</label>
             <input
               value={technicianIdsText}
-              onChange={(event) => setTechnicianIdsText(event.target.value)}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                manualTechnicianIdsRef.current = nextValue;
+                setTechnicianIdsText(nextValue);
+              }}
+              disabled={isFilterActive}
               placeholder="101, 205, 389"
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
             />
             <p className="text-xs text-slate-500">Used for technician broadcast only.</p>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={filters.selectAll}
+                      onChange={(event) => updateFilter("selectAll", event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                    />
+                    Select All Technicians
+                  </label>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    <Users className="h-3.5 w-3.5" />
+                    {selectedTechnicianCount} technicians selected
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Category</p>
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {TECHNICIAN_CATEGORY_OPTIONS.map((option) => {
+                      const checked = filters.categories.includes(option.value);
+                      return (
+                        <label
+                          key={option.value}
+                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                            filters.selectAll
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                              : checked
+                                ? "border-slate-900 bg-slate-900 text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={filters.selectAll}
+                            onChange={() => toggleCategory(option.value)}
+                            className="h-4 w-4 rounded border-current"
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Region</label>
+                    <select
+                      value={filters.region}
+                      onChange={(event) => updateFilter("region", event.target.value)}
+                      disabled={filters.selectAll}
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                    >
+                      <option value="">All regions</option>
+                      {regionOptions.map((region) => (
+                        <option key={region} value={region}>
+                          {region}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Status</label>
+                    <select
+                      value={filters.status}
+                      onChange={(event) => updateFilter("status", event.target.value)}
+                      disabled={filters.selectAll}
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                    >
+                      <option value="">All statuses</option>
+                      {TECHNICIAN_STATUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {isFilteringTechnicians ? (
+                  <p className="inline-flex items-center gap-2 text-xs text-slate-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading filtered technicians...
+                  </p>
+                ) : null}
+
+                {filterError ? (
+                  <p className="text-xs text-rose-600">{filterError}</p>
+                ) : null}
+
+                {technicianDirectoryQuery.isError && !filterError ? (
+                  <p className="text-xs text-rose-600">
+                    {(technicianDirectoryQuery.error as Error).message}
+                  </p>
+                ) : null}
+
+                <p className="text-xs text-slate-500">
+                  Filtered results auto-fill the Technician IDs field. Clear all filters to re-enable manual entry.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -159,7 +396,7 @@ export default function AdminExtendedNotificationsPage() {
           <button
             type="button"
             onClick={() => sendBroadcast("technician")}
-            disabled={sending}
+            disabled={sending || isFilteringTechnicians}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
           >
             <Send className="h-4 w-4" /> Send Technician Broadcast
@@ -198,7 +435,7 @@ export default function AdminExtendedNotificationsPage() {
                 <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                 <p className="mt-1 text-sm text-slate-600">{item.message}</p>
                 <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-                  {item.type} • {new Date(item.created_at).toLocaleString()}
+                  {item.type} | {new Date(item.created_at).toLocaleString()}
                 </p>
               </div>
               <button

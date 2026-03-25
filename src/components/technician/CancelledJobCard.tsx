@@ -10,6 +10,7 @@ export interface CancelledJobDetails {
   address?: string | null;
   cancellationReason?: string | null;
   serviceType?: string | null;
+  cancelledAt?: string | null;
 }
 
 interface CancelledJobCardProps {
@@ -27,6 +28,15 @@ const CancelledJobCard = ({
   const serviceLabel = String(job.serviceType || "").trim().replace(/-/g, " ") || "Roadside assistance";
   const locationLabel = String(job.address || "").trim() || "Location details are not available.";
   const reasonLabel = String(job.cancellationReason || "").trim();
+  const cancelledAtLabel = job.cancelledAt
+    ? new Date(job.cancelledAt).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
     <Card
@@ -79,6 +89,15 @@ const CancelledJobCard = ({
             <p className="mt-2 text-sm font-semibold leading-relaxed text-foreground">{locationLabel}</p>
           </div>
         </div>
+
+        {cancelledAtLabel ? (
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+              Cancelled At
+            </p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{cancelledAtLabel}</p>
+          </div>
+        ) : null}
 
         {reasonLabel ? (
           <div className="rounded-2xl border border-red-100 bg-red-50/70 p-4">

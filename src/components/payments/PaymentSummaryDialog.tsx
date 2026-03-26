@@ -26,6 +26,7 @@ type PaymentBreakdown = {
   platformFee: number;
   paymentFeePercent?: number;
   paymentFee?: number;
+  paymentMode?: "cash" | "upi" | null;
   totalAmount: number;
   currency?: string;
 };
@@ -80,6 +81,7 @@ export function PaymentSummaryDialog({
 }: PaymentSummaryDialogProps) {
   const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
   const parsedBaseAmount = Number(baseAmount);
+  const isCash = paymentMethod === "cash";
   const numericBaseAmount = Number.isFinite(parsedBaseAmount) && parsedBaseAmount > 0 ? parsedBaseAmount : 0;
   const normalizedCurrency = String(breakdown?.currency || currency || "INR").toUpperCase();
   const feePercent =
@@ -94,7 +96,11 @@ export function PaymentSummaryDialog({
     Number.isFinite(paymentFeePercent) && paymentFeePercent >= 0
       ? paymentFeePercent
       : 0.02;
-  const fallbackPaymentFee = roundMoney(numericBaseAmount * paymentPercent);
+  const fallbackPaymentFee = isCash
+    ? 0
+    : paymentPercent > 0
+    ? roundMoney(numericBaseAmount * paymentPercent)
+    : 2;
   const fallbackTotal = roundMoney(numericBaseAmount + fallbackPlatformFee + fallbackPaymentFee);
 
   const resolvedBase = Number.isFinite(Number(breakdown?.baseAmount))
@@ -118,10 +124,11 @@ export function PaymentSummaryDialog({
   const resolvedTotalAmount = Number.isFinite(Number(breakdown?.totalAmount))
     ? Number(breakdown?.totalAmount)
     : fallbackTotal;
-  const isCash = paymentMethod === "cash";
+  const resolvedPaymentMode = breakdown?.paymentMode || (isCash ? "cash" : "upi");
 
   const formatAmount = (amount: number) => `${normalizedCurrency} ${amount.toFixed(2)}`;
   const hasDiscount = resolvedDiscountAmount > 0;
+  const shouldShowPaymentFee = resolvedPaymentMode === "upi" && resolvedPaymentFee > 0;
 
   const couponMessageClass = couponMessage?.tone === "success"
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -180,7 +187,7 @@ export function PaymentSummaryDialog({
         >
           <div className="rounded-2xl border border-border bg-muted/30 p-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Service amount</span>
+              <span className="text-muted-foreground">Technician amount</span>
               <span className="font-medium">{formatAmount(resolvedBase)}</span>
             </div>
             <div className="mt-2 flex items-start justify-between text-sm">
@@ -192,15 +199,19 @@ export function PaymentSummaryDialog({
               </div>
               <span className="font-medium">{formatAmount(resolvedPlatformFee)}</span>
             </div>
-            <div className="mt-2 flex items-start justify-between text-sm">
-              <div>
-                <p className="text-muted-foreground">Payment fee</p>
-                <p className="text-[11px] text-muted-foreground/80">
-                  {Math.round(paymentPercent * 100)}% gateway and convenience charge
-                </p>
+            {shouldShowPaymentFee && (
+              <div className="mt-2 flex items-start justify-between text-sm">
+                <div>
+                  <p className="text-muted-foreground">Razorpay fee</p>
+                  <p className="text-[11px] text-muted-foreground/80">
+                    {paymentPercent > 0
+                      ? `${Math.round(paymentPercent * 100)}% gateway fee`
+                      : "Fixed Razorpay processing fee"}
+                  </p>
+                </div>
+                <span className="font-medium">{formatAmount(resolvedPaymentFee)}</span>
               </div>
-              <span className="font-medium">{formatAmount(resolvedPaymentFee)}</span>
-            </div>
+            )}
             {hasDiscount && (
               <>
                 <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">

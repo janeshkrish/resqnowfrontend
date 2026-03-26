@@ -3,6 +3,7 @@ import { apiFetch, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayment';
 
 interface RequestData {
   id: string;
@@ -21,8 +22,19 @@ interface RequestData {
   price?: number;
   amount?: number | string | null;
   service_charge?: number | string | null;
+  payment_method?: string | null;
+  paymentMode?: "cash" | "upi" | null;
+  payment_mode?: "cash" | "upi" | null;
+  baseAmount?: number | string | null;
+  base_amount?: number | string | null;
+  platformFee?: number | string | null;
+  platform_fee?: number | string | null;
+  razorpayFee?: number | string | null;
+  razorpay_fee?: number | string | null;
   finalAmount?: number | string | null;
   final_amount?: number | string | null;
+  dueAmount?: number | string | null;
+  due_amount?: number | string | null;
   cancellation_reason?: string | null;
 }
 
@@ -44,6 +56,26 @@ interface RealtimeOptions {
   onTechnicianAssigned?: () => void;
 }
 
+const normalizeRequestData = (data: any): RequestData => {
+  const paymentDetails = resolveServiceRequestPaymentDetails(data);
+
+  return {
+    ...data,
+    paymentMode: paymentDetails.paymentMode,
+    payment_mode: paymentDetails.paymentMode,
+    baseAmount: paymentDetails.baseAmount,
+    base_amount: paymentDetails.baseAmount,
+    platformFee: paymentDetails.platformFee,
+    platform_fee: paymentDetails.platformFee,
+    razorpayFee: paymentDetails.razorpayFee,
+    razorpay_fee: paymentDetails.razorpayFee,
+    finalAmount: paymentDetails.finalAmount,
+    final_amount: paymentDetails.finalAmount,
+    dueAmount: paymentDetails.dueAmount,
+    due_amount: paymentDetails.dueAmount,
+  };
+};
+
 export const useRealtimeServiceRequest = (requestId: string | undefined, options?: RealtimeOptions) => {
   const [request, setRequest] = useState<RequestData | null>(null);
   const [technician, setTechnician] = useState<TechnicianData | null>(null);
@@ -58,11 +90,12 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       const res = await apiFetch(`/api/service-requests/${requestId}`);
       if (res.ok) {
         const data = await res.json();
+        const normalizedRequest = normalizeRequestData(data);
         // Backend returns the full request object. If it has a technician property, use it.
-        setRequest(data);
-        if (data.technician) {
+        setRequest(normalizedRequest);
+        if (normalizedRequest.technician) {
           // Normalize and sanitize technician payload so UI stays fully data-driven.
-          const techData: any = { ...data.technician };
+          const techData: any = { ...normalizedRequest.technician };
           const techId = techData?.id != null ? String(techData.id) : "";
           const rawLat = techData?.location?.lat ?? techData?.location_lat ?? null;
           const rawLng = techData?.location?.lng ?? techData?.location_lng ?? null;
@@ -146,7 +179,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
               options?.onStatusChange?.(prev.status, data.status);
             }
             // Merge only simple fields from event; fetchRequest will refresh full object
-            return { ...prev, ...data } as any;
+            return normalizeRequestData({ ...prev, ...data }) as any;
           });
         }
       };

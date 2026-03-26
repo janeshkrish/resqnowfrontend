@@ -1,3 +1,10 @@
+import {
+  normalizeServiceRequestPaymentMode,
+  resolveServiceRequestPaymentDetails,
+  SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
+  SERVICE_REQUEST_RAZORPAY_FEE,
+} from "@/utils/serviceRequestPayment";
+
 const normalizeBaseUrl = (value: string | undefined): string => {
   const trimmed = (value ?? "").trim();
   const unquoted = trimmed.replace(/^["']|["']$/g, "");
@@ -228,10 +235,12 @@ const ensureUserProfile = (patch: AnyRecord = {}) => {
 
 const withTechnician = (request: AnyRecord) => {
   if (!request) return request;
+  const paymentDetails = resolveServiceRequestPaymentDetails(request);
   const technician = getTechnicians().find((item) => String(item.id) === String(request.technician_id));
-  if (!technician) return request;
+  if (!technician) return { ...request, ...paymentDetails };
   return {
     ...request,
+    ...paymentDetails,
     technician: {
       id: technician.id,
       name: technician.name,
@@ -275,16 +284,35 @@ const isRequestPaid = (request: AnyRecord) =>
   ["paid", "completed"].includes(String(request?.status || "").toLowerCase()) ||
   String(request?.payment_status || "").toLowerCase() === "completed";
 
+const getMockPendingDues = () =>
+  roundMoney(
+    getRequests().reduce((sum, request) => {
+      const paymentDetails = resolveServiceRequestPaymentDetails(request);
+      if (isRequestPaid(request) && paymentDetails.paymentMode === "cash" && !request?.is_settled) {
+        return sum + Number(paymentDetails.platformFee || 0);
+      }
+      return sum;
+    }, 0)
+  );
+
 const buildMockPaymentQuote = (
   request: AnyRecord,
   couponCode: unknown,
-  { preserveExistingApplied = false }: { preserveExistingApplied?: boolean } = {}
+  {
+    preserveExistingApplied = false,
+    paymentMode = null,
+  }: { preserveExistingApplied?: boolean; paymentMode?: "cash" | "upi" | null } = {}
 ) => {
   const pricingConfig = MOCK_PRICING_CONFIG;
+  const normalizedPaymentMode =
+    normalizeServiceRequestPaymentMode(
+      paymentMode ?? request?.payment_mode ?? request?.payment_method,
+      "cash"
+    ) || "cash";
   const baseAmount = roundMoney(
     Number(request?.amount || request?.service_charge || pricingConfig.default_service_amount)
   );
-  const originalPlatformFee = roundMoney(baseAmount * Number(pricingConfig.platform_fee_percent || 0.1));
+  const originalPlatformFee = roundMoney(baseAmount * SERVICE_REQUEST_PLATFORM_FEE_PERCENT);
 
   const configuredCode = normalizeCouponCode(pricingConfig.welcome_coupon_code);
   const enteredCode = normalizeCouponCode(couponCode);
@@ -328,17 +356,23 @@ const buildMockPaymentQuote = (
   const discountPercent = Number(pricingConfig.welcome_coupon_discount_percent || 0.1);
   const discountAmount = isApplied ? roundMoney(originalPlatformFee * discountPercent) : 0;
   const platformFee = roundMoney(Math.max(0, originalPlatformFee - discountAmount));
-  const totalAmount = roundMoney(baseAmount + platformFee);
+  const paymentFee = normalizedPaymentMode === "upi" ? SERVICE_REQUEST_RAZORPAY_FEE : 0;
+  const totalAmount = roundMoney(baseAmount + platformFee + paymentFee);
 
   return {
     breakdown: {
       currency: pricingConfig.currency,
+      payment_mode: normalizedPaymentMode,
       base_amount: baseAmount,
-      platform_fee_percent: Number(pricingConfig.platform_fee_percent || 0.1),
+      platform_fee_percent: Number(SERVICE_REQUEST_PLATFORM_FEE_PERCENT),
       original_platform_fee: originalPlatformFee,
       discount_amount: discountAmount,
       platform_fee: platformFee,
+      payment_fee_percent: 0,
+      payment_fee: paymentFee,
+      razorpay_fee: paymentFee,
       total_amount: totalAmount,
+      final_amount: totalAmount,
     },
     coupon: {
       active: Boolean(pricingConfig.welcome_coupon_active),
@@ -927,16 +961,27 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/technicians/earnings-history" && method === "GET") return json([{ date: "Mon", amount: 1200 }, { date: "Tue", amount: 1800 }, { date: "Wed", amount: 900 }, { date: "Thu", amount: 2200 }, { date: "Fri", amount: 1500 }]);
   if (path === "/api/technicians/me/reviews" && method === "GET") return json([{ id: 1, rating: 5, comment: "Quick and professional service." }]);
   if (path === "/api/technicians/me/notifications" && method === "GET") return json([]);
-  if (path === "/api/technicians/me/financials" && method === "GET") return json({ total_earnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0), pending_dues: 0 });
-  if (path === "/api/technicians/me/dues" && method === "GET") return json({ total: 0 });
+  if (path === "/api/technicians/me/financials" && method === "GET") return json({ total_earnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0), pending_dues: getMockPendingDues() });
+  if (path === "/api/technicians/me/dues" && method === "GET") return json({ total: getMockPendingDues() });
   if (path === "/api/technicians/me/active-job" && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
   if (/^\/api\/technician\/active-job\/[^/]+$/.test(path) && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
   if (path === "/api/technicians/me/profile" && method === "PATCH") return json({ success: true });
   if (path === "/api/technicians/me/payout-transactions" && method === "GET") return json([]);
   if (path === "/api/technicians/me/location" && method === "PATCH") return json({ success: true });
-  if (path === "/api/technicians/me/pay-dues/order" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: 0, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
-  if ((path === "/api/technicians/me/pay-dues/verify" || path === "/api/technicians/me/verify-dues") && method === "POST") return json({ success: true, financials: { pending_dues: 0, total_earnings: 0 } });
-  if (path === "/api/technicians/me/pay-dues" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: 0, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
+  if (path === "/api/technicians/me/pay-dues/order" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: Math.round(getMockPendingDues() * 100), currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
+  if ((path === "/api/technicians/me/pay-dues/verify" || path === "/api/technicians/me/verify-dues") && method === "POST") {
+    setRequests(
+      getRequests().map((item) => {
+        const paymentDetails = resolveServiceRequestPaymentDetails(item);
+        if (isRequestPaid(item) && paymentDetails.paymentMode === "cash") {
+          return { ...item, is_settled: true };
+        }
+        return item;
+      })
+    );
+    return json({ success: true, financials: { pending_dues: getMockPendingDues(), total_earnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0) } });
+  }
+  if (path === "/api/technicians/me/pay-dues" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: Math.round(getMockPendingDues() * 100), currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
 
   if (path === "/api/service-requests" && method === "GET") return json(getRequests().map(withTechnician));
   if (path === "/api/service-requests" && method === "POST") {
@@ -1011,6 +1056,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     if (isRequestPaid(request)) return json({ error: "Request already paid" }, 409);
     const quote = buildMockPaymentQuote(request, body.couponCode, {
       preserveExistingApplied: body.preserveExistingApplied !== false,
+      paymentMode: normalizeServiceRequestPaymentMode(body.paymentMode, "cash"),
     });
     return json({ success: true, request_id: request.id, ...quote });
   }
@@ -1029,7 +1075,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     if (!request) return json({ error: "Request not found" }, 404);
     if (isRequestPaid(request)) return json({ error: "Request already paid" }, 409);
 
-    const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false });
+    const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false, paymentMode: "upi" });
     if (String(body.couponCode || "").trim() && !quote.coupon.is_applied) {
       return json({ error: quote.coupon.reason || "Coupon could not be applied.", coupon: quote.coupon }, 400);
     }
@@ -1041,6 +1087,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
       applied_discount_amount: quote.breakdown.discount_amount,
       payment_method: "razorpay",
       payment_status: "pending",
+      is_settled: true,
     });
 
     const orderId = `order_${Date.now()}`;
@@ -1057,8 +1104,10 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
       platform_fee: quote.breakdown.platform_fee,
       payment_fee_percent: quote.breakdown.payment_fee_percent,
       payment_fee: quote.breakdown.payment_fee,
+      razorpay_fee: quote.breakdown.razorpay_fee,
       platform_fee_percent: quote.breakdown.platform_fee_percent,
       total_amount: quote.breakdown.total_amount,
+      final_amount: quote.breakdown.final_amount,
       coupon: quote.coupon,
     });
   }
@@ -1066,7 +1115,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/payments/verify-subscription-payment" && method === "POST") return json({ success: true });
   if (path === "/api/payments/confirm" && method === "POST") {
     const req = requestById(String(body.requestId || ""));
-    if (req) upsertRequest({ ...req, status: "paid", payment_status: "completed" });
+    if (req) upsertRequest({ ...req, status: "paid", payment_status: "completed", payment_method: "razorpay", is_settled: true });
     return json({ success: true, request: req ? withTechnician({ ...req, status: "paid", payment_status: "completed" }) : undefined });
   }
   if (path === "/api/payments/cash" && method === "POST") {
@@ -1074,7 +1123,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     if (!request) return json({ error: "Request not found" }, 404);
     if (isRequestPaid(request)) return json({ success: true, alreadyPaid: true });
 
-    const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false });
+    const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false, paymentMode: "cash" });
     if (String(body.couponCode || "").trim() && !quote.coupon.is_applied) {
       return json({ error: quote.coupon.reason || "Coupon could not be applied.", coupon: quote.coupon }, 400);
     }
@@ -1084,6 +1133,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
       status: "paid",
       payment_status: "completed",
       payment_method: "cash",
+      is_settled: false,
       applied_coupon_code: quote.coupon.applied_coupon_code,
       applied_discount_percent: quote.coupon.is_applied ? quote.coupon.discount_percent : 0,
       applied_discount_amount: quote.breakdown.discount_amount,

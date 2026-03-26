@@ -425,6 +425,8 @@ const ActiveJob = () => {
 
   if (!job) return <div className="p-8 text-center">Loading job details...</div>;
 
+  const jobDue = toOptionalNumber(job.dueAmount ?? job.due_amount);
+  const displayDue = jobDue != null && jobDue > 0 ? jobDue : dues;
   const displayUser = toOptionalString(job.customerName ?? job.contact_name ?? job.user?.name) || 'Not Available';
   const displayService = toOptionalString(job.serviceType ?? job.service_type ?? job.service?.type);
   const displayVehicle = buildVehicleDetails(job);
@@ -472,10 +474,10 @@ const ActiveJob = () => {
               </div>
               <button
                 type="button"
-                onClick={dues > 0 ? handlePayDues : undefined}
-                disabled={dues <= 0}
+                onClick={displayDue > 0 ? handlePayDues : undefined}
+                disabled={displayDue <= 0}
                 className={`rounded-2xl border px-3 py-2 text-left shadow-lg backdrop-blur-sm ${
-                  dues > 0
+                  displayDue > 0
                     ? 'border-red-200 bg-red-50/95 text-red-700'
                     : 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
                 }`}
@@ -483,7 +485,7 @@ const ActiveJob = () => {
                 <p className="text-[9px] font-bold uppercase tracking-[0.18em]">
                   Platform Due
                 </p>
-                <p className="mt-1 text-sm font-black">{formatMoney(dues, 0)}</p>
+                <p className="mt-1 text-sm font-black">{formatMoney(displayDue, 0)}</p>
               </button>
             </div>
           </div>
@@ -535,8 +537,8 @@ const ActiveJob = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Platform Due</p>
-                    <p className={`text-sm font-black ${dues > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {formatMoney(dues, 0)}
+                    <p className={`text-sm font-black ${displayDue > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {formatMoney(displayDue, 0)}
                     </p>
                   </div>
                 </div>

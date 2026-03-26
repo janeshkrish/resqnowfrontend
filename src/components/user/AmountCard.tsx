@@ -4,6 +4,11 @@ import { cn } from "@/lib/utils";
 
 export interface AmountCardProps {
   amount?: number | null;
+  technicianAmount?: number | null;
+  platformFee?: number | null;
+  razorpayFee?: number | null;
+  total?: number | null;
+  paymentMode?: "cash" | "upi" | null;
   currency?: string;
   title?: string;
   loadingLabel?: string;
@@ -30,6 +35,11 @@ const formatAmount = (amount: number, currency: string) => {
 
 const AmountCard = ({
   amount = null,
+  technicianAmount = null,
+  platformFee = null,
+  razorpayFee = null,
+  total = null,
+  paymentMode = null,
   currency = "INR",
   title = DEFAULT_TITLE,
   loadingLabel = DEFAULT_LOADING_LABEL,
@@ -37,10 +47,22 @@ const AmountCard = ({
   badgeText,
   className,
 }: AmountCardProps) => {
-  const hasAmount = Number.isFinite(amount) && Number(amount) > 0;
-  const resolvedAmount = hasAmount ? formatAmount(Number(amount), currency) : loadingLabel;
+  const resolvedTotal =
+    total != null && Number.isFinite(Number(total))
+      ? Number(total)
+      : amount != null && Number.isFinite(Number(amount))
+      ? Number(amount)
+      : technicianAmount != null && platformFee != null
+      ? Number(technicianAmount || 0) + Number(platformFee || 0) + Number(razorpayFee || 0)
+      : null;
+  const hasAmount = Number.isFinite(resolvedTotal) && Number(resolvedTotal) > 0;
+  const resolvedAmount = hasAmount && resolvedTotal != null ? formatAmount(resolvedTotal, currency) : loadingLabel;
   const resolvedBadgeText =
     badgeText === undefined ? (hasAmount ? "Live" : "Updating") : badgeText;
+  const hasBreakdown =
+    (technicianAmount != null && Number.isFinite(Number(technicianAmount))) ||
+    (platformFee != null && Number.isFinite(Number(platformFee))) ||
+    (razorpayFee != null && Number.isFinite(Number(razorpayFee)));
 
   return (
     <Card
@@ -79,6 +101,37 @@ const AmountCard = ({
             </Badge>
           ) : null}
         </div>
+
+        {hasBreakdown ? (
+          <div className="mt-4 rounded-xl border border-orange-100/80 bg-white/80 p-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Technician</span>
+              <span className="font-semibold">
+                {formatAmount(Number(technicianAmount || 0), currency)}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Platform Fee</span>
+              <span className="font-semibold">
+                {formatAmount(Number(platformFee || 0), currency)}
+              </span>
+            </div>
+            {(paymentMode === "upi" || Number(razorpayFee || 0) > 0) && (
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Razorpay Fee</span>
+                <span className="font-semibold">
+                  {formatAmount(Number(razorpayFee || 0), currency)}
+                </span>
+              </div>
+            )}
+            <div className="mt-3 flex items-center justify-between border-t border-orange-100 pt-3 text-sm">
+              <span className="font-semibold text-foreground">Total</span>
+              <span className="text-base font-black text-orange-600">
+                {formatAmount(Number(resolvedTotal || 0), currency)}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

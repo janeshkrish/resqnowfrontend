@@ -39,6 +39,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
+import {
+  resolveServiceRequestPaymentDetails,
+  SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
+  normalizeServiceRequestPaymentMode,
+} from "@/utils/serviceRequestPayment";
 
 const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   pending: {
@@ -119,6 +124,7 @@ type PaymentQuoteResponse = {
   success?: boolean;
   breakdown?: {
     currency?: string;
+    payment_mode?: "cash" | "upi" | null;
     base_amount?: number;
     platform_fee_percent?: number;
     original_platform_fee?: number;
@@ -126,7 +132,9 @@ type PaymentQuoteResponse = {
     platform_fee?: number;
     payment_fee_percent?: number;
     payment_fee?: number;
+    razorpay_fee?: number;
     total_amount?: number;
+    final_amount?: number;
   };
   coupon?: {
     active?: boolean;
@@ -230,12 +238,15 @@ const RequestTracking = () => {
     setSheetHeightVh((prev) => clampSheetHeight(prev));
   }, [isMobile, showPayment]);
 
+  const selectedBackendPaymentMode = selectedPaymentMethod === "cash" ? "cash" : "upi";
+
   const fetchPaymentQuote = async (
     couponCode: string | null = null,
     {
       showFeedback = false,
       preserveExistingApplied = true,
-    }: { showFeedback?: boolean; preserveExistingApplied?: boolean } = {}
+      paymentMode = selectedBackendPaymentMode,
+    }: { showFeedback?: boolean; preserveExistingApplied?: boolean; paymentMode?: "cash" | "upi" } = {}
   ) => {
     if (!request?.id) return null;
     setIsFetchingQuote(true);
@@ -244,6 +255,7 @@ const RequestTracking = () => {
       const payload: Record<string, unknown> = {
         requestId: request.id,
         preserveExistingApplied,
+        paymentMode,
       };
       const normalizedCoupon = String(couponCode || "").trim().toUpperCase();
       if (normalizedCoupon) {
@@ -305,24 +317,25 @@ const RequestTracking = () => {
 
   useEffect(() => {
     if (!showPayment || !request?.id) return;
-    void fetchPaymentQuote(appliedCouponCode, { showFeedback: false, preserveExistingApplied: true });
+    void fetchPaymentQuote(appliedCouponCode, {
+      showFeedback: false,
+      preserveExistingApplied: true,
+      paymentMode: selectedBackendPaymentMode,
+    });
     // Deliberately excluding appliedCouponCode to avoid repeated background refetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPayment, request?.id]);
+  }, [showPayment, request?.id, selectedBackendPaymentMode]);
 
   useEffect(() => {
     if (!showPaymentSummary || !request?.id) return;
-    void fetchPaymentQuote(appliedCouponCode, { showFeedback: false, preserveExistingApplied: true });
+    void fetchPaymentQuote(appliedCouponCode, {
+      showFeedback: false,
+      preserveExistingApplied: true,
+      paymentMode: selectedBackendPaymentMode,
+    });
     // Deliberately excluding appliedCouponCode to avoid repeated dialog refetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPaymentSummary, request?.id]);
-
-  useEffect(() => {
-    const nextFinalAmount = Number(request?.finalAmount ?? request?.final_amount ?? Number.NaN);
-    if (finalAmount === null && Number.isFinite(nextFinalAmount) && nextFinalAmount > 0) {
-      setFinalAmount(nextFinalAmount);
-    }
-  }, [request?.finalAmount, request?.final_amount, finalAmount]);
+  }, [showPaymentSummary, request?.id, selectedBackendPaymentMode]);
 
   const formatElapsedTime = () => {
     const secs = elapsedSeconds;
@@ -575,7 +588,7 @@ const RequestTracking = () => {
 
   const status = normalizeRequestStatus(request?.status || "pending");
   const paymentStatus = normalizeRequestPaymentStatus(request?.payment_status);
-  const paymentCompleted = paymentStatus === "paid" || status === "paid" || status === "completed";
+  const paymentCompleted = paymentStatus === "paid" || status === "paid";
   const statusMeta = STATUS_COPY[status] || {
     title: "Request status updated",
     subtitle: "Your request is being processed."
@@ -617,21 +630,60 @@ const RequestTracking = () => {
   })();
 
   const stageProgress = Math.round((stageIndex / (JOURNEY_STAGES.length - 1)) * 100);
-  const requestAmountRaw = Number(request?.amount ?? request?.service_charge ?? Number.NaN);
-  const requestAmount =
-    Number.isFinite(requestAmountRaw) && requestAmountRaw > 0
-      ? requestAmountRaw
-      : finalAmount ?? 0;
-  const amountLabel = requestAmount.toFixed(2);
-  const shouldShowAmount = finalAmount !== null && status !== "completed";
-
   const quoteBreakdown = paymentQuote?.breakdown;
   const quoteCoupon = paymentQuote?.coupon;
-  const resolvedTotalAmount = Number(quoteBreakdown?.total_amount);
+  const requestPaymentDetails = useMemo(
+    () => resolveServiceRequestPaymentDetails(request, showPayment ? selectedBackendPaymentMode : null),
+    [request, showPayment, selectedBackendPaymentMode]
+  );
+  const selectedMethodPaymentDetails = useMemo(
+    () => resolveServiceRequestPaymentDetails(request, selectedBackendPaymentMode),
+    [request, selectedBackendPaymentMode]
+  );
+  const quotePaymentDetails = useMemo(() => {
+    if (!quoteBreakdown) return null;
+
+    const paymentMode =
+      normalizeServiceRequestPaymentMode(quoteBreakdown.payment_mode, selectedBackendPaymentMode) ??
+      selectedBackendPaymentMode;
+
+    return resolveServiceRequestPaymentDetails(
+      {
+        paymentMode,
+        baseAmount: quoteBreakdown.base_amount ?? selectedMethodPaymentDetails.baseAmount,
+        platformFee: quoteBreakdown.platform_fee,
+        razorpayFee: quoteBreakdown.razorpay_fee ?? quoteBreakdown.payment_fee,
+        finalAmount: quoteBreakdown.final_amount ?? quoteBreakdown.total_amount,
+        discountAmount: quoteBreakdown.discount_amount,
+        originalPlatformFee: quoteBreakdown.original_platform_fee,
+      },
+      paymentMode
+    );
+  }, [quoteBreakdown, selectedBackendPaymentMode, selectedMethodPaymentDetails.baseAmount]);
+  const amountCardDetails = quotePaymentDetails ?? requestPaymentDetails;
+  const summaryPaymentDetails = quotePaymentDetails ?? selectedMethodPaymentDetails;
+
+  useEffect(() => {
+    const nextFinalAmount = Number(
+      amountCardDetails.finalAmount ?? amountCardDetails.totalAmount ?? Number.NaN
+    );
+    if (Number.isFinite(nextFinalAmount) && nextFinalAmount > 0) {
+      setFinalAmount(nextFinalAmount);
+      return;
+    }
+    setFinalAmount(null);
+  }, [amountCardDetails.finalAmount, amountCardDetails.totalAmount]);
+
+  const requestAmount =
+    Number.isFinite(Number(requestPaymentDetails.baseAmount)) && requestPaymentDetails.baseAmount > 0
+      ? requestPaymentDetails.baseAmount
+      : finalAmount ?? 0;
   const amountDueLabel =
-    Number.isFinite(resolvedTotalAmount) && resolvedTotalAmount > 0
-      ? resolvedTotalAmount.toFixed(2)
-      : amountLabel;
+    Number.isFinite(Number(summaryPaymentDetails.finalAmount)) && Number(summaryPaymentDetails.finalAmount) > 0
+      ? Number(summaryPaymentDetails.finalAmount).toFixed(2)
+      : requestAmount.toFixed(2);
+  const shouldShowAmount =
+    Boolean(amountCardDetails.hasPricing) && finalAmount !== null && !paymentCompleted && status !== "cancelled";
 
   const couponConfiguredCode = String(
     quoteCoupon?.configured_code || pricingConfig?.welcome_coupon_code || ""
@@ -682,24 +734,28 @@ const RequestTracking = () => {
     }
   };
 
-  const summaryBreakdown =
-    quoteBreakdown && Number.isFinite(Number(quoteBreakdown.total_amount))
-      ? {
-          currency: String(quoteBreakdown.currency || currency).toUpperCase(),
-          baseAmount: Number(quoteBreakdown.base_amount || requestAmount),
-          platformFeePercent: Number(
-            quoteBreakdown.platform_fee_percent ?? pricingConfig?.platform_fee_percent ?? 0.1
-          ),
-          originalPlatformFee: Number(quoteBreakdown.original_platform_fee || 0),
-          discountAmount: Number(quoteBreakdown.discount_amount || 0),
-          platformFee: Number(quoteBreakdown.platform_fee || 0),
-          paymentFeePercent: Number(
-            quoteBreakdown.payment_fee_percent ?? pricingConfig?.payment_fee_percent ?? 0.02
-          ),
-          paymentFee: Number(quoteBreakdown.payment_fee || 0),
-          totalAmount: Number(quoteBreakdown.total_amount || requestAmount),
-        }
-      : null;
+  const summaryBreakdown = summaryPaymentDetails.hasPricing
+    ? {
+        currency: String(quoteBreakdown?.currency || currency).toUpperCase(),
+        paymentMode: summaryPaymentDetails.paymentMode ?? selectedBackendPaymentMode,
+        baseAmount: summaryPaymentDetails.baseAmount,
+        platformFeePercent: Number(
+          quoteBreakdown?.platform_fee_percent ?? SERVICE_REQUEST_PLATFORM_FEE_PERCENT
+        ),
+        originalPlatformFee: Number(
+          quoteBreakdown?.original_platform_fee ?? summaryPaymentDetails.originalPlatformFee
+        ),
+        discountAmount: Number(
+          quoteBreakdown?.discount_amount ?? summaryPaymentDetails.discountAmount
+        ),
+        platformFee: summaryPaymentDetails.platformFee,
+        paymentFeePercent: 0,
+        paymentFee: summaryPaymentDetails.razorpayFee,
+        totalAmount: Number(
+          summaryPaymentDetails.finalAmount ?? summaryPaymentDetails.totalAmount ?? requestAmount
+        ),
+      }
+    : null;
 
   if (isLoading) {
     return (
@@ -844,9 +900,14 @@ const RequestTracking = () => {
                   {shouldShowAmount ? (
                     <AmountCard
                       amount={finalAmount}
+                      technicianAmount={amountCardDetails.baseAmount}
+                      platformFee={amountCardDetails.platformFee}
+                      razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
+                      total={amountCardDetails.finalAmount}
+                      paymentMode={amountCardDetails.paymentMode}
                       currency={currency}
                       title="Final Amount"
-                      helperText="Confirmed service amount before payment."
+                      helperText="Live payment breakdown from your current service request."
                       badgeText={null}
                       className="mt-4"
                     />
@@ -1040,8 +1101,8 @@ const RequestTracking = () => {
           baseAmount={requestAmount}
           isProcessing={isProcessingPayment}
           paymentMethod={selectedPaymentMethod}
-          platformFeePercent={pricingConfig?.platform_fee_percent}
-          paymentFeePercent={pricingConfig?.payment_fee_percent}
+          platformFeePercent={SERVICE_REQUEST_PLATFORM_FEE_PERCENT}
+          paymentFeePercent={0}
           currency={currency}
           breakdown={summaryBreakdown}
           showCouponSection={true}
@@ -1058,7 +1119,7 @@ const RequestTracking = () => {
           couponMessage={couponMessage}
         />
 
-        {(status === "completed" || status === "paid" || (paymentCompleted && status === "payment_pending")) && (
+        {paymentCompleted && (status === "completed" || status === "paid" || status === "payment_pending") && (
           <ClientJobCompletion
             technicianName={technician?.name || "Technician"}
             onSubmitReview={() => {
@@ -1103,9 +1164,14 @@ const RequestTracking = () => {
             {shouldShowAmount ? (
               <AmountCard
                 amount={finalAmount}
+                technicianAmount={amountCardDetails.baseAmount}
+                platformFee={amountCardDetails.platformFee}
+                razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
+                total={amountCardDetails.finalAmount}
+                paymentMode={amountCardDetails.paymentMode}
                 currency={currency}
                 title="Final Amount"
-                helperText="Confirmed service amount before payment."
+                helperText="Live payment breakdown from your current service request."
                 badgeText={null}
               />
             ) : null}
@@ -1134,8 +1200,8 @@ const RequestTracking = () => {
         baseAmount={requestAmount}
         isProcessing={isProcessingPayment}
         paymentMethod={selectedPaymentMethod}
-        platformFeePercent={pricingConfig?.platform_fee_percent}
-        paymentFeePercent={pricingConfig?.payment_fee_percent}
+        platformFeePercent={SERVICE_REQUEST_PLATFORM_FEE_PERCENT}
+        paymentFeePercent={0}
         currency={currency}
         breakdown={summaryBreakdown}
         showCouponSection={true}

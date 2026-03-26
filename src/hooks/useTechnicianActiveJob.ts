@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, readJsonSafely } from "@/lib/api";
 import { useSocket } from "@/contexts/SocketContext";
 import { normalizeTechnicianStatus } from "@/utils/technicianStatus";
+import { resolveServiceRequestPaymentDetails } from "@/utils/serviceRequestPayment";
 
 const EMPTY_VALUE_TOKENS = new Set(["not available", "n/a", "na", "null", "undefined", "no phone number"]);
 
@@ -65,7 +66,10 @@ const normalizeJob = (job: any) => {
     job.destinationLongitude ?? job.destination_longitude ?? job.destination_lng
   );
   const serviceDescription = toOptionalString(job.service?.description ?? job.description);
-  const amount = toOptionalNumber(job.amount ?? job.service_charge ?? job.serviceCharge);
+  const paymentDetails = resolveServiceRequestPaymentDetails(job);
+  const amount = toOptionalNumber(
+    job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
+  );
   const cancellationReason = toOptionalString(job.cancellation_reason ?? job.reason);
   const cancelledAt = toOptionalString(job.cancelled_at ?? job.cancelledAt);
 
@@ -84,6 +88,18 @@ const normalizeJob = (job: any) => {
     destinationLatitude,
     destinationLongitude,
     amount,
+    baseAmount: paymentDetails.baseAmount,
+    base_amount: paymentDetails.baseAmount,
+    platformFee: paymentDetails.platformFee,
+    platform_fee: paymentDetails.platformFee,
+    razorpayFee: paymentDetails.razorpayFee,
+    razorpay_fee: paymentDetails.razorpayFee,
+    paymentMode: paymentDetails.paymentMode,
+    payment_mode: paymentDetails.paymentMode,
+    finalAmount: paymentDetails.finalAmount,
+    final_amount: paymentDetails.finalAmount,
+    dueAmount: paymentDetails.dueAmount,
+    due_amount: paymentDetails.dueAmount,
     address,
     cancellation_reason: cancellationReason,
     cancelled_at: cancelledAt,
@@ -216,7 +232,7 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
           data?.cancellation_reason ?? data?.reason ?? prev?.cancellation_reason
         );
 
-        return {
+        return normalizeJob({
           ...prev,
           status: nextStatus,
           jobStatus: nextStatus,
@@ -238,7 +254,7 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
             name: nextCustomerName ?? prev.user?.name ?? prev.contact_name ?? null,
             phone: nextPhone ?? prev.user?.phone ?? prev.contact_phone ?? null,
           },
-        };
+        }) ?? prev;
       });
       if (
         ["paid", "completed", "job_completed", "cancelled", "cancelled_by_user", "rejected"].includes(

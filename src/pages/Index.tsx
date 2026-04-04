@@ -19,7 +19,7 @@ const MsmeAccreditationCard = () => (
 
     <div className="relative flex items-center gap-4">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-50 to-white shadow-sm ring-1 ring-slate-200">
-        <img src="../assets/msme-logo.png" alt="MSME Certified" className="h-14 w-14 object-contain" />
+        <img src="../../assets/msme-logo.png" alt="MSME Certified" className="h-14 w-14 object-contain" />
       </div>
       <div>
         <div className="mb-1 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-blue-700">

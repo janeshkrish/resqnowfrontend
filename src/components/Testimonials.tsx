@@ -1,164 +1,128 @@
-import { StarIcon, Quote } from "lucide-react";
-import { useState } from "react";
-import { Carousel, CarouselContent, CarouselItem } from "./ui/carousel";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import { Quote, StarIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
-const testimonials = [
+const reviews = [
   {
-    id: 1,
-    name: "Sarah Johnson",
-    location: "New York, NY",
-    rating: 5,
-    testimonial: "I was stranded on the highway with a flat tire. SwiftAssist arrived in just 20 minutes and got me back on the road quickly. Amazing service!",
-    service: "Flat Tire Repair",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg"
+    name: "Arun Kumar",
+    location: "Gandhipuram, Coimbatore",
+    text: "My bike broke down near Gandhipuram. The service was quick and the technician was very helpful!",
+    image: "/users/user1.jpg",
   },
   {
-    id: 2,
-    name: "Michael Chen",
-    location: "Los Angeles, CA",
-    rating: 5,
-    testimonial: "Battery died in a parking lot late at night. Their technician was professional, fast, and got my car started in minutes. Would definitely recommend!",
-    service: "Battery Jumpstart",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg"
+    name: "Dhinakaran A",
+    location: "Peelamedu, Coimbatore",
+    text: "Battery issue was fixed within 20 minutes. Very professional service.",
+    image: "/users/user2.jpg",
   },
   {
-    id: 3,
-    name: "Emily Rodriguez",
-    location: "Chicago, IL",
-    rating: 4,
-    testimonial: "Locked my keys in the car with my toddler's car seat inside. The technician arrived quickly and helped me get back in without any damage. Very grateful!",
-    service: "Lockout Assistance",
-    avatar: "https://randomuser.me/api/portraits/women/68.jpg"
+    name: "Karthik R",
+    location: "RS Puram, Coimbatore",
+    text: "Fast response and affordable pricing. Great experience overall.",
+    image: "/users/user3.jpg",
   },
-  {
-    id: 4,
-    name: "David Williams",
-    location: "Houston, TX",
-    rating: 5,
-    testimonial: "My car broke down miles from home. The towing service was prompt and the driver was incredibly helpful. They took great care of my vehicle.",
-    service: "Towing Services",
-    avatar: "https://randomuser.me/api/portraits/men/75.jpg"
-  }
-];
+] as const;
 
-const Testimonials = () => {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const isMobile = useIsMobile();
+export default function Testimonials() {
+  const [index, setIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setIndex((prev) => (prev + 1) % reviews.length);
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const review = reviews[index];
 
   return (
-    <section>
-      <div className="container px-4 md:px-6">
-        <div className="mb-10 md:mb-16 text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 rounded-full mb-6 border border-amber-100 dark:border-amber-500/20">
-             <StarIcon className="w-4 h-4 text-amber-500" />
-             <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">Customer Stories</span>
+    <section className="w-full">
+      <div className="mx-auto max-w-2xl px-4 md:px-6">
+        <div className="mb-8 text-center md:mb-10">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5">
+            <StarIcon className="h-4 w-4 fill-amber-400 text-amber-400" />
+            <span className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">
+              Coimbatore Reviews
+            </span>
           </div>
-          <h2 className="text-3xl md:text-5xl font-black text-foreground tracking-tight mb-4">
-            Loved by thousands.
+          <h2 className="text-3xl font-black tracking-tight text-foreground md:text-4xl">
+            Trusted by drivers across Coimbatore.
           </h2>
-          <p className="text-base md:text-xl text-slate-500 dark:text-slate-400 font-medium">
-            Real stories from drivers we've helped get back on the road.
+          <p className="mt-3 text-sm font-medium text-slate-500 md:text-base">
+            Real roadside assistance stories from Gandhipuram, Peelamedu, and RS Puram.
           </p>
         </div>
 
-        {isMobile ? (
-          <Carousel className="w-full" opts={{ loop: true, align: "center", dragFree: true }}>
-            <CarouselContent className="-ml-3 pb-8">
-              {testimonials.map((testimonial) => (
-                <CarouselItem key={testimonial.id} className="pl-3 basis-[85%]">
-                  <div className="bg-card dark:bg-slate-900 rounded-[2rem] p-7 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-border/60 h-full flex flex-col relative overflow-hidden group">
-                    <Quote className="absolute -top-4 -right-4 h-28 w-28 text-slate-50 transform rotate-12 transition-transform group-hover:scale-110 duration-500" />
-
-                    <div className="relative z-10 flex-grow">
-                      <div className="flex items-center gap-1 mb-5">
-                        {[...Array(5)].map((_, i) => (
-                          <StarIcon
-                            key={i}
-                            className={cn(
-                              "h-4 w-4",
-                              i < testimonial.rating ? "text-amber-400 fill-amber-400 drop-shadow-sm" : "text-slate-200"
-                            )}
-                          />
-                        ))}
-                      </div>
-                      <p className="text-muted-foreground font-medium leading-relaxed mb-6">
-                        "{testimonial.testimonial}"
-                      </p>
-                    </div>
-
-                    <div className="relative z-10 flex items-center gap-4 mt-auto pt-5 border-t border-border/80">
-                       <img
-                        src={testimonial.avatar}
-                        alt={testimonial.name}
-                        className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-sm"
-                      />
-                      <div>
-                        <h4 className="font-bold text-foreground text-sm">{testimonial.name}</h4>
-                        <p className="text-muted-foreground/80 text-xs font-medium">{testimonial.location}</p>
-                      </div>
-                    </div>
+        <div className="mx-auto max-w-xl">
+          <div
+            key={review.image}
+            className="rounded-2xl bg-white p-5 shadow-md transition-all duration-500 ease-in-out animate-in fade-in-0 slide-in-from-right-3 md:p-6"
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {failedImages[review.image] ? (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-red-400 to-blue-500 text-base font-semibold text-white">
+                    {review.name[0]}
                   </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {testimonials.map((testimonial, index) => (
-              <div
-                key={testimonial.id}
-                className="bg-white dark:bg-card rounded-[2rem] p-8 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100 dark:border-slate-800/60 hover:border-transparent transition-all duration-300 relative overflow-hidden group flex flex-col h-full hover:-translate-y-2"
-                onMouseEnter={() => setActiveIndex(index)}
-                onMouseLeave={() => setActiveIndex(null)}
-              >
-                <Quote className={cn(
-                  "absolute -top-6 -right-6 h-32 w-32 text-slate-50 dark:text-slate-800/30 transform rotate-12 transition-transform duration-500",
-                  activeIndex === index && "scale-110 text-slate-100 dark:text-slate-800/50"
-                )} />
+                ) : (
+                  <img
+                    src={review.image}
+                    alt={review.name}
+                    className="h-12 w-12 rounded-full object-cover shadow-sm"
+                    onError={() =>
+                      setFailedImages((prev) => ({
+                        ...prev,
+                        [review.image]: true,
+                      }))
+                    }
+                  />
+                )}
 
-                <div className="relative z-10 flex-grow">
-                  <div className="flex items-center gap-1 mb-6">
-                    {[...Array(5)].map((_, i) => (
-                      <StarIcon
-                        key={i}
-                        className={cn(
-                          "h-5 w-5",
-                          i < testimonial.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"
-                        )}
-                      />
-                    ))}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="font-semibold text-gray-800">{review.name}</h4>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">
+                      ✔ Verified
+                    </span>
                   </div>
-
-                  <p className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed mb-8 text-lg">
-                    "{testimonial.testimonial}"
-                  </p>
-                </div>
-
-                <div className="relative z-10 flex items-center gap-4 mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
-                  <div className={cn(
-                    "relative w-12 h-12 rounded-full overflow-hidden border-2 transition-all duration-300",
-                    activeIndex === index ? "border-amber-400 scale-105 shadow-md" : "border-slate-100 dark:border-slate-800"
-                  )}>
-                    <img
-                      src={testimonial.avatar}
-                      alt={testimonial.name}
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100">{testimonial.name}</h4>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-0.5">{testimonial.location}</p>
-                  </div>
+                  <p className="text-xs text-gray-500">{review.location}</p>
                 </div>
               </div>
-            ))}
+
+              <Quote className="h-5 w-5 shrink-0 text-slate-200" />
+            </div>
+
+            <div className="mb-3 flex items-center gap-1">
+              {Array.from({ length: 5 }).map((_, starIndex) => (
+                <StarIcon
+                  key={starIndex}
+                  className="h-4 w-4 fill-amber-400 text-amber-400"
+                />
+              ))}
+            </div>
+
+            <p className="text-sm leading-7 text-gray-600">{review.text}</p>
           </div>
-        )}
+        </div>
+
+        <div className="mt-5 flex items-center justify-center gap-2">
+          {reviews.map((item, dotIndex) => {
+            const isActive = dotIndex === index;
+            return (
+              <button
+                key={item.image}
+                type="button"
+                aria-label={`Show review ${dotIndex + 1}`}
+                onClick={() => setIndex(dotIndex)}
+                className={`h-2.5 rounded-full transition-all duration-500 ease-in-out ${
+                  isActive ? "w-8 bg-slate-900" : "w-2.5 bg-slate-300 hover:bg-slate-400"
+                }`}
+              />
+            );
+          })}
+        </div>
       </div>
     </section>
   );
-};
-
-export default Testimonials;
+}

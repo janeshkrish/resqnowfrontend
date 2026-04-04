@@ -17,11 +17,14 @@ const MsmeAccreditationCard = () => (
     <img
       src={msmeLogo}
       alt="MSME Certified"
-      className="h-10 w-10 shrink-0 object-contain"
+      className="h-16 w-16 shrink-0 object-contain"
     />
-    <h3 className="min-w-0 text-sm font-semibold tracking-wide text-gray-800">
-      MSME Certified Service Provider
-    </h3>
+    <div>
+      <h3 className="text-sm font-semibold tracking-wide text-gray-800">
+        MSME Certified Startup
+      </h3>
+      <p className="text-xs text-gray-500">Government of India Recognized</p>
+    </div>
   </section>
 );
 

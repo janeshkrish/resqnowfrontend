@@ -13,7 +13,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { Users, Wrench, TrendingUp, Activity } from "lucide-react";
+import { Users, Wrench, TrendingUp, Activity, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api";
@@ -235,8 +235,14 @@ const AdminAnalytics = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-        <p className="text-muted-foreground">Platform performance and insights</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          {(loading || refreshing) ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : null}
+        </div>
+        <p className="text-muted-foreground">
+          Platform performance and insights
+          {refreshing ? " • Refreshing live data" : ""}
+        </p>
       </div>
 
       {error ? (

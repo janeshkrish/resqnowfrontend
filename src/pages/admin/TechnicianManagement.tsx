@@ -178,23 +178,23 @@ const TechnicianManagement = () => {
   };
 
   return (
-    <div className="container py-8">
-      <div className="mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="container max-w-full overflow-hidden px-4 py-6 md:px-6 md:py-8">
+      <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <h1 className="text-2xl font-bold">Technician Management</h1>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative">
+        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:items-center md:gap-4">
+          <div className="relative w-full md:w-auto">
             <Input
               type="search"
               placeholder="Search technicians..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pr-10 w-64"
+              className="w-full pr-10 md:w-64"
             />
             <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/80" />
           </div>
 
           <Select value={filter} onValueChange={handleFilterChange}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full md:w-[150px]">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
@@ -206,7 +206,7 @@ const TechnicianManagement = () => {
             </SelectContent>
           </Select>
 
-          <Button onClick={() => navigate("/admin/technicians/add")}>
+          <Button onClick={() => navigate("/admin/technicians/add")} className="w-full md:w-auto">
             <UserPlus className="h-4 w-4 mr-2" />
             Add Technician
           </Button>

@@ -231,7 +231,7 @@ export default function AdminExtendedNotificationsPage() {
   };
 
   return (
-    <section className="space-y-4">
+    <section className="max-w-full overflow-hidden space-y-4">
       <header>
         <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Notification Broadcast</h1>
         <p className="text-sm text-slate-500">Send announcements to all users or targeted technicians.</p>
@@ -384,12 +384,12 @@ export default function AdminExtendedNotificationsPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-col gap-2 md:flex-row md:flex-wrap">
           <button
             type="button"
             onClick={() => sendBroadcast("system")}
             disabled={sending}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 md:w-auto"
           >
             <BellRing className="h-4 w-4" /> Send System Announcement
           </button>
@@ -397,7 +397,7 @@ export default function AdminExtendedNotificationsPage() {
             type="button"
             onClick={() => sendBroadcast("technician")}
             disabled={sending || isFilteringTechnicians}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 md:w-auto"
           >
             <Send className="h-4 w-4" /> Send Technician Broadcast
           </button>
@@ -405,7 +405,7 @@ export default function AdminExtendedNotificationsPage() {
             type="button"
             onClick={() => sendBroadcast("emergency")}
             disabled={sending}
-            className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60 md:w-auto"
           >
             <AlertTriangle className="h-4 w-4" /> Send Emergency Message
           </button>

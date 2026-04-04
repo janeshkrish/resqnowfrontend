@@ -13,7 +13,9 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  Shield
+  Menu,
+  Shield,
+  X,
 } from "lucide-react";
 import { apiFetch, FRONTEND_ONLY_MODE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ const AdminDashboardLayout = () => {
   const { logoutAdmin } = useAdminAuth();
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
   // Notification State
@@ -144,15 +147,18 @@ const AdminDashboardLayout = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="flex min-h-screen bg-muted/10">
-      {/* Sidebar - fixed on mobile, relative on desktop */}
+    <div className="flex min-h-screen overflow-x-hidden bg-muted/10">
       <aside
         className={cn(
-          "bg-card border-r border-border transition-all duration-300 ease-in-out flex-shrink-0",
-          "fixed md:relative z-40 h-screen md:h-auto md:min-h-screen",
-          isSidebarCollapsed ? "w-16" : "w-64 md:w-64",
-          "md:block"
+          "fixed inset-y-0 left-0 z-40 flex h-screen max-w-[85vw] flex-col border-r border-border bg-card transition-all duration-300 ease-in-out",
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
+          isSidebarCollapsed ? "md:w-16" : "md:w-64",
+          "w-72 md:sticky md:top-0 md:max-w-none md:translate-x-0"
         )}
       >
         <div className="p-4 border-b border-border flex items-center justify-between">
@@ -166,8 +172,16 @@ const AdminDashboardLayout = () => {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleSidebar}
-            className={cn("ml-auto", isSidebarCollapsed && "mx-auto")}
+            className={cn("ml-auto hidden md:inline-flex", isSidebarCollapsed && "md:mx-auto")}
           >
             {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
@@ -177,6 +191,7 @@ const AdminDashboardLayout = () => {
           <div className="space-y-1 px-3">
             <Link
               to="/admin/dashboard"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/dashboard")
@@ -190,6 +205,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/technicians"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/technicians") || isActive("/admin/technician/")
@@ -203,6 +219,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/users"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/users")
@@ -216,6 +233,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/applications"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/applications")
@@ -239,6 +257,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/analytics"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/analytics")
@@ -252,6 +271,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/payments"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/payments")
@@ -265,6 +285,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/payouts"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/payouts")
@@ -278,6 +299,7 @@ const AdminDashboardLayout = () => {
 
             <Link
               to="/admin/settings"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/settings")
@@ -292,6 +314,7 @@ const AdminDashboardLayout = () => {
             {/* Extended Tools Link */}
             <Link
               to="/admin/extended/dashboard"
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
                 isActive("/admin/extended")
@@ -307,7 +330,7 @@ const AdminDashboardLayout = () => {
 
         <div className="p-4 border-t border-border">
           <Button variant="outline" className="w-full justify-start" asChild>
-            <Link to="/">
+            <Link to="/" onClick={() => setMobileSidebarOpen(false)}>
               <LogOut className="w-4 h-4 mr-2" />
               {!isSidebarCollapsed && <span>Exit Admin</span>}
             </Link>
@@ -315,22 +338,17 @@ const AdminDashboardLayout = () => {
         </div>
       </aside>
 
-      {/* Main content - add left margin on desktop to prevent sidebar overlap */}
-      <div className={cn(
-        "flex-1 flex flex-col transition-all duration-300 min-w-0",
-        !isSidebarCollapsed ? "md:ml-64" : "md:ml-16"
-      )}>
-        {/* Top nav */}
-        <header className="border-b border-border bg-card h-14 md:h-16 flex items-center px-4 md:px-6 sticky top-0 z-10">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border bg-card px-4 md:h-16 md:px-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={toggleSidebar}
+                onClick={() => setMobileSidebarOpen((prev) => !prev)}
                 className="md:hidden"
               >
-                <ChevronRight className="h-4 w-4" />
+                <Menu className="h-4 w-4" />
               </Button>
               <h1 className="text-lg font-semibold">Admin Dashboard</h1>
             </div>
@@ -434,17 +452,15 @@ const AdminDashboardLayout = () => {
           </div>
         </header>
 
-        {/* Content area - proper padding to prevent overlap */}
-        <main className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6 pb-20 md:pb-6">
+        <main className="max-w-full flex-1 overflow-x-hidden overflow-y-auto bg-muted/20 p-4 pb-20 md:p-6 md:pb-6">
           <Outlet />
         </main>
       </div>
 
-      {/* Mobile overlay */}
-      {!isSidebarCollapsed && (
+      {mobileSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-30 md:hidden"
-          onClick={() => setIsSidebarCollapsed(true)}
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
         />
       )}
     </div>

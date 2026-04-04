@@ -18,9 +18,14 @@ const FRONTEND_ONLY_ENV = String(import.meta.env.VITE_FRONTEND_ONLY ?? "")
   .trim()
   .toLowerCase();
 
-export const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+const DEFAULT_API_BASE_URL = "https://resqnowbackend.onrender.com";
+const ENV_API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+
 export const FRONTEND_ONLY_MODE =
   FRONTEND_ONLY_ENV === "true" || FRONTEND_ONLY_ENV === "1";
+export const API_BASE_URL = FRONTEND_ONLY_MODE
+  ? ENV_API_BASE_URL
+  : ENV_API_BASE_URL || DEFAULT_API_BASE_URL;
 
 const DEMO_USER_TOKEN = "demo-user-token";
 const DEMO_TECH_TOKEN = "demo-tech-token";
@@ -1202,9 +1207,7 @@ installMockFetch();
 export function getRequiredApiBaseUrl(): string {
   if (API_BASE_URL) return API_BASE_URL;
   if (FRONTEND_ONLY_MODE) return runtimeOrigin();
-  throw new Error(
-    "Missing VITE_API_URL. Set it in Netlify env (example: https://your-render-service.onrender.com)."
-  );
+  return DEFAULT_API_BASE_URL;
 }
 
 export function apiUrl(path: string): string {

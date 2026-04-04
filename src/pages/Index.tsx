@@ -10,27 +10,18 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import { MapPin, Search, ArrowRight, Bell, Briefcase, Download, Smartphone } from "lucide-react";
 import { apiUrl } from "@/lib/api";
+import msmeLogo from "../../assets/msme-logo.png";
 
 const MsmeAccreditationCard = () => (
-  <section className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl">
-    <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-red-500 via-rose-500 to-blue-600" />
-    <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-blue-100/70 blur-2xl transition-transform duration-300 group-hover:scale-110" />
-    <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-red-100/80 blur-2xl transition-transform duration-300 group-hover:scale-110" />
-
-    <div className="relative flex items-center gap-4">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-50 to-white shadow-sm ring-1 ring-slate-200">
-        <img src="../../assets/msme-logo.png" alt="MSME Certified" className="h-14 w-14 object-contain" />
-      </div>
-      <div>
-        <div className="mb-1 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-blue-700">
-          Trusted Provider
-        </div>
-        <h3 className="text-lg font-semibold text-slate-800">MSME Certified Service Provider</h3>
-        <p className="text-sm text-slate-500">
-          Recognized under Government of India MSME initiative for trusted roadside assistance services.
-        </p>
-      </div>
-    </div>
+  <section className="my-6 flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+    <img
+      src={msmeLogo}
+      alt="MSME Certified"
+      className="h-10 w-10 shrink-0 object-contain"
+    />
+    <h3 className="min-w-0 text-sm font-semibold tracking-wide text-gray-800">
+      MSME Certified Service Provider
+    </h3>
   </section>
 );
 

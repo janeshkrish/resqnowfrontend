@@ -82,7 +82,6 @@
     "mysql2": "^3.17.4",
     "next-themes": "^0.3.0",
     "node-fetch": "^3.3.2",
-    "nodemailer": "^7.0.13",
     "pg": "^8.18.0",
     "razorpay": "^2.9.6",
     "react": "^18.3.1",

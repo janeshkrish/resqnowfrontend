@@ -11,6 +11,7 @@ import {
   Home,
   LogOut,
   Bell,
+  Mail,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -295,6 +296,20 @@ const AdminDashboardLayout = () => {
             >
               <HandCoins className="w-5 h-5 mr-3" />
               {!isSidebarCollapsed && <span>Payouts</span>}
+            </Link>
+
+            <Link
+              to="/admin/email-templates"
+              onClick={() => setMobileSidebarOpen(false)}
+              className={cn(
+                "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
+                isActive("/admin/email-templates")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Mail className="w-5 h-5 mr-3" />
+              {!isSidebarCollapsed && <span>Email Templates</span>}
             </Link>
 
             <Link

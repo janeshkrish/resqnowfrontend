@@ -127,6 +127,49 @@ const defaultUsers = () => [
   { id: 1, full_name: "Demo User", email: "demo@resqnow.app", email_confirmed: true, created_at: nowIso() },
 ];
 
+const defaultEmailTemplates = () => [
+  {
+    eventType: "USER_REGISTER",
+    subject: "Welcome to ResQNow",
+    content: "<h2>Hi {{name}}</h2><p>Welcome to ResQNow! We're excited to have you.</p>",
+  },
+  {
+    eventType: "TECHNICIAN_REGISTER",
+    subject: "Welcome to ResQNow Technician Network",
+    content: "<p>Hi {{name}}, your technician account has been created with ResQNow.</p>",
+  },
+  {
+    eventType: "TECHNICIAN_APPLICATION_SUBMITTED",
+    subject: "Application Received",
+    content: "<p>Hi {{name}}, our team will review your application and contact you soon.</p>",
+  },
+  {
+    eventType: "TECHNICIAN_APPLICATION_APPROVED",
+    subject: "Application Approved",
+    content: "<p>Congrats {{name}}, your application is approved!</p>",
+  },
+  {
+    eventType: "TECHNICIAN_APPLICATION_REJECTED",
+    subject: "Application Update",
+    content: "<p>Hi {{name}}, your application has been rejected.</p>",
+  },
+  {
+    eventType: "ADMIN_NEW_TECHNICIAN_APPLICATION",
+    subject: "New Technician Application",
+    content: "<p>{{name}} submitted a technician application.</p><p>Email: {{applicantEmail}}</p>",
+  },
+  {
+    eventType: "ADMIN_NEW_USER_REQUEST",
+    subject: "New User Request",
+    content: "<p>A new service request was created.</p><p>Request ID: {{requestId}}</p><p>Service: {{serviceType}}</p><p>User: {{name}}</p>",
+  },
+  {
+    eventType: "ADMIN_TECHNICIAN_ASSIGNED",
+    subject: "Technician Assigned",
+    content: "<p>A technician has been assigned to a user request.</p><p>Request ID: {{requestId}}</p><p>Technician: {{technicianName}}</p><p>User: {{name}}</p>",
+  },
+];
+
 const MOCK_PRICING_CONFIG = {
   currency: "INR",
   platform_fee_percent: 0.1,
@@ -189,6 +232,8 @@ const getRequests = () => readStore("resqnow_mock_requests", defaultRequests());
 const setRequests = (value: AnyRecord[]) => writeStore("resqnow_mock_requests", value);
 const getUsers = () => readStore("resqnow_mock_users", defaultUsers());
 const setUsers = (value: AnyRecord[]) => writeStore("resqnow_mock_users", value);
+const getEmailTemplates = () => readStore("resqnow_mock_email_templates", defaultEmailTemplates());
+const setEmailTemplates = (value: AnyRecord[]) => writeStore("resqnow_mock_email_templates", value);
 const getVehicles = () =>
   readStore("resqnow_mock_vehicles", [
     { id: 1, type: "car", make: "Hyundai", model: "i20", license_plate: "KA01DEMO1", status: "ready" },
@@ -421,6 +466,32 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
 
   if (path === "/api/admin/login" && method === "POST") return json({ token: DEMO_ADMIN_TOKEN, admin: { id: "demo-admin-1", email: "admin@resqnow.app", name: "Demo Admin", role: "super_admin" } });
   if (path === "/api/admin/users" && method === "GET") return json(getUsers());
+  if (path === "/api/admin/email-templates" && method === "GET") return json(getEmailTemplates());
+  const adminEmailTemplateMatch = path.match(/^\/api\/admin\/email-templates\/([^/]+)$/);
+  if (adminEmailTemplateMatch && method === "PUT") {
+    const eventType = decodeURIComponent(adminEmailTemplateMatch[1] || "").trim().toUpperCase();
+    const templates = getEmailTemplates();
+    const next = templates.map((item) =>
+      String(item.eventType || "").toUpperCase() === eventType
+        ? {
+            ...item,
+            eventType,
+            subject: String(body.subject || ""),
+            content: String(body.content || ""),
+          }
+        : item
+    );
+    const exists = next.some((item) => String(item.eventType || "").toUpperCase() === eventType);
+    const updated = exists
+      ? next
+      : next.concat({
+          eventType,
+          subject: String(body.subject || ""),
+          content: String(body.content || ""),
+        });
+    setEmailTemplates(updated);
+    return json(updated.find((item) => String(item.eventType || "").toUpperCase() === eventType));
+  }
   if (path === "/api/admin/users" && method === "POST") {
     const users = getUsers();
     users.push({ id: users.length + 1, full_name: body.name || "New User", email: body.email || `user${users.length + 1}@resqnow.app`, email_confirmed: true, created_at: nowIso() });

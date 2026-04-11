@@ -84,6 +84,7 @@ const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminPaymentLogs = lazy(() => import("./pages/admin/AdminPaymentLogs"));
 const AdminPayouts = lazy(() => import("./pages/admin/AdminPayouts"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const EmailTemplates = lazy(() => import("./pages/admin/EmailTemplates"));
 const TechnicianApplications = lazy(() => import("./pages/admin/TechnicianApplications"));
 const TechnicianDetails = lazy(() => import("./pages/admin/TechnicianDetails"));
 const AddTechnician = lazy(() => import("./pages/admin/AddTechnician"));
@@ -299,6 +300,7 @@ const App = () => {
                               <Route path="analytics" element={<AdminAnalytics />} />
                               <Route path="payments" element={<AdminPaymentLogs />} />
                               <Route path="payouts" element={<AdminPayouts />} />
+                              <Route path="email-templates" element={<EmailTemplates />} />
                               <Route path="settings" element={<AdminSettings />} />
                               <Route path="technician/:technicianId" element={<TechnicianDetails />} />
                             </Route>

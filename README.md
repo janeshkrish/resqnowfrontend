@@ -111,7 +111,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
     ```bash
     npm run dev
     ```
-    _App runs on `http://localhost:8080`_
+    _App runs on `http://localhost:8080`_ 
 
 ## Netlify Deployment (Frontend)
 
@@ -120,10 +120,10 @@ Use these settings in Netlify:
 ```txt
 Framework preset: Vite
 Build command: npm run build
-Build output directory: dist
+Build output directory: dist 
 ```
 
-Set these environment variables in Netlify:
+Set these environment variables in Vercel:
 
 ```txt
 VITE_API_URL=https://your-render-backend.onrender.com

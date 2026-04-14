@@ -781,7 +781,10 @@ const RequestTracking = () => {
       >
         <div className="absolute inset-0 z-0">
           {status === "pending" ? (
-            <FindingTechnician vehicleType={request?.vehicle_type} />
+            <FindingTechnician 
+              vehicleType={request?.vehicle_type} 
+              serviceType={request?.service_type} 
+            />
           ) : (
             <LiveTrackingMap
               techLocation={

@@ -103,15 +103,15 @@ const Contact = () => {
               <ul className="space-y-4 text-muted-foreground">
                 <li className="flex items-start gap-3">
                   <MapPin className="mt-1" />
-                  <div>123 ResQ Street, Bengaluru, Karnataka</div>
+                  <div>KGISL Institute of Technology, KGISL Campus,Thudiyalur Road, Saravanampatti,Coimbatore -641 035</div>
                 </li>
                 <li className="flex items-start gap-3">
                   <Phone className="mt-1" />
-                  <div><a href="tel:+919876543210" className="hover:text-red-500">+91 98765 43210</a></div>
+                  <div><a href="tel:+919566510080" className="hover:text-red-500">+91 9566510080</a></div>
                 </li>
                 <li className="flex items-start gap-3">
                   <Mail className="mt-1" />
-                  <div><a href="mailto:support@resqnow.com" className="hover:text-red-500">support@resqnow.com</a></div>
+                  <div><a href="mailto:support@resqnow.com" className="hover:text-red-500">resqnow01@gmail.com</a></div>
                 </li>
                 <li className="flex items-start gap-3">
                   <Clock className="mt-1" />

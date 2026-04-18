@@ -61,11 +61,7 @@ const TechnicianManagement = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTechnicians();
-  }, [filter]);
-
-  const fetchTechnicians = async () => {
+  const fetchTechnicians = React.useCallback(async () => {
     setLoading(true);
     try {
       const status = statusToApi[filter];
@@ -80,7 +76,11 @@ const TechnicianManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter]);
+
+  useEffect(() => {
+    void fetchTechnicians();
+  }, [fetchTechnicians]);
 
   const handleEditClick = (tech: Technician) => {
     setEditingTech(tech);
@@ -132,12 +132,13 @@ const TechnicianManagement = () => {
         method: "DELETE",
         admin: true,
       });
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        toast.success("Technician deleted successfully");
-        setTechnicians(prev => prev.filter(t => t.id !== deletingId));
+        toast.success(data.message || "Deleted successfully");
+        await fetchTechnicians();
       } else {
-        toast.error("Failed to delete technician");
+        toast.error(data.message || data.error || "Failed to delete technician");
       }
     } catch (err) {
       toast.error("An error occurred");
@@ -165,7 +166,7 @@ const TechnicianManagement = () => {
     }
   };
 
-  const formatVehicleTypes = (vehicleTypes: any) => {
+  const formatVehicleTypes = (vehicleTypes: Record<string, unknown> | null | undefined) => {
     if (!vehicleTypes || typeof vehicleTypes !== "object") return "-";
     const selected = Object.entries(vehicleTypes)
       .filter(([, enabled]) => Boolean(enabled))

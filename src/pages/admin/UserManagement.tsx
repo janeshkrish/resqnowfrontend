@@ -59,13 +59,15 @@ const UserManagement = () => {
     if (!window.confirm(`Delete user "${email}"? This cannot be undone.`)) return;
     try {
       const res = await apiFetch(`/api/admin/users/${id}`, { method: "DELETE", admin: true });
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || "Failed to delete user.");
+        toast.error(data.message || data.error || "Failed to delete user.");
         return;
       }
-      toast.success("User deleted.");
-      fetchUsers();
+
+      toast.success(data.message || "Deleted successfully");
+      await fetchUsers();
     } catch {
       toast.error("Failed to delete user.");
     }
@@ -92,7 +94,7 @@ const UserManagement = () => {
 
     setIsUpdating(true);
     try {
-      const payload: any = { name: editForm.name.trim() };
+      const payload: { name: string; password?: string } = { name: editForm.name.trim() };
       if (editForm.password) {
         payload.password = editForm.password;
       }

@@ -1,34 +1,41 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
 import { toast } from "sonner";
-import { Loader2, MapPin, DollarSign, Briefcase, Navigation, PhoneCall, User, Car, AlertCircle, TrendingUp, Star, CreditCard } from "lucide-react";
+import { Loader2, MapPin, DollarSign, Navigation, PhoneCall, User, Car, Briefcase, CreditCard, Star } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
+import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsChart";
 import CancelledJobCard, { CancelledJobDetails } from "@/components/technician/CancelledJobCard";
 import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl, readJsonSafely } from "@/lib/api";
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
+import TechnicianDashboardOverview from "@/components/technician/dashboard/TechnicianDashboardOverview";
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
+import { useTechnicianTowingManagement } from "@/hooks/useTechnicianTowingManagement";
 import {
   formatTechnicianStatus,
   isTechnicianCompletionStatus,
   normalizeTechnicianStatus,
 } from "@/utils/technicianStatus";
+import {
+  buildEarningsBreakdown,
+  buildOrderOverviewCounts,
+  buildOrderPerformanceSummary,
+  buildRewardItems,
+  calculateRewardPoints,
+  countEnabledVehicleTypes,
+  getGreetingName,
+} from "@/utils/technicianDashboard";
+import { isTowingTechnician as isTowingTechnicianRole } from "@/utils/technicianRole";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
-
-// Restored imports for widgets
-import TechnicianJobHistory from "@/components/technician/TechnicianJobHistory";
-import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsChart"; // Ensure this matches file name
-import TechnicianReviews from "@/components/technician/TechnicianReviews"; // Ensure this matches file name
-import TechnicianNotifications from "@/components/technician/TechnicianNotifications"; // Ensure this matches file name
+import FleetManagementModule from "@/components/technician/dashboard/towing/FleetManagementModule";
+import TeamManagementModule from "@/components/technician/dashboard/towing/TeamManagementModule";
+import type { FleetVehicle, FleetVehicleInput, TeamEmployee, TeamEmployeeInput } from "@/types/towingManagement";
 
 const TechnicianDashboard = () => {
   const { technician, isOnline, setIsOnline, isLoading } = useTechnicianAuth();
@@ -52,7 +59,15 @@ const TechnicianDashboard = () => {
   const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
   const [isCancelled, setIsCancelled] = useState(false);
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
+  const [walletSummary, setWalletSummary] = useState<any | null>(null);
+  const [dashboardLanguage, setDashboardLanguage] = useState("en");
+  const [fleetDialogOpen, setFleetDialogOpen] = useState(false);
+  const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<TeamEmployee | null>(null);
   const isNativePlatform = Capacitor.isNativePlatform();
+  const isTowingOperator = isTowingTechnicianRole(technician);
+  const towingManagement = useTechnicianTowingManagement(isTowingOperator);
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
   const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
   const JOB_TAKEN_MESSAGE = "This job has already been taken by another technician.";
@@ -78,6 +93,14 @@ const TechnicianDashboard = () => {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedLanguage = String(localStorage.getItem("resqnow_technician_dashboard_language") || "en").trim().toLowerCase();
+    if (storedLanguage) {
+      setDashboardLanguage(storedLanguage);
+    }
   }, []);
 
   const stopAlertSound = () => {
@@ -314,14 +337,15 @@ const TechnicianDashboard = () => {
     // Fetch initial status, active job and stats
     const fetchData = async () => {
       try {
-        const [meRes, statsRes, historyRes, earningsRes, reviewsRes, notificationsRes, financialsRes] = await Promise.all([
+        const [meRes, statsRes, historyRes, earningsRes, reviewsRes, notificationsRes, financialsRes, walletRes] = await Promise.all([
           apiFetch("/api/technicians/me", { technician: true }),
           apiFetch("/api/technicians/dashboard-stats", { technician: true }),
           apiFetch("/api/technicians/requests", { technician: true }),
           apiFetch("/api/technicians/earnings-history", { technician: true }),
           apiFetch("/api/technicians/me/reviews", { technician: true }),
           apiFetch("/api/technicians/me/notifications", { technician: true }),
-          apiFetch("/api/technicians/me/financials", { technician: true })
+          apiFetch("/api/technicians/me/financials", { technician: true }),
+          apiFetch("/api/technicians/me/wallet", { technician: true })
         ]);
 
         let meData = null;
@@ -365,6 +389,11 @@ const TechnicianDashboard = () => {
         if (financialsRes && financialsRes.ok) {
           const data = await financialsRes.json();
           setFinancials(data);
+        }
+
+        if (walletRes && walletRes.ok) {
+          const data = await walletRes.json();
+          setWalletSummary(data);
         }
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
@@ -520,6 +549,14 @@ const TechnicianDashboard = () => {
         ...prev,
         total_earnings: data.totalEarnings
       }));
+      setWalletSummary((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              total_earnings: Number(data.totalEarnings ?? prev.total_earnings ?? 0),
+            }
+          : prev
+      );
 
       if (data?.newJobAmount != null && !Number.isNaN(Number(data.newJobAmount))) {
         toast.success("New earnings recorded!", {
@@ -535,6 +572,16 @@ const TechnicianDashboard = () => {
         total_earnings: Number(data.total_earnings ?? prev.total_earnings ?? 0),
         pending_dues: Number(data.pending_dues ?? prev.pending_dues ?? 0)
       }));
+      void apiFetch("/api/technicians/me/wallet", { technician: true })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((wallet) => {
+          if (wallet) {
+            setWalletSummary(wallet);
+          }
+        })
+        .catch(() => {
+          // Ignore transient wallet refresh failures.
+        });
     });
 
     // Listen for new reviews
@@ -655,12 +702,13 @@ const TechnicianDashboard = () => {
 
       if (['payment_pending', 'paid', 'completed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
         try {
-          const [activeJobRes, statsRes, historyRes, financialsRes, notificationsRes] = await Promise.all([
+          const [activeJobRes, statsRes, historyRes, financialsRes, notificationsRes, walletRes] = await Promise.all([
             apiFetch("/api/technicians/me/active-job", { technician: true }),
             apiFetch("/api/technicians/dashboard-stats", { technician: true }),
             apiFetch("/api/technicians/requests", { technician: true }),
             apiFetch("/api/technicians/me/financials", { technician: true }),
             apiFetch("/api/technicians/me/notifications", { technician: true }),
+            apiFetch("/api/technicians/me/wallet", { technician: true }),
           ]);
 
           if (activeJobRes.ok) {
@@ -690,6 +738,10 @@ const TechnicianDashboard = () => {
           if (notificationsRes.ok) {
             const notificationsData = await notificationsRes.json();
             setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+          }
+          if (walletRes.ok) {
+            const walletData = await walletRes.json();
+            setWalletSummary(walletData);
           }
         } catch (err) {
           console.warn("Failed to sync dashboard after status update:", err);
@@ -1542,66 +1594,231 @@ const TechnicianDashboard = () => {
     toggleAvailability(checked);
   };
 
+  const handleLanguageChange = (value: string) => {
+    const nextLanguage = String(value || "en").trim().toLowerCase() || "en";
+    setDashboardLanguage(nextLanguage);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("resqnow_technician_dashboard_language", nextLanguage);
+    }
+  };
+
+  const scrollToSection = (sectionId: string) => {
+    if (typeof document === "undefined") return;
+    const target = document.getElementById(sectionId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleFleetDialogOpenChange = (open: boolean) => {
+    setFleetDialogOpen(open);
+    if (!open) {
+      setSelectedVehicle(null);
+    }
+  };
+
+  const handleEmployeeDialogOpenChange = (open: boolean) => {
+    setEmployeeDialogOpen(open);
+    if (!open) {
+      setSelectedEmployee(null);
+    }
+  };
+
+  const openCreateVehicleDialog = () => {
+    setSelectedVehicle(null);
+    setFleetDialogOpen(true);
+  };
+
+  const openCreateEmployeeDialog = () => {
+    setSelectedEmployee(null);
+    setEmployeeDialogOpen(true);
+  };
+
+  const handleCreateVehicle = async (payload: FleetVehicleInput) => {
+    try {
+      await towingManagement.createVehicle(payload);
+      toast.success("Vehicle added to fleet.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add vehicle.");
+      throw error;
+    }
+  };
+
+  const handleUpdateVehicle = async (id: string, payload: FleetVehicleInput) => {
+    try {
+      await towingManagement.updateVehicle(id, payload);
+      toast.success("Fleet vehicle updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update vehicle.");
+      throw error;
+    }
+  };
+
+  const handleDeleteVehicle = async (vehicle: FleetVehicle) => {
+    if (!window.confirm(`Delete ${vehicle.vehicle_number} from your fleet?`)) return;
+
+    try {
+      await towingManagement.deleteVehicle(vehicle.id);
+      toast.success("Vehicle removed from fleet.");
+      if (selectedVehicle?.id === vehicle.id) {
+        handleFleetDialogOpenChange(false);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete vehicle.");
+    }
+  };
+
+  const handleCreateEmployee = async (payload: TeamEmployeeInput) => {
+    try {
+      await towingManagement.createEmployee(payload);
+      toast.success("Employee added to team.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add employee.");
+      throw error;
+    }
+  };
+
+  const handleUpdateEmployee = async (id: string, payload: TeamEmployeeInput) => {
+    try {
+      await towingManagement.updateEmployee(id, payload);
+      toast.success("Team member updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update employee.");
+      throw error;
+    }
+  };
+
+  const handleDeleteEmployee = async (employee: TeamEmployee) => {
+    if (!window.confirm(`Delete ${employee.name} from your team?`)) return;
+
+    try {
+      await towingManagement.deleteEmployee(employee.id);
+      toast.success("Employee removed from team.");
+      if (selectedEmployee?.id === employee.id) {
+        handleEmployeeDialogOpenChange(false);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete employee.");
+    }
+  };
+
+  const totalEarningsValue = Number(walletSummary?.total_earnings ?? financials.total_earnings ?? stats.earnings ?? 0);
+  const orderOverview = buildOrderOverviewCounts(jobHistory);
+  const orderPerformance = buildOrderPerformanceSummary(jobHistory);
+  const earningsBreakdown = buildEarningsBreakdown(walletSummary);
+  const pointsBalance = calculateRewardPoints({
+    totalEarnings: totalEarningsValue,
+    completedJobs: Number(stats.jobs || 0),
+  });
+  const rewardItems = buildRewardItems(pointsBalance);
+  const unreadNotifications = notifications.filter((notification: any) => !notification?.is_read).length;
+  const defaultFleetCount = countEnabledVehicleTypes(technician?.vehicle_types);
+  const defaultTeamCount = Number(
+    (technician as any)?.service_providers_count ??
+    (technician as any)?.team_members_count ??
+    (technician as any)?.sub_providers_count ??
+    (technician?.id ? 1 : 0)
+  );
+  const fleetCount = isTowingOperator ? towingManagement.vehicles.length : defaultFleetCount;
+  const teamCount = isTowingOperator ? towingManagement.employees.length : defaultTeamCount;
+  const technicianGreetingName = getGreetingName(
+    String((technician as any)?.proprietor_name || technician?.name || "").trim()
+  );
+  const technicianIdentifier = String(
+    (technician as any)?.technician_id || (technician as any)?.sp_id || technician?.id || ""
+  );
+
   return (
     <div className="min-h-screen bg-[#f3f4f6] pb-24 md:pb-8 selection:bg-primary/20 relative">
-      <div className="container max-w-md mx-auto px-4 pt-6 pb-24 space-y-5">
+      <div className="mx-auto max-w-7xl space-y-5 px-4 pb-24 pt-4 md:px-6 md:pt-6">
+        {showIdleDashboard ? (
+          <TechnicianDashboardOverview
+            showTowingManagement={isTowingOperator}
+            technicianName={technicianGreetingName}
+            technicianId={technicianIdentifier}
+            isOnline={isOnline}
+            pointsBalance={pointsBalance}
+            unreadNotifications={unreadNotifications}
+            language={dashboardLanguage}
+            notifications={notifications}
+            fleetCount={fleetCount}
+            teamCount={teamCount}
+            orderOverview={orderOverview}
+            orderPerformance={orderPerformance}
+            earnings={{
+              total: totalEarningsValue,
+              withdrawable: earningsBreakdown.withdrawable,
+              pending: earningsBreakdown.pending,
+              paid: earningsBreakdown.paid,
+              disputed: earningsBreakdown.disputed,
+            }}
+            rewardItems={rewardItems}
+            onToggleAvailability={handleToggleAvailability}
+            onOpenNotifications={() => scrollToSection("dashboard-notifications")}
+            onLanguageChange={handleLanguageChange}
+            onOpenUcp={() => navigate("/technician/profile?tab=profile")}
+            onManageFleet={() => scrollToSection("dashboard-fleet")}
+            onAddVehicle={() => {
+              scrollToSection("dashboard-fleet");
+              openCreateVehicleDialog();
+            }}
+            onViewHistory={() => navigate("/technician/history")}
+            onOpenFinancialReport={() => navigate("/technician/earnings")}
+            onManageTeam={() => scrollToSection("dashboard-team")}
+            onAddServiceProvider={() => {
+              scrollToSection("dashboard-team");
+              openCreateEmployeeDialog();
+            }}
+          />
+        ) : null}
 
-        {/* 1. MAP SECTION (NOW AT THE TOP) */}
-        {showIdleDashboard && (
-          <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-sm border border-border overflow-hidden relative">
-            {/* Map Placeholder when no active job */}
-            <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-[400]">
-              <div className="bg-card dark:bg-slate-900/90 backdrop-blur pb-1 pt-1.5 px-4 rounded-2xl shadow-sm border border-border">
-                <h3 className="font-black text-foreground text-sm tracking-tight uppercase">Live Map</h3>
-              </div>
-              {isOnline ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50/90 backdrop-blur rounded-full border border-green-100 shadow-sm">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">Active</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-card dark:bg-slate-900/90 backdrop-blur rounded-full border border-border shadow-sm">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full" />
-                  <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest">Paused</span>
-                </div>
-              )}
-            </div>
-            <div className="h-[300px] w-full relative">
-              <TechnicianJobMap
-                techLocation={currentLocation}
-                jobLocation={null}
-              />
-              {!isOnline && (
-                <div className="absolute inset-0 bg-card dark:bg-slate-900/60 backdrop-blur-[2px] z-[400] flex items-center justify-center">
-                  <div className="bg-card dark:bg-slate-900 shadow-xl px-6 py-3 rounded-full border border-border font-bold text-sm text-foreground flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-slate-400" /> Map Paused
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {showIdleDashboard && isTowingOperator ? (
+          <>
+            <FleetManagementModule
+              vehicles={towingManagement.vehicles}
+              isLoading={towingManagement.isVehiclesLoading}
+              isMutating={towingManagement.isMutating}
+              error={towingManagement.vehicleError}
+              dialogOpen={fleetDialogOpen}
+              selectedVehicle={selectedVehicle}
+              onDialogOpenChange={handleFleetDialogOpenChange}
+              onOpenCreate={openCreateVehicleDialog}
+              onEditVehicle={(vehicle) => {
+                setSelectedVehicle(vehicle);
+                setFleetDialogOpen(true);
+              }}
+              onDeleteVehicle={handleDeleteVehicle}
+              onRefresh={towingManagement.refreshVehicles}
+              onCreateVehicle={handleCreateVehicle}
+              onUpdateVehicle={handleUpdateVehicle}
+            />
 
-        {showIdleDashboard && (
-          <div className="flex justify-center">
-            <div className="w-[220px] bg-card dark:bg-slate-900 border border-border rounded-[20px] shadow-[0_4px_10px_rgba(0,0,0,0.08)] px-4 py-3 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Status</span>
-                <span className={`text-sm font-black ${isOnline ? "text-green-700" : "text-slate-500"}`}>
-                  {isOnline ? "ONLINE" : "OFFLINE"}
-                </span>
-              </div>
-              <Switch
-                checked={isOnline}
-                onCheckedChange={handleToggleAvailability}
-                className="data-[state=checked]:bg-green-600"
-              />
-            </div>
-          </div>
-        )}
+            <TeamManagementModule
+              employees={towingManagement.employees}
+              vehicles={towingManagement.vehicles}
+              isLoading={towingManagement.isEmployeesLoading}
+              isMutating={towingManagement.isMutating}
+              error={towingManagement.employeeError}
+              dialogOpen={employeeDialogOpen}
+              selectedEmployee={selectedEmployee}
+              onDialogOpenChange={handleEmployeeDialogOpenChange}
+              onOpenCreate={openCreateEmployeeDialog}
+              onEditEmployee={(employee) => {
+                setSelectedEmployee(employee);
+                setEmployeeDialogOpen(true);
+              }}
+              onDeleteEmployee={handleDeleteEmployee}
+              onRefresh={towingManagement.refreshEmployees}
+              onCreateEmployee={handleCreateEmployee}
+              onUpdateEmployee={handleUpdateEmployee}
+            />
+          </>
+        ) : null}
+
+
+
 
         {/* 2. QUICK MENU GRID SECTION */}
-        {showIdleDashboard && (
+        {false && showIdleDashboard && (
           <div className="grid grid-cols-2 gap-3">
             <Link to="/technician/earnings" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
               <div className="h-10 w-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-3 group-hover:scale-110 transition-transform">
@@ -1662,7 +1879,7 @@ const TechnicianDashboard = () => {
         )}
 
         {/* 3. BUSINESS ANALYTICS GRAPH (NEW POSITION) */}
-        {showIdleDashboard && Array.isArray(earningsHistory) && earningsHistory.length > 0 && (
+        {false && showIdleDashboard && Array.isArray(earningsHistory) && earningsHistory.length > 0 && (
           <div className="mb-4">
             <TechnicianEarningsChart data={earningsHistory} />
           </div>
@@ -1670,7 +1887,7 @@ const TechnicianDashboard = () => {
 
         {/* ACTIVE JOB HERO CARD */}
         {showActiveJobCard ? (
-          <div className="bg-card dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-border relative mb-4">
+          <div className="relative mx-auto mb-4 max-w-3xl overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/50 dark:bg-slate-900">
 
             {/* Live Map Header */}
             <div className="h-[220px] w-full relative bg-muted/50">
@@ -1826,7 +2043,7 @@ const TechnicianDashboard = () => {
         ) : showCancelledJobCard && visibleCancelledJob ? (
           <CancelledJobCard
             job={visibleCancelledJob}
-            className="mb-4"
+            className="mx-auto mb-4 max-w-3xl"
             onViewDetails={() => {
               setCancelledJob(null);
               navigate("/technician/history");

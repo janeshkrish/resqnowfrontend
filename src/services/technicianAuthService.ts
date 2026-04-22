@@ -7,10 +7,15 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
   const settings = data.settings && typeof data.settings === "object" ? (data.settings as any) : {};
   const settingsAppearance = settings.appearance && typeof settings.appearance === "object" ? settings.appearance : {};
   const settingsNotifications = settings.notifications && typeof settings.notifications === "object" ? settings.notifications : {};
+  const specialties = (Array.isArray(data.specialties) ? data.specialties : []) as string[];
+  const operationalRole = String(
+    data.service_type ?? data.serviceType ?? specialties[0] ?? data.role ?? "technician"
+  ).trim() || "technician";
 
   return {
     id: String(data.id),
-    role: String(data.role ?? "technician"),
+    role: operationalRole,
+    service_type: String(data.service_type ?? data.serviceType ?? operationalRole),
     name: String(data.name),
     email: String(data.email),
     phone: String(data.phone ?? ""),
@@ -21,7 +26,7 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
     locality: data.locality != null ? String(data.locality) : undefined,
     serviceAreaRange: Number(data.serviceAreaRange ?? data.service_area_range ?? 0),
     experience: Number(data.experience ?? 0),
-    specialties: (Array.isArray(data.specialties) ? data.specialties : []) as string[],
+    specialties,
     pricing: (data.pricing && typeof data.pricing === "object" ? data.pricing : {}) as Record<string, any>,
     verification_status: (data.verification_status as "pending" | "verified" | "rejected") || "pending",
     working_hours: (data.working_hours || {}) as any,
@@ -136,7 +141,8 @@ export const technicianAuthService = {
     return {
       ...data,
       id: String(responseData.id),
-      role: "technician",
+      role: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
+      service_type: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
       name: responseData.name,
       email: responseData.email,
       verification_status: "pending" as const,

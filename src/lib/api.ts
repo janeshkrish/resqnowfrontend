@@ -72,6 +72,8 @@ const writeStore = (key: string, value: unknown) => {
 const defaultTechnicians = () => [
   {
     id: "tech-101",
+    role: "towing",
+    service_type: "towing",
     name: "Rapid Auto Care",
     email: "rapid@resqnow.demo",
     phone: "+91 9876500001",
@@ -88,6 +90,8 @@ const defaultTechnicians = () => [
   },
   {
     id: "tech-102",
+    role: "mechanical",
+    service_type: "mechanical",
     name: "City Bike Clinic",
     email: "bike@resqnow.demo",
     phone: "+91 9876500002",
@@ -239,6 +243,64 @@ const getVehicles = () =>
     { id: 1, type: "car", make: "Hyundai", model: "i20", license_plate: "KA01DEMO1", status: "ready" },
   ]);
 const setVehicles = (value: AnyRecord[]) => writeStore("resqnow_mock_vehicles", value);
+const defaultTechnicianFleetVehicles = () => [
+  {
+    id: 1,
+    vehicle_id: "1",
+    technician_id: "tech-101",
+    vehicle_type: "flatbed",
+    vehicle_number: "KA01TR1001",
+    capacity: "2 cars",
+    status: "available",
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+  {
+    id: 2,
+    vehicle_id: "2",
+    technician_id: "tech-101",
+    vehicle_type: "wheel-lift",
+    vehicle_number: "KA01TR1002",
+    capacity: "1 SUV",
+    status: "busy",
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+];
+const getTechnicianFleetVehicles = () =>
+  readStore("resqnow_mock_technician_fleet_vehicles", defaultTechnicianFleetVehicles());
+const setTechnicianFleetVehicles = (value: AnyRecord[]) =>
+  writeStore("resqnow_mock_technician_fleet_vehicles", value);
+const defaultTechnicianEmployees = () => [
+  {
+    id: 1,
+    employee_id: "1",
+    technician_id: "tech-101",
+    name: "Rohit Sharma",
+    phone: "+91 9876500011",
+    role: "driver",
+    status: "active",
+    assigned_vehicle_id: "1",
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+  {
+    id: 2,
+    employee_id: "2",
+    technician_id: "tech-101",
+    name: "Imran Khan",
+    phone: "+91 9876500012",
+    role: "helper",
+    status: "active",
+    assigned_vehicle_id: "2",
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+];
+const getTechnicianEmployees = () =>
+  readStore("resqnow_mock_technician_team_members", defaultTechnicianEmployees());
+const setTechnicianEmployees = (value: AnyRecord[]) =>
+  writeStore("resqnow_mock_technician_team_members", value);
 const defaultWallets = () => {
   const technicians = getTechnicians();
   return technicians.map((tech, idx) => {
@@ -326,6 +388,49 @@ const upsertRequest = (request: AnyRecord) => {
   if (idx >= 0) requests[idx] = { ...requests[idx], ...request, updated_at: nowIso() };
   else requests.unshift({ ...request, updated_at: nowIso() });
   setRequests(requests);
+};
+
+const getCurrentTechnician = () => getTechnicians()[0] || null;
+
+const getCurrentTechnicianFleetVehicles = () =>
+  getTechnicianFleetVehicles().filter(
+    (item) => String(item.technician_id || "") === String(getCurrentTechnician()?.id || "")
+  );
+
+const getCurrentTechnicianEmployees = () =>
+  getTechnicianEmployees().filter(
+    (item) => String(item.technician_id || "") === String(getCurrentTechnician()?.id || "")
+  );
+
+const withAssignedVehicle = (employee: AnyRecord) => {
+  if (!employee) return employee;
+  const assignedVehicleId =
+    employee.assigned_vehicle_id != null ? String(employee.assigned_vehicle_id) : null;
+  const vehicle =
+    assignedVehicleId == null
+      ? null
+      : getCurrentTechnicianFleetVehicles().find(
+          (item) => String(item.id) === assignedVehicleId
+        ) || null;
+
+  return {
+    ...employee,
+    id: String(employee.id),
+    employee_id: String(employee.employee_id || employee.id),
+    technician_id: String(employee.technician_id || getCurrentTechnician()?.id || ""),
+    assigned_vehicle_id: assignedVehicleId,
+    assigned_vehicle: vehicle
+      ? {
+          id: String(vehicle.id),
+          vehicle_id: String(vehicle.vehicle_id || vehicle.id),
+          vehicle_number: String(vehicle.vehicle_number || ""),
+          vehicle_type: String(vehicle.vehicle_type || ""),
+        }
+      : null,
+    assigned_vehicle_label: vehicle
+      ? `${String(vehicle.vehicle_number || "")} (${String(vehicle.vehicle_type || "")})`
+      : null,
+  };
 };
 
 const roundMoney = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -1058,6 +1163,189 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     return json({ success: true, financials: { pending_dues: getMockPendingDues(), total_earnings: getRequests().reduce((sum, item) => sum + Number(item.amount || 0), 0) } });
   }
   if (path === "/api/technicians/me/pay-dues" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: Math.round(getMockPendingDues() * 100), currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });
+  if (path === "/api/technicians/vehicles" && method === "GET") {
+    const technician = getCurrentTechnician();
+    if (!technician || String(technician.service_type || technician.role || "").toLowerCase() !== "towing") {
+      return json({ error: "Fleet and team management is available only for towing technicians." }, 403);
+    }
+    return json(getCurrentTechnicianFleetVehicles());
+  }
+  if (path === "/api/technicians/vehicles" && method === "POST") {
+    const technician = getCurrentTechnician();
+    if (!technician || String(technician.service_type || technician.role || "").toLowerCase() !== "towing") {
+      return json({ error: "Fleet and team management is available only for towing technicians." }, 403);
+    }
+    const vehicleType = String(body.vehicle_type || body.vehicleType || "").trim().toLowerCase();
+    const vehicleNumber = String(body.vehicle_number || body.vehicleNumber || "").trim().toUpperCase();
+    if (!vehicleType || !vehicleNumber) {
+      return json({ error: "vehicle_type and vehicle_number are required." }, 400);
+    }
+    const vehicles = getTechnicianFleetVehicles();
+    const duplicate = vehicles.find(
+      (item) =>
+        String(item.technician_id || "") === String(technician.id) &&
+        String(item.vehicle_number || "").trim().toUpperCase() === vehicleNumber
+    );
+    if (duplicate) {
+      return json({ error: "This vehicle number is already registered in your fleet." }, 409);
+    }
+    const nextId = Date.now();
+    const nextVehicle = {
+      id: nextId,
+      vehicle_id: String(nextId),
+      technician_id: technician.id,
+      vehicle_type: vehicleType,
+      vehicle_number: vehicleNumber,
+      capacity: String(body.capacity || "").trim() || null,
+      status: String(body.status || "available").trim().toLowerCase() || "available",
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    vehicles.unshift(nextVehicle);
+    setTechnicianFleetVehicles(vehicles);
+    return json(nextVehicle, 201);
+  }
+  const technicianVehicleMatch = path.match(/^\/api\/technicians\/vehicles\/([^/]+)$/);
+  if (technicianVehicleMatch && method === "PATCH") {
+    const vehicleId = String(technicianVehicleMatch[1] || "");
+    const vehicles = getTechnicianFleetVehicles();
+    const idx = vehicles.findIndex((item) => String(item.id) === vehicleId);
+    if (idx < 0) return json({ error: "Fleet vehicle not found." }, 404);
+    const nextVehicleNumber = body.vehicle_number ?? body.vehicleNumber;
+    const normalizedVehicleNumber =
+      nextVehicleNumber != null
+        ? String(nextVehicleNumber).trim().toUpperCase()
+        : String(vehicles[idx].vehicle_number || "").trim().toUpperCase();
+    const duplicate = vehicles.find(
+      (item, itemIdx) =>
+        itemIdx !== idx &&
+        String(item.technician_id || "") === String(vehicles[idx].technician_id || "") &&
+        String(item.vehicle_number || "").trim().toUpperCase() === normalizedVehicleNumber
+    );
+    if (duplicate) {
+      return json({ error: "This vehicle number is already registered in your fleet." }, 409);
+    }
+    vehicles[idx] = {
+      ...vehicles[idx],
+      vehicle_type:
+        body.vehicle_type != null || body.vehicleType != null
+          ? String(body.vehicle_type || body.vehicleType || "").trim().toLowerCase()
+          : vehicles[idx].vehicle_type,
+      vehicle_number: normalizedVehicleNumber,
+      capacity:
+        body.capacity !== undefined ? String(body.capacity || "").trim() || null : vehicles[idx].capacity || null,
+      status:
+        body.status !== undefined
+          ? String(body.status || "available").trim().toLowerCase() || "available"
+          : vehicles[idx].status,
+      updated_at: nowIso(),
+    };
+    setTechnicianFleetVehicles(vehicles);
+    return json(vehicles[idx]);
+  }
+  if (technicianVehicleMatch && method === "DELETE") {
+    const vehicleId = String(technicianVehicleMatch[1] || "");
+    const vehicles = getTechnicianFleetVehicles();
+    const exists = vehicles.some((item) => String(item.id) === vehicleId);
+    if (!exists) return json({ error: "Fleet vehicle not found." }, 404);
+    setTechnicianFleetVehicles(vehicles.filter((item) => String(item.id) !== vehicleId));
+    setTechnicianEmployees(
+      getTechnicianEmployees().map((item) =>
+        String(item.assigned_vehicle_id || "") === vehicleId
+          ? { ...item, assigned_vehicle_id: null, updated_at: nowIso() }
+          : item
+      )
+    );
+    return json({ success: true });
+  }
+  if (path === "/api/technicians/employees" && method === "GET") {
+    const technician = getCurrentTechnician();
+    if (!technician || String(technician.service_type || technician.role || "").toLowerCase() !== "towing") {
+      return json({ error: "Fleet and team management is available only for towing technicians." }, 403);
+    }
+    return json(getCurrentTechnicianEmployees().map(withAssignedVehicle));
+  }
+  if (path === "/api/technicians/employees" && method === "POST") {
+    const technician = getCurrentTechnician();
+    if (!technician || String(technician.service_type || technician.role || "").toLowerCase() !== "towing") {
+      return json({ error: "Fleet and team management is available only for towing technicians." }, 403);
+    }
+    const name = String(body.name || "").trim();
+    const phone = String(body.phone || "").trim();
+    const role = String(body.role || "driver").trim().toLowerCase() || "driver";
+    const assignedVehicleId = body.assigned_vehicle == null || body.assigned_vehicle === "" ? null : String(body.assigned_vehicle);
+    if (!name || !phone) {
+      return json({ error: "name and phone are required." }, 400);
+    }
+    if (assignedVehicleId) {
+      const vehicleExists = getCurrentTechnicianFleetVehicles().some(
+        (item) => String(item.id) === assignedVehicleId
+      );
+      if (!vehicleExists) {
+        return json({ error: "assigned_vehicle must belong to your fleet." }, 400);
+      }
+    }
+    const nextId = Date.now();
+    const employees = getTechnicianEmployees();
+    const nextEmployee = {
+      id: nextId,
+      employee_id: String(nextId),
+      technician_id: technician.id,
+      name,
+      phone,
+      role,
+      status: String(body.status || "active").trim().toLowerCase() || "active",
+      assigned_vehicle_id: assignedVehicleId,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    employees.unshift(nextEmployee);
+    setTechnicianEmployees(employees);
+    return json(withAssignedVehicle(nextEmployee), 201);
+  }
+  const technicianEmployeeMatch = path.match(/^\/api\/technicians\/employees\/([^/]+)$/);
+  if (technicianEmployeeMatch && method === "PATCH") {
+    const employeeId = String(technicianEmployeeMatch[1] || "");
+    const employees = getTechnicianEmployees();
+    const idx = employees.findIndex((item) => String(item.id) === employeeId);
+    if (idx < 0) return json({ error: "Team member not found." }, 404);
+    const nextAssignedVehicleId =
+      body.assigned_vehicle !== undefined
+        ? body.assigned_vehicle == null || body.assigned_vehicle === ""
+          ? null
+          : String(body.assigned_vehicle)
+        : employees[idx].assigned_vehicle_id != null
+          ? String(employees[idx].assigned_vehicle_id)
+          : null;
+    if (nextAssignedVehicleId) {
+      const vehicleExists = getCurrentTechnicianFleetVehicles().some(
+        (item) => String(item.id) === nextAssignedVehicleId
+      );
+      if (!vehicleExists) {
+        return json({ error: "assigned_vehicle must belong to your fleet." }, 400);
+      }
+    }
+    employees[idx] = {
+      ...employees[idx],
+      name: body.name !== undefined ? String(body.name || "").trim() : employees[idx].name,
+      phone: body.phone !== undefined ? String(body.phone || "").trim() : employees[idx].phone,
+      role: body.role !== undefined ? String(body.role || "driver").trim().toLowerCase() || "driver" : employees[idx].role,
+      status:
+        body.status !== undefined ? String(body.status || "active").trim().toLowerCase() || "active" : employees[idx].status,
+      assigned_vehicle_id: nextAssignedVehicleId,
+      updated_at: nowIso(),
+    };
+    setTechnicianEmployees(employees);
+    return json(withAssignedVehicle(employees[idx]));
+  }
+  if (technicianEmployeeMatch && method === "DELETE") {
+    const employeeId = String(technicianEmployeeMatch[1] || "");
+    const employees = getTechnicianEmployees();
+    const exists = employees.some((item) => String(item.id) === employeeId);
+    if (!exists) return json({ error: "Team member not found." }, 404);
+    setTechnicianEmployees(employees.filter((item) => String(item.id) !== employeeId));
+    return json({ success: true });
+  }
 
   if (path === "/api/service-requests" && method === "GET") return json(getRequests().map(withTechnician));
   if (path === "/api/service-requests" && method === "POST") {

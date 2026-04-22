@@ -17,11 +17,6 @@ const TechnicianProtectedRoute = ({ children }: { children: React.ReactNode }) =
     return <Navigate to="/technician/login" replace />;
   }
 
-  const role = String((technician as any)?.role || "technician").trim().toLowerCase();
-  if (role !== "technician") {
-    return <Navigate to="/" replace />;
-  }
-
   return <>{children}</>;
 };
 

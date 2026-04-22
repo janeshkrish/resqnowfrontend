@@ -8,13 +8,15 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
   const settingsAppearance = settings.appearance && typeof settings.appearance === "object" ? settings.appearance : {};
   const settingsNotifications = settings.notifications && typeof settings.notifications === "object" ? settings.notifications : {};
   const specialties = (Array.isArray(data.specialties) ? data.specialties : []) as string[];
+  const rawRole = String(data.role ?? "").trim().toLowerCase();
+  const accountRole = rawRole === "admin" || rawRole === "user" ? rawRole : "technician";
   const operationalRole = String(
     data.service_type ?? data.serviceType ?? specialties[0] ?? data.role ?? "technician"
   ).trim() || "technician";
 
   return {
     id: String(data.id),
-    role: operationalRole,
+    role: accountRole,
     service_type: String(data.service_type ?? data.serviceType ?? operationalRole),
     name: String(data.name),
     email: String(data.email),
@@ -141,7 +143,7 @@ export const technicianAuthService = {
     return {
       ...data,
       id: String(responseData.id),
-      role: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
+      role: "technician",
       service_type: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
       name: responseData.name,
       email: responseData.email,

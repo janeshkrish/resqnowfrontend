@@ -123,7 +123,7 @@ Build command: npm run build
 Build output directory: dist 
 ```
 
-Set these environment variables in Vercel :
+Set these environment variables in Vercel 
 
 ```txt
 VITE_API_URL=https://your-render-backend.onrender.com

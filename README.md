@@ -131,7 +131,7 @@ VITE_RAZORPAY_KEY_ID=your_live_or_test_key
 VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
 ```
 
-You can copy the same keys from `.env.example` and set production values in Netlify UI ..
+You can copy the same keys from `.env.example` and set production values in Netlify UI o.
 
 Frontend-only demo mode (no backend, optional)
 ```txt

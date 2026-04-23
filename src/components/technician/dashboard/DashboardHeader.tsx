@@ -1,18 +1,23 @@
-import { Bell, Star, User2 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Bell, Palette, MoreVertical, Shield, SlidersHorizontal, User2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 type DashboardHeaderProps = {
   technicianName: string;
   technicianId: string;
+  profileImageUrl?: string | null;
   pointsBalance: number;
   unreadNotifications: number;
   isOnline: boolean;
   onToggleAvailability: (checked: boolean) => void;
   onOpenNotifications: () => void;
+  onViewProfile: () => void;
+  onOpenAppearanceSettings: () => void;
+  onOpenNotificationSettings: () => void;
+  onOpenSecuritySettings: () => void;
 };
 
 const getInitials = (name: string) =>
@@ -27,21 +32,60 @@ const getInitials = (name: string) =>
 const DashboardHeader = ({
   technicianName,
   technicianId,
+  profileImageUrl,
   pointsBalance,
   unreadNotifications,
   isOnline,
   onToggleAvailability,
   onOpenNotifications,
+  onViewProfile,
+  onOpenAppearanceSettings,
+  onOpenNotificationSettings,
+  onOpenSecuritySettings,
 }: DashboardHeaderProps) => {
+  const controlItems = [
+    {
+      key: "profile",
+      label: "View Profile",
+      description: "Open technician details",
+      icon: User2,
+      onClick: onViewProfile,
+    },
+    {
+      key: "appearance",
+      label: "Appearance",
+      description: "Theme and navigation",
+      icon: Palette,
+      onClick: onOpenAppearanceSettings,
+    },
+    {
+      key: "notifications",
+      label: "Notification Settings",
+      description: "Alert preferences",
+      icon: Bell,
+      onClick: onOpenNotificationSettings,
+    },
+    {
+      key: "security",
+      label: "Security",
+      description: "Password and app data",
+      icon: Shield,
+      onClick: onOpenSecuritySettings,
+    },
+  ];
+
   return (
     <section
       id="dashboard-home"
       className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0f172a_0%,#172554_42%,#2563eb_100%)] text-white shadow-[0_24px_60px_-28px_rgba(37,99,235,0.65)]"
     >
       <div className="space-y-5 p-5 md:p-7">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
             <Avatar className="h-14 w-14 border border-white/20 bg-white/10 shadow-lg">
+              {profileImageUrl ? (
+                <AvatarImage src={profileImageUrl} alt={`${technicianName} profile`} />
+              ) : null}
               <AvatarFallback className="bg-white/10 text-base font-bold text-white">
                 {getInitials(technicianName) || <User2 className="h-5 w-5" />}
               </AvatarFallback>
@@ -69,10 +113,103 @@ const DashboardHeader = ({
                 <span className="absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
               ) : null}
             </Button>
-            <Badge className="flex h-11 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/10">
-              <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
-              {pointsBalance}
-            </Badge>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 rounded-full border border-white/10 bg-white/10 text-white hover:bg-white/15"
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="w-[88vw] max-w-sm border-l border-slate-200 bg-slate-50 p-0"
+              >
+                <div className="flex h-full flex-col">
+                  <SheetHeader className="gap-0 border-b border-slate-200 bg-white px-5 pb-5 pt-10 text-left">
+                    <div className="flex items-center gap-4 pr-8">
+                      <Avatar className="h-16 w-16 border border-slate-200 bg-slate-100 shadow-sm">
+                        {profileImageUrl ? (
+                          <AvatarImage src={profileImageUrl} alt={`${technicianName} profile`} />
+                        ) : null}
+                        <AvatarFallback className="bg-slate-100 text-lg font-black text-slate-900">
+                          {getInitials(technicianName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <SheetTitle className="truncate text-xl font-black tracking-tight text-slate-900">
+                          {technicianName}
+                        </SheetTitle>
+                        <SheetDescription className="mt-1 text-sm text-slate-500">
+                          SP ID: {technicianId}
+                        </SheetDescription>
+                        <p className="mt-3 inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
+                          {isOnline ? "Online" : "Offline"}
+                        </p>
+                      </div>
+                    </div>
+                  </SheetHeader>
+
+                  <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+                    <div className="rounded-[1.5rem] bg-[linear-gradient(160deg,#0f172a_0%,#111827_100%)] p-5 text-white shadow-[0_18px_40px_-25px_rgba(15,23,42,0.9)]">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-300">
+                          <SlidersHorizontal className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">
+                            Points System
+                          </p>
+                          <p className="mt-1 text-sm text-white/70">
+                            Calculated from live earnings and completed jobs
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-6 text-4xl font-black tracking-tight">{pointsBalance}</p>
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        UCP Controls
+                      </p>
+                      <div className="mt-4 grid gap-3">
+                        {controlItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <SheetClose asChild key={item.key}>
+                              <Button
+                                variant="ghost"
+                                onClick={item.onClick}
+                                className="h-auto justify-start rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4 text-left hover:bg-slate-100"
+                              >
+                                <span className="mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                                  <Icon className="h-5 w-5" />
+                                </span>
+                                <span className="flex min-w-0 flex-col">
+                                  <span className="text-sm font-bold text-slate-900">{item.label}</span>
+                                  <span className="text-xs text-slate-500">{item.description}</span>
+                                </span>
+                              </Button>
+                            </SheetClose>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <SheetClose asChild>
+                      <Button
+                        onClick={onViewProfile}
+                        className="w-full rounded-[1.25rem] bg-slate-900 text-white hover:bg-slate-800"
+                      >
+                        Open Profile Panel
+                      </Button>
+                    </SheetClose>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 

@@ -15,9 +15,13 @@ const normalizeRoleToken = (value: unknown) =>
     .replace(/^-+|-+$/g, "");
 
 export function getTechnicianOperationalRole(
-  technician: (Technician & { service_type?: string | null }) | null | undefined
+  technician:
+    | (Technician & { service_type?: string | null; operational_role?: string | null })
+    | null
+    | undefined
 ) {
   const candidates = [
+    technician?.operational_role,
     technician?.role,
     technician?.service_type,
     ...(Array.isArray(technician?.specialties) ? technician.specialties : []),

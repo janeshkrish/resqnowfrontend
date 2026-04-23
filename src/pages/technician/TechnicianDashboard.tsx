@@ -24,7 +24,6 @@ import {
   buildEarningsBreakdown,
   buildOrderOverviewCounts,
   buildOrderPerformanceSummary,
-  buildRewardItems,
   calculateRewardPoints,
   countEnabledVehicleTypes,
   getGreetingName,
@@ -60,13 +59,14 @@ const TechnicianDashboard = () => {
   const [isCancelled, setIsCancelled] = useState(false);
   const [financials, setFinancials] = useState({ total_earnings: 0, pending_dues: 0 });
   const [walletSummary, setWalletSummary] = useState<any | null>(null);
-  const [dashboardLanguage, setDashboardLanguage] = useState("en");
+  const [dashboardTechnician, setDashboardTechnician] = useState<any | null>(null);
   const [fleetDialogOpen, setFleetDialogOpen] = useState(false);
   const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<TeamEmployee | null>(null);
   const isNativePlatform = Capacitor.isNativePlatform();
-  const isTowingOperator = isTowingTechnicianRole(technician);
+  const technicianSnapshot = dashboardTechnician || technician;
+  const isTowingOperator = isTowingTechnicianRole(technicianSnapshot);
   const towingManagement = useTechnicianTowingManagement(isTowingOperator);
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
   const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
@@ -93,14 +93,6 @@ const TechnicianDashboard = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storedLanguage = String(localStorage.getItem("resqnow_technician_dashboard_language") || "en").trim().toLowerCase();
-    if (storedLanguage) {
-      setDashboardLanguage(storedLanguage);
-    }
   }, []);
 
   const stopAlertSound = () => {
@@ -351,6 +343,7 @@ const TechnicianDashboard = () => {
         let meData = null;
         if (meRes.ok) {
           meData = await meRes.json();
+          setDashboardTechnician(meData);
           setIsOnline(!!meData.is_active);
           if (meData.latitude && meData.longitude) {
             setCurrentLocation({ lat: meData.latitude, lng: meData.longitude });
@@ -1594,14 +1587,6 @@ const TechnicianDashboard = () => {
     toggleAvailability(checked);
   };
 
-  const handleLanguageChange = (value: string) => {
-    const nextLanguage = String(value || "en").trim().toLowerCase() || "en";
-    setDashboardLanguage(nextLanguage);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("resqnow_technician_dashboard_language", nextLanguage);
-    }
-  };
-
   const scrollToSection = (sectionId: string) => {
     if (typeof document === "undefined") return;
     const target = document.getElementById(sectionId);
@@ -1709,23 +1694,26 @@ const TechnicianDashboard = () => {
     totalEarnings: totalEarningsValue,
     completedJobs: Number(stats.jobs || 0),
   });
-  const rewardItems = buildRewardItems(pointsBalance);
   const unreadNotifications = notifications.filter((notification: any) => !notification?.is_read).length;
-  const defaultFleetCount = countEnabledVehicleTypes(technician?.vehicle_types);
+  const defaultFleetCount = countEnabledVehicleTypes(technicianSnapshot?.vehicle_types);
   const defaultTeamCount = Number(
-    (technician as any)?.service_providers_count ??
-    (technician as any)?.team_members_count ??
-    (technician as any)?.sub_providers_count ??
-    (technician?.id ? 1 : 0)
+    (technicianSnapshot as any)?.service_providers_count ??
+    (technicianSnapshot as any)?.team_members_count ??
+    (technicianSnapshot as any)?.sub_providers_count ??
+    (technicianSnapshot?.id ? 1 : 0)
   );
   const fleetCount = isTowingOperator ? towingManagement.vehicles.length : defaultFleetCount;
   const teamCount = isTowingOperator ? towingManagement.employees.length : defaultTeamCount;
   const technicianGreetingName = getGreetingName(
-    String((technician as any)?.proprietor_name || technician?.name || "").trim()
+    String((technicianSnapshot as any)?.proprietor_name || technicianSnapshot?.name || "").trim()
   );
   const technicianIdentifier = String(
-    (technician as any)?.technician_id || (technician as any)?.sp_id || technician?.id || ""
+    (technicianSnapshot as any)?.technician_id || (technicianSnapshot as any)?.sp_id || technicianSnapshot?.id || ""
   );
+  const profilePhotoPath = String((technicianSnapshot as any)?.documents?.profile_photo || "").trim();
+  const profileImageUrl = profilePhotoPath
+    ? (/^https?:\/\//i.test(profilePhotoPath) ? profilePhotoPath : apiUrl(profilePhotoPath))
+    : null;
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] pb-24 md:pb-8 selection:bg-primary/20 relative">
@@ -1735,10 +1723,10 @@ const TechnicianDashboard = () => {
             showTowingManagement={isTowingOperator}
             technicianName={technicianGreetingName}
             technicianId={technicianIdentifier}
+            profileImageUrl={profileImageUrl}
             isOnline={isOnline}
             pointsBalance={pointsBalance}
             unreadNotifications={unreadNotifications}
-            language={dashboardLanguage}
             notifications={notifications}
             fleetCount={fleetCount}
             teamCount={teamCount}
@@ -1751,11 +1739,12 @@ const TechnicianDashboard = () => {
               paid: earningsBreakdown.paid,
               disputed: earningsBreakdown.disputed,
             }}
-            rewardItems={rewardItems}
             onToggleAvailability={handleToggleAvailability}
             onOpenNotifications={() => scrollToSection("dashboard-notifications")}
-            onLanguageChange={handleLanguageChange}
-            onOpenUcp={() => navigate("/technician/profile?tab=profile")}
+            onViewProfile={() => navigate("/technician/profile?tab=profile")}
+            onOpenAppearanceSettings={() => navigate("/technician/profile?tab=appearance")}
+            onOpenNotificationSettings={() => navigate("/technician/profile?tab=notifications")}
+            onOpenSecuritySettings={() => navigate("/technician/profile?tab=security")}
             onManageFleet={() => scrollToSection("dashboard-fleet")}
             onAddVehicle={() => {
               scrollToSection("dashboard-fleet");

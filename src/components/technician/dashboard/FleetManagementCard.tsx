@@ -23,7 +23,7 @@ const FleetManagementCard = ({
           <div className="mt-8">
             <p className="text-4xl font-black tracking-tight text-foreground">{activeVehicles}</p>
             <p className="mt-2 text-sm font-medium text-muted-foreground">
-              Active vehicle classes
+              Active Trucks
             </p>
           </div>
           <Button
@@ -41,7 +41,7 @@ const FleetManagementCard = ({
           </div>
           <div className="space-y-2">
             <h3 className="text-2xl font-black tracking-tight">Add Vehicle</h3>
-            <p className="text-sm text-blue-100">Update your supported fleet and service coverage.</p>
+            <p className="text-sm text-blue-100">Onboard new towing units and keep dispatch-ready.</p>
           </div>
           <Button
             onClick={onAddVehicle}

@@ -1,5 +1,6 @@
 import { Technician } from "@/types/technician";
 import { apiFetch, setTechnicianToken } from "@/lib/api";
+import { getTechnicianOperationalRole } from "@/utils/technicianRole";
 
 const BASE = "/api/technicians";
 
@@ -8,16 +9,30 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
   const settingsAppearance = settings.appearance && typeof settings.appearance === "object" ? settings.appearance : {};
   const settingsNotifications = settings.notifications && typeof settings.notifications === "object" ? settings.notifications : {};
   const specialties = (Array.isArray(data.specialties) ? data.specialties : []) as string[];
+  const rawAccountRole = String(data.account_role ?? "").trim().toLowerCase();
   const rawRole = String(data.role ?? "").trim().toLowerCase();
-  const accountRole = rawRole === "admin" || rawRole === "user" ? rawRole : "technician";
-  const operationalRole = String(
-    data.service_type ?? data.serviceType ?? specialties[0] ?? data.role ?? "technician"
+  const accountRole =
+    rawAccountRole === "technician" || rawAccountRole === "admin" || rawAccountRole === "user"
+      ? rawAccountRole
+      : rawRole === "admin" || rawRole === "user"
+        ? rawRole
+        : "technician";
+  const serviceType = String(
+    data.service_type ?? data.serviceType ?? data.operational_role ?? specialties[0] ?? data.role ?? "technician"
   ).trim() || "technician";
+  const operationalRole = getTechnicianOperationalRole({
+    role: String(data.operational_role ?? data.role ?? serviceType),
+    operational_role: String(data.operational_role ?? ""),
+    service_type: serviceType,
+    specialties,
+  } as Technician);
 
   return {
     id: String(data.id),
-    role: accountRole,
-    service_type: String(data.service_type ?? data.serviceType ?? operationalRole),
+    role: operationalRole,
+    account_role: accountRole,
+    operational_role: operationalRole,
+    service_type: serviceType,
     name: String(data.name),
     email: String(data.email),
     phone: String(data.phone ?? ""),
@@ -139,17 +154,22 @@ export const technicianAuthService = {
     if (responseData.token) {
       setTechnicianToken(responseData.token);
     }
+    const operationalRole = getTechnicianOperationalRole({
+      role: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
+      service_type: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
+      specialties: Array.isArray(data?.specialties) ? data.specialties : [],
+    } as Technician);
     // Merge input data with response to satisfy Technician type locally
     return {
       ...data,
       id: String(responseData.id),
-      role: "technician",
-      service_type: String(data?.service_type ?? data?.specialties?.[0] ?? "technician"),
+      role: operationalRole,
+      account_role: "technician",
+      operational_role: operationalRole,
+      service_type: String(data?.service_type ?? data?.specialties?.[0] ?? operationalRole),
       name: responseData.name,
       email: responseData.email,
       verification_status: "pending" as const,
-      // Pass through all other data properties since we just registered with them
-      ...data
     };
   },
 

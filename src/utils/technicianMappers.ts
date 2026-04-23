@@ -1,5 +1,6 @@
 import { Technician } from "@/types/technician";
 import { API_BASE_URL } from "@/lib/api";
+import { getTechnicianOperationalRole } from "@/utils/technicianRole";
 
 // Helper function to map database/API fields to our Technician type
 const resolveUrl = (path: string) => {
@@ -39,9 +40,20 @@ export const mapTechnicianData = (data: any): Technician => {
     tools_photo: resolveUrl(docs.tools_photo),
     facilities_photo: resolveUrl(docs.facilities_photo),
   };
+  const specialties = Array.isArray(data.specialties) ? data.specialties : [];
+  const serviceType = String(data.service_type ?? data.serviceType ?? specialties[0] ?? "technician");
+  const operationalRole = getTechnicianOperationalRole({
+    role: String(data.operational_role ?? data.role ?? serviceType),
+    operational_role: String(data.operational_role ?? ""),
+    service_type: serviceType,
+    specialties,
+  } as Technician);
 
   return {
     id: String(data.id),
+    role: operationalRole,
+    account_role: String(data.account_role ?? "technician"),
+    operational_role: operationalRole,
     name: data.name,
     email: data.email,
     phone: data.phone ?? "",
@@ -52,7 +64,8 @@ export const mapTechnicianData = (data: any): Technician => {
     locality: data.locality,
     serviceAreaRange: data.serviceAreaRange ?? data.service_area_range ?? 0,
     experience: data.experience ?? 0,
-    specialties: Array.isArray(data.specialties) ? data.specialties : [],
+    service_type: serviceType,
+    specialties,
     pricing: parsedPricing && typeof parsedPricing === "object" ? parsedPricing : {},
     verification_status: (data.verification_status || "pending") as "pending" | "verified" | "rejected",
 

@@ -63,15 +63,6 @@ export type EarningsBreakdown = {
   withdrawable: number;
 };
 
-export type RewardItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  pointsRequired: number;
-  progress: number;
-  redeemable: boolean;
-};
-
 const LATE_FALLBACK_THRESHOLD_MINUTES = 90;
 
 export const formatCurrency = (value: number | null | undefined) =>
@@ -239,35 +230,6 @@ export function calculateRewardPoints({
   completedJobs: number;
 }) {
   return Math.max(0, Math.floor(Number(totalEarnings || 0) / 1000) + Number(completedJobs || 0) * 5);
-}
-
-export function buildRewardItems(pointsBalance: number): RewardItem[] {
-  const items = [
-    {
-      id: "fuel-credit",
-      title: "Fuel Credit",
-      subtitle: "Redeem a roadside refill voucher.",
-      pointsRequired: 120,
-    },
-    {
-      id: "tool-kit",
-      title: "Compact Tool Kit",
-      subtitle: "Essentials for daily field jobs.",
-      pointsRequired: 260,
-    },
-    {
-      id: "service-jacket",
-      title: "ResQNow Service Jacket",
-      subtitle: "Branded gear for your team.",
-      pointsRequired: 420,
-    },
-  ];
-
-  return items.map((item) => ({
-    ...item,
-    progress: Math.min(100, Math.round((pointsBalance / item.pointsRequired) * 100)),
-    redeemable: pointsBalance >= item.pointsRequired,
-  }));
 }
 
 export function getGreetingName(name: string | null | undefined) {

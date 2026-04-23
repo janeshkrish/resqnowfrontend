@@ -23,7 +23,7 @@ const TeamManagementCard = ({
           <div className="mt-8">
             <p className="text-4xl font-black tracking-tight text-foreground">{serviceProvidersCount}</p>
             <p className="mt-2 text-sm font-medium text-muted-foreground">
-              Service providers in your network
+              Service Providers
             </p>
           </div>
           <Button
@@ -41,7 +41,7 @@ const TeamManagementCard = ({
           </div>
           <div className="space-y-2">
             <h3 className="text-2xl font-black tracking-tight">Add SP</h3>
-            <p className="text-sm text-cyan-50/85">Reuse the existing technician onboarding flow for new providers.</p>
+            <p className="text-sm text-cyan-50/85">Onboard new drivers and helpers into your towing team.</p>
           </div>
           <Button
             onClick={onAddServiceProvider}

@@ -4,6 +4,8 @@ export type VerificationStatus = "pending" | "verified" | "rejected";
 export type Technician = {
   id: string;
   role?: string;
+  account_role?: string;
+  operational_role?: string;
   service_type?: string;
   name: string;
   email: string;

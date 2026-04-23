@@ -3,8 +3,6 @@ import EarningsSection from "@/components/technician/dashboard/EarningsSection";
 import FleetManagementCard from "@/components/technician/dashboard/FleetManagementCard";
 import OrderOverviewGrid from "@/components/technician/dashboard/OrderOverviewGrid";
 import OrderPerformanceCard from "@/components/technician/dashboard/OrderPerformanceCard";
-import QuickActions from "@/components/technician/dashboard/QuickActions";
-import RewardsSection from "@/components/technician/dashboard/RewardsSection";
 import TeamManagementCard from "@/components/technician/dashboard/TeamManagementCard";
 import TechnicianNotifications from "@/components/technician/TechnicianNotifications";
 
@@ -12,10 +10,10 @@ type TechnicianDashboardOverviewProps = {
   showTowingManagement: boolean;
   technicianName: string;
   technicianId: string;
+  profileImageUrl?: string | null;
   isOnline: boolean;
   pointsBalance: number;
   unreadNotifications: number;
-  language: string;
   notifications: Array<{
     id: string;
     type: string;
@@ -51,18 +49,12 @@ type TechnicianDashboardOverviewProps = {
     paid: number;
     disputed: number;
   };
-  rewardItems: Array<{
-    id: string;
-    title: string;
-    subtitle: string;
-    pointsRequired: number;
-    progress: number;
-    redeemable: boolean;
-  }>;
   onToggleAvailability: (checked: boolean) => void;
   onOpenNotifications: () => void;
-  onLanguageChange: (value: string) => void;
-  onOpenUcp: () => void;
+  onViewProfile: () => void;
+  onOpenAppearanceSettings: () => void;
+  onOpenNotificationSettings: () => void;
+  onOpenSecuritySettings: () => void;
   onManageFleet: () => void;
   onAddVehicle: () => void;
   onViewHistory: () => void;
@@ -75,21 +67,22 @@ const TechnicianDashboardOverview = ({
   showTowingManagement,
   technicianName,
   technicianId,
+  profileImageUrl,
   isOnline,
   pointsBalance,
   unreadNotifications,
-  language,
   notifications,
   fleetCount,
   teamCount,
   orderOverview,
   orderPerformance,
   earnings,
-  rewardItems,
   onToggleAvailability,
   onOpenNotifications,
-  onLanguageChange,
-  onOpenUcp,
+  onViewProfile,
+  onOpenAppearanceSettings,
+  onOpenNotificationSettings,
+  onOpenSecuritySettings,
   onManageFleet,
   onAddVehicle,
   onViewHistory,
@@ -102,41 +95,22 @@ const TechnicianDashboardOverview = ({
       <DashboardHeader
         technicianName={technicianName}
         technicianId={technicianId}
+        profileImageUrl={profileImageUrl}
         pointsBalance={pointsBalance}
         unreadNotifications={unreadNotifications}
         isOnline={isOnline}
         onToggleAvailability={onToggleAvailability}
         onOpenNotifications={onOpenNotifications}
+        onViewProfile={onViewProfile}
+        onOpenAppearanceSettings={onOpenAppearanceSettings}
+        onOpenNotificationSettings={onOpenNotificationSettings}
+        onOpenSecuritySettings={onOpenSecuritySettings}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
+      <OrderOverviewGrid counts={orderOverview} onViewHistory={onViewHistory} />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.95fr)]">
         <div className="space-y-6">
-          <div className={`grid gap-6 ${showTowingManagement ? "lg:grid-cols-2" : ""}`}>
-            {showTowingManagement ? (
-              <FleetManagementCard
-                activeVehicles={fleetCount}
-                onManageFleet={onManageFleet}
-                onAddVehicle={onAddVehicle}
-              />
-            ) : null}
-            <OrderPerformanceCard
-              totalOrders={orderPerformance.totalOrders}
-              onTimeOrders={orderPerformance.onTimeOrders}
-              lateOrders={orderPerformance.lateOrders}
-              lastOrder={orderPerformance.lastOrder}
-            />
-          </div>
-
-          <QuickActions
-            notificationCount={unreadNotifications}
-            selectedLanguage={language}
-            onOpenUcp={onOpenUcp}
-            onOpenNotifications={onOpenNotifications}
-            onLanguageChange={onLanguageChange}
-          />
-
-          <OrderOverviewGrid counts={orderOverview} onViewHistory={onViewHistory} />
-
           <EarningsSection
             totalEarnings={earnings.total}
             withdrawableBalance={earnings.withdrawable}
@@ -147,10 +121,27 @@ const TechnicianDashboardOverview = ({
             }}
             onOpenFinancialReport={onOpenFinancialReport}
           />
+
+          <div id="dashboard-notifications">
+            <TechnicianNotifications notifications={notifications.slice(0, 5)} />
+          </div>
         </div>
 
         <div className="space-y-6">
-          <RewardsSection pointsBalance={pointsBalance} items={rewardItems} />
+          <OrderPerformanceCard
+            totalOrders={orderPerformance.totalOrders}
+            onTimeOrders={orderPerformance.onTimeOrders}
+            lateOrders={orderPerformance.lateOrders}
+            lastOrder={orderPerformance.lastOrder}
+          />
+
+          {showTowingManagement ? (
+            <FleetManagementCard
+              activeVehicles={fleetCount}
+              onManageFleet={onManageFleet}
+              onAddVehicle={onAddVehicle}
+            />
+          ) : null}
 
           {showTowingManagement ? (
             <TeamManagementCard
@@ -159,10 +150,6 @@ const TechnicianDashboardOverview = ({
               onAddServiceProvider={onAddServiceProvider}
             />
           ) : null}
-
-          <div id="dashboard-notifications">
-            <TechnicianNotifications notifications={notifications.slice(0, 5)} />
-          </div>
         </div>
       </div>
     </div>

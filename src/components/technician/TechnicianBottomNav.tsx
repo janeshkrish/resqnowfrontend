@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Bell, Home, IndianRupee, Trophy } from "lucide-react";
+import { Bell, Home, IndianRupee, User2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useAutoHideBottomNav } from "@/hooks/useAutoHideBottomNav";
 
-type NavItemKey = "home" | "earnings" | "notifications" | "rewards";
+type NavItemKey = "home" | "earnings" | "notifications" | "profile";
 
 const TechnicianBottomNav = () => {
   const location = useLocation();
@@ -55,7 +55,8 @@ const TechnicianBottomNav = () => {
   useEffect(() => {
     const hash = String(location.hash || "").trim();
     if (hash === "#dashboard-notifications") setActiveItem("notifications");
-    else if (hash === "#dashboard-rewards") setActiveItem("rewards");
+    else if (currentPath === "/technician/profile") setActiveItem("profile");
+    else if (currentPath === "/technician/earnings") setActiveItem("earnings");
     else if (currentPath === "/technician/dashboard") setActiveItem("home");
   }, [currentPath, location.hash]);
 
@@ -97,10 +98,13 @@ const TechnicianBottomNav = () => {
       onClick: () => scrollToSection("dashboard-notifications", "notifications"),
     },
     {
-      key: "rewards" as const,
-      label: "Reward",
-      icon: Trophy,
-      onClick: () => scrollToSection("dashboard-rewards", "rewards"),
+      key: "profile" as const,
+      label: "Profile",
+      icon: User2,
+      onClick: () => {
+        setActiveItem("profile");
+        navigate("/technician/profile?tab=profile");
+      },
     },
   ];
 

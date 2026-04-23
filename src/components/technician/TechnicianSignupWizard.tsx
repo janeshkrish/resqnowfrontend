@@ -180,7 +180,7 @@ const TOWING_FLEET_TYPES = [
     },
     {
         id: "wheel-lift",
-        label: "Wheel-Lift Trucks",
+        label: "Front-Lift / Wheel-Lift Trucks",
         icon: Truck,
         description: "For rapid urban towing",
     },
@@ -363,7 +363,7 @@ const ServiceConfigCard = ({ serviceId, index, register, watch, setValue, select
         serviceId === "flat-tire"
             ? "Tap the vehicle categories and subcategories you cover, then enter separate tube tyre and tubeless puncture prices."
             : serviceId === "towing"
-                ? "Select the vehicle categories you tow and enter the base towing price for each one."
+                ? "Select the vehicle categories you tow and set separate pricing for each selected tow truck type."
                 : pricingMeta?.description || "Tap the vehicle categories you support, then enter your pricing.";
 
     const syncField = (fieldName: string, value: unknown) => {
@@ -428,38 +428,72 @@ const ServiceConfigCard = ({ serviceId, index, register, watch, setValue, select
                         </div>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-3">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-foreground">Base charge (INR)</Label>
-                            <Input
-                                type="number"
-                                inputMode="numeric"
-                                min="0"
-                                placeholder="e.g. 1200"
-                                {...register(`${prefix}.towing_vehicle_pricing.${vehicleType}.base_charge`)}
-                            />
+                    {towingFleetTypes.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                            Select at least one tow truck type above to add pricing for this vehicle category.
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-foreground">Free distance (km)</Label>
-                            <Input
-                                type="number"
-                                inputMode="numeric"
-                                min="0"
-                                placeholder="e.g. 5"
-                                {...register(`${prefix}.towing_vehicle_pricing.${vehicleType}.free_distance`)}
-                            />
+                    ) : (
+                        <div className="space-y-4">
+                            {towingFleetTypes.map((fleetType) => {
+                                const fleetConfig = TOWING_FLEET_TYPES.find((option) => option.id === fleetType);
+                                if (!fleetConfig) return null;
+                                const FleetIcon = fleetConfig.icon;
+
+                                return (
+                                    <div key={fleetType} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                <FleetIcon className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-foreground">{fleetConfig.label}</p>
+                                                <p className="text-xs text-muted-foreground">{fleetConfig.description}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-3 md:grid-cols-3">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-foreground">Base charge (INR)</Label>
+                                                <Input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min="0"
+                                                    placeholder="e.g. 1200"
+                                                    {...register(
+                                                        `${prefix}.towing_vehicle_pricing.${vehicleType}.fleet_pricing.${fleetType}.base_charge`
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-foreground">Free distance up to (km)</Label>
+                                                <Input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min="0"
+                                                    placeholder="e.g. 5"
+                                                    {...register(
+                                                        `${prefix}.towing_vehicle_pricing.${vehicleType}.fleet_pricing.${fleetType}.free_distance`
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-foreground">Cost per km (INR)</Label>
+                                                <Input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min="0"
+                                                    placeholder="e.g. 45"
+                                                    {...register(
+                                                        `${prefix}.towing_vehicle_pricing.${vehicleType}.fleet_pricing.${fleetType}.per_km_charge`
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-foreground">Per km charge (INR)</Label>
-                            <Input
-                                type="number"
-                                inputMode="numeric"
-                                min="0"
-                                placeholder="e.g. 45"
-                                {...register(`${prefix}.towing_vehicle_pricing.${vehicleType}.per_km_charge`)}
-                            />
-                        </div>
-                    </div>
+                    )}
                 </div>
             );
         }
@@ -512,6 +546,45 @@ const ServiceConfigCard = ({ serviceId, index, register, watch, setValue, select
                                 </button>
                             );
                         })}
+                    </div>
+
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                        <div className="mb-3">
+                            <p className="font-semibold text-foreground">Visit and distance charges</p>
+                            <p className="text-xs text-muted-foreground">Add the visit charge and distance pricing for this vehicle category.</p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-foreground">Visit charge (INR)</Label>
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="0"
+                                    placeholder="e.g. 120"
+                                    {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.visit_charge`)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-foreground">Free distance up to (km)</Label>
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="0"
+                                    placeholder="e.g. 3"
+                                    {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.free_distance`)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-foreground">Cost per km (INR)</Label>
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="0"
+                                    placeholder="e.g. 20"
+                                    {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.extra_km_charge`)}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {selectedSubcategories.length === 0 ? (

@@ -129,6 +129,8 @@ const buildFlatTireVehiclePricing = (
   return pruneEmpty({
     service_charge: minimumPrice,
     visit_charge: toNumberOrNull(row.visit_charge),
+    free_distance: toNumberOrNull(row.free_distance),
+    extra_km_charge: toNumberOrNull(row.extra_km_charge),
     [getVehicleBasePriceKey(vehicleType)]: minimumPrice,
     subcategories,
   }) as Record<string, unknown> | null;
@@ -136,12 +138,50 @@ const buildFlatTireVehiclePricing = (
 
 const buildTowingVehiclePricing = (value: unknown, fleetTypes: string[]) => {
   const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const rawFleetPricing =
+    row.fleet_pricing && typeof row.fleet_pricing === "object"
+      ? (row.fleet_pricing as Record<string, Record<string, unknown>>)
+      : {};
+  const normalizedFleetTypes = uniqueStrings(
+    fleetTypes.length > 0 ? fleetTypes : Object.keys(rawFleetPricing)
+  );
+  const fleetPricingEntries = normalizedFleetTypes
+    .map((fleetType) => {
+      const fleetRow =
+        rawFleetPricing[fleetType] && typeof rawFleetPricing[fleetType] === "object"
+          ? rawFleetPricing[fleetType]
+          : {};
+      const sanitizedPricing = pruneEmpty({
+        base_charge: toNumberOrNull(fleetRow.base_charge),
+        free_distance: toNumberOrNull(fleetRow.free_distance),
+        extra_km_charge: toNumberOrNull(fleetRow.per_km_charge ?? fleetRow.extra_km_charge),
+      }) as Record<string, unknown> | null;
 
-  return pruneEmpty({
+      if (!sanitizedPricing) return null;
+      return [fleetType, sanitizedPricing] as const;
+    })
+    .filter(Boolean) as Array<readonly [string, Record<string, unknown>]>;
+  const fleetPricingMap =
+    fleetPricingEntries.length > 0 ? Object.fromEntries(fleetPricingEntries) : null;
+  const legacyPricing = pruneEmpty({
     base_charge: toNumberOrNull(row.base_charge),
     free_distance: toNumberOrNull(row.free_distance),
     extra_km_charge: toNumberOrNull(row.per_km_charge ?? row.extra_km_charge),
-    tow_truck_types: uniqueStrings(fleetTypes),
+  }) as Record<string, unknown> | null;
+  const defaultTowTruckType =
+    normalizedFleetTypes.find((fleetType) => fleetPricingMap?.[fleetType]) ||
+    fleetPricingEntries[0]?.[0] ||
+    null;
+  const defaultFleetPricing =
+    (defaultTowTruckType && fleetPricingMap?.[defaultTowTruckType]) || legacyPricing;
+
+  return pruneEmpty({
+    base_charge: defaultFleetPricing?.base_charge ?? legacyPricing?.base_charge ?? null,
+    free_distance: defaultFleetPricing?.free_distance ?? legacyPricing?.free_distance ?? null,
+    extra_km_charge: defaultFleetPricing?.extra_km_charge ?? legacyPricing?.extra_km_charge ?? null,
+    tow_truck_types: normalizedFleetTypes,
+    default_tow_truck_type: defaultTowTruckType,
+    fleet_pricing: fleetPricingMap,
   }) as Record<string, unknown> | null;
 };
 

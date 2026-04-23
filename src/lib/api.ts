@@ -73,10 +73,15 @@ const defaultTechnicians = () => [
   {
     id: "tech-101",
     role: "towing",
+    account_role: "technician",
+    operational_role: "towing",
     service_type: "towing",
     name: "Rapid Auto Care",
     email: "rapid@resqnow.demo",
     phone: "+91 9876500001",
+    documents: {
+      profile_photo: "/users/user1.jpg",
+    },
     verification_status: "verified",
     specialties: ["Towing Assistance", "Battery Jump Start", "Tyre / Puncture Repair"],
     vehicle_types: { car: true, bike: true, commercial: true, ev: true },
@@ -91,10 +96,15 @@ const defaultTechnicians = () => [
   {
     id: "tech-102",
     role: "mechanical",
+    account_role: "technician",
+    operational_role: "mechanical",
     service_type: "mechanical",
     name: "City Bike Clinic",
     email: "bike@resqnow.demo",
     phone: "+91 9876500002",
+    documents: {
+      profile_photo: "/users/user2.jpg",
+    },
     verification_status: "pending",
     specialties: ["Tyre / Puncture Repair", "Fuel Delivery"],
     vehicle_types: { bike: true, ev: true },
@@ -358,6 +368,7 @@ const withTechnician = (request: AnyRecord) => {
       name: technician.name,
       phone: technician.phone,
       rating: technician.rating,
+      avatar_url: technician?.documents?.profile_photo || null,
       location_lat: technician.latitude,
       location_lng: technician.longitude,
       completedJobs: technician.jobs_completed,
@@ -1146,7 +1157,32 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/technicians/me/dues" && method === "GET") return json({ total: getMockPendingDues() });
   if (path === "/api/technicians/me/active-job" && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
   if (/^\/api\/technician\/active-job\/[^/]+$/.test(path) && method === "GET") return json(withTechnician(getRequests().find((item) => ["assigned", "accepted", "en-route", "arrived", "in-progress", "awaiting_payment", "payment_pending"].includes(String(item.status).toLowerCase())) || null));
-  if (path === "/api/technicians/me/profile" && method === "PATCH") return json({ success: true });
+  if (path === "/api/technicians/me/profile" && method === "PATCH") {
+    const technicians = getTechnicians();
+    const current = technicians[0];
+    if (!current) return json({ error: "Technician not found." }, 404);
+
+    const nextDocuments = {
+      ...(current.documents && typeof current.documents === "object" ? current.documents : {}),
+      ...(body.documents && typeof body.documents === "object" ? body.documents : {}),
+    };
+    if (body.profile_photo !== undefined) {
+      nextDocuments.profile_photo = String(body.profile_photo || "").trim();
+    }
+
+    technicians[0] = {
+      ...current,
+      name: body.name !== undefined ? String(body.name || "").trim() : current.name,
+      phone: body.phone !== undefined ? String(body.phone || "").trim() : current.phone,
+      address: body.address !== undefined ? String(body.address || "").trim() : current.address,
+      experience: body.experience !== undefined ? Number(body.experience || 0) : current.experience,
+      serviceAreaRange:
+        body.service_area_range !== undefined ? Number(body.service_area_range || 0) : current.serviceAreaRange,
+      documents: nextDocuments,
+    };
+    setTechnicians(technicians);
+    return json({ success: true, technician: technicians[0] });
+  }
   if (path === "/api/technicians/me/payout-transactions" && method === "GET") return json([]);
   if (path === "/api/technicians/me/location" && method === "PATCH") return json({ success: true });
   if (path === "/api/technicians/me/pay-dues/order" && method === "POST") return json({ id: `order_dues_${Date.now()}`, amount: Math.round(getMockPendingDues() * 100), currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo" });

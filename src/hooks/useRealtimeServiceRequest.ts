@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
+import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -103,12 +103,16 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           const parsedLng = Number(rawLng);
           const parsedRating = Number(techData?.rating);
           const parsedCompletedJobs = Number(techData?.completedJobs ?? techData?.jobs_completed ?? 0);
+          const rawAvatarUrl = String(techData?.avatar_url || techData?.profile_photo || "").trim();
 
           techData.id = techId;
           techData.location_lat = Number.isFinite(parsedLat) ? parsedLat : undefined;
           techData.location_lng = Number.isFinite(parsedLng) ? parsedLng : undefined;
           techData.rating = Number.isFinite(parsedRating) ? parsedRating : 0;
           techData.completedJobs = Number.isFinite(parsedCompletedJobs) ? parsedCompletedJobs : 0;
+          techData.avatar_url = rawAvatarUrl
+            ? (/^https?:\/\//i.test(rawAvatarUrl) ? rawAvatarUrl : apiUrl(rawAvatarUrl))
+            : undefined;
 
           setTechnician(techData);
 

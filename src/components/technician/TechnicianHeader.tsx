@@ -10,10 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, User, Settings } from "lucide-react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
+import { apiUrl } from "@/lib/api";
 
 const TechnicianHeader = () => {
   const { technician, isAuthenticated, logout } = useTechnicianAuth();
@@ -37,6 +38,10 @@ const TechnicianHeader = () => {
   const isActive = (path: string) => {
     return location.pathname === path;
   };
+  const profilePhotoPath = String((technician as any)?.documents?.profile_photo || "").trim();
+  const profileImageUrl = profilePhotoPath
+    ? (/^https?:\/\//i.test(profilePhotoPath) ? profilePhotoPath : apiUrl(profilePhotoPath))
+    : null;
 
   const navLinks = [
     { path: "/", label: "Home" },
@@ -80,6 +85,9 @@ const TechnicianHeader = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 border-2 border-border shadow-sm hover:shadow-md transition-shadow">
                     <Avatar className="h-full w-full">
+                      {profileImageUrl ? (
+                        <AvatarImage src={profileImageUrl} alt={`${technician?.name || "Technician"} profile`} className="object-cover" />
+                      ) : null}
                       <AvatarFallback className="bg-blue-50 text-blue-700 font-bold">
                         {technician ? getInitials(technician.name) : <User className="h-5 w-5" />}
                       </AvatarFallback>

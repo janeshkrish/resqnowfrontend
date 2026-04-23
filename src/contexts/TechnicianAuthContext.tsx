@@ -12,6 +12,7 @@ const TechnicianAuthContext = createContext<TechnicianAuthContextType>({
   register: async () => ({}),
   approveTechnician: async () => false,
   rejectTechnician: async () => false,
+  refreshTechnician: async () => null,
   isOnline: false,
   setIsOnline: () => { },
   logout: async () => { },

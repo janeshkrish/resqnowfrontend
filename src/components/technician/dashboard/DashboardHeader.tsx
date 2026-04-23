@@ -91,13 +91,18 @@ const DashboardHeader = ({
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
-                Technician Dashboard
-              </p>
-              <h1 className="truncate text-2xl font-black tracking-tight md:text-3xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-white/90">
+                  ResQNow
+                </span>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
+                  Technician Dashboard
+                </p>
+              </div>
+              <h1 className="mt-3 max-w-[18rem] text-2xl font-black leading-tight tracking-tight break-words md:max-w-[24rem] md:text-3xl">
                 Hello, {technicianName}
               </h1>
-              <p className="mt-1 text-sm text-white/70">SP ID: {technicianId}</p>
+              <p className="mt-2 text-sm text-white/70">SP ID: {technicianId}</p>
             </div>
           </div>
 

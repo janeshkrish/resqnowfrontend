@@ -26,7 +26,6 @@ import {
   buildOrderPerformanceSummary,
   calculateRewardPoints,
   countEnabledVehicleTypes,
-  getGreetingName,
 } from "@/utils/technicianDashboard";
 import { isTowingTechnician as isTowingTechnicianRole } from "@/utils/technicianRole";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
@@ -1704,9 +1703,9 @@ const TechnicianDashboard = () => {
   );
   const fleetCount = isTowingOperator ? towingManagement.vehicles.length : defaultFleetCount;
   const teamCount = isTowingOperator ? towingManagement.employees.length : defaultTeamCount;
-  const technicianGreetingName = getGreetingName(
-    String((technicianSnapshot as any)?.proprietor_name || technicianSnapshot?.name || "").trim()
-  );
+  const technicianDisplayName = String(
+    (technicianSnapshot as any)?.proprietor_name || technicianSnapshot?.name || "Technician"
+  ).trim() || "Technician";
   const technicianIdentifier = String(
     (technicianSnapshot as any)?.technician_id || (technicianSnapshot as any)?.sp_id || technicianSnapshot?.id || ""
   );
@@ -1721,7 +1720,7 @@ const TechnicianDashboard = () => {
         {showIdleDashboard ? (
           <TechnicianDashboardOverview
             showTowingManagement={isTowingOperator}
-            technicianName={technicianGreetingName}
+            technicianName={technicianDisplayName}
             technicianId={technicianIdentifier}
             profileImageUrl={profileImageUrl}
             isOnline={isOnline}

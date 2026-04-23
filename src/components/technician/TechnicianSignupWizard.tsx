@@ -18,17 +18,21 @@ import {
     Loader2, ArrowRight, Check, Car, MapPin, User, Wrench, CreditCard,
     Upload, Clock, Key, AlertTriangle, Truck, Zap,
     CheckCircle2, ChevronRight, Fuel, ChevronLeft, Building2, Wallet,
-    Globe, Briefcase, Smartphone
+    Globe, Briefcase, Smartphone, Bike, Bus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SERVICE_CATALOG } from "@/config/serviceCatalog";
 import {
-    normalizePricingConfigForApi,
     normalizeSpecialtiesForApi,
     normalizeVehicleTypesForApi,
+    normalizePricingConfigForApi,
 } from "@/config/technicianNormalization";
 import { apiUrl } from "@/lib/api";
+import {
+    buildSignupPricingPayload,
+    getSelectedSignupVehicleTypes,
+} from "@/utils/technicianSignupPricing";
 
 // --- Zod Schema ---
 
@@ -59,6 +63,7 @@ const technicianSchema = z.object({
     vehicle_types: z.any().refine((data) => data && Object.values(data).some(val => val === true), {
         message: "Select at least one vehicle type"
     }),
+    towing_fleet_types: z.array(z.string()).default([]),
 
     // Step 2: Verification
     aadhaar_number: z.string().min(12, "12 digits required").max(12),
@@ -99,12 +104,26 @@ const technicianSchema = z.object({
     consent: z.object({
         agreed: z.boolean().refine(val => val === true, "Required"),
     }),
-}).refine((data) => data.password === data.confirmPassword, {
-    message: "Mismatch",
-    path: ["confirmPassword"],
+}).superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Mismatch",
+            path: ["confirmPassword"],
+        });
+    }
+
+    if (data.specialties.includes("towing") && data.towing_fleet_types.length === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Select at least one tow truck type",
+            path: ["towing_fleet_types"],
+        });
+    }
 });
 
 type TechnicianFormValues = z.infer<typeof technicianSchema>;
+type SignupVehicleType = ReturnType<typeof getSelectedSignupVehicleTypes>[number];
 
 
 // --- Constants ---
@@ -145,11 +164,135 @@ const SERVICE_NAME_BY_ID = ALL_SERVICES.reduce<Record<string, string>>((acc, ser
 }, {});
 
 const VEHICLES = [
-    { id: "Two-Wheeler", label: "M/Cycle", icon: Car },
-    { id: "Four-Wheeler", label: "Car", icon: Car },
-    { id: "Commercial", label: "Truck", icon: Truck },
-    { id: "EV", label: "EV", icon: Zap },
+    { id: "bike", label: "M/Cycle", icon: Bike, description: "Two-wheelers and scooters" },
+    { id: "car", label: "Car", icon: Car, description: "Cars and personal vehicles" },
+    { id: "commercial", label: "Truck", icon: Bus, description: "Commercial vehicles" },
+    { id: "ev", label: "EV", icon: Zap, description: "Electric vehicles" },
 ];
+
+const TOWING_FLEET_TYPES = [
+    {
+        id: "flatbed",
+        label: "Flatbed Trucks",
+        icon: Car,
+        description: "For luxury and damaged cars",
+    },
+    {
+        id: "wheel-lift",
+        label: "Wheel-Lift Trucks",
+        icon: Truck,
+        description: "For rapid urban towing",
+    },
+    {
+        id: "heavy-duty-wrecker",
+        label: "Heavy-Duty Wreckers",
+        icon: Bus,
+        description: "For commercial vehicles",
+    },
+] as const;
+
+const VEHICLE_PRICING_VISUALS: Record<string, { label: string; icon: any; description: string }> = {
+    bike: { label: "Bike", icon: Bike, description: "Two-wheeler roadside jobs" },
+    car: { label: "Car", icon: Car, description: "Personal cars and SUVs" },
+    commercial: { label: "Commercial", icon: Bus, description: "Truck and fleet support" },
+    ev: { label: "EV", icon: Zap, description: "Electric vehicle support" },
+};
+
+const FLAT_TIRE_SUBCATEGORY_CONFIG: Record<string, { label: string; helper: string; items: { id: string; label: string }[] }> = {
+    bike: {
+        label: "Bike Categories",
+        helper: "Pick the two-wheeler segments you service.",
+        items: [
+            { id: "scooter", label: "Scooter" },
+            { id: "commuter-bike", label: "Commuter Bike" },
+            { id: "sports-bike", label: "Sports Bike" },
+            { id: "premium-bike", label: "Premium Bike" },
+        ],
+    },
+    car: {
+        label: "Car Categories",
+        helper: "Pick the car segments you cover.",
+        items: [
+            { id: "hatchback", label: "Hatchback" },
+            { id: "compact-suv", label: "Compact SUV" },
+            { id: "sedan", label: "Sedan" },
+            { id: "big-suv", label: "Big SUV" },
+        ],
+    },
+    commercial: {
+        label: "Truck Categories",
+        helper: "Pick the commercial segments you support.",
+        items: [
+            { id: "pickup-mini-truck", label: "Pickup / Mini Truck" },
+            { id: "tempo-van", label: "Tempo / Van" },
+            { id: "light-commercial", label: "Light Commercial" },
+            { id: "heavy-truck", label: "Heavy Truck" },
+        ],
+    },
+    ev: {
+        label: "EV Categories",
+        helper: "Pick the electric vehicle segments you handle.",
+        items: [
+            { id: "electric-scooter", label: "Electric Scooter" },
+            { id: "electric-bike", label: "Electric Bike" },
+            { id: "electric-car", label: "Electric Car" },
+            { id: "electric-suv", label: "Electric SUV" },
+        ],
+    },
+};
+
+const SERVICE_PRICING_FIELD_CONFIG: Record<
+    string,
+    {
+        description: string;
+        helper?: string;
+        fields: { id: string; label: string; placeholder: string }[];
+    }
+> = {
+    mechanical: {
+        description: "Enter the standard roadside repair charge for each vehicle category you support.",
+        fields: [
+            { id: "service_charge", label: "Service charge (INR)", placeholder: "e.g. 450" },
+            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 150" },
+        ],
+    },
+    battery: {
+        description: "Set your jumpstart pricing by vehicle category.",
+        fields: [
+            { id: "service_charge", label: "Jumpstart charge (INR)", placeholder: "e.g. 350" },
+            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 120" },
+        ],
+    },
+    fuel: {
+        description: "Enter only the delivery charge. Fuel cost can still be billed separately.",
+        helper: "Fuel amount can be collected separately at actuals.",
+        fields: [{ id: "delivery_charge", label: "Delivery charge (INR)", placeholder: "e.g. 200" }],
+    },
+    lockout: {
+        description: "Set your lockout support pricing for each category you service.",
+        fields: [
+            { id: "service_charge", label: "Unlock charge (INR)", placeholder: "e.g. 400" },
+            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 100" },
+        ],
+    },
+    winching: {
+        description: "Set the recovery fee you want to quote for each vehicle category.",
+        fields: [
+            { id: "service_charge", label: "Recovery fee (INR)", placeholder: "e.g. 800" },
+            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 200" },
+        ],
+    },
+    "ev-charging": {
+        description: "Set the emergency charging support fee by vehicle category.",
+        fields: [
+            { id: "service_charge", label: "Charging support fee (INR)", placeholder: "e.g. 500" },
+            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 150" },
+        ],
+    },
+};
+
+const toggleArrayValue = (values: string[], nextValue: string) =>
+    values.includes(nextValue) ? values.filter((value) => value !== nextValue) : [...values, nextValue];
 
 
 // --- Components ---
@@ -205,121 +348,336 @@ const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (ur
     );
 };
 
-// --- SERVICE CONFIGURATION WITH FULL LOGIC ---
-const ServiceConfigCard = ({ serviceId, index, register, watch, setValue }: any) => {
+// --- SERVICE CONFIGURATION WITH STRUCTURED VEHICLE PRICING ---
+const ServiceConfigCard = ({ serviceId, index, register, watch, setValue, selectedVehicleTypes }: any) => {
     const prefix = `pricing_config.${index}`;
     const serviceLabel = SERVICE_NAME_BY_ID[serviceId] || serviceId;
-    const getFieldName = (field: string) => `${prefix}.${field}`;
-    const renderSectionHeader = (title: string) => <div className="font-bold text-xs mt-3 mb-2 text-muted-foreground/80 uppercase">{title}</div>;
+    const serviceVisual = ALL_SERVICES.find((service) => service.id === serviceId);
+    const serviceIcon = serviceVisual?.icon || Wrench;
+    const vehicleCategories = (watch(`${prefix}.vehicle_categories`) || []) as SignupVehicleType[];
+    const towingFleetTypes = (watch("towing_fleet_types") || []) as string[];
+    const availableVehicleTypes = (selectedVehicleTypes || []).filter((vehicleType: SignupVehicleType) => VEHICLE_PRICING_VISUALS[vehicleType]);
+    const pricingMeta = SERVICE_PRICING_FIELD_CONFIG[serviceId];
+    const cardDescription =
+        serviceId === "flat-tire"
+            ? "Tap the vehicle categories and subcategories you cover, then enter separate tube tyre and tubeless puncture prices."
+            : serviceId === "towing"
+                ? "Select the vehicle categories you tow and enter the base towing price for each one."
+                : pricingMeta?.description || "Tap the vehicle categories you support, then enter your pricing.";
 
-    // Helper to sync array checkboxes
-    const handleCheckboxArray = (option: string, fieldName: string) => {
-        const currentList = watch(fieldName) || [];
-        const exists = currentList.includes(option);
-        if (exists) {
-            setValue(fieldName, currentList.filter((x: string) => x !== option));
-        } else {
-            setValue(fieldName, [...currentList, option]);
+    const syncField = (fieldName: string, value: unknown) => {
+        setValue(fieldName, value, { shouldDirty: true, shouldValidate: true });
+    };
+
+    const toggleVehicleCategory = (vehicleType: SignupVehicleType) => {
+        syncField(`${prefix}.vehicle_categories`, toggleArrayValue(vehicleCategories, vehicleType));
+    };
+
+    const toggleFlatTireSubcategory = (
+        vehicleType: SignupVehicleType,
+        subcategoryId: string,
+        subcategoryLabel: string
+    ) => {
+        const fieldName = `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.selected_subcategories`;
+        const currentValues = (watch(fieldName) || []) as string[];
+        const nextValues = toggleArrayValue(currentValues, subcategoryId);
+        syncField(fieldName, nextValues);
+        if (nextValues.includes(subcategoryId)) {
+            syncField(
+                `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.label`,
+                subcategoryLabel
+            );
         }
     };
 
-    const isChecked = (option: string, fieldName: string) => (watch(fieldName) || []).includes(option);
+    const renderVehiclePricingSection = (vehicleType: SignupVehicleType) => {
+        const visual = VEHICLE_PRICING_VISUALS[vehicleType];
+        if (!visual) return null;
+
+        const VehicleIcon = visual.icon;
+
+        if (serviceId === "towing") {
+            return (
+                <div key={vehicleType} className="rounded-2xl border border-border/70 bg-card p-4 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <VehicleIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-foreground">{visual.label}</h4>
+                            <p className="text-xs text-muted-foreground">{visual.description}</p>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-dashed border-primary/20 bg-primary/5 px-3 py-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-primary/80">Fleet Selected</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {towingFleetTypes.length > 0 ? (
+                                towingFleetTypes.map((fleetType) => {
+                                    const fleetConfig = TOWING_FLEET_TYPES.find((option) => option.id === fleetType);
+                                    return (
+                                        <span key={fleetType} className="rounded-full border border-primary/20 bg-card px-3 py-1 text-xs font-medium text-foreground">
+                                            {fleetConfig?.label || fleetType}
+                                        </span>
+                                    );
+                                })
+                            ) : (
+                                <span className="text-xs text-muted-foreground">Select tow truck types above to complete this section.</span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-foreground">Base charge (INR)</Label>
+                            <Input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder="e.g. 1200"
+                                {...register(`${prefix}.towing_vehicle_pricing.${vehicleType}.base_charge`)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-foreground">Free distance (km)</Label>
+                            <Input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder="e.g. 5"
+                                {...register(`${prefix}.towing_vehicle_pricing.${vehicleType}.free_distance`)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-foreground">Per km charge (INR)</Label>
+                            <Input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder="e.g. 45"
+                                {...register(`${prefix}.towing_vehicle_pricing.${vehicleType}.per_km_charge`)}
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (serviceId === "flat-tire") {
+            const subcategoryConfig = FLAT_TIRE_SUBCATEGORY_CONFIG[vehicleType];
+            const selectedSubcategories = (watch(
+                `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.selected_subcategories`
+            ) || []) as string[];
+
+            return (
+                <div key={vehicleType} className="rounded-2xl border border-border/70 bg-card p-4 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <VehicleIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-foreground">{subcategoryConfig?.label || visual.label}</h4>
+                            <p className="text-xs text-muted-foreground">
+                                {subcategoryConfig?.helper || "Select the segments you cover and enter pricing."}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {subcategoryConfig?.items.map((subcategory) => {
+                            const isSelected = selectedSubcategories.includes(subcategory.id);
+                            return (
+                                <button
+                                    key={subcategory.id}
+                                    type="button"
+                                    onClick={() => toggleFlatTireSubcategory(vehicleType, subcategory.id, subcategory.label)}
+                                    className={cn(
+                                        "rounded-xl border px-3 py-3 text-left transition-all",
+                                        isSelected
+                                            ? "border-primary bg-primary/5 shadow-sm"
+                                            : "border-border bg-muted/30 hover:bg-muted/60"
+                                    )}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="text-sm font-semibold text-foreground">{subcategory.label}</span>
+                                        {isSelected ? (
+                                            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-white">
+                                                <Check className="h-3.5 w-3.5" />
+                                            </div>
+                                        ) : (
+                                            <div className="h-5 w-5 rounded border-2 border-border" />
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {selectedSubcategories.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                            Tap at least one {visual.label.toLowerCase()} segment to add puncture pricing.
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {selectedSubcategories.map((subcategoryId) => {
+                                const subcategory = subcategoryConfig?.items.find((item) => item.id === subcategoryId);
+                                if (!subcategory) return null;
+
+                                return (
+                                    <div key={subcategoryId} className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold text-foreground">{subcategory.label}</p>
+                                                <p className="text-xs text-muted-foreground">Enter the puncture pricing for both tyre types.</p>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="hidden"
+                                            {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.label`)}
+                                            value={subcategory.label}
+                                            readOnly
+                                        />
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-foreground">Tube tyre puncture (INR)</Label>
+                                                <Input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min="0"
+                                                    placeholder="e.g. 120"
+                                                    {...register(
+                                                        `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.tube_tyre_price`
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-foreground">Tubeless puncture (INR)</Label>
+                                                <Input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min="0"
+                                                    placeholder="e.g. 180"
+                                                    {...register(
+                                                        `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.tubeless_price`
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        return (
+            <div key={vehicleType} className="rounded-2xl border border-border/70 bg-card p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <VehicleIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-foreground">{visual.label}</h4>
+                        <p className="text-xs text-muted-foreground">{visual.description}</p>
+                    </div>
+                </div>
+                <div className={cn("grid gap-3", pricingMeta?.fields.length === 1 ? "md:grid-cols-1" : "md:grid-cols-2")}>
+                    {pricingMeta?.fields.map((field) => (
+                        <div key={field.id} className="space-y-2">
+                            <Label className="text-xs font-semibold text-foreground">{field.label}</Label>
+                            <Input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder={field.placeholder}
+                                {...register(`${prefix}.vehicle_pricing.${vehicleType}.${field.id}`)}
+                            />
+                        </div>
+                    ))}
+                </div>
+                {pricingMeta?.helper ? (
+                    <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        {pricingMeta.helper}
+                    </div>
+                ) : null}
+            </div>
+        );
+    };
 
     return (
         <Card className="mb-4 border shadow-sm">
-            <CardHeader className="bg-muted py-2 px-4 border-b flex flex-row items-center gap-2">
-                <Wrench className="w-4 h-4 text-primary" />
-                <CardTitle className="text-sm font-bold text-foreground">{serviceLabel}</CardTitle>
+            <CardHeader className="border-b bg-muted/60 px-4 py-3">
+                <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        {React.createElement(serviceIcon, { className: "h-5 w-5" })}
+                    </div>
+                    <div className="space-y-1">
+                        <CardTitle className="text-base font-bold text-foreground">{serviceLabel}</CardTitle>
+                        <CardDescription className="text-xs leading-relaxed text-muted-foreground">
+                            {cardDescription}
+                        </CardDescription>
+                    </div>
+                </div>
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
-                <input type="hidden" {...register(getFieldName("service_name"))} value={serviceId} />
-
-                {/* --- 1. TYRE / PUNCTURE REPAIR --- */}
-                {serviceId === "flat-tire" && (
-                    <>
+            <CardContent className="space-y-5 p-4">
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
                         <div>
-                            {renderSectionHeader("Includes")}
-                            <div className="flex flex-wrap gap-2">
-                                {["Tube puncture repair", "Valve replacement", "Wheel removal"].map(opt => (
-                                    <div key={opt} className={cn("px-3 py-1.5 rounded-full text-xs font-medium border cursor-pointer", isChecked(opt, getFieldName("work_included")) ? "bg-slate-800 text-white border-slate-800" : "bg-card dark:bg-slate-900 text-muted-foreground border-border")}
-                                        onClick={() => handleCheckboxArray(opt, getFieldName("work_included"))}>
-                                        {opt}
-                                    </div>
-                                ))}
-                            </div>
+                            <p className="text-sm font-semibold text-foreground">Vehicle categories</p>
+                            <p className="text-xs text-muted-foreground">Tap the categories you want to price for this service.</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 mt-2">
-                            <div><label className="text-xs font-semibold">2W Charge (₹)</label><div className="flex gap-1"><Input placeholder="Min" className="h-8 text-xs" {...register(getFieldName("price_2w_min"))} /><Input placeholder="Max" className="h-8 text-xs" {...register(getFieldName("price_2w_max"))} /></div></div>
-                            <div><label className="text-xs font-semibold">4W Charge (₹)</label><div className="flex gap-1"><Input placeholder="Min" className="h-8 text-xs" {...register(getFieldName("price_4w_min"))} /><Input placeholder="Max" className="h-8 text-xs" {...register(getFieldName("price_4w_max"))} /></div></div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                            <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Visit (₹)</label><Input className="h-8" type="number" {...register(getFieldName("visit_charge"))} /></div>
-                            <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Free Km</label><Input className="h-8" type="number" {...register(getFieldName("free_distance"))} /></div>
-                            <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Extra/Km</label><Input className="h-8" type="number" {...register(getFieldName("extra_km_charge"))} /></div>
-                        </div>
-                    </>
-                )}
-
-                {/* --- 2. TUBELESS REPAIR --- */}
-                {serviceId === "__tubeless-legacy__" && (
-                    <>
-                        <div>
-                            {renderSectionHeader("Type")}
-                            <div className="flex gap-2">
-                                {["Plug repair", "Patch repair"].map(opt => (
-                                    <div key={opt} className={cn("px-3 py-1.5 rounded-full text-xs font-medium border cursor-pointer", isChecked(opt, getFieldName("work_included")) ? "bg-slate-800 text-white border-slate-800" : "bg-card dark:bg-slate-900 text-muted-foreground border-border")}
-                                        onClick={() => handleCheckboxArray(opt, getFieldName("work_included"))}>
-                                        {opt}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-xs font-semibold">Per Puncture (₹)</label><Input className="h-9" type="number" {...register(getFieldName("per_puncture_charge"))} /></div>
-                            <div><label className="text-xs font-semibold">Night Extra (₹)</label><Input className="h-9" type="number" {...register(getFieldName("night_charge"))} /></div>
-                        </div>
-                    </>
-                )}
-
-                {/* --- 3. JUMPSTART --- */}
-                {serviceId === "battery" && (
-                    <div className="grid grid-cols-2 gap-3">
-                        <div><label className="text-xs font-semibold">Service Fee (₹)</label><Input className="h-9" type="number" {...register(getFieldName("service_charge"))} /></div>
-                        <div><label className="text-xs font-semibold">Visit Charge (₹)</label><Input className="h-9" type="number" {...register(getFieldName("visit_charge"))} /></div>
                     </div>
-                )}
-
-                {/* --- 5. TOWING --- */}
-                {serviceId === "towing" && (
-                    <>
-                        <div className="grid grid-cols-3 gap-2">
-                            <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Base (₹)</label><Input className="h-8" type="number" {...register(getFieldName("base_charge"))} /></div>
-                            <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Free Km</label><Input className="h-8" type="number" {...register(getFieldName("free_distance"))} /></div>
-                            <div><label className="text-[10px] font-bold text-muted-foreground/80 uppercase">Per Km</label><Input className="h-8" type="number" {...register(getFieldName("per_km_charge"))} /></div>
-                        </div>
-                        <div className="mt-2">
-                            <label className="text-xs font-semibold">Pricing Class</label>
-                            <Select onValueChange={(v) => setValue(getFieldName("vehicle_type_pricing"), v)}>
-                                <SelectTrigger className="h-9 mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-                                <SelectContent><SelectItem value="2w">Two Wheeler</SelectItem><SelectItem value="4w">Four Wheeler</SelectItem><SelectItem value="commercial">Commercial</SelectItem></SelectContent>
-                            </Select>
-                        </div>
-                    </>
-                )}
-
-                {/* --- 6. FUEL --- */}
-                {serviceId === "fuel" && (
-                    <div className="grid grid-cols-2 gap-3">
-                        <div><label className="text-xs font-semibold">Delivery Fee (₹)</label><Input className="h-9" type="number" {...register(getFieldName("delivery_charge"))} /></div>
-                        <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded flex items-center">Fuel cost charged at actuals.</div>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {availableVehicleTypes.map((vehicleType: SignupVehicleType) => {
+                            const visual = VEHICLE_PRICING_VISUALS[vehicleType];
+                            if (!visual) return null;
+                            const isSelected = vehicleCategories.includes(vehicleType);
+                            return (
+                                <button
+                                    key={vehicleType}
+                                    type="button"
+                                    onClick={() => toggleVehicleCategory(vehicleType)}
+                                    className={cn(
+                                        "rounded-2xl border px-4 py-4 text-left transition-all",
+                                        isSelected
+                                            ? "border-primary bg-primary/5 shadow-sm"
+                                            : "border-border bg-muted/20 hover:bg-muted/60"
+                                    )}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className={cn(
+                                            "flex h-10 w-10 items-center justify-center rounded-full",
+                                            isSelected ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                                        )}>
+                                            <visual.icon className="h-5 w-5" />
+                                        </div>
+                                        {isSelected ? (
+                                            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-white">
+                                                <Check className="h-3.5 w-3.5" />
+                                            </div>
+                                        ) : (
+                                            <div className="h-5 w-5 rounded border-2 border-border" />
+                                        )}
+                                    </div>
+                                    <p className="mt-3 text-sm font-semibold text-foreground">{visual.label}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">{visual.description}</p>
+                                </button>
+                            );
+                        })}
                     </div>
-                )}
+                </div>
 
-                {/* --- DEFAULT / GENERIC (Used for General Servicing, etc) --- */}
-                {!["flat-tire", "battery", "towing", "fuel"].includes(serviceId) && (
-                    <div className="grid grid-cols-2 gap-3">
-                        <div><label className="text-xs font-semibold">Min Labour (₹)</label><Input type="number" {...register(getFieldName("labour_min"))} className="h-9" /></div>
-                        <div><label className="text-xs font-semibold">Max Labour (₹)</label><Input type="number" {...register(getFieldName("labour_max"))} className="h-9" /></div>
+                {vehicleCategories.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
+                        Select at least one vehicle category above to enter pricing for {serviceLabel.toLowerCase()}.
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {vehicleCategories
+                            .filter((vehicleType) => availableVehicleTypes.includes(vehicleType))
+                            .map((vehicleType) => renderVehiclePricingSection(vehicleType))}
                     </div>
                 )}
             </CardContent>
@@ -348,6 +706,7 @@ const TechnicianSignupWizard = () => {
             aadhaar_number: "", gst_number: "",
             vehicle_types: {},
             specialties: [],
+            towing_fleet_types: [],
             pricing_config: [],
             working_hours: { opening_time: "09:00", closing_time: "20:00", weekly_off: "Sunday", is_24x7: false },
             payment_details: { modes: { cash: true }, upi_id: "", bank_name: "", bank_account_number: "", ifsc_code: "" },
@@ -358,11 +717,56 @@ const TechnicianSignupWizard = () => {
     });
 
     const { control, watch, setValue, trigger, register, formState: { errors } } = form;
-    const selectedServices = watch("specialties");
+    const selectedServices = watch("specialties") || [];
+    const selectedVehicleTypeMap = watch("vehicle_types");
+    const selectedVehicleTypes = getSelectedSignupVehicleTypes(selectedVehicleTypeMap);
+    const towingFleetTypes = watch("towing_fleet_types") || [];
 
     const handleLocationDetected = React.useCallback((loc: any) => {
         setValue("location", loc);
     }, [setValue]);
+
+    useEffect(() => {
+        const currentPricingConfig = Array.isArray(form.getValues("pricing_config")) ? form.getValues("pricing_config") : [];
+        const nextPricingConfig = selectedServices.map((serviceId: string) => {
+            const existingEntry =
+                currentPricingConfig.find((entry: any) => {
+                    const existingServiceId = String(entry?.service_domain || entry?.service_name || entry?.service || "").trim();
+                    return existingServiceId === serviceId;
+                }) || {};
+
+            const existingVehicleCategories = Array.isArray(existingEntry.vehicle_categories)
+                ? existingEntry.vehicle_categories.filter((vehicleType: SignupVehicleType) => selectedVehicleTypes.includes(vehicleType))
+                : [];
+
+            const nextEntry = {
+                ...existingEntry,
+                service_name: serviceId,
+                service_domain: serviceId,
+                vehicle_categories: existingVehicleCategories.length > 0 ? existingVehicleCategories : [...selectedVehicleTypes],
+            };
+
+            if (serviceId === "towing") {
+                return {
+                    ...nextEntry,
+                    towing_fleet_types: [...towingFleetTypes],
+                };
+            }
+
+            const { towing_fleet_types: _unused, ...restEntry } = nextEntry;
+            return restEntry;
+        });
+
+        if (JSON.stringify(currentPricingConfig) !== JSON.stringify(nextPricingConfig)) {
+            setValue("pricing_config", nextPricingConfig, { shouldDirty: false, shouldValidate: false });
+        }
+    }, [
+        form,
+        selectedServices,
+        selectedVehicleTypes,
+        setValue,
+        towingFleetTypes,
+    ]);
 
     // Scroll to top on step change
     useEffect(() => {
@@ -372,7 +776,7 @@ const TechnicianSignupWizard = () => {
     const handleNext = async () => {
         let fields: any[] = [];
         if (currentStep === 0) fields = ["proprietor_name", "name", "email", "password", "phone", "location", "experience", "serviceAreaRange"];
-        if (currentStep === 1) fields = ["specialties", "vehicle_types"];
+        if (currentStep === 1) fields = ["specialties", "vehicle_types", "towing_fleet_types"];
         if (currentStep === 2) fields = ["aadhaar_number", "documents"];
         if (currentStep === 6) fields = ["consent"];
 
@@ -399,7 +803,27 @@ const TechnicianSignupWizard = () => {
             if (data.password !== data.confirmPassword) { toast.error("Password mismatch"); return; }
             const normalizedSpecialties = normalizeSpecialtiesForApi(data.specialties);
             const normalizedVehicleTypes = normalizeVehicleTypesForApi(data.vehicle_types);
-            const normalizedPricingConfig = normalizePricingConfigForApi(data.pricing_config);
+            const selectedSignupVehicleTypes = getSelectedSignupVehicleTypes(normalizedVehicleTypes);
+            const normalizedPricingConfig = normalizePricingConfigForApi(
+                Array.isArray(data.pricing_config)
+                    ? data.pricing_config.map((entry: Record<string, unknown>) => {
+                        const currentVehicleCategories = Array.isArray(entry?.vehicle_categories)
+                            ? entry.vehicle_categories.filter((vehicleType) => selectedSignupVehicleTypes.includes(vehicleType as SignupVehicleType))
+                            : [];
+
+                        return {
+                            ...entry,
+                            vehicle_categories:
+                                currentVehicleCategories.length > 0 ? currentVehicleCategories : [...selectedSignupVehicleTypes],
+                            towing_fleet_types:
+                                entry?.service_domain === "towing" || entry?.service_name === "towing"
+                                    ? data.towing_fleet_types || []
+                                    : entry?.towing_fleet_types,
+                        };
+                    })
+                    : []
+            );
+            const { serviceCosts, pricingSummary } = buildSignupPricingPayload(normalizedPricingConfig);
             const payload = {
                 ...data,
                 specialties: normalizedSpecialties,
@@ -412,8 +836,8 @@ const TechnicianSignupWizard = () => {
                 district: data.location.district,
                 state: data.location.state,
                 service_type: normalizedSpecialties[0] || "other",
-                service_costs: normalizedPricingConfig,
-                pricing: normalizedPricingConfig,
+                service_costs: serviceCosts,
+                pricing: pricingSummary,
                 whatsapp_number: data.whatsapp_number || data.phone
             };
             await technicianAuthService.register(payload);
@@ -705,6 +1129,65 @@ const TechnicianSignupWizard = () => {
                                         })}
                                     </div>
                                 </div>
+
+                                {selectedServices.includes("towing") && (
+                                    <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                        <div className="pb-2 border-b border-border/50">
+                                            <h3 className="font-bold text-lg flex items-center gap-2"><Truck className="w-5 h-5 text-primary" /> Tow Truck Fleet *</h3>
+                                            <p className="text-xs text-muted-foreground mt-1">What kind of tow trucks do you have in your fleet? Tap all that apply.</p>
+                                        </div>
+                                        {errors.towing_fleet_types && (
+                                            <p className="text-xs text-red-500 font-medium bg-red-50 p-2 rounded">
+                                                Please select at least one tow truck type.
+                                            </p>
+                                        )}
+                                        <div className="grid gap-3 pt-2 md:grid-cols-3">
+                                            {TOWING_FLEET_TYPES.map((fleetType) => {
+                                                const isSelected = towingFleetTypes.includes(fleetType.id);
+                                                const FleetIcon = fleetType.icon;
+
+                                                return (
+                                                    <button
+                                                        key={fleetType.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setValue(
+                                                                "towing_fleet_types",
+                                                                toggleArrayValue(towingFleetTypes, fleetType.id),
+                                                                { shouldDirty: true, shouldValidate: true }
+                                                            );
+                                                            trigger("towing_fleet_types");
+                                                        }}
+                                                        className={cn(
+                                                            "rounded-2xl border p-4 text-left transition-all",
+                                                            isSelected
+                                                                ? "border-primary bg-primary/5 shadow-sm"
+                                                                : "border-border bg-muted/20 hover:bg-muted/60"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className={cn(
+                                                                "flex h-11 w-11 items-center justify-center rounded-full",
+                                                                isSelected ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                                                            )}>
+                                                                <FleetIcon className="h-5 w-5" />
+                                                            </div>
+                                                            {isSelected ? (
+                                                                <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-white">
+                                                                    <Check className="h-3.5 w-3.5" />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="h-5 w-5 rounded border-2 border-border" />
+                                                            )}
+                                                        </div>
+                                                        <p className="mt-3 text-sm font-semibold text-foreground">{fleetType.label}</p>
+                                                        <p className="mt-1 text-xs text-muted-foreground">{fleetType.description}</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -809,7 +1292,21 @@ const TechnicianSignupWizard = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    {selectedServices.map((s, i) => <div className="[&>div]:rounded-[1.5rem] [&>div]:shadow-sm [&>div]:border-border/60 [&_input]:h-11 [&_input]:rounded-lg [&_input]:bg-muted/50 [&_input]:border-transparent [&_input:focus]:border-primary" key={s}><ServiceConfigCard serviceId={s} index={i} register={register} watch={watch} setValue={setValue} /></div>)}
+                                    {selectedServices.map((s, i) => (
+                                        <div
+                                            className="[&>div]:rounded-[1.5rem] [&>div]:shadow-sm [&>div]:border-border/60 [&_input]:h-11 [&_input]:rounded-lg [&_input]:bg-muted/50 [&_input]:border-transparent [&_input:focus]:border-primary"
+                                            key={s}
+                                        >
+                                            <ServiceConfigCard
+                                                serviceId={s}
+                                                index={i}
+                                                register={register}
+                                                watch={watch}
+                                                setValue={setValue}
+                                                selectedVehicleTypes={selectedVehicleTypes}
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

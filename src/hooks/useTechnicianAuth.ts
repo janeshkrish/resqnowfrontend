@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Technician } from "@/types/technician";
 import { technicianAuthService } from "@/services/technicianAuthService";
 import { technicianAdminService } from "@/services/technicianAdminService";
@@ -9,36 +9,48 @@ export const useTechnicianAuth = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
 
+  const refreshTechnician = useCallback(async (options?: { signal?: AbortSignal }) => {
+    const token = getTechnicianToken();
+    if (!token) {
+      localStorage.removeItem("resqnow_technician");
+      setTechnician(null);
+      return null;
+    }
+
+    try {
+      const techData = await technicianAuthService.fetchTechnicianProfile("", options);
+      if (techData) {
+        setTechnician(techData);
+        localStorage.setItem("resqnow_technician", JSON.stringify(techData));
+        return techData;
+      }
+      localStorage.removeItem("resqnow_technician");
+      setTechnician(null);
+      return null;
+    } catch {
+      localStorage.removeItem("resqnow_technician");
+      setTechnician(null);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const checkTechnicianAuth = async () => {
-      const token = getTechnicianToken();
-      if (token) {
+      const techData = await refreshTechnician();
+      if (techData) {
         try {
-          const techData = await technicianAuthService.fetchTechnicianProfile("");
-          if (techData) {
-            setTechnician(techData);
-            localStorage.setItem("resqnow_technician", JSON.stringify(techData));
-            try {
-              await technicianAuthService.heartbeat({
-                source: "auth_restore",
-                path: window.location.pathname,
-              });
-            } catch (heartbeatError) {
-              console.warn("[TechnicianAuth] restore heartbeat failed:", heartbeatError);
-            }
-          } else {
-            localStorage.removeItem("resqnow_technician");
-          }
-        } catch {
-          localStorage.removeItem("resqnow_technician");
+          await technicianAuthService.heartbeat({
+            source: "auth_restore",
+            path: window.location.pathname,
+          });
+        } catch (heartbeatError) {
+          console.warn("[TechnicianAuth] restore heartbeat failed:", heartbeatError);
         }
-      } else {
-        localStorage.removeItem("resqnow_technician");
       }
       setIsLoading(false);
     };
     checkTechnicianAuth();
-  }, []);
+  }, [refreshTechnician]);
 
   useEffect(() => {
     if (!technician?.id) return;
@@ -101,6 +113,7 @@ export const useTechnicianAuth = () => {
     register,
     approveTechnician: technicianAdminService.approveTechnician,
     rejectTechnician: technicianAdminService.rejectTechnician,
+    refreshTechnician,
     isOnline,
     setIsOnline,
     logout,

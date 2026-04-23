@@ -71,6 +71,7 @@ export interface TechnicianAuthContextType {
   register: (data: any) => Promise<any>;
   approveTechnician: (technicianId: string) => Promise<boolean>;
   rejectTechnician: (technicianId: string) => Promise<boolean>;
+  refreshTechnician: (options?: { signal?: AbortSignal }) => Promise<Technician | null>;
   isOnline: boolean;
   setIsOnline: (online: boolean) => void;
   logout: () => void;

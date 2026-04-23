@@ -24,14 +24,14 @@ export const useServiceRequests = () => {
         lat = parseFloat(locationParts[1]);
         lng = parseFloat(locationParts[2]);
       }
-      const payload = {
+        const payload = {
         service_type: serviceType,
         vehicle_type: `${formData.vehicleType} - ${formData.vehicleSubtype}`,
         vehicle_model: formData.vehicleModel,
         address: formData.location,
         description: formData.details,
         technician_id: formData.selectedTechnicianId,
-        contact_phone: user.email, // placeholder or fetch from profile
+        contact_phone: user.phone || user.email,
         location_lat: lat,
         location_lng: lng
       };
@@ -78,11 +78,16 @@ export const useServiceRequests = () => {
   const getTechnicianRequests = async (technicianId: string) => {
     setIsLoading(true);
     try {
-      // Stub or implement endpoint
-      console.warn("getTechnicianRequests not fully implemented in backend yet");
-      return [];
+      const res = await apiFetch("/api/technicians/requests", {
+        method: "GET",
+        technician: true,
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error("Error fetching technician requests:", error);
+      toast.error("Failed to load technician requests");
       return [];
     } finally {
       setIsLoading(false);

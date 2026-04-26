@@ -139,7 +139,7 @@ VITE_FRONTEND_ONLY=true
 ```
 
 When `VITE_FRONTEND_ONLY=true`, the app runs with in-browser mock API responses so UI flows work without a backend.
-Do not set `VITE_FRONTEND_ONLY` for production backend-connected deployments ..
+Do not set `VITE_FRONTEND_ONLY` for production backend-connected deployments 
 
 Notes:
 

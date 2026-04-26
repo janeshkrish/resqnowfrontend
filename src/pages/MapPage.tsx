@@ -2,8 +2,8 @@ import Map from "@/components/Map";
 
 const MapPage = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <Map />
+    <div className="bg-[#eef3fb]">
+      <Map mode="page" />
     </div>
   );
 };

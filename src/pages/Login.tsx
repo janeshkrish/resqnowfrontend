@@ -25,7 +25,7 @@ const formSchema = z.object({
 
 type LoginFormValues = z.infer<typeof formSchema>;
 
-const fieldLabelClassName = "mb-2 block text-[13px] font-semibold text-slate-700";
+const fieldLabelClassName = "mb-1.5 block text-[13px] font-semibold text-slate-700 sm:mb-2";
 const fieldIconClassName =
   "pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400";
 
@@ -213,7 +213,7 @@ const Login = () => {
       }
     >
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3.5 sm:space-y-4">
           <FormField
             control={form.control}
             name="email"

@@ -32,7 +32,7 @@ const formSchema = z
 
 type RegisterFormValues = z.infer<typeof formSchema>;
 
-const fieldLabelClassName = "mb-2 block text-[13px] font-semibold text-slate-700";
+const fieldLabelClassName = "mb-1.5 block text-[13px] font-semibold text-slate-700 sm:mb-2";
 const fieldIconClassName =
   "pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400";
 
@@ -155,7 +155,7 @@ const Register = () => {
       }
     >
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3.5 sm:space-y-4">
           <FormField
             control={form.control}
             name="name"
@@ -267,7 +267,7 @@ const Register = () => {
             )}
           />
 
-          <p className="px-1 text-xs font-medium leading-5 text-slate-500">
+          <p className="px-1 text-[11px] font-medium leading-4 text-slate-500 sm:text-xs sm:leading-5">
             By signing up, you agree to the{" "}
             <Link to="/terms-of-service" className="font-semibold text-[#ef233c] hover:text-[#dc1f38]">
               Terms of Service

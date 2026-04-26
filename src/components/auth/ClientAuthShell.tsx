@@ -19,10 +19,10 @@ type ClientAuthShellProps = {
 };
 
 export const clientAuthInputClassName =
-  "h-14 rounded-2xl border border-slate-200 bg-white pl-12 pr-12 text-[15px] font-medium text-slate-900 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition-all placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#ef233c]/15 focus-visible:ring-offset-0 focus-visible:border-[#ef233c]";
+  "h-[3.25rem] sm:h-14 rounded-[1.25rem] border border-slate-200 bg-white/95 pl-12 pr-12 text-[15px] font-medium text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition-all placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#ef233c]/15 focus-visible:ring-offset-0 focus-visible:border-[#ef233c]";
 
 export const clientAuthPrimaryButtonClassName =
-  "mt-2 h-14 w-full rounded-2xl bg-[#ef233c] px-4 text-base font-bold text-white shadow-[0_18px_35px_rgba(239,35,60,0.32)] transition-all hover:bg-[#dc1f38] active:scale-[0.99]";
+  "mt-2 h-[3.25rem] sm:h-14 w-full rounded-[1.25rem] bg-[#ef233c] px-4 text-[15px] sm:text-base font-bold text-white shadow-[0_18px_35px_rgba(239,35,60,0.32)] transition-all hover:bg-[#dc1f38] active:scale-[0.99]";
 
 export function ClientAuthShell({
   mode,
@@ -39,28 +39,27 @@ export function ClientAuthShell({
 
   return (
     <div
-      className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.92),_rgba(235,240,247,0.96)_46%,_rgba(228,233,242,1)_100%)] px-3 py-4 sm:px-6 sm:py-8"
+      className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.92),_rgba(235,240,247,0.96)_46%,_rgba(228,233,242,1)_100%)] px-0 py-0 sm:px-6 sm:py-8"
       style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
     >
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[420px] items-stretch justify-center sm:min-h-0">
-        <div className="relative flex w-full overflow-hidden rounded-[34px] border border-white/70 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.16)]">
-          <div className="pointer-events-none absolute inset-x-6 top-16 h-44 rounded-full bg-[radial-gradient(circle,_rgba(239,35,60,0.10),_rgba(239,35,60,0)_70%)] blur-3xl" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 overflow-hidden">
-            <div className="absolute -bottom-10 -left-10 h-28 w-44 rounded-[999px] bg-slate-900" />
-            <div className="absolute -bottom-8 -left-4 h-20 w-36 rounded-[999px] bg-[#ef233c] rotate-[-11deg]" />
-            <div className="absolute -bottom-10 left-12 h-16 w-48 rounded-[999px] bg-[#f7f8fb] rotate-[-8deg]" />
+      <div className="mx-auto flex min-h-[100dvh] max-w-[440px] items-stretch justify-center sm:min-h-[calc(100dvh-4rem)]">
+        <div className="relative flex w-full flex-col overflow-hidden bg-white sm:rounded-[34px] sm:border sm:border-white/70 sm:shadow-[0_30px_80px_rgba(15,23,42,0.16)]">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_rgba(248,250,252,0.98)_0%,_rgba(255,255,255,1)_34%,_rgba(248,250,252,1)_100%)]" />
+          <div className="pointer-events-none absolute inset-x-4 top-0 h-48 rounded-full bg-[radial-gradient(circle,_rgba(239,35,60,0.16),_rgba(239,35,60,0)_72%)] blur-3xl sm:inset-x-6 sm:top-16 sm:h-44" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 overflow-hidden sm:h-28">
+            <div className="absolute -bottom-12 -left-8 h-24 w-40 rounded-[999px] bg-slate-900 sm:-bottom-10 sm:-left-10 sm:h-28 sm:w-44" />
+            <div className="absolute -bottom-10 -left-2 h-16 w-32 rounded-[999px] rotate-[-11deg] bg-[#ef233c] sm:-bottom-8 sm:-left-4 sm:h-20 sm:w-36" />
+            <div className="absolute -bottom-10 left-10 h-14 w-36 rounded-[999px] rotate-[-8deg] bg-[#f7f8fb] sm:left-12 sm:h-16 sm:w-48" />
           </div>
 
-          <div className="relative z-10 flex w-full flex-col px-5 pb-10 pt-4 sm:px-6">
-            <PhoneStatusBar />
-
-            <div className={cn("mb-5 flex items-center", isSignup ? "justify-between" : "justify-center")}>
+          <div className="relative z-10 flex min-h-[100dvh] w-full flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-0 sm:px-6 sm:pb-10 sm:pt-5">
+            <div className={cn("mb-4 flex items-center sm:mb-5", isSignup ? "justify-between" : "justify-center")}>
               {isSignup ? (
                 <Button
                   asChild
                   variant="outline"
                   size="icon"
-                  className="h-10 w-10 rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                  className="h-10 w-10 rounded-2xl border-slate-200 bg-white/90 text-slate-700 shadow-sm hover:bg-slate-50"
                 >
                   <Link to="/login" aria-label="Back to login">
                     <ChevronLeft className="h-5 w-5" />
@@ -73,49 +72,53 @@ export function ClientAuthShell({
               </div>
             </div>
 
-            {isSignup ? <SignupSpacer /> : <RoadsideScene />}
+            {!isSignup ? <RoadsideScene /> : null}
 
-            <div className={cn("text-center", isSignup ? "mb-4 mt-2" : "mb-5")}>
-              <h1 className="text-[1.9rem] font-extrabold tracking-[-0.04em] text-slate-900">{title}</h1>
-              <p className="mt-2 text-sm font-medium text-slate-500">{subtitle}</p>
+            <div className={cn("text-center", isSignup ? "mb-4 mt-1 sm:mt-2" : "mb-4 sm:mb-5")}>
+              <h1 className="text-[1.72rem] font-extrabold tracking-[-0.04em] text-slate-900 sm:text-[1.9rem]">
+                {title}
+              </h1>
+              <p className="mt-1.5 text-[13px] font-medium text-slate-500 sm:mt-2 sm:text-sm">{subtitle}</p>
             </div>
 
-            {error ? (
-              <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            ) : null}
-
-            <div className="space-y-5">{children}</div>
-
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator className="bg-slate-200" />
+            <div className="flex flex-1 flex-col">
+              {error ? (
+                <div className="mb-3 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm sm:mb-4">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
                 </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    or continue with
-                  </span>
+              ) : null}
+
+              <div className="flex-1">{children}</div>
+
+              <div className="mt-5 sm:mt-6">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="bg-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white px-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 sm:text-[11px]">
+                      or continue with
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3 sm:mt-5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-[3.25rem] sm:h-14 w-full justify-center rounded-[1.25rem] border-slate-200 bg-white text-[15px] font-semibold text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.05)] hover:bg-slate-50"
+                    onClick={onGoogleAction}
+                    disabled={isLoading}
+                  >
+                    <GoogleMark className="mr-3 h-5 w-5" />
+                    {googleLabel}
+                  </Button>
                 </div>
               </div>
 
-              <div className="mt-5 space-y-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-14 w-full justify-center rounded-2xl border-slate-200 bg-white text-[15px] font-semibold text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.05)] hover:bg-slate-50"
-                  onClick={onGoogleAction}
-                  disabled={isLoading}
-                >
-                  <GoogleMark className="mr-3 h-5 w-5" />
-                  {googleLabel}
-                </Button>
-              </div>
+              <div className="mt-5 text-center text-[13px] font-medium text-slate-600 sm:mt-6 sm:text-sm">{footer}</div>
             </div>
-
-            <div className="mt-6 text-center text-sm font-medium text-slate-600">{footer}</div>
           </div>
         </div>
       </div>
@@ -123,35 +126,10 @@ export function ClientAuthShell({
   );
 }
 
-function PhoneStatusBar() {
-  return (
-    <div className="mb-6 flex items-center justify-between text-[11px] font-semibold tracking-[0.08em] text-slate-900">
-      <span>9:41</span>
-      <div className="flex items-center gap-1.5 text-slate-900">
-        <span className="flex items-end gap-[2px]">
-          <span className="h-[5px] w-[2px] rounded-full bg-current opacity-60" />
-          <span className="h-[7px] w-[2px] rounded-full bg-current opacity-70" />
-          <span className="h-[9px] w-[2px] rounded-full bg-current opacity-80" />
-          <span className="h-[11px] w-[2px] rounded-full bg-current" />
-        </span>
-        <span className="h-[10px] w-[14px] rounded-sm border border-current opacity-80" />
-        <span className="relative h-[10px] w-[22px] rounded-[4px] border border-current">
-          <span className="absolute inset-[1.5px] rounded-[2px] bg-current" />
-          <span className="absolute -right-[3px] top-[2px] h-[4px] w-[2px] rounded-r-sm bg-current" />
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function SignupSpacer() {
-  return <div className="mb-3 h-3" aria-hidden="true" />;
-}
-
 function ResQNowWordmark() {
   return (
     <div className="inline-flex flex-col items-center">
-      <div className="relative inline-flex items-end text-[2.2rem] font-black tracking-[-0.08em] text-slate-900">
+      <div className="relative inline-flex items-end text-[1.9rem] font-black tracking-[-0.08em] text-slate-900 sm:text-[2.2rem]">
         <span>Res</span>
         <span className="relative mx-[0.03em] inline-flex h-[1em] w-[0.86em] items-center justify-center">
           <span className="absolute inset-[14%_8%_14%_8%] rounded-full border-[0.14em] border-[#ef233c]" />
@@ -160,7 +138,7 @@ function ResQNowWordmark() {
         <span>Now</span>
         <span className="pointer-events-none absolute left-[34.5%] top-[65%] h-[0.11em] w-[1.05em] rotate-[128deg] rounded-full bg-[#ef233c]" />
       </div>
-      <div className="mt-1 text-[0.5rem] font-extrabold uppercase tracking-[0.22em] text-slate-400">
+      <div className="mt-1 text-[0.45rem] font-extrabold uppercase tracking-[0.22em] text-slate-400 sm:text-[0.5rem]">
         On time. <span className="text-[#ef233c]">Every time.</span>
       </div>
     </div>
@@ -169,8 +147,8 @@ function ResQNowWordmark() {
 
 function RoadsideScene() {
   return (
-    <div className="relative mb-6 flex justify-center">
-      <svg viewBox="0 0 320 144" className="h-[132px] w-full max-w-[300px]" aria-hidden="true">
+    <div className="relative mb-4 flex justify-center sm:mb-6">
+      <svg viewBox="0 0 320 144" className="h-[96px] w-full max-w-[224px] sm:h-[132px] sm:max-w-[300px]" aria-hidden="true">
         <path
           d="M24 104c11-28 18-41 31-46l14 46H24Zm26-14c8-16 13-24 19-28l10 42H50V90Zm44-7c7-11 13-16 22-17l9 38H94V83Zm50-4c5-8 10-13 18-14l8 39h-26V79Zm44-10c5-7 12-11 21-12l11 47h-32V69Zm57 31c8-18 14-27 26-30l18 34h-44V100Z"
           fill="#f4f6fb"

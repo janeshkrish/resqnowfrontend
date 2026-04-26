@@ -237,7 +237,7 @@ const Index = () => {
       </div>
 
       <div className="hidden md:block w-full relative z-30 bg-transparent border-t border-border/40 drop-shadow-sm -mt-8">
-        <Map />
+        <Map mode="preview" />
       </div>
 
       <div className="bg-white dark:bg-card border-b border-border/40">

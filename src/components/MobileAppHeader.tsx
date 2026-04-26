@@ -1,23 +1,46 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
-import { PhoneCall } from "lucide-react";
+import { ArrowLeft, PhoneCall } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 // Dropdown imports removed for cleaner mobile header with bottom nav
 
 const MobileAppHeader = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
+  const navigate = useNavigate();
   const isLiveMapPage = location.pathname === "/map";
+  const isServiceRequestFlow =
+    location.pathname.startsWith("/request-service/") &&
+    !location.pathname.startsWith("/request-service-tracking");
 
   if (!isMobile) return null;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border">
       <div className="flex h-14 items-center justify-between px-4">
-        <Link to="/" className="flex items-center">
-          <span className="text-lg font-bold text-primary">ResQNow</span>
-        </Link>
+        <div className="flex items-center gap-2.5">
+          {isServiceRequestFlow && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/");
+                }
+              }}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+
+          <Link to="/" className="flex items-center">
+            <span className="text-lg font-bold text-primary">ResQNow</span>
+          </Link>
+        </div>
 
         {!isLiveMapPage && (
           <div className="flex items-center gap-2">

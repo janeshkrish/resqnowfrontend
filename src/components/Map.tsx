@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  animate,
+  motion,
+  useDragControls,
+  useMotionValue,
+  useReducedMotion,
+  type PanInfo,
+} from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -19,9 +26,7 @@ import {
   Loader2,
   LocateFixed,
   Navigation,
-  PhoneCall,
   ShieldCheck,
-  Sparkles,
   Star,
   Wrench,
 } from "lucide-react";
@@ -48,6 +53,11 @@ interface Technician {
   vehicle_types?: Record<string, boolean> | string[];
 }
 
+interface FilterChip {
+  id: string;
+  label: string;
+}
+
 function MapViewport({
   userPosition,
   activeTechnicianPosition,
@@ -70,7 +80,7 @@ function MapViewport({
 
     if (userPosition && activeTechnicianPosition) {
       map.fitBounds(L.latLngBounds([userPosition, activeTechnicianPosition]), {
-        paddingTopLeft: [28, 92],
+        paddingTopLeft: [24, 92],
         paddingBottomRight: [rightPadding, bottomPadding],
         maxZoom: 14,
         animate: !reduceMotion,
@@ -87,61 +97,19 @@ function MapViewport({
   return null;
 }
 
-function TowTruckIllustration({ reduceMotion }: { reduceMotion: boolean }) {
-  return (
-    <motion.div
-      animate={reduceMotion ? undefined : { y: [0, -4, 0] }}
-      transition={reduceMotion ? undefined : { duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
-      className="w-[118px] sm:w-[136px]"
-    >
-      <svg viewBox="0 0 220 140" className="h-auto w-full" role="img" aria-label="Tow truck illustration">
-        <defs>
-          <linearGradient id="truckCab" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#fb7185" />
-            <stop offset="100%" stopColor="#ef4444" />
-          </linearGradient>
-          <linearGradient id="truckBed" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#64748b" />
-            <stop offset="100%" stopColor="#334155" />
-          </linearGradient>
-        </defs>
-
-        <g opacity="0.9">
-          <rect x="142" y="12" width="12" height="58" rx="4" fill="#e2e8f0" />
-          <rect x="160" y="2" width="16" height="68" rx="4" fill="#e5e7eb" />
-          <rect x="182" y="18" width="14" height="52" rx="4" fill="#cbd5e1" />
-          <rect x="199" y="28" width="10" height="42" rx="3" fill="#e2e8f0" />
-          <path d="M130 70h84" stroke="#e2e8f0" strokeWidth="6" strokeLinecap="round" />
-        </g>
-
-        <ellipse cx="116" cy="110" rx="78" ry="12" fill="#e2e8f0" />
-
-        <g transform="translate(18 28)">
-          <path d="M62 54h68l8 16H52z" fill="url(#truckBed)" />
-          <path d="M118 42h20c10 0 18 8 18 18v16h-38z" fill="url(#truckCab)" />
-          <path d="M121 46h18c7 0 13 6 13 13v7h-31z" fill="#f8fafc" opacity="0.88" />
-          <rect x="36" y="52" width="24" height="6" rx="3" fill="#94a3b8" />
-          <path d="M26 60l18-18h6l-14 18z" fill="#94a3b8" />
-          <path d="M40 42l-8 30" stroke="#94a3b8" strokeWidth="5" strokeLinecap="round" />
-          <circle cx="72" cy="80" r="15" fill="#0f172a" />
-          <circle cx="72" cy="80" r="6" fill="#cbd5e1" />
-          <circle cx="142" cy="80" r="15" fill="#0f172a" />
-          <circle cx="142" cy="80" r="6" fill="#cbd5e1" />
-          <path d="M51 50h35c9 0 16 7 16 16v4H44v-2c0-10 8-18 18-18z" fill="#f1f5f9" />
-          <path d="M66 48h18c4 0 8 3 8 8v7H58v-2c0-7 4-13 8-13z" fill="#cbd5e1" />
-          <circle cx="58" cy="70" r="8" fill="#334155" />
-          <circle cx="90" cy="70" r="8" fill="#334155" />
-          <path d="M153 56h14" stroke="#f8fafc" strokeWidth="4" strokeLinecap="round" />
-        </g>
-      </svg>
-    </motion.div>
-  );
-}
-
 const toNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
+
+const toDisplayTitle = (value: string) =>
+  String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 
 const estimateDistanceKm = (
   fromLat: number,
@@ -195,11 +163,11 @@ const getVendorInitials = (name: string) => {
 
 const getServiceHighlights = (tech: Technician) => {
   if (Array.isArray(tech.specialties) && tech.specialties.length > 0) {
-    return tech.specialties.slice(0, 3).join(" / ");
+    return tech.specialties.slice(0, 3).map(toDisplayTitle).join(" / ");
   }
 
   const serviceType = tech.service_type.trim();
-  return serviceType ? `${serviceType} / Roadside Help` : "Towing / Recovery / Roadside Help";
+  return serviceType ? `${toDisplayTitle(serviceType)} / Roadside Help` : "Towing / Recovery / Roadside Help";
 };
 
 const buildRouteCurve = (from: [number, number], to: [number, number]): [number, number][] => {
@@ -267,6 +235,8 @@ const createTechnicianIcon = (tech: Technician, selected: boolean) => {
 
 const userRadarIcon = createUserIcon();
 
+const buildFilterId = (serviceType: string) => `service:${serviceType.trim().toLowerCase()}`;
+
 const normalizeTechnicians = (input: unknown, origin: [number, number]) => {
   if (!Array.isArray(input)) return [];
 
@@ -295,10 +265,7 @@ const normalizeTechnicians = (input: unknown, origin: [number, number]) => {
         id: String(raw.id ?? `tech-${index}`),
         name: String(raw.name ?? raw.shop_name ?? raw.business_name ?? "Nearby Technician"),
         service_type: String(raw.service_type ?? raw.serviceType ?? raw.primary_service ?? "Roadside Help"),
-        distance: toNumber(
-          raw.distance,
-          estimateDistanceKm(origin[0], origin[1], latitude, longitude),
-        ),
+        distance: toNumber(raw.distance, estimateDistanceKm(origin[0], origin[1], latitude, longitude)),
         rating: toNumber(raw.rating ?? raw.average_rating ?? raw.avg_rating, 4.8),
         latitude,
         longitude,
@@ -316,14 +283,19 @@ const Map = ({ mode = "page" }: MapProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
+  const sheetDragY = useMotionValue(0);
+  const dragControls = useDragControls();
   const { coordinates, loading: loadingLocation, error: locationError, requestLocation } = useGeolocation();
 
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loadingTechnicians, setLoadingTechnicians] = useState(false);
   const [selectedTechId, setSelectedTechId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>("all");
 
   const isPreview = mode === "preview";
+  const isDraggableSheet = !isPreview && isMobile;
+  const collapsedSheetOffset = isDraggableSheet ? 228 : 0;
   const mapCenter: [number, number] = coordinates ? [coordinates.lat, coordinates.lng] : DEFAULT_CENTER;
 
   useEffect(() => {
@@ -331,16 +303,36 @@ const Map = ({ mode = "page" }: MapProps) => {
   }, [requestLocation]);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isDraggableSheet) {
       setSheetExpanded(true);
     }
-  }, [isMobile]);
+  }, [isDraggableSheet]);
 
   useEffect(() => {
     if (coordinates) {
       fetchTechnicians(coordinates.lat, coordinates.lng);
     }
   }, [coordinates]);
+
+  useEffect(() => {
+    const targetY = isDraggableSheet && !sheetExpanded ? collapsedSheetOffset : 0;
+
+    if (reduceMotion) {
+      sheetDragY.set(targetY);
+      return;
+    }
+
+    const controls = animate(sheetDragY, targetY, {
+      type: "spring",
+      stiffness: 420,
+      damping: 36,
+      mass: 0.82,
+    });
+
+    return () => {
+      controls.stop();
+    };
+  }, [collapsedSheetOffset, isDraggableSheet, reduceMotion, sheetDragY, sheetExpanded]);
 
   const fetchTechnicians = async (lat: number, lng: number) => {
     setLoadingTechnicians(true);
@@ -422,11 +414,50 @@ const Map = ({ mode = "page" }: MapProps) => {
     }
   };
 
-  const orderedTechnicians = [...technicians].sort((a, b) => {
-    if (a.aiRecommended && !b.aiRecommended) return -1;
-    if (!a.aiRecommended && b.aiRecommended) return 1;
-    return toNumber(a.distance, Number.MAX_SAFE_INTEGER) - toNumber(b.distance, Number.MAX_SAFE_INTEGER);
-  });
+  const filterChips = useMemo<FilterChip[]>(() => {
+    const serviceTypes = Array.from(
+      new Set(
+        technicians
+          .map((tech) => tech.service_type.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    return [
+      { id: "all", label: "All" },
+      { id: "recommended", label: "Best Match" },
+      ...serviceTypes.map((serviceType) => ({
+        id: buildFilterId(serviceType),
+        label: toDisplayTitle(serviceType),
+      })),
+    ];
+  }, [technicians]);
+
+  const filteredTechnicians = useMemo(() => {
+    return technicians.filter((tech) => {
+      if (activeFilter === "all") return true;
+      if (activeFilter === "recommended") return Boolean(tech.aiRecommended);
+      if (activeFilter.startsWith("service:")) {
+        return buildFilterId(tech.service_type) === activeFilter;
+      }
+
+      return true;
+    });
+  }, [activeFilter, technicians]);
+
+  const orderedTechnicians = useMemo(() => {
+    return [...filteredTechnicians].sort((a, b) => {
+      if (a.aiRecommended && !b.aiRecommended) return -1;
+      if (!a.aiRecommended && b.aiRecommended) return 1;
+      return toNumber(a.distance, Number.MAX_SAFE_INTEGER) - toNumber(b.distance, Number.MAX_SAFE_INTEGER);
+    });
+  }, [filteredTechnicians]);
+
+  useEffect(() => {
+    if (!filterChips.some((chip) => chip.id === activeFilter)) {
+      setActiveFilter("all");
+    }
+  }, [activeFilter, filterChips]);
 
   useEffect(() => {
     if (orderedTechnicians.length === 0) {
@@ -443,22 +474,20 @@ const Map = ({ mode = "page" }: MapProps) => {
     }
   }, [orderedTechnicians, selectedTechId]);
 
-  const bestMatch = orderedTechnicians[0] ?? null;
+  const bestMatch = orderedTechnicians.find((tech) => tech.aiRecommended) ?? orderedTechnicians[0] ?? null;
   const activeTech = orderedTechnicians.find((tech) => tech.id === selectedTechId) ?? bestMatch;
   const userPosition = coordinates ? ([coordinates.lat, coordinates.lng] as [number, number]) : null;
   const activeTechPosition = activeTech ? ([activeTech.latitude, activeTech.longitude] as [number, number]) : null;
-  const routePath =
-    userPosition && activeTechPosition ? buildRouteCurve(activeTechPosition, userPosition) : [];
+  const routePath = userPosition && activeTechPosition ? buildRouteCurve(activeTechPosition, userPosition) : [];
   const nearbyCount = orderedTechnicians.length;
-  const activeEta = activeTech ? calculateEtaMinutes(activeTech.distance) : null;
   const secondaryTechnicians = orderedTechnicians.filter((tech) => tech.id !== activeTech?.id);
   const visibleSecondaryTechnicians =
-    sheetExpanded || !isMobile ? secondaryTechnicians : secondaryTechnicians.slice(0, 3);
+    sheetExpanded || !isDraggableSheet ? secondaryTechnicians : secondaryTechnicians.slice(0, 2);
 
   const handleTechSelect = (tech: Technician) => {
     setSelectedTechId(tech.id);
 
-    if (isMobile) {
+    if (isDraggableSheet) {
       setSheetExpanded(true);
     }
   };
@@ -485,20 +514,40 @@ const Map = ({ mode = "page" }: MapProps) => {
     navigate(targetUrl);
   };
 
+  const handleSheetDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggableSheet) return;
+    dragControls.start(event);
+  };
+
+  const handleSheetDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (!isDraggableSheet) return;
+
+    const shouldCollapse = info.offset.y > 70 || info.velocity.y > 600;
+    const shouldExpand = info.offset.y < -45 || info.velocity.y < -450;
+
+    if (shouldCollapse) {
+      setSheetExpanded(false);
+      return;
+    }
+
+    if (shouldExpand) {
+      setSheetExpanded(true);
+    }
+  };
+
   const containerClasses = isPreview
     ? "relative isolate mx-auto h-[760px] w-full max-w-6xl overflow-hidden rounded-[2.75rem] border border-slate-200 bg-[#eef3fb] shadow-[0_45px_90px_-50px_rgba(15,23,42,0.5)]"
     : "relative isolate h-[calc(100dvh-3.5rem)] overflow-hidden bg-[#eef3fb] md:h-[calc(100dvh-4rem)] lg:h-[calc(100dvh-5rem)]";
 
   const panelClasses = cn(
-    "absolute z-[420] overflow-hidden bg-white/96 backdrop-blur-xl border border-white/70 shadow-[0_-14px_45px_rgba(15,23,42,0.16)]",
+    "absolute z-[420] overflow-hidden bg-white/97 backdrop-blur-xl border border-white/70 shadow-[0_-14px_45px_rgba(15,23,42,0.16)]",
     isPreview
-      ? "right-6 top-6 bottom-6 w-[388px] rounded-[2rem]"
-      : "inset-x-0 bottom-0 rounded-t-[2rem] md:inset-y-6 md:right-6 md:left-auto md:w-[398px] md:rounded-[2rem]",
-    !isPreview && (sheetExpanded ? "max-h-[76dvh] md:max-h-none" : "max-h-[56dvh] md:max-h-none"),
+      ? "right-6 top-6 bottom-6 w-[392px] rounded-[2rem]"
+      : "inset-x-0 bottom-0 h-[73dvh] rounded-t-[1.9rem] md:inset-y-6 md:right-6 md:left-auto md:h-auto md:w-[396px] md:rounded-[2rem]",
   );
 
-  const mapFitBottomPadding = isMobile ? (sheetExpanded ? 336 : 256) : 56;
-  const mapFitRightPadding = isMobile ? 32 : 432;
+  const mapFitBottomPadding = isDraggableSheet ? (sheetExpanded ? 340 : 170) : isPreview ? 78 : 64;
+  const mapFitRightPadding = isMobile ? 32 : 430;
 
   return (
     <div className={containerClasses}>
@@ -588,28 +637,28 @@ const Map = ({ mode = "page" }: MapProps) => {
           className="pointer-events-none absolute inset-0 z-[380]"
           style={{
             background:
-              "radial-gradient(circle at top right, rgba(255,255,255,0.8), transparent 22%), radial-gradient(circle at bottom left, rgba(255,255,255,0.55), transparent 28%), linear-gradient(180deg, rgba(245,248,255,0.18), rgba(245,248,255,0.34))",
+              "radial-gradient(circle at top right, rgba(255,255,255,0.82), transparent 22%), radial-gradient(circle at bottom left, rgba(255,255,255,0.52), transparent 28%), linear-gradient(180deg, rgba(245,248,255,0.18), rgba(245,248,255,0.34))",
           }}
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-4 top-4 z-[430] flex items-start justify-between md:inset-x-6 md:top-6">
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-[430] flex items-start justify-between md:inset-x-6 md:top-6">
         <motion.div
-          initial={reduceMotion ? undefined : { opacity: 0, y: -10 }}
+          initial={reduceMotion ? undefined : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28 }}
-          className="pointer-events-auto max-w-[220px] rounded-[1.35rem] bg-white/96 px-4 py-3 shadow-[0_18px_35px_-22px_rgba(15,23,42,0.4)]"
+          transition={{ duration: 0.24 }}
+          className="pointer-events-auto max-w-[200px] rounded-[1.25rem] bg-white/96 px-3.5 py-2.5 shadow-[0_18px_35px_-22px_rgba(15,23,42,0.4)]"
         >
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 shadow-inner shadow-rose-100/60">
-              <span className="relative flex h-5 w-5 items-center justify-center">
-                <span className="absolute h-5 w-5 rounded-full border-2 border-rose-500/45" />
-                <span className="absolute h-2.5 w-2.5 rounded-full bg-rose-500" />
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 shadow-inner shadow-rose-100/60">
+              <span className="relative flex h-4 w-4 items-center justify-center">
+                <span className="absolute h-4 w-4 rounded-full border-2 border-rose-500/45" />
+                <span className="absolute h-2 w-2 rounded-full bg-rose-500" />
               </span>
             </span>
             <div>
-              <p className="text-[15px] font-extrabold tracking-tight text-slate-900">Live Radar</p>
-              <p className="text-xs font-medium text-emerald-600">
+              <p className="text-[14px] font-extrabold tracking-tight text-slate-900">Live Radar</p>
+              <p className="text-[11px] font-semibold text-emerald-600">
                 {loadingTechnicians ? "Scanning nearby teams" : `${nearbyCount} Tech${nearbyCount === 1 ? "" : "s"} Nearby`}
               </p>
             </div>
@@ -617,109 +666,134 @@ const Map = ({ mode = "page" }: MapProps) => {
         </motion.div>
 
         <motion.div
-          initial={reduceMotion ? undefined : { opacity: 0, scale: 0.92 }}
+          initial={reduceMotion ? undefined : { opacity: 0, scale: 0.94 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.24, delay: 0.04 }}
+          transition={{ duration: 0.22, delay: 0.03 }}
           className="pointer-events-auto"
         >
           <Button
             type="button"
             onClick={requestLocation}
             disabled={loadingLocation || loadingTechnicians}
-            className="h-12 w-12 rounded-[1.2rem] bg-white/96 p-0 text-slate-700 shadow-[0_18px_35px_-22px_rgba(15,23,42,0.4)] hover:bg-white"
+            className="h-11 w-11 rounded-[1rem] bg-white/96 p-0 text-slate-700 shadow-[0_18px_35px_-22px_rgba(15,23,42,0.4)] hover:bg-white"
           >
-            {loadingLocation ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
+            {loadingLocation ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <LocateFixed className="h-4.5 w-4.5" />}
           </Button>
         </motion.div>
       </div>
 
       {locationError && (
-        <div className="absolute left-4 top-[5.5rem] z-[430] max-w-[240px] rounded-2xl bg-white/92 px-3 py-2 text-[11px] font-medium text-amber-700 shadow-[0_10px_24px_-16px_rgba(15,23,42,0.35)] md:left-6 md:top-[6.25rem]">
+        <div className="absolute left-3 top-[5rem] z-[430] max-w-[230px] rounded-2xl bg-white/92 px-3 py-2 text-[11px] font-medium text-amber-700 shadow-[0_10px_24px_-16px_rgba(15,23,42,0.35)] md:left-6 md:top-[6.1rem]">
           {locationError}
         </div>
       )}
 
-      {!isPreview && (
-        <motion.div
-          initial={reduceMotion ? undefined : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.12 }}
-          className="absolute right-4 z-[430] md:right-6"
-          style={{ bottom: isMobile ? "calc(env(safe-area-inset-bottom) + 5.4rem)" : "2rem" }}
-        >
-          <Button
-            type="button"
-            onClick={() => navigate("/request-service/emergency")}
-            className="h-[72px] w-[72px] rounded-full bg-[linear-gradient(135deg,#ff4d4f,#ff1f3d)] p-0 text-white shadow-[0_28px_38px_-24px_rgba(239,68,68,0.9)] hover:opacity-95"
-          >
-            <span className="flex flex-col items-center justify-center gap-1">
-              <PhoneCall className="h-5 w-5" />
-              <span className="text-[12px] font-extrabold tracking-wide">SOS</span>
-            </span>
-          </Button>
-        </motion.div>
-      )}
-
       <motion.section
-        initial={reduceMotion ? undefined : { opacity: 0, y: 32 }}
+        initial={reduceMotion ? undefined : { opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
+        transition={{ duration: 0.32, ease: "easeOut" }}
+        drag={isDraggableSheet ? "y" : false}
+        dragListener={false}
+        dragControls={dragControls}
+        dragElastic={0.05}
+        dragMomentum={false}
+        dragConstraints={{ top: 0, bottom: collapsedSheetOffset }}
+        onDragEnd={handleSheetDragEnd}
+        style={isDraggableSheet ? { y: sheetDragY } : undefined}
         className={panelClasses}
       >
         <div className="flex h-full flex-col">
-          <button
-            type="button"
-            onClick={() => setSheetExpanded((current) => !current)}
-            className="flex items-center justify-center gap-2 pt-3 text-slate-400 transition hover:text-slate-600 md:hidden"
-            aria-label={sheetExpanded ? "Collapse nearby technicians panel" : "Expand nearby technicians panel"}
-          >
-            <span className="h-1.5 w-12 rounded-full bg-slate-300" />
-            {sheetExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </button>
+          {!isPreview && (
+            <div className="relative shrink-0 px-4 pt-2.5 md:hidden">
+              <div
+                role="presentation"
+                onPointerDown={handleSheetDragStart}
+                className="mx-auto flex w-full touch-none items-center justify-center py-2"
+                style={{ touchAction: "none" }}
+              >
+                <span className="h-1.5 w-12 rounded-full bg-slate-300" />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSheetExpanded((current) => !current)}
+                className="absolute right-4 top-1.5 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label={sheetExpanded ? "Collapse technicians panel" : "Expand technicians panel"}
+              >
+                {sheetExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </button>
+            </div>
+          )}
 
           <div
             className={cn(
               "flex-1 overflow-y-auto px-4 pb-5 pt-2 custom-scrollbar sm:px-5",
-              !isPreview && "pb-[calc(env(safe-area-inset-bottom)+5.75rem)] md:pb-5",
+              !isPreview && "pb-[calc(env(safe-area-inset-bottom)+5.15rem)] md:pb-5",
             )}
           >
             <div className="space-y-4">
-              <div
-                className="relative overflow-hidden rounded-[1.9rem] border border-rose-100 px-4 pb-4 pt-4"
-                style={{
-                  background:
-                    "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,245,245,0.94) 100%)",
-                }}
-              >
-                <div className="pr-[7.1rem]">
-                  <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-rose-500">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {activeTech?.id === bestMatch?.id ? "Best Match Found" : "Alternative Nearby"}
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
+                    <p className="text-[11px] font-medium text-slate-500">
+                      {loadingTechnicians
+                        ? "Refreshing live radar..."
+                        : activeFilter === "all"
+                          ? `${nearbyCount} technicians available around you`
+                          : `${nearbyCount} technicians in this filter`}
+                    </p>
                   </div>
-                  <h2 className="mt-3 text-[1.7rem] font-black leading-[1.05] tracking-tight text-slate-950">
-                    {activeEta ? `Help arriving in ${activeEta} mins` : "Finding your nearest help"}
-                  </h2>
-                  <p className="mt-2 max-w-[220px] text-xs font-medium leading-relaxed text-slate-500">
-                    {activeTech
-                      ? "We found the best nearby technician for you with fast dispatch and verified support."
-                      : "Turn on location access so we can match you with nearby support teams."}
-                  </p>
+
+                  {activeFilter !== "all" ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilter("all")}
+                      className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500 transition hover:bg-slate-50"
+                    >
+                      Clear
+                    </button>
+                  ) : (
+                    <div className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                      Live
+                    </div>
+                  )}
                 </div>
 
-                <div className="pointer-events-none absolute bottom-1 right-1">
-                  <TowTruckIllustration reduceMotion={reduceMotion} />
+                <div className="overflow-x-auto hide-scrollbar -mx-1 px-1">
+                  <div className="flex gap-2 pb-1">
+                    {filterChips.map((chip) => {
+                      const isActive = chip.id === activeFilter;
+
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          onClick={() => setActiveFilter(chip.id)}
+                          className={cn(
+                            "shrink-0 rounded-full border px-3.5 py-2 text-[11px] font-bold transition",
+                            isActive
+                              ? "border-rose-200 bg-rose-50 text-rose-500 shadow-[0_12px_24px_-20px_rgba(244,63,94,0.75)]"
+                              : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                          )}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
               {loadingTechnicians && (
-                <div className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
+                <div className="rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                      <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+                      <Loader2 className="h-4.5 w-4.5 animate-spin" />
                     </span>
                     <div>
                       <p className="text-sm font-bold text-slate-900">Scanning live radar...</p>
-                      <p className="text-xs text-slate-500">Matching you with the closest verified technicians.</p>
+                      <p className="text-[11px] text-slate-500">Matching the closest verified technicians for you.</p>
                     </div>
                   </div>
                 </div>
@@ -728,49 +802,64 @@ const Map = ({ mode = "page" }: MapProps) => {
               {!loadingTechnicians && activeTech && (
                 <motion.div
                   layout={!reduceMotion}
-                  className="rounded-[1.75rem] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.26)]"
+                  className="rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.24)]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-base font-black text-white">
-                        {getVendorInitials(activeTech.name)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-[1rem] font-black tracking-tight text-slate-900">
-                            {activeTech.name}
-                          </p>
-                          <Badge className="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-500 hover:bg-rose-50">
-                            {activeTech.id === bestMatch?.id ? "Best Match" : "Nearby"}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs font-medium text-slate-500">{getServiceHighlights(activeTech)}</p>
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
+                      {getVendorInitials(activeTech.name)}
                     </div>
 
-                    <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[13px] font-black text-amber-500">
-                      <Star className="h-3.5 w-3.5 fill-current" />
-                      <span>{formatRating(activeTech.rating)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-[0.95rem] font-black tracking-tight text-slate-900">
+                            {toDisplayTitle(activeTech.name)}
+                          </p>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            {toDisplayTitle(activeTech.service_type)}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[12px] font-black text-amber-500">
+                          <Star className="h-3.5 w-3.5 fill-current" />
+                          <span>{formatRating(activeTech.rating)}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {activeTech.aiRecommended && (
+                          <Badge className="rounded-full bg-rose-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-rose-500 hover:bg-rose-50">
+                            Best Match
+                          </Badge>
+                        )}
+                        <Badge className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-emerald-600 hover:bg-emerald-50">
+                          Verified Team
+                        </Badge>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2.5">
-                    <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                  <p className="mt-3 text-[11px] font-medium leading-relaxed text-slate-500">
+                    {getServiceHighlights(activeTech)}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl bg-slate-50 px-2.5 py-2.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
                         <Navigation className="h-3.5 w-3.5" />
                         Distance
                       </div>
                       <p className="mt-1 text-sm font-black text-slate-900">{formatDistanceDetailed(activeTech.distance)}</p>
                     </div>
-                    <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                    <div className="rounded-2xl bg-slate-50 px-2.5 py-2.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
                         <Clock3 className="h-3.5 w-3.5" />
                         ETA
                       </div>
                       <p className="mt-1 text-sm font-black text-slate-900">{formatEtaWindow(activeTech.distance)}</p>
                     </div>
-                    <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                    <div className="rounded-2xl bg-slate-50 px-2.5 py-2.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         Verified
                       </div>
@@ -778,18 +867,18 @@ const Map = ({ mode = "page" }: MapProps) => {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between rounded-[1.25rem] border border-emerald-100 bg-emerald-50 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-sm font-bold text-emerald-700">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[1rem] border border-emerald-100 bg-emerald-50 px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-[12px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-4 w-4" />
                       Background Verified
                     </div>
-                    <span className="text-[11px] font-semibold text-emerald-600">Trusted &amp; Verified</span>
+                    <span className="text-[10px] font-semibold text-emerald-600">Trusted &amp; Verified</span>
                   </div>
 
                   <Button
                     type="button"
                     onClick={() => handleBookService(activeTech)}
-                    className="mt-4 h-12 w-full rounded-[1.2rem] bg-[linear-gradient(135deg,#ff3b4d,#ff263f)] text-sm font-black text-white shadow-[0_24px_32px_-24px_rgba(239,68,68,0.85)] hover:opacity-95"
+                    className="mt-4 h-11 w-full rounded-[1.1rem] bg-[linear-gradient(135deg,#ff3b4d,#ff263f)] text-sm font-black text-white shadow-[0_24px_32px_-24px_rgba(239,68,68,0.85)] hover:opacity-95"
                   >
                     <span className="flex w-full items-center justify-center gap-2">
                       Request Now
@@ -802,39 +891,44 @@ const Map = ({ mode = "page" }: MapProps) => {
               )}
 
               {!loadingTechnicians && !activeTech && (
-                <div className="rounded-[1.75rem] border border-slate-100 bg-white p-5 text-center shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                    <Wrench className="h-6 w-6" />
+                <div className="rounded-[1.45rem] border border-slate-100 bg-white p-5 text-center shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                    <Wrench className="h-5 w-5" />
                   </div>
-                  <p className="mt-4 text-base font-black tracking-tight text-slate-900">No nearby technicians yet</p>
+                  <p className="mt-4 text-base font-black tracking-tight text-slate-900">
+                    {activeFilter === "all" ? "No nearby technicians yet" : "No technicians in this filter"}
+                  </p>
                   <p className="mt-2 text-sm text-slate-500">
-                    Enable location access or refresh the radar to search again.
+                    {activeFilter === "all"
+                      ? "Enable location access or refresh the radar to search again."
+                      : "Try a different filter to see more nearby options."}
                   </p>
                   <Button
                     type="button"
-                    onClick={requestLocation}
+                    onClick={activeFilter === "all" ? requestLocation : () => setActiveFilter("all")}
                     className="mt-4 rounded-full bg-slate-900 px-5 text-white hover:bg-slate-800"
                   >
-                    Use My Location
+                    {activeFilter === "all" ? "Use My Location" : "Show All Technicians"}
                   </Button>
                 </div>
               )}
 
               <div>
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[0.95rem] font-black tracking-tight text-slate-900">Other Technicians Nearby</p>
-                    <p className="text-xs font-medium text-slate-500">
+                    <p className="text-[0.95rem] font-black tracking-tight text-slate-900">Other technicians nearby</p>
+                    <p className="text-[11px] font-medium text-slate-500">
                       {secondaryTechnicians.length > 0
                         ? `${secondaryTechnicians.length} additional options around you`
                         : "No other nearby technicians right now"}
                     </p>
                   </div>
-                  {secondaryTechnicians.length > 3 && (
+
+                  {secondaryTechnicians.length > visibleSecondaryTechnicians.length && (
                     <button
                       type="button"
                       onClick={() => setSheetExpanded((current) => !current)}
-                      className="text-xs font-extrabold text-rose-500 transition hover:text-rose-600"
+                      className="text-[11px] font-extrabold text-rose-500 transition hover:text-rose-600"
                     >
                       {sheetExpanded ? "See less" : "See all"}
                     </button>
@@ -851,28 +945,26 @@ const Map = ({ mode = "page" }: MapProps) => {
                         key={tech.id}
                         type="button"
                         onClick={() => handleTechSelect(tech)}
-                        initial={reduceMotion ? undefined : { opacity: 0, y: 14 }}
+                        initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.24, delay: index * 0.04 }}
+                        transition={{ duration: 0.22, delay: index * 0.04 }}
                         className={cn(
-                          "w-full rounded-[1.35rem] border bg-white p-3 text-left shadow-[0_14px_32px_-30px_rgba(15,23,42,0.4)] transition",
+                          "w-full rounded-[1.3rem] border bg-white p-3 text-left shadow-[0_14px_32px_-30px_rgba(15,23,42,0.4)] transition",
                           isSelected
                             ? "border-rose-200 ring-2 ring-rose-100"
                             : "border-slate-100 hover:border-slate-200 hover:shadow-[0_18px_32px_-28px_rgba(15,23,42,0.4)]",
                         )}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
                             {getVendorInitials(tech.name)}
                           </div>
 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="truncate text-sm font-black tracking-tight text-slate-900">{tech.name}</p>
-                              <div className="flex items-center gap-1 text-[12px] font-bold text-amber-500">
-                                <Star className="h-3.5 w-3.5 fill-current" />
-                                <span>{formatRating(tech.rating)}</span>
-                              </div>
+                              <p className="truncate text-sm font-black tracking-tight text-slate-900">
+                                {toDisplayTitle(tech.name)}
+                              </p>
                               {isBestRow && (
                                 <Badge className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-rose-500 hover:bg-rose-50">
                                   Best Match
@@ -880,19 +972,21 @@ const Map = ({ mode = "page" }: MapProps) => {
                               )}
                             </div>
                             <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                              {getServiceHighlights(tech)}
+                              {toDisplayTitle(tech.service_type)}
                             </p>
                           </div>
 
                           <div className="shrink-0 text-right">
-                            <p className="text-xs font-black text-slate-900">{formatEtaWindow(tech.distance)}</p>
-                            <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                              {formatDistanceCompact(tech.distance)}
-                            </p>
+                            <div className="flex items-center justify-end gap-1 text-[12px] font-bold text-amber-500">
+                              <Star className="h-3.5 w-3.5 fill-current" />
+                              <span>{formatRating(tech.rating)}</span>
+                            </div>
+                            <p className="mt-1 text-[11px] font-semibold text-slate-500">{formatDistanceCompact(tech.distance)}</p>
                           </div>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-end">
+                        <div className="mt-3 flex items-center justify-between">
+                          <p className="text-[11px] font-bold text-slate-600">{formatEtaWindow(tech.distance)}</p>
                           <span
                             className={cn(
                               "rounded-full border px-4 py-2 text-[11px] font-extrabold transition",

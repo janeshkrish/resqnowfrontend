@@ -12,6 +12,7 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { isAuthenticated: isTechAuthenticated } = useTechnicianAuth();
+  const isLiveMapPage = location.pathname === "/map";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -104,16 +105,18 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Button
-            size="lg"
-            className="bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 hidden lg:flex animate-pulse-blue shadow-lg"
-            asChild
-          >
-            <Link to="/request-service/emergency">
-              <PhoneCall className="mr-2 h-5 w-5" />
-              Emergency Call
-            </Link>
-          </Button>
+          {!isLiveMapPage && (
+            <Button
+              size="lg"
+              className="bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 hidden lg:flex animate-pulse-blue shadow-lg"
+              asChild
+            >
+              <Link to="/request-service/emergency">
+                <PhoneCall className="mr-2 h-5 w-5" />
+                Emergency Call
+              </Link>
+            </Button>
+          )}
 
           <div className="hidden lg:block">
             <UserMenu />
@@ -198,19 +201,21 @@ const Header = () => {
               <UserMenu />
             </div>
 
-            <Button
-              size="xl"
-              className="bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 w-full mt-4 shadow-lg"
-              asChild
-            >
-              <Link
-                to="/request-service/emergency"
-                onClick={() => setMobileMenuOpen(false)}
+            {!isLiveMapPage && (
+              <Button
+                size="xl"
+                className="bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 w-full mt-4 shadow-lg"
+                asChild
               >
-                <PhoneCall className="mr-3 h-6 w-6" />
-                Emergency Call
-              </Link>
-            </Button>
+                <Link
+                  to="/request-service/emergency"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <PhoneCall className="mr-3 h-6 w-6" />
+                  Emergency Call
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       )}

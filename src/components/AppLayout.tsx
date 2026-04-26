@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
 import MobileBottomNav from "./MobileBottomNav"; // Use new Nav
@@ -9,6 +9,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const AppLayout = () => {
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const isLiveMapPage = location.pathname === "/map";
 
   return (
     <div className={`flex flex-col min-h-screen ${isMobile ? 'mobile-app-layout bg-background' : ''}`}>
@@ -30,9 +32,11 @@ const AppLayout = () => {
       {isMobile && <MobileBottomNav />}
 
       {/* Chatbot - positioned differently on mobile */}
-      <div className={isMobile ? 'mobile-chatbot bottom-20' : ''}>
-        <Chatbot />
-      </div>
+      {!isLiveMapPage && (
+        <div className={isMobile ? 'mobile-chatbot bottom-20' : ''}>
+          <Chatbot />
+        </div>
+      )}
     </div>
   );
 };

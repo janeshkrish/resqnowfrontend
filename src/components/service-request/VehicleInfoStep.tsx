@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { ServiceRequestFormData, VehicleType } from "./types";
-import { Bike, Car, Check, ChevronDown, ChevronRight, Clock3, Home, LayoutGrid, ShieldCheck, Truck } from "lucide-react";
+import { Bike, Car, Check, ChevronRight, Clock3, Home, LayoutGrid, ShieldCheck, Truck } from "lucide-react";
 import {
   getBikeBrands,
   getBrandModels,
@@ -122,7 +122,7 @@ const getBodyTypeIcon = (vehicleType: string, subtype: string) => {
 
 const VehicleHeroIllustration = () => {
   return (
-    <div className="w-[164px] sm:w-[190px]">
+    <div className="w-[128px] sm:w-[168px] md:w-[190px]">
       <svg viewBox="0 0 240 170" className="h-auto w-full" role="img" aria-label="Tow truck carrying a vehicle">
         <defs>
           <linearGradient id="vehicleHeroSkyline" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -176,7 +176,6 @@ const VehicleInfoStep = ({
   onInputChange,
   onVehicleTypeSelect,
   onVehicleSubtypeSelect,
-  onGarageVehicleSelected,
   hideCategorySelection = false,
 }: VehicleInfoStepProps) => {
   const extendedFormData = formData as ExtendedFormData;
@@ -194,6 +193,10 @@ const VehicleInfoStep = ({
   const primarySubtypes = currentVehicleDefinition?.subtypes.slice(0, 4) || [];
   const additionalSubtypes = currentVehicleDefinition?.subtypes.slice(4) || [];
   const selectedBrandMeta = availableBrands.find((brand) => brand.id === selectedBrand) || null;
+  const selectedBrandLabel = useMemo(
+    () => formatBrandName(selectedBrandMeta?.name || extendedFormData.vehicleBrand || ""),
+    [extendedFormData.vehicleBrand, selectedBrandMeta],
+  );
   const resolvedModelValue = useMemo(() => {
     if (availableModels.includes(formData.vehicleModel)) return formData.vehicleModel;
 
@@ -219,7 +222,7 @@ const VehicleInfoStep = ({
     if (matchedBrand) {
       setSelectedBrand(matchedBrand.id);
       setAvailableModels(getBrandModels(matchedBrand.id));
-    } else if (!presetBrand) {
+    } else {
       setSelectedBrand("");
       setAvailableModels([]);
     }
@@ -289,22 +292,22 @@ const VehicleInfoStep = ({
   return (
     <div className="animate-in fade-in-50 duration-500">
       {!hideCategorySelection && (
-        <section className="px-5 pb-2 pt-3 md:px-0 md:pt-0">
-          <div className="mb-5">
+        <section className="px-4 pb-2 pt-3 md:px-0 md:pt-0">
+          <div className="mb-4 md:mb-5">
             <p className="text-sm font-black tracking-tight text-foreground">Select vehicle category</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Choose the category so we can tailor the rest of the request quickly.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
             {vehicleTypes.map((type) => (
               <button
                 key={type.id}
                 type="button"
                 onClick={() => handleVehicleTypeChange(type.id)}
                 className={cn(
-                  "rounded-[1.2rem] border p-4 text-left transition-all duration-200 active:scale-[0.98]",
+                  "rounded-[1rem] border px-4 py-3.5 text-left transition-all duration-200 active:scale-[0.98] md:rounded-[1.2rem] md:p-4",
                   formData.vehicleType === type.id
                     ? "border-primary bg-red-50 shadow-[0_14px_28px_-24px_rgba(229,57,53,0.7)]"
                     : "border-slate-200 bg-white shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 hover:shadow-[0_16px_30px_-26px_rgba(15,23,42,0.22)]",
@@ -312,13 +315,13 @@ const VehicleInfoStep = ({
               >
                 <div
                   className={cn(
-                    "flex h-11 w-11 items-center justify-center rounded-2xl",
+                    "flex h-10 w-10 items-center justify-center rounded-xl md:h-11 md:w-11 md:rounded-2xl",
                     formData.vehicleType === type.id ? "bg-white text-primary" : "bg-slate-50 text-slate-700",
                   )}
                 >
                   <type.icon className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-sm font-bold text-foreground">{type.name}</p>
+                <p className="mt-2.5 text-sm font-bold text-foreground">{type.name}</p>
               </button>
             ))}
           </div>
@@ -327,33 +330,33 @@ const VehicleInfoStep = ({
 
       {currentVehicleType && (
         <>
-          <section className="px-5 pb-7 pt-3 md:px-0">
-            <div className="grid grid-cols-[1.15fr_0.85fr] items-center gap-3 border-b border-slate-100 pb-7">
-              <div className="max-w-[220px]">
-                <h2 className="text-[2rem] font-black leading-[1.05] tracking-tight text-[#0B1F3A] md:text-[2.25rem]">
+          <section className="px-4 pb-5 pt-3 md:px-0 md:pb-7">
+            <div className="grid grid-cols-[minmax(0,1fr)_128px] items-center gap-2.5 border-b border-slate-100 pb-5 md:grid-cols-[1.15fr_0.85fr] md:gap-3 md:pb-7">
+              <div className="min-w-0">
+                <h2 className="max-w-[9ch] text-[1.78rem] font-black leading-[1.05] tracking-tight text-[#0B1F3A] md:max-w-[220px] md:text-[2.25rem]">
                   {currentHeroCopy.title}
                 </h2>
-                <p className="mt-3 text-[1.05rem] leading-[1.8] text-slate-500">
+                <p className="mt-2 text-sm leading-6 text-slate-500 md:mt-3 md:text-[1.05rem] md:leading-[1.8]">
                   {currentHeroCopy.description}
                 </p>
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end self-end">
                 <VehicleHeroIllustration />
               </div>
             </div>
           </section>
 
-          <div className="space-y-8 px-5 pb-10 md:px-0 md:pb-4">
-            <section className="space-y-3">
+          <div className="space-y-5 px-4 pb-28 md:space-y-8 md:px-0 md:pb-4">
+            <section className="space-y-2.5 md:space-y-3">
               <div>
-                <h3 className="text-[1.05rem] font-black tracking-tight text-[#0B1F3A]">Quick select from garage</h3>
+                <h3 className="text-[0.95rem] font-black tracking-tight text-[#0B1F3A] md:text-[1.05rem]">Quick select from garage</h3>
               </div>
 
               <Select onValueChange={handleGarageSelect}>
-                <SelectTrigger className="h-[88px] rounded-[1.2rem] border border-slate-200 bg-white px-5 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15">
-                  <div className="flex w-full items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-primary">
-                      <Home className="h-5 w-5" />
+                <SelectTrigger className="h-16 rounded-[1rem] border border-slate-200 bg-white px-4 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15 md:h-[88px] md:rounded-[1.2rem] md:px-5">
+                  <div className="flex w-full items-center gap-3 md:gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-primary md:h-12 md:w-12 md:rounded-2xl">
+                      <Home className="h-[18px] w-[18px] md:h-5 md:w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <SelectValue placeholder="Choose a saved vehicle" />
@@ -365,7 +368,12 @@ const VehicleInfoStep = ({
                     garageVehicles
                       .filter((vehicle) => !hideCategorySelection || vehicle.type === currentVehicleType)
                       .map((vehicle) => (
-                        <SelectItem key={vehicle.id} value={String(vehicle.id)} className="py-3">
+                        <SelectItem
+                          key={vehicle.id}
+                          value={String(vehicle.id)}
+                          textValue={`${formatBrandName(vehicle.make)} ${vehicle.model}${vehicle.license_plate ? ` - ${vehicle.license_plate}` : ""}`}
+                          className="py-3"
+                        >
                           {formatBrandName(vehicle.make)} {vehicle.model}
                           {vehicle.license_plate ? ` • ${vehicle.license_plate}` : ""}
                         </SelectItem>
@@ -379,12 +387,12 @@ const VehicleInfoStep = ({
               </Select>
             </section>
 
-            <section className="space-y-4">
+            <section className="space-y-3 md:space-y-4">
               <div>
-                <h3 className="text-[1.05rem] font-black tracking-tight text-[#0B1F3A]">Body type</h3>
+                <h3 className="text-[0.95rem] font-black tracking-tight text-[#0B1F3A] md:text-[1.05rem]">Body type</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5 md:gap-3">
                 {primarySubtypes.map((subtype) => {
                   const Icon = getBodyTypeIcon(currentVehicleType, subtype);
                   const isSelected = formData.vehicleSubtype === subtype;
@@ -395,7 +403,7 @@ const VehicleInfoStep = ({
                       type="button"
                       onClick={() => onVehicleSubtypeSelect(subtype)}
                       className={cn(
-                        "relative flex min-h-[112px] items-center gap-4 rounded-[1.2rem] border px-5 py-4 text-left transition-all duration-200 active:scale-[0.985]",
+                        "relative flex min-h-[76px] items-center gap-3 rounded-[1rem] border px-3.5 py-3 text-left transition-all duration-200 active:scale-[0.985] md:min-h-[112px] md:gap-4 md:rounded-[1.2rem] md:px-5 md:py-4",
                         isSelected
                           ? "border-primary bg-[linear-gradient(180deg,rgba(229,57,53,0.06),rgba(229,57,53,0.02))] shadow-[0_18px_30px_-24px_rgba(229,57,53,0.5)]"
                           : "border-slate-200 bg-white shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-24px_rgba(15,23,42,0.22)]",
@@ -403,20 +411,20 @@ const VehicleInfoStep = ({
                     >
                       <div
                         className={cn(
-                          "flex h-12 w-12 items-center justify-center rounded-full",
+                          "flex h-9 w-9 items-center justify-center rounded-full md:h-12 md:w-12",
                           isSelected ? "bg-white text-primary shadow-sm" : "bg-slate-50 text-[#0B1F3A]",
                         )}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-[18px] w-[18px] md:h-5 md:w-5" />
                       </div>
 
-                      <span className="pr-7 text-[1.02rem] font-medium tracking-tight text-[#0B1F3A]">
+                      <span className="pr-6 text-[0.95rem] font-semibold leading-tight tracking-tight text-[#0B1F3A] md:pr-7 md:text-[1.02rem] md:font-medium">
                         {toTitle(subtype)}
                       </span>
 
                       {isSelected && (
-                        <span className="absolute right-5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-white shadow-[0_18px_28px_-24px_rgba(229,57,53,0.85)]">
-                          <Check className="h-5 w-5" />
+                        <span className="absolute right-3.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-white shadow-[0_18px_28px_-24px_rgba(229,57,53,0.85)] md:right-5 md:h-10 md:w-10">
+                          <Check className="h-3.5 w-3.5 md:h-5 md:w-5" />
                         </span>
                       )}
                     </button>
@@ -425,30 +433,30 @@ const VehicleInfoStep = ({
               </div>
 
               {additionalSubtypes.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-2.5 md:space-y-3">
                   <button
                     type="button"
                     onClick={() => setShowMoreTypes((current) => !current)}
-                    className="flex min-h-[96px] w-full items-center justify-between rounded-[1.2rem] border border-slate-200 bg-white px-5 py-4 text-left shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-24px_rgba(15,23,42,0.22)] active:scale-[0.985]"
+                    className="flex min-h-[56px] w-full items-center justify-between rounded-[1rem] border border-slate-200 bg-white px-3.5 py-3 text-left shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-24px_rgba(15,23,42,0.22)] active:scale-[0.985] md:min-h-[96px] md:rounded-[1.2rem] md:px-5 md:py-4"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 text-[#0B1F3A]">
-                        <LayoutGrid className="h-5 w-5" />
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-50 text-[#0B1F3A] md:h-12 md:w-12">
+                        <LayoutGrid className="h-[18px] w-[18px] md:h-5 md:w-5" />
                       </div>
-                      <span className="text-[1.02rem] font-medium tracking-tight text-[#0B1F3A]">
+                      <span className="text-[0.95rem] font-semibold tracking-tight text-[#0B1F3A] md:text-[1.02rem] md:font-medium">
                         More vehicle types
                       </span>
                     </div>
                     <ChevronRight
                       className={cn(
-                        "h-5 w-5 text-slate-400 transition-transform duration-200",
+                        "h-4 w-4 text-slate-400 transition-transform duration-200 md:h-5 md:w-5",
                         showMoreTypes && "rotate-90",
                       )}
                     />
                   </button>
 
                   {showMoreTypes && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5 md:gap-3">
                       {additionalSubtypes.map((subtype) => {
                         const Icon = getBodyTypeIcon(currentVehicleType, subtype);
                         const isSelected = formData.vehicleSubtype === subtype;
@@ -459,7 +467,7 @@ const VehicleInfoStep = ({
                             type="button"
                             onClick={() => onVehicleSubtypeSelect(subtype)}
                             className={cn(
-                              "flex min-h-[96px] items-center gap-3 rounded-[1.15rem] border px-4 py-3 text-left transition-all duration-200 active:scale-[0.985]",
+                              "flex min-h-[70px] items-center gap-3 rounded-[1rem] border px-3.5 py-3 text-left transition-all duration-200 active:scale-[0.985] md:min-h-[96px] md:rounded-[1.15rem] md:px-4",
                               isSelected
                                 ? "border-primary bg-red-50 shadow-[0_18px_30px_-24px_rgba(229,57,53,0.45)]"
                                 : "border-slate-200 bg-white shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)]",
@@ -467,13 +475,13 @@ const VehicleInfoStep = ({
                           >
                             <div
                               className={cn(
-                                "flex h-10 w-10 items-center justify-center rounded-full",
+                                "flex h-9 w-9 items-center justify-center rounded-full md:h-10 md:w-10",
                                 isSelected ? "bg-white text-primary" : "bg-slate-50 text-[#0B1F3A]",
                               )}
                             >
-                              <Icon className="h-4.5 w-4.5" />
+                              <Icon className="h-[18px] w-[18px]" />
                             </div>
-                            <span className="text-sm font-medium text-[#0B1F3A]">{toTitle(subtype)}</span>
+                            <span className="text-[0.9rem] font-medium leading-tight text-[#0B1F3A]">{toTitle(subtype)}</span>
                           </button>
                         );
                       })}
@@ -483,23 +491,26 @@ const VehicleInfoStep = ({
               )}
             </section>
 
-            <section className="space-y-4">
+            <section className="space-y-3 md:space-y-4">
               <div>
-                <h3 className="text-[1.05rem] font-black tracking-tight text-[#0B1F3A]">Vehicle make &amp; model</h3>
+                <h3 className="text-[0.95rem] font-black tracking-tight text-[#0B1F3A] md:text-[1.05rem]">Vehicle make &amp; model</h3>
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <Label className="mb-2 block text-sm font-medium text-slate-500">Make</Label>
+                  <Label className="mb-1.5 block text-[0.82rem] font-medium text-slate-500 md:mb-2 md:text-sm">Make</Label>
                   <Select value={selectedBrand} onValueChange={handleBrandChange}>
-                    <SelectTrigger className="h-[74px] rounded-[1.2rem] border border-slate-200 bg-white px-5 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15">
-                      <div className="flex w-full items-center gap-4">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-[inset_0_0_0_1px_rgba(229,57,53,0.14)]">
+                    <SelectTrigger className="h-16 rounded-[1rem] border border-slate-200 bg-white px-4 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15 md:h-[74px] md:rounded-[1.2rem] md:px-5">
+                      <span className="sr-only">
+                        <SelectValue placeholder="Select make" />
+                      </span>
+                      <div className="flex w-full items-center gap-3 md:gap-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-[inset_0_0_0_1px_rgba(229,57,53,0.14)] md:h-11 md:w-11 md:rounded-2xl">
                           {selectedBrandMeta ? (
                             <img
                               src={getBrandLogoSrc(selectedBrandMeta.logo)}
                               alt={selectedBrandMeta.name}
-                              className="h-7 w-7 object-contain"
+                              className="h-6 w-6 object-contain md:h-7 md:w-7"
                               onError={handleBrandLogoError}
                             />
                           ) : (
@@ -507,13 +518,21 @@ const VehicleInfoStep = ({
                           )}
                         </div>
                         <div className="min-w-0 flex-1 text-left">
-                          <SelectValue placeholder="Select make" />
+                          {selectedBrandLabel ? (
+                            <span className="block truncate text-sm font-medium text-[#0B1F3A] md:text-base">
+                              {selectedBrandLabel}
+                            </span>
+                          ) : (
+                            <span className="block truncate text-sm text-slate-400 md:text-base">
+                              Select make
+                            </span>
+                          )}
                         </div>
                       </div>
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-slate-200">
                       {availableBrands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id} className="py-3">
+                        <SelectItem key={brand.id} value={brand.id} textValue={formatBrandName(brand.name)} className="py-3">
                           <div className="flex items-center gap-3">
                             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]">
                               <img
@@ -532,9 +551,9 @@ const VehicleInfoStep = ({
                 </div>
 
                 <div>
-                  <Label className="mb-2 block text-sm font-medium text-slate-500">Model</Label>
+                  <Label className="mb-1.5 block text-[0.82rem] font-medium text-slate-500 md:mb-2 md:text-sm">Model</Label>
                   <Select value={resolvedModelValue} onValueChange={handleModelChange} disabled={!selectedBrand}>
-                    <SelectTrigger className="h-[74px] rounded-[1.2rem] border border-slate-200 bg-white px-5 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-70">
+                    <SelectTrigger className="h-16 rounded-[1rem] border border-slate-200 bg-white px-4 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-70 md:h-[74px] md:rounded-[1.2rem] md:px-5">
                       <div className="flex w-full items-center justify-between gap-4 text-left">
                         <div className="min-w-0 flex-1">
                           <SelectValue placeholder={selectedBrand ? "Select model" : "Choose make first"} />
@@ -553,25 +572,25 @@ const VehicleInfoStep = ({
               </div>
             </section>
 
-            <section className="rounded-[1.45rem] bg-white px-4 py-4 shadow-[0_24px_44px_-36px_rgba(15,23,42,0.3)]">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                    <Clock3 className="h-5 w-5" />
+            <section className="rounded-[1.15rem] bg-white px-3.5 py-3.5 shadow-[0_24px_44px_-36px_rgba(15,23,42,0.3)] md:rounded-[1.45rem] md:px-4 md:py-4">
+              <div className="grid grid-cols-2 gap-0">
+                <div className="flex items-center gap-2.5 pr-3 md:gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 md:h-12 md:w-12">
+                    <Clock3 className="h-[18px] w-[18px] md:h-5 md:w-5" />
                   </div>
                   <div>
-                    <p className="text-[0.9rem] text-slate-500">Fastest arrival</p>
-                    <p className="text-[1.1rem] font-black text-emerald-600">14 - 19 mins</p>
+                    <p className="text-[0.72rem] text-slate-500 md:text-[0.9rem]">Fastest arrival</p>
+                    <p className="text-[0.98rem] font-black text-emerald-600 md:text-[1.1rem]">14 - 19 mins</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 border-l border-slate-100 pl-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                    <ShieldCheck className="h-5 w-5" />
+                <div className="flex items-center gap-2.5 border-l border-slate-100 pl-3 md:gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 md:h-12 md:w-12">
+                    <ShieldCheck className="h-[18px] w-[18px] md:h-5 md:w-5" />
                   </div>
                   <div>
-                    <p className="text-[0.9rem] text-slate-500">Verified technicians</p>
-                    <p className="text-[1.1rem] font-black text-blue-600">100% Safe</p>
+                    <p className="text-[0.72rem] text-slate-500 md:text-[0.9rem]">Verified technicians</p>
+                    <p className="text-[0.98rem] font-black text-blue-600 md:text-[1.1rem]">100% Safe</p>
                   </div>
                 </div>
               </div>

@@ -5,10 +5,22 @@ export const BRAND_LOGO_FALLBACK = "/brands/default-brand.png";
 export function getBrandLogoSrc(logo?: string | null): string {
   const value = String(logo || "").trim();
   if (!value) return BRAND_LOGO_FALLBACK;
-  if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")) {
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:") ||
+    value.startsWith("blob:") ||
+    value.startsWith("/")
+  ) {
     return value;
   }
-  return `/brands/${value}`;
+
+  const normalized = value.replace(/\\/g, "/").replace(/^\.?\//, "");
+  if (normalized.startsWith("brands/") || normalized.includes("/")) {
+    return `/${normalized}`;
+  }
+
+  return `/brands/${normalized}`;
 }
 
 export function handleBrandLogoError(event: React.SyntheticEvent<HTMLImageElement>) {

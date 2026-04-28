@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useAutoHideBottomNav } from "@/hooks/useAutoHideBottomNav";
+import { isTrackingExperiencePath } from "@/lib/appShellRoutes";
 
 const MobileBottomNav = () => {
     const location = useLocation();
@@ -67,9 +68,10 @@ const MobileBottomNav = () => {
         { name: "Profile", path: isAuthenticated ? "/settings" : "/login?from=profile", icon: User },
     ];
 
-    const isServiceRequest = location.pathname.startsWith("/request-service") || location.pathname.startsWith("/request-service-tracking");
+    const isServiceRequest = location.pathname.startsWith("/request-service");
+    const isTrackingExperience = isTrackingExperiencePath(location.pathname);
 
-    if (isServiceRequest || !navEnabled) {
+    if (isServiceRequest || isTrackingExperience || !navEnabled) {
         return null;
     }
 

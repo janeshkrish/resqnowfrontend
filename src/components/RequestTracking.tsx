@@ -1,18 +1,33 @@
 import { useState, useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
+  animate,
+  motion,
+  useDragControls,
+  useMotionValue,
+  useReducedMotion,
+  type PanInfo,
+} from "framer-motion";
+import {
+  ArrowLeft,
   Phone,
   Star,
   RefreshCw,
   ShieldCheck,
-  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  ChevronUp,
+  CreditCard,
+  MapPin,
   MessageSquare,
+  RadioTower,
   Wifi,
   WifiOff,
   Clock3,
   CircleDot,
   ReceiptText,
-  AlertCircle
+  AlertCircle,
+  Wrench,
 } from "lucide-react";
 import FindingTechnician from "./FindingTechnician";
 import ClientJobCompletion from "./ClientJobCompletion";
@@ -92,16 +107,69 @@ const JOURNEY_STAGES = [
   "Completed"
 ];
 
-const SHEET_MIN_VH = 36;
-const SHEET_MAX_VH = 86;
-const SHEET_SNAP_POINTS = [40, 60, 82];
+type TrackingSheetMode = "map" | "balanced" | "sheet";
 
-const clampSheetHeight = (value: number) => Math.min(SHEET_MAX_VH, Math.max(SHEET_MIN_VH, value));
+const TRACKING_PANEL_HEIGHT_VH = 82;
+const TRACKING_PAYMENT_PANEL_HEIGHT_VH = 86;
+const TRACKING_COLLAPSED_PEEK = 118;
+const TRACKING_PAYMENT_COLLAPSED_PEEK = 152;
 
-const snapSheetHeight = (value: number) =>
-  SHEET_SNAP_POINTS.reduce((closest, current) =>
-    Math.abs(current - value) < Math.abs(closest - value) ? current : closest
+const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const formatCompactTime = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+};
+
+const formatDisplayLabel = (value: string | null | undefined) =>
+  String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+const getTrackingSheetOffsets = (
+  panelHeight: number,
+  viewportHeight: number,
+  showPayment: boolean,
+): Record<TrackingSheetMode, number> => {
+  const peekHeight = showPayment ? TRACKING_PAYMENT_COLLAPSED_PEEK : TRACKING_COLLAPSED_PEEK;
+  const balancedVisibleHeight = clampNumber(
+    Math.round(viewportHeight * (showPayment ? 0.45 : 0.39)),
+    showPayment ? 290 : 260,
+    showPayment ? 420 : 340,
   );
+  const expandedVisibleHeight = clampNumber(
+    Math.round(viewportHeight * (showPayment ? 0.83 : 0.76)),
+    showPayment ? 470 : 410,
+    panelHeight,
+  );
+
+  return {
+    map: Math.max(0, panelHeight - peekHeight),
+    balanced: Math.max(0, panelHeight - balancedVisibleHeight),
+    sheet: Math.max(0, panelHeight - expandedVisibleHeight),
+  };
+};
+
+const getClosestTrackingSheetMode = (
+  offsets: Record<TrackingSheetMode, number>,
+  projectedY: number,
+): TrackingSheetMode =>
+  (Object.entries(offsets) as [TrackingSheetMode, number][])
+    .reduce(
+      (closest, current) =>
+        Math.abs(current[1] - projectedY) < Math.abs(offsets[closest] - projectedY) ? current[0] : closest,
+      "balanced" as TrackingSheetMode,
+    );
 
 const normalizeRequestStatus = (value: unknown) => {
   const raw = String(value || "").trim().toLowerCase();
@@ -171,8 +239,13 @@ const RequestTracking = () => {
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [couponMessage, setCouponMessage] = useState<CouponMessageState | null>(null);
   const [finalAmount, setFinalAmount] = useState<number | null>(null);
-  const [sheetHeightVh, setSheetHeightVh] = useState(60);
-  const sheetDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const [sheetMode, setSheetMode] = useState<TrackingSheetMode>("balanced");
+  const [panelHeight, setPanelHeight] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const sheetY = useMotionValue(0);
+  const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
 
   const isMobile = useIsMobile();
   const { data: pricingConfig } = usePricingConfig();
@@ -231,12 +304,23 @@ const RequestTracking = () => {
 
   useEffect(() => {
     if (!isMobile) return;
-    if (showPayment) {
-      setSheetHeightVh((prev) => clampSheetHeight(Math.max(prev, 64)));
-      return;
-    }
-    setSheetHeightVh((prev) => clampSheetHeight(prev));
+    setSheetMode((current) => {
+      if (showPayment) return "sheet";
+      return current === "sheet" ? "balanced" : current;
+    });
   }, [isMobile, showPayment]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const updateViewportHeight = () => {
+      setViewportHeight(window.innerHeight);
+    };
+
+    updateViewportHeight();
+    window.addEventListener("resize", updateViewportHeight);
+    return () => window.removeEventListener("resize", updateViewportHeight);
+  }, [isMobile]);
 
   const selectedBackendPaymentMode = selectedPaymentMethod === "cash" ? "cash" : "upi";
 
@@ -598,27 +682,78 @@ const RequestTracking = () => {
   const technicianRatingLabel =
     Number.isFinite(technicianRating) && technicianRating > 0 ? technicianRating.toFixed(1) : "N/A";
   const technicianJobs = Number(technician?.completedJobs || 0);
+  const liveTrackingMetrics = useMemo(() => {
+    const hasBothLocations =
+      Number.isFinite(Number(technician?.location_lat)) &&
+      Number.isFinite(Number(technician?.location_lng)) &&
+      Number.isFinite(Number(request?.location_lat)) &&
+      Number.isFinite(Number(request?.location_lng));
 
-  const eta = (() => {
-    if (status === "arrived") return "Arrived";
-    if (status !== "en-route") return undefined;
-    if (!technician?.location_lat || !technician?.location_lng || !request?.location_lat || !request?.location_lng) {
-      return "On the way";
+    if (!hasBothLocations) {
+      return {
+        eta:
+          status === "arrived"
+            ? "Arrived"
+            : status === "en-route"
+              ? "On the way"
+              : status === "in-progress"
+                ? "Live"
+                : undefined,
+        etaDisplay:
+          status === "arrived"
+            ? "Arrived"
+            : status === "en-route"
+              ? "On the way"
+              : status === "in-progress"
+                ? "Live"
+                : undefined,
+        distanceKm: null as number | null,
+        distanceLabel: null as string | null,
+      };
     }
-    const toRad = (v: number) => (v * Math.PI) / 180;
-    const R = 6371;
-    const dLat = toRad(request.location_lat - technician.location_lat);
-    const dLon = toRad(request.location_lng - technician.location_lng);
+
+    const technicianLat = Number(technician?.location_lat);
+    const technicianLng = Number(technician?.location_lng);
+    const requestLat = Number(request?.location_lat);
+    const requestLng = Number(request?.location_lng);
+    const toRad = (value: number) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const deltaLat = toRad(requestLat - technicianLat);
+    const deltaLng = toRad(requestLng - technicianLng);
     const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(technician.location_lat)) *
-        Math.cos(toRad(request.location_lat)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const distanceKm = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const mins = Math.max(1, Math.ceil((distanceKm / 30) * 60));
-    return `${mins} mins`;
-  })();
+      Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+      Math.cos(toRad(technicianLat)) *
+        Math.cos(toRad(requestLat)) *
+        Math.sin(deltaLng / 2) *
+        Math.sin(deltaLng / 2);
+    const distanceKm = Number((2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1));
+    const minutes = Math.max(1, Math.ceil((distanceKm / 30) * 60));
+    const etaLabel = `${minutes} min`;
+
+    if (status === "arrived") {
+      return {
+        eta: "Arrived",
+        etaDisplay: "Arrived",
+        distanceKm,
+        distanceLabel: "At your location",
+      };
+    }
+
+    return {
+      eta: status === "en-route" ? etaLabel : status === "in-progress" ? "Live" : undefined,
+      etaDisplay: status === "en-route" ? etaLabel : status === "in-progress" ? "Live" : undefined,
+      distanceKm,
+      distanceLabel: `${distanceKm.toFixed(1)} km away`,
+    };
+  }, [
+    request?.location_lat,
+    request?.location_lng,
+    status,
+    technician?.location_lat,
+    technician?.location_lng,
+  ]);
+  const eta = liveTrackingMetrics.eta;
+  const distanceLabel = liveTrackingMetrics.distanceLabel;
 
   const stageIndex = (() => {
     if (status === "pending") return 0;
@@ -706,33 +841,185 @@ const RequestTracking = () => {
     Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
       ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
       : null;
+  const sheetPanelHeightVh = showPayment ? TRACKING_PAYMENT_PANEL_HEIGHT_VH : TRACKING_PANEL_HEIGHT_VH;
+  const sheetOffsets = useMemo(
+    () => getTrackingSheetOffsets(panelHeight, viewportHeight, showPayment),
+    [panelHeight, showPayment, viewportHeight],
+  );
 
-  const handleSheetPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    sheetDragRef.current = {
-      startY: event.clientY,
-      startHeight: sheetHeightVh,
+  useEffect(() => {
+    if (!isMobile || !panelRef.current) return;
+
+    const panelNode = panelRef.current;
+    const updatePanelHeight = () => {
+      setPanelHeight(Math.round(panelNode.getBoundingClientRect().height));
     };
+
+    updatePanelHeight();
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updatePanelHeight()) : null;
+    resizeObserver?.observe(panelNode);
+    window.addEventListener("resize", updatePanelHeight);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updatePanelHeight);
+    };
+  }, [isMobile, sheetPanelHeightVh]);
+
+  useEffect(() => {
+    if (!isMobile || panelHeight === 0 || viewportHeight === 0) return;
+    const targetY = sheetOffsets[sheetMode];
+
+    if (reduceMotion) {
+      sheetY.set(targetY);
+      return;
+    }
+
+    const controls = animate(sheetY, targetY, {
+      type: "spring",
+      stiffness: 380,
+      damping: 36,
+      mass: 0.82,
+    });
+
+    return () => {
+      controls.stop();
+    };
+  }, [isMobile, panelHeight, reduceMotion, sheetMode, sheetOffsets, sheetY, viewportHeight]);
+
+  const handleMapInteract = () => {
+    setSheetMode("map");
   };
 
-  const handleSheetPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!sheetDragRef.current) return;
-    const deltaY = sheetDragRef.current.startY - event.clientY;
-    const deltaVh = (deltaY / window.innerHeight) * 100;
-    setSheetHeightVh(clampSheetHeight(sheetDragRef.current.startHeight + deltaVh));
+  const handleSheetDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isMobile) return;
+    dragControls.start(event);
   };
 
-  const handleSheetPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (sheetDragRef.current) {
-      setSheetHeightVh((prev) => snapSheetHeight(clampSheetHeight(prev)));
-      sheetDragRef.current = null;
-    }
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // no-op
-    }
+  const handleSheetDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (!isMobile || panelHeight === 0 || viewportHeight === 0) return;
+    const projectedY = sheetY.get() + info.velocity.y * 0.14;
+    setSheetMode(getClosestTrackingSheetMode(sheetOffsets, projectedY));
   };
+
+  const handleSheetExpand = () => {
+    setSheetMode("sheet");
+  };
+
+  const serviceLocationLabel = request.address?.trim() || "Location is being updated";
+  const serviceTypeLabel = [formatDisplayLabel(request.vehicle_type), formatDisplayLabel(request.service_type)]
+    .filter(Boolean)
+    .join(" ");
+  const paymentMethodLabel = paymentCompleted
+    ? selectedBackendPaymentMode === "cash"
+      ? "Cash collected"
+      : "Paid online"
+    : selectedBackendPaymentMode === "cash"
+      ? "Cash on service"
+      : "Online payment";
+  const trackingSummary = useMemo(() => {
+    if (status === "en-route") {
+      return {
+        eyebrow: "Technician arriving in",
+        value: eta || "Live",
+        detail: distanceLabel || "Live location active",
+      };
+    }
+
+    if (status === "arrived") {
+      return {
+        eyebrow: "Technician has arrived",
+        value: "On site",
+        detail: serviceLocationLabel,
+      };
+    }
+
+    if (status === "in-progress") {
+      return {
+        eyebrow: "Service is in progress",
+        value: elapsedSeconds > 0 ? formatElapsedTime() : "Live",
+        detail: "Work has started",
+      };
+    }
+
+    if (showPayment && !paymentCompleted) {
+      return {
+        eyebrow: "Payment pending",
+        value: `${currency} ${amountDueLabel}`,
+        detail: "Complete payment to close the request",
+      };
+    }
+
+    if (status === "pending") {
+      return {
+        eyebrow: "Finding a nearby technician",
+        value: "Matching",
+        detail: "We are checking nearby partners for you",
+      };
+    }
+
+    return {
+      eyebrow: statusMeta.title,
+      value: status === "completed" || status === "paid" ? "Closed" : "Live",
+      detail: statusMeta.subtitle,
+    };
+  }, [
+    amountDueLabel,
+    currency,
+    distanceLabel,
+    elapsedSeconds,
+    paymentCompleted,
+    serviceLocationLabel,
+    showPayment,
+    status,
+    statusMeta.subtitle,
+    statusMeta.title,
+    eta,
+  ]);
+  const collapsedPreviewLabel = technician
+    ? `${technician.name}${eta ? ` | ${eta}` : ""}`
+    : status === "pending"
+      ? "Matching nearby technicians"
+      : statusMeta.title;
+  const trackingSteps = [
+    {
+      label: "Placed",
+      caption: formatCompactTime(request.created_at) || "Created",
+      complete: stageIndex >= 0,
+      active: stageIndex === 0,
+      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    },
+    {
+      label: "Assigned",
+      caption: technician ? "Matched" : "Pending",
+      complete: stageIndex >= 1,
+      active: stageIndex === 1,
+      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    },
+    {
+      label: "On the way",
+      caption: eta || "Waiting",
+      complete: stageIndex >= 2,
+      active: stageIndex === 2,
+      icon: <RadioTower className="h-3.5 w-3.5" />,
+    },
+    {
+      label: "Service",
+      caption: formatCompactTime(request.started_at) || "Pending",
+      complete: stageIndex >= 3,
+      active: stageIndex === 3,
+      icon: <Wrench className="h-3.5 w-3.5" />,
+    },
+    {
+      label: "Completed",
+      caption: paymentCompleted ? "Paid" : formatCompactTime(request.completed_at) || "Pending",
+      complete: stageIndex >= 4,
+      active: stageIndex === 4,
+      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    },
+  ];
 
   const summaryBreakdown = summaryPaymentDetails.hasPricing
     ? {

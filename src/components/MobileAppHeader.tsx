@@ -3,18 +3,22 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ArrowLeft, PhoneCall } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  isLiveMapPath,
+  isServiceRequestFlowPath,
+  isTrackingExperiencePath,
+} from "@/lib/appShellRoutes";
 // Dropdown imports removed for cleaner mobile header with bottom nav
 
 const MobileAppHeader = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
-  const isLiveMapPage = location.pathname === "/map";
-  const isServiceRequestFlow =
-    location.pathname.startsWith("/request-service/") &&
-    !location.pathname.startsWith("/request-service-tracking");
+  const isLiveMapPage = isLiveMapPath(location.pathname);
+  const isServiceRequestFlow = isServiceRequestFlowPath(location.pathname);
+  const isTrackingExperience = isTrackingExperiencePath(location.pathname);
 
-  if (!isMobile) return null;
+  if (!isMobile || isTrackingExperience) return null;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border">

@@ -6,23 +6,22 @@ import MobileBottomNav from "./MobileBottomNav"; // Use new Nav
 import MobileAppHeader from "./MobileAppHeader";
 import Chatbot from "./Chatbot";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { isTrackingExperiencePath, shouldHideSupportSurfaces } from "@/lib/appShellRoutes";
 
 const AppLayout = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
-  const isLiveMapPage = location.pathname === "/map";
-  const isServiceRequestFlow =
-    location.pathname.startsWith("/request-service/") &&
-    !location.pathname.startsWith("/request-service-tracking");
+  const shouldHideShellSupport = shouldHideSupportSurfaces(location.pathname);
+  const isTrackingExperience = isTrackingExperiencePath(location.pathname);
 
   return (
     <div className={`flex flex-col min-h-screen ${isMobile ? 'mobile-app-layout bg-background' : ''}`}>
       {/* Conditional header for mobile vs desktop */}
-      {isMobile ? <MobileAppHeader /> : <Header />}
+      {isMobile ? !isTrackingExperience && <MobileAppHeader /> : <Header />}
 
       {/* Main content with app-like styling on mobile */}
       {/* Added pb-20 to ensure content isn't hidden behind bottom nav */}
-      <main className={`flex-grow ${isMobile ? 'mobile-main pb-20' : ''}`}>
+      <main className={`flex-grow ${isMobile ? `mobile-main ${isTrackingExperience ? "" : "pb-20"}` : ''}`}>
         <Outlet />
       </main>
 
@@ -32,10 +31,10 @@ const AppLayout = () => {
       </div>
 
       {/* Mobile-specific features */}
-      {isMobile && <MobileBottomNav />}
+      {isMobile && !isTrackingExperience && <MobileBottomNav />}
 
       {/* Chatbot - positioned differently on mobile */}
-      {!isLiveMapPage && !isServiceRequestFlow && (
+      {!shouldHideShellSupport && (
         <div className={isMobile ? 'mobile-chatbot bottom-20' : ''}>
           <Chatbot />
         </div>

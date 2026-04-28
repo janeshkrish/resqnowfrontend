@@ -365,7 +365,7 @@ const normalizeTechnicians = (input: unknown, origin: [number, number]) => {
     .filter((tech): tech is Technician => Boolean(tech));
 };
 
-const Map = ({ mode = "page" }: MapProps) => {
+const RadarMap = ({ mode = "page" }: MapProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
@@ -1237,4 +1237,4 @@ const Map = ({ mode = "page" }: MapProps) => {
   );
 };
 
-export default Map;
+export default RadarMap;

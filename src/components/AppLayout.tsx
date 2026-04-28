@@ -11,6 +11,9 @@ const AppLayout = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const isLiveMapPage = location.pathname === "/map";
+  const isServiceRequestFlow =
+    location.pathname.startsWith("/request-service/") &&
+    !location.pathname.startsWith("/request-service-tracking");
 
   return (
     <div className={`flex flex-col min-h-screen ${isMobile ? 'mobile-app-layout bg-background' : ''}`}>
@@ -32,7 +35,7 @@ const AppLayout = () => {
       {isMobile && <MobileBottomNav />}
 
       {/* Chatbot - positioned differently on mobile */}
-      {!isLiveMapPage && (
+      {!isLiveMapPage && !isServiceRequestFlow && (
         <div className={isMobile ? 'mobile-chatbot bottom-20' : ''}>
           <Chatbot />
         </div>

@@ -86,11 +86,11 @@ const CommercialServiceRequest = () => {
     <div className={cn("min-h-screen bg-[#F5F7FA]", isMobile ? "pb-24" : "py-8 pb-8")}>
       <div className={cn("mx-auto transition-all duration-300", isMobile ? "w-full px-0" : "container px-4 max-w-4xl")}>
         <div className={cn("bg-white transition-all duration-300", isMobile ? "min-h-screen shadow-none rounded-none" : "rounded-[2rem] shadow-[0_30px_70px_-40px_rgba(15,23,42,0.25)] border border-slate-100 overflow-hidden")}>
-          <div className={cn(isMobile ? "sticky top-14 z-30 bg-white/95 backdrop-blur-xl border-b border-slate-100" : "border-b border-slate-100 bg-white")}>
+          <div className={cn(isMobile ? "border-b border-slate-100 bg-white" : "border-b border-slate-100 bg-white")}>
             <ProgressStepper currentStep={currentStep} steps={steps} />
           </div>
 
-          <div className={cn(isMobile ? (currentStep === 1 ? "pb-8" : "px-5 pt-5 pb-8") : "px-8 py-6")}>
+          <div className={cn(isMobile ? (currentStep === 1 ? "pt-2 pb-8" : "px-5 pt-5 pb-8") : "px-8 py-6")}>
             {currentStep === 1 && (
               <div className="space-y-6">
                 <VehicleInfoStep

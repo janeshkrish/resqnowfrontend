@@ -6,3 +6,31 @@
   [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m648[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4173[22m/[39m
+
+PWA v0.20.5
+mode      generateSW
+precache  2 entries (0.00 KiB)
+files generated
+  dev-dist/sw.js
+  dev-dist/workbox-d2eebf2c.js
+[2m8:25:48 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AppLayout.tsx, /src/index.css[22m
+[2m8:35:11 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:35:23 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:35:29 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:35:35 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:36:08 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:36:21 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:36:54 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:37:01 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:37:13 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:38:22 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:38:34 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:38:47 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:41:59 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:42:10 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:42:21 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:42:32 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:42:44 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:43:01 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:43:09 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Map.tsx, /src/index.css[22m
+[2m8:43:19 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m

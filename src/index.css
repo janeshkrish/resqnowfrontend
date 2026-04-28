@@ -354,6 +354,8 @@
 
 .radar-map .leaflet-tile-pane {
   filter: saturate(0.92) brightness(1.04);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .radar-map .leaflet-div-icon {
@@ -382,6 +384,8 @@
   align-items: flex-start;
   gap: 8px;
   transform-origin: bottom center;
+  will-change: transform;
+  backface-visibility: hidden;
   animation: radarMarkerFloat 3.8s ease-in-out infinite;
 }
 
@@ -448,6 +452,7 @@
   inset: -8px;
   border-radius: 9999px;
   background: rgba(16, 185, 129, 0.18);
+  will-change: transform, opacity;
   animation: radarPinPulse 2.5s ease-out infinite;
 }
 
@@ -492,6 +497,7 @@
   position: absolute;
   border-radius: 9999px;
   background: rgba(251, 113, 133, 0.16);
+  will-change: transform, opacity;
   animation: radarUserPulse 3.2s ease-out infinite;
 }
 

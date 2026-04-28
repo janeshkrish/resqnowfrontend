@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   animate,
   motion,
@@ -8,12 +8,13 @@ import {
   type PanInfo,
 } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SERVICE_CATALOG } from "@/config/serviceCatalog";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { apiUrl } from "@/lib/api";
@@ -58,6 +59,20 @@ interface FilterChip {
   label: string;
 }
 
+const SERVICE_LABEL_BY_KEY = SERVICE_CATALOG.reduce<Record<string, string>>((accumulator, service) => {
+  if (service.id !== "other") {
+    accumulator[service.id] = service.name;
+  }
+  return accumulator;
+}, {});
+
+const SERVICE_ORDER_BY_KEY = SERVICE_CATALOG.reduce<Record<string, number>>((accumulator, service, index) => {
+  if (service.id !== "other") {
+    accumulator[service.id] = index;
+  }
+  return accumulator;
+}, {});
+
 function MapViewport({
   userPosition,
   activeTechnicianPosition,
@@ -97,6 +112,28 @@ function MapViewport({
   return null;
 }
 
+function MapInteractionBridge({
+  enabled,
+  onInteract,
+}: {
+  enabled: boolean;
+  onInteract: () => void;
+}) {
+  useMapEvents(
+    enabled
+      ? {
+          click: onInteract,
+          mousedown: onInteract,
+          touchstart: onInteract,
+          dragstart: onInteract,
+          zoomstart: onInteract,
+        }
+      : {},
+  );
+
+  return null;
+}
+
 const toNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -110,6 +147,41 @@ const toDisplayTitle = (value: string) =>
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+
+const normalizeServiceFilterKey = (value: string) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+
+  if (!normalized) return "";
+  if (normalized.includes("tow") || normalized.includes("recover")) return "towing";
+  if (normalized.includes("tyre") || normalized.includes("tire") || normalized.includes("puncture")) {
+    return "flat-tire";
+  }
+  if (normalized.includes("battery") || normalized.includes("jump start") || normalized.includes("jumpstart")) {
+    return "battery";
+  }
+  if (normalized.includes("fuel")) return "fuel";
+  if (normalized.includes("lock")) return "lockout";
+  if (normalized.includes("winch")) return "winching";
+  if (normalized.includes("charge") || normalized.includes("charger") || normalized.includes("ev")) {
+    return "ev-charging";
+  }
+  if (
+    normalized.includes("mechanic") ||
+    normalized.includes("engine") ||
+    normalized.includes("repair") ||
+    normalized.includes("roadside help")
+  ) {
+    return "mechanical";
+  }
+
+  return normalized.replace(/\s+/g, "-");
+};
+
+const getServiceFilterLabel = (serviceKey: string) =>
+  SERVICE_LABEL_BY_KEY[serviceKey] || toDisplayTitle(serviceKey);
 
 const estimateDistanceKm = (
   fromLat: number,
@@ -237,6 +309,20 @@ const userRadarIcon = createUserIcon();
 
 const buildFilterId = (serviceType: string) => `service:${serviceType.trim().toLowerCase()}`;
 
+const getTechnicianServiceKeys = (tech: Technician) =>
+  Array.from(
+    new Set(
+      [tech.service_type, ...(Array.isArray(tech.specialties) ? tech.specialties : [])]
+        .map(normalizeServiceFilterKey)
+        .filter(Boolean),
+    ),
+  );
+
+const getPrimaryTechnicianServiceKey = (tech: Technician) =>
+  getTechnicianServiceKeys(tech)[0] || normalizeServiceFilterKey(tech.service_type) || "other";
+
+const getTechnicianServiceLabel = (tech: Technician) => getServiceFilterLabel(getPrimaryTechnicianServiceKey(tech));
+
 const normalizeTechnicians = (input: unknown, origin: [number, number]) => {
   if (!Array.isArray(input)) return [];
 
@@ -283,6 +369,7 @@ const Map = ({ mode = "page" }: MapProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
+  const panelRef = useRef<HTMLElement | null>(null);
   const sheetDragY = useMotionValue(0);
   const dragControls = useDragControls();
   const { coordinates, loading: loadingLocation, error: locationError, requestLocation } = useGeolocation();
@@ -290,12 +377,14 @@ const Map = ({ mode = "page" }: MapProps) => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loadingTechnicians, setLoadingTechnicians] = useState(false);
   const [selectedTechId, setSelectedTechId] = useState<string | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [panelHeight, setPanelHeight] = useState(0);
 
   const isPreview = mode === "preview";
   const isDraggableSheet = !isPreview && isMobile;
-  const collapsedSheetOffset = isDraggableSheet ? 228 : 0;
+  const collapsedPeekHeight = isDraggableSheet ? 118 : 0;
+  const collapsedSheetOffset = isDraggableSheet ? Math.max(0, panelHeight - collapsedPeekHeight) : 0;
   const mapCenter: [number, number] = coordinates ? [coordinates.lat, coordinates.lng] : DEFAULT_CENTER;
 
   useEffect(() => {
@@ -306,6 +395,27 @@ const Map = ({ mode = "page" }: MapProps) => {
     if (!isDraggableSheet) {
       setSheetExpanded(true);
     }
+  }, [isDraggableSheet]);
+
+  useEffect(() => {
+    if (!isDraggableSheet || !panelRef.current) return;
+
+    const panelNode = panelRef.current;
+    const updatePanelHeight = () => {
+      setPanelHeight(Math.round(panelNode.getBoundingClientRect().height));
+    };
+
+    updatePanelHeight();
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updatePanelHeight()) : null;
+    resizeObserver?.observe(panelNode);
+    window.addEventListener("resize", updatePanelHeight);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updatePanelHeight);
+    };
   }, [isDraggableSheet]);
 
   useEffect(() => {
@@ -324,9 +434,9 @@ const Map = ({ mode = "page" }: MapProps) => {
 
     const controls = animate(sheetDragY, targetY, {
       type: "spring",
-      stiffness: 420,
-      damping: 36,
-      mass: 0.82,
+      stiffness: 360,
+      damping: 34,
+      mass: 0.78,
     });
 
     return () => {
@@ -414,36 +524,52 @@ const Map = ({ mode = "page" }: MapProps) => {
     }
   };
 
-  const filterChips = useMemo<FilterChip[]>(() => {
-    const serviceTypes = Array.from(
-      new Set(
-        technicians
-          .map((tech) => tech.service_type.trim())
-          .filter(Boolean),
+  const serviceKeysByTechnicianId = useMemo(
+    () =>
+      new Map(
+        technicians.map((tech) => [tech.id, getTechnicianServiceKeys(tech)]),
       ),
-    );
+    [technicians],
+  );
+
+  const filterChips = useMemo<FilterChip[]>(() => {
+    const serviceKeys = Array.from(
+      new Set(
+        technicians.flatMap((tech) => serviceKeysByTechnicianId.get(tech.id) || []),
+      ),
+    ).sort((left, right) => {
+      const leftOrder = SERVICE_ORDER_BY_KEY[left] ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = SERVICE_ORDER_BY_KEY[right] ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+
+      return getServiceFilterLabel(left).localeCompare(getServiceFilterLabel(right));
+    });
 
     return [
       { id: "all", label: "All" },
       { id: "recommended", label: "Best Match" },
-      ...serviceTypes.map((serviceType) => ({
-        id: buildFilterId(serviceType),
-        label: toDisplayTitle(serviceType),
+      ...serviceKeys.map((serviceKey) => ({
+        id: buildFilterId(serviceKey),
+        label: getServiceFilterLabel(serviceKey),
       })),
     ];
-  }, [technicians]);
+  }, [serviceKeysByTechnicianId, technicians]);
 
   const filteredTechnicians = useMemo(() => {
     return technicians.filter((tech) => {
       if (activeFilter === "all") return true;
       if (activeFilter === "recommended") return Boolean(tech.aiRecommended);
       if (activeFilter.startsWith("service:")) {
-        return buildFilterId(tech.service_type) === activeFilter;
+        const activeServiceKey = activeFilter.replace(/^service:/, "");
+        return (serviceKeysByTechnicianId.get(tech.id) || []).includes(activeServiceKey);
       }
 
       return true;
     });
-  }, [activeFilter, technicians]);
+  }, [activeFilter, serviceKeysByTechnicianId, technicians]);
 
   const orderedTechnicians = useMemo(() => {
     return [...filteredTechnicians].sort((a, b) => {
@@ -480,30 +606,37 @@ const Map = ({ mode = "page" }: MapProps) => {
   const activeTechPosition = activeTech ? ([activeTech.latitude, activeTech.longitude] as [number, number]) : null;
   const routePath = userPosition && activeTechPosition ? buildRouteCurve(activeTechPosition, userPosition) : [];
   const nearbyCount = orderedTechnicians.length;
+  const mapPriority = isDraggableSheet && !sheetExpanded;
   const secondaryTechnicians = orderedTechnicians.filter((tech) => tech.id !== activeTech?.id);
   const visibleSecondaryTechnicians =
     sheetExpanded || !isDraggableSheet ? secondaryTechnicians : secondaryTechnicians.slice(0, 2);
+  const activeTechServiceLabel = activeTech ? getTechnicianServiceLabel(activeTech) : "";
 
-  const handleTechSelect = (tech: Technician) => {
+  const handleTechSelect = (tech: Technician, source: "map" | "sheet" = "sheet") => {
     setSelectedTechId(tech.id);
 
-    if (isDraggableSheet) {
+    if (isDraggableSheet && source === "sheet") {
+      setSheetExpanded(true);
+    }
+  };
+
+  const handleMapInteract = () => {
+    if (isDraggableSheet && sheetExpanded) {
+      setSheetExpanded(false);
+    }
+  };
+
+  const handleSheetPreviewClick = () => {
+    if (isDraggableSheet && !sheetExpanded) {
       setSheetExpanded(true);
     }
   };
 
   const handleBookService = (tech: Technician) => {
     const token = localStorage.getItem("resqnow_user_token");
-    const lower = tech.service_type.toLowerCase();
-    const serviceRoute = lower.includes("tow")
-      ? "towing"
-      : lower.includes("tire") || lower.includes("tyre")
-        ? "flat-tire"
-        : lower.includes("battery")
-          ? "battery"
-          : "towing";
+    const serviceRoute = getPrimaryTechnicianServiceKey(tech);
 
-    const targetUrl = `/request-service/${serviceRoute}/car?techId=${tech.id}`;
+    const targetUrl = `/request-service/${serviceRoute}?techId=${tech.id}`;
 
     if (!token) {
       sessionStorage.setItem("returnUrl", targetUrl);
@@ -520,19 +653,10 @@ const Map = ({ mode = "page" }: MapProps) => {
   };
 
   const handleSheetDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (!isDraggableSheet) return;
+    if (!isDraggableSheet || collapsedSheetOffset === 0) return;
 
-    const shouldCollapse = info.offset.y > 70 || info.velocity.y > 600;
-    const shouldExpand = info.offset.y < -45 || info.velocity.y < -450;
-
-    if (shouldCollapse) {
-      setSheetExpanded(false);
-      return;
-    }
-
-    if (shouldExpand) {
-      setSheetExpanded(true);
-    }
+    const projectedY = sheetDragY.get() + info.velocity.y * 0.12;
+    setSheetExpanded(projectedY < collapsedSheetOffset * 0.48);
   };
 
   const containerClasses = isPreview
@@ -546,8 +670,43 @@ const Map = ({ mode = "page" }: MapProps) => {
       : "inset-x-0 bottom-0 h-[73dvh] rounded-t-[1.9rem] md:inset-y-6 md:right-6 md:left-auto md:h-auto md:w-[396px] md:rounded-[2rem]",
   );
 
-  const mapFitBottomPadding = isDraggableSheet ? (sheetExpanded ? 340 : 170) : isPreview ? 78 : 64;
-  const mapFitRightPadding = isMobile ? 32 : 430;
+  const mapFitBottomPadding = isDraggableSheet
+    ? sheetExpanded
+      ? Math.min(Math.max(Math.round(panelHeight * 0.46), 280), 360)
+      : collapsedPeekHeight + 26
+    : isPreview
+      ? 78
+      : 64;
+  const mapFitRightPadding = isPreview ? 430 : isMobile ? 32 : 430;
+  const shouldShowBodyHeader = isPreview || !isMobile;
+  const renderFilterChips = (variant: "panel" | "overlay" = "panel") => (
+    <div className={cn("overflow-x-auto hide-scrollbar -mx-1 px-1", variant === "overlay" && "pointer-events-auto")}>
+      <div className="flex gap-2 pb-1">
+        {filterChips.map((chip) => {
+          const isActive = chip.id === activeFilter;
+
+          return (
+            <button
+              key={`${variant}-${chip.id}`}
+              type="button"
+              onClick={() => setActiveFilter(chip.id)}
+              className={cn(
+                "shrink-0 rounded-full border font-bold transition",
+                variant === "overlay" ? "px-3 py-2 text-[10px] shadow-sm" : "px-3.5 py-2 text-[11px]",
+                isActive
+                  ? "border-rose-200 bg-rose-50 text-rose-500 shadow-[0_12px_24px_-20px_rgba(244,63,94,0.75)]"
+                  : variant === "overlay"
+                    ? "border-white/80 bg-white/96 text-slate-600 hover:border-slate-200 hover:bg-white"
+                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+              )}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className={containerClasses}>
@@ -563,6 +722,8 @@ const Map = ({ mode = "page" }: MapProps) => {
           touchZoom
         >
           <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+
+          <MapInteractionBridge enabled={isDraggableSheet} onInteract={handleMapInteract} />
 
           <MapViewport
             userPosition={userPosition}
@@ -627,7 +788,7 @@ const Map = ({ mode = "page" }: MapProps) => {
               key={tech.id}
               position={[tech.latitude, tech.longitude]}
               icon={createTechnicianIcon(tech, activeTech?.id === tech.id)}
-              eventHandlers={{ click: () => handleTechSelect(tech) }}
+              eventHandlers={{ click: () => handleTechSelect(tech, "map") }}
               zIndexOffset={activeTech?.id === tech.id ? 400 : 150}
             />
           ))}
@@ -688,7 +849,22 @@ const Map = ({ mode = "page" }: MapProps) => {
         </div>
       )}
 
+      {mapPriority && filterChips.length > 1 && (
+        <motion.div
+          initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className="pointer-events-none absolute inset-x-3 z-[430] md:hidden"
+          style={{ bottom: `calc(env(safe-area-inset-bottom) + ${collapsedPeekHeight + 14}px)` }}
+        >
+          <div className="rounded-[1.2rem] border border-white/70 bg-white/86 px-2 py-2 backdrop-blur-xl shadow-[0_18px_36px_-26px_rgba(15,23,42,0.3)]">
+            {renderFilterChips("overlay")}
+          </div>
+        </motion.div>
+      )}
+
       <motion.section
+        ref={panelRef}
         initial={reduceMotion ? undefined : { opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.32, ease: "easeOut" }}
@@ -699,12 +875,12 @@ const Map = ({ mode = "page" }: MapProps) => {
         dragMomentum={false}
         dragConstraints={{ top: 0, bottom: collapsedSheetOffset }}
         onDragEnd={handleSheetDragEnd}
-        style={isDraggableSheet ? { y: sheetDragY } : undefined}
+        style={isDraggableSheet ? { y: sheetDragY, willChange: "transform" } : undefined}
         className={panelClasses}
       >
         <div className="flex h-full flex-col">
           {!isPreview && (
-            <div className="relative shrink-0 px-4 pt-2.5 md:hidden">
+            <div className="shrink-0 border-b border-slate-100/80 px-4 pb-3 pt-2.5 md:hidden">
               <div
                 role="presentation"
                 onPointerDown={handleSheetDragStart}
@@ -714,25 +890,7 @@ const Map = ({ mode = "page" }: MapProps) => {
                 <span className="h-1.5 w-12 rounded-full bg-slate-300" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSheetExpanded((current) => !current)}
-                className="absolute right-4 top-1.5 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                aria-label={sheetExpanded ? "Collapse technicians panel" : "Expand technicians panel"}
-              >
-                {sheetExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              </button>
-            </div>
-          )}
-
-          <div
-            className={cn(
-              "flex-1 overflow-y-auto px-4 pb-5 pt-2 custom-scrollbar sm:px-5",
-              !isPreview && "pb-[calc(env(safe-area-inset-bottom)+5.15rem)] md:pb-5",
-            )}
-          >
-            <div className="space-y-4">
-              <div className="space-y-3">
+              {sheetExpanded ? (
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
@@ -754,36 +912,104 @@ const Map = ({ mode = "page" }: MapProps) => {
                       Clear
                     </button>
                   ) : (
-                    <div className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                    <button
+                      type="button"
+                      onClick={() => setSheetExpanded(false)}
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 transition hover:bg-slate-200"
+                      aria-label="Collapse technicians panel"
+                    >
                       Live
-                    </div>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
                   )}
                 </div>
-
-                <div className="overflow-x-auto hide-scrollbar -mx-1 px-1">
-                  <div className="flex gap-2 pb-1">
-                    {filterChips.map((chip) => {
-                      const isActive = chip.id === activeFilter;
-
-                      return (
-                        <button
-                          key={chip.id}
-                          type="button"
-                          onClick={() => setActiveFilter(chip.id)}
-                          className={cn(
-                            "shrink-0 rounded-full border px-3.5 py-2 text-[11px] font-bold transition",
-                            isActive
-                              ? "border-rose-200 bg-rose-50 text-rose-500 shadow-[0_12px_24px_-20px_rgba(244,63,94,0.75)]"
-                              : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
-                          )}
-                        >
-                          {chip.label}
-                        </button>
-                      );
-                    })}
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSheetPreviewClick}
+                  className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-3.5 py-3 text-left shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] transition hover:border-slate-300 hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
+                      <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
+                        {loadingTechnicians
+                          ? "Scanning nearby teams"
+                          : activeTech
+                            ? `${activeTech.name} - ${formatEtaWindow(activeTech.distance)}`
+                            : `${nearbyCount} technicians available around you`}
+                      </p>
+                    </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+                      <ChevronUp className="h-4 w-4" />
+                    </span>
                   </div>
+
+                  {activeTech && !loadingTechnicians && (
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
+                        {getVendorInitials(activeTech.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[0.82rem] font-bold text-slate-900">{activeTechServiceLabel}</p>
+                        <p className="truncate text-[11px] font-medium text-slate-500">
+                          {formatDistanceDetailed(activeTech.distance)} away
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">
+                        Live
+                      </span>
+                    </div>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div
+            className={cn(
+              "flex-1 px-4 pb-5 custom-scrollbar sm:px-5",
+              sheetExpanded || !isDraggableSheet ? "overflow-y-auto pt-3" : "overflow-hidden pt-0",
+              !isPreview && "pb-[calc(env(safe-area-inset-bottom)+5.15rem)] md:pb-5",
+            )}
+          >
+            <div className="space-y-4">
+              {shouldShowBodyHeader && (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {loadingTechnicians
+                          ? "Refreshing live radar..."
+                          : activeFilter === "all"
+                            ? `${nearbyCount} technicians available around you`
+                            : `${nearbyCount} technicians in this filter`}
+                      </p>
+                    </div>
+
+                    {activeFilter !== "all" ? (
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilter("all")}
+                        className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500 transition hover:bg-slate-50"
+                      >
+                        Clear
+                      </button>
+                    ) : (
+                      <div className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                        Live
+                      </div>
+                    )}
+                  </div>
+
+                  {renderFilterChips()}
                 </div>
-              </div>
+              )}
+
+              {!shouldShowBodyHeader && sheetExpanded && (
+                renderFilterChips()
+              )}
 
               {loadingTechnicians && (
                 <div className="rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
@@ -813,10 +1039,10 @@ const Map = ({ mode = "page" }: MapProps) => {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-[0.95rem] font-black tracking-tight text-slate-900">
-                            {toDisplayTitle(activeTech.name)}
+                            {activeTech.name}
                           </p>
                           <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                            {toDisplayTitle(activeTech.service_type)}
+                            {activeTechServiceLabel}
                           </p>
                         </div>
 
@@ -944,7 +1170,7 @@ const Map = ({ mode = "page" }: MapProps) => {
                       <motion.button
                         key={tech.id}
                         type="button"
-                        onClick={() => handleTechSelect(tech)}
+                        onClick={() => handleTechSelect(tech, "sheet")}
                         initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.22, delay: index * 0.04 }}
@@ -963,7 +1189,7 @@ const Map = ({ mode = "page" }: MapProps) => {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <p className="truncate text-sm font-black tracking-tight text-slate-900">
-                                {toDisplayTitle(tech.name)}
+                                {tech.name}
                               </p>
                               {isBestRow && (
                                 <Badge className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-rose-500 hover:bg-rose-50">
@@ -972,7 +1198,7 @@ const Map = ({ mode = "page" }: MapProps) => {
                               )}
                             </div>
                             <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                              {toDisplayTitle(tech.service_type)}
+                              {getTechnicianServiceLabel(tech)}
                             </p>
                           </div>
 

@@ -9,7 +9,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 - **Secure Authentication:** Google OAuth and email-based login (JWT) for users and technicians.
 - **Technician Dashboard:** Comprehensive tools for managing jobs, earnings, and availability.
 - **Admin Console:** Manage technicians, users, and service categories.
-- **Payment Integration:** Razorpay integration for seamless service payments.
+- **Payment Integration:** Razorpay integration for seamless service payments
 
 ## 🛠️ Technology Stack
 

@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ArrowRight, Menu, PhoneCall, ShieldCheck, X } from "lucide-react";
 import UserMenu from "./UserMenu";
-
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -19,154 +18,189 @@ const Header = () => {
     { label: "Platform", to: "/#platform", activePath: "/" },
     { label: "Solutions", to: "/#solutions", activePath: "/services" },
     { label: "Fleet", to: "/#fleet", activePath: "/map" },
-    { label: "Industries", to: "/#ecosystem", activePath: "/about" },
+    { label: "Ecosystem", to: "/#ecosystem", activePath: "/about" },
     { label: "Technology", to: "/#technology", activePath: "/technology" },
-    { label: "Contact", to: "/contact", activePath: "/contact" },
-    { label: "Partner With Us", to: partnerRoute, activePath: "/technician" },
   ];
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 10) {
+      if (window.scrollY > 20) {
         setIsScrolled(true);
       } else {
         setIsScrolled(false);
       }
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
+  const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   const isActive = (path: string) => {
-    if (path === "/") return location.pathname === "/";
+    if (path === "/") return location.pathname === "/" && !location.hash;
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${
+      className={`sticky top-0 z-50 w-full transition-all duration-500 ease-in-out ${
         isScrolled
-          ? "border-slate-200/80 bg-white/[0.86] shadow-[0_18px_45px_-38px_rgba(15,23,42,0.6)] backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-950/90"
-          : "border-slate-200/70 bg-white/[0.78] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/[0.88]"
-        }`}
+          ? "border-b border-slate-200/40 bg-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl"
+          : "bg-white/60 backdrop-blur-md border-b border-transparent"
+      }`}
     >
-      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:h-20 lg:px-8">
-        <Link to="/" className="flex items-center gap-3" aria-label="ResQNow home">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-950 text-white shadow-sm">
+      <div className="container mx-auto flex h-[76px] max-w-7xl items-center justify-between px-4 lg:px-8">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-3 group" aria-label="ResQNow home">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.5)] transition-transform duration-300 group-hover:scale-105">
             <ShieldCheck className="h-5 w-5" />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-xl font-black tracking-tight text-slate-950 dark:text-white lg:text-2xl">ResQNow</span>
-            <span className="mt-1 hidden text-[0.62rem] font-black uppercase tracking-[0.22em] text-slate-400 lg:block">
-              Mobility Grid
+          </div>
+          <div className="flex flex-col leading-none">
+            <span className="text-[22px] font-black tracking-tight text-slate-900 transition-colors group-hover:text-blue-700">ResQNow</span>
+            <span className="mt-1 hidden text-[10px] font-bold uppercase tracking-[0.25em] text-blue-600 lg:block">
+              Enterprise
             </span>
-          </span>
+          </div>
         </Link>
 
-        <nav className="hidden items-center gap-1 rounded-full border border-slate-200 bg-white/70 p-1 shadow-sm backdrop-blur-xl lg:flex">
+        {/* Desktop Navigation */}
+        <nav className="hidden lg:flex items-center gap-9 absolute left-1/2 -translate-x-1/2">
           {navItems.map((item) => {
             const active = isActive(item.activePath);
             return (
               <Link
                 key={item.label}
                 to={item.to}
-                className={`rounded-full px-4 py-2 text-sm font-bold transition-all ${
-                  active
-                    ? "bg-slate-950 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                }`}
+                className="relative text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors py-2"
               >
                 {item.label}
+                {active && (
+                  <motion.div
+                    layoutId="activeNavIndicator"
+                    className="absolute -bottom-[24px] left-0 right-0 h-[3px] rounded-t-full bg-blue-600"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="flex items-center gap-3">
-          {!isLiveMapPage && (
-            <Button
-              size="lg"
-              className="hidden rounded-lg bg-red-50 px-5 font-black text-red-600 shadow-sm ring-1 ring-red-100 hover:bg-red-100 lg:flex"
-              asChild
+        {/* Desktop Actions */}
+        <div className="flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-5">
+            <Link 
+              to={partnerRoute}
+              className="text-[14px] font-bold text-slate-500 hover:text-blue-600 transition-colors"
             >
-              <Link to="/request-service/emergency">
-                <PhoneCall className="h-4 w-4" />
-                SOS
-              </Link>
-            </Button>
-          )}
-
-          <Button
-            size="lg"
-            className="hidden rounded-lg bg-blue-600 px-5 font-black text-white shadow-[0_18px_30px_-22px_rgba(37,99,235,0.75)] hover:bg-blue-700 lg:flex"
-            asChild
-          >
-            <Link to="/contact">
-              Schedule Demo
-              <ArrowRight className="h-4 w-4" />
+              Partner Network
             </Link>
-          </Button>
+            <Link 
+              to="/contact"
+              className="text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors mr-2"
+            >
+              Contact
+            </Link>
+            
+            {!isLiveMapPage && (
+              <Button
+                variant="outline"
+                className="rounded-xl border-slate-200 bg-white/50 backdrop-blur-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                asChild
+              >
+                <Link to="/request-service/emergency">
+                  <PhoneCall className="mr-2 h-4 w-4 text-red-500" />
+                  SOS
+                </Link>
+              </Button>
+            )}
 
-          <div className="hidden lg:block">
+            <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
             <UserMenu />
           </div>
 
           <button
-            className="lg:hidden text-muted-foreground p-2 hover:bg-muted/50 rounded-lg transition-colors"
+            className="lg:hidden text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-colors"
             onClick={toggleMobileMenu}
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+            {mobileMenuOpen ? <X size={26} /> : <Menu size={26} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-16 left-0 right-0 bg-card dark:bg-slate-900 border-b border-border shadow-xl animate-fade-in">
-          <div className="container py-6 px-4 flex flex-col gap-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.label}
-                to={item.to}
-                className={`font-medium py-4 px-4 text-lg rounded-lg transition-colors ${
-                  isActive(item.activePath)
-                    ? "text-primary bg-primary/10 font-semibold"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-
-            <div className="py-4 px-4">
-              <UserMenu />
-            </div>
-
-            {!isLiveMapPage && (
-              <Button
-                size="xl"
-                className="bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 w-full mt-4 shadow-lg"
-                asChild
-              >
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="lg:hidden absolute top-[76px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-2xl"
+          >
+            <div className="container py-6 px-4 flex flex-col gap-2">
+              {navItems.map((item) => (
                 <Link
-                  to="/request-service/emergency"
+                  key={item.label}
+                  to={item.to}
+                  className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
+                    isActive(item.activePath)
+                      ? "text-blue-700 bg-blue-50/80"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <PhoneCall className="mr-3 h-6 w-6" />
-                  Emergency Call
+                  {item.label}
                 </Link>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+              ))}
+              
+              <Link
+                  to={partnerRoute}
+                  className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
+                    isActive("/technician")
+                      ? "text-blue-700 bg-blue-50/80"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Partner With Us
+              </Link>
+              <Link
+                  to="/contact"
+                  className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
+                    isActive("/contact")
+                      ? "text-blue-700 bg-blue-50/80"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Contact Sales
+              </Link>
+
+              <div className="py-4 px-4 border-t border-slate-100 mt-2">
+                <UserMenu />
+              </div>
+
+              {!isLiveMapPage && (
+                <Button
+                  size="xl"
+                  className="bg-red-600 hover:bg-red-700 text-white w-full mt-2 rounded-xl shadow-lg shadow-red-600/20 font-bold"
+                  asChild
+                >
+                  <Link
+                    to="/request-service/emergency"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <PhoneCall className="mr-3 h-5 w-5" />
+                    Emergency SOS
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

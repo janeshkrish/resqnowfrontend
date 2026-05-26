@@ -15,11 +15,9 @@ const Header = () => {
 
   const partnerRoute = isTechAuthenticated ? "/technician/dashboard" : "/technician/register";
   const navItems = [
-    { label: "Platform", to: "/#platform", activePath: "/" },
-    { label: "Solutions", to: "/#solutions", activePath: "/services" },
-    { label: "Fleet", to: "/#fleet", activePath: "/map" },
-    { label: "Ecosystem", to: "/#ecosystem", activePath: "/about" },
-    { label: "Technology", to: "/#technology", activePath: "/technology" },
+    { label: "Platform", to: "/", activePath: "/" },
+    { label: "Services", to: "/services", activePath: "/services" },
+    { label: "Our Story", to: "/about", activePath: "/about" },
   ];
 
   useEffect(() => {

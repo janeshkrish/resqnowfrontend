@@ -1,15 +1,12 @@
-import React, { ReactNode, useRef } from "react";
+import React, { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
-  Activity, ArrowRight, BarChart3, BatteryCharging, Building2, Car,
-  CheckCircle2, Clock3, CloudCog, Gauge, Globe2, Headphones, Layers3,
-  LineChart, MapPin, Network, PlugZap, Radar, Route, ShieldCheck,
-  Smartphone, Sparkles, TimerReset, Truck, UsersRound, Wrench, Zap
+  Activity, ArrowRight, Car,
+  CheckCircle2, Clock3, Route, ShieldCheck,
+  Smartphone, Sparkles, Truck, Wrench, Navigation, IndianRupee, Map
 } from "lucide-react";
-
-type IconType = typeof Activity;
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -20,15 +17,6 @@ const staggerContainer = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 };
-
-const partners = [
-  { title: "Fleet Operators", body: "Centralized assistance, ETA visibility, and service evidence for distributed vehicles.", icon: Truck },
-  { title: "Automobile Companies", body: "White-label roadside support layer for OEM warranty, after-sales, and loyalty programs.", icon: Car },
-  { title: "EV Ecosystems", body: "Charging, battery support, and technician routing for connected electric mobility.", icon: BatteryCharging },
-  { title: "Insurance Providers", body: "Claim-aware dispatch workflows with traceable incidents, photos, and response history.", icon: ShieldCheck },
-  { title: "Service Networks", body: "Verified garages, technicians, and towing operators organized into live availability grids.", icon: Wrench },
-  { title: "Towing Partners", body: "Fleet assignment, partner activity, pricing transparency, and completion tracking.", icon: Route },
-];
 
 const Reveal = ({ children, className = "", delay = 0 }: { children: ReactNode; className?: string; delay?: number }) => (
   <motion.div
@@ -41,12 +29,6 @@ const Reveal = ({ children, className = "", delay = 0 }: { children: ReactNode; 
   >
     {children}
   </motion.div>
-);
-
-const GlassCard = ({ children, className = "" }: { children: ReactNode; className?: string }) => (
-  <div className={`rounded-2xl border border-white/60 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl ${className}`}>
-    {children}
-  </div>
 );
 
 const AnimatedDashboardMockup = () => {
@@ -67,14 +49,14 @@ const AnimatedDashboardMockup = () => {
               <div className="w-3 h-3 rounded-full bg-slate-200" />
               <div className="w-3 h-3 rounded-full bg-slate-200" />
             </div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">Command Center</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">AI Dispatch Engine</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
-            System Live
+            Sub-45m ETA Grid
           </div>
         </div>
 
@@ -111,7 +93,7 @@ const AnimatedDashboardMockup = () => {
                 <Truck size={16} />
               </div>
               <div className="absolute -top-8 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap shadow-xl">
-                ETA 11 min
+                ETA 22 min
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45" />
               </div>
             </motion.div>
@@ -132,16 +114,16 @@ const AnimatedDashboardMockup = () => {
             >
               <div className="flex justify-between items-center mb-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Active Assignment</p>
-                  <p className="text-sm font-black text-slate-800">Flatbed to NH-48 Sector</p>
+                  <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Avinashi Rd. Corridor</p>
+                  <p className="text-sm font-black text-slate-800">Navigating Tier-2 Detours</p>
                 </div>
-                <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-[10px] font-bold">En Route</span>
+                <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-[10px] font-bold">Fastest Route</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <motion.div 
                   className="h-full bg-blue-600 rounded-full"
                   initial={{ width: "0%" }}
-                  animate={{ width: "65%" }}
+                  animate={{ width: "45%" }}
                   transition={{ duration: 1.5, delay: 1, ease: "easeOut" }}
                 />
               </div>
@@ -150,28 +132,27 @@ const AnimatedDashboardMockup = () => {
 
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex-1">
-              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2">Network Uptime</p>
-              <p className="text-3xl font-black text-slate-800 tracking-tight">99.8%</p>
+              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2">Avg Wait Time</p>
+              <p className="text-3xl font-black text-slate-800 tracking-tight">30m</p>
               <p className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-                <Activity size={12} /> Optimal state
+                <Activity size={12} /> Beating market avg (180m)
               </p>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex-1">
-              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2">Active Incidents</p>
-              <p className="text-3xl font-black text-slate-800 tracking-tight">42</p>
-              <p className="text-xs text-slate-500 font-semibold mt-1">Live tracking active</p>
+              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2">Verified Network</p>
+              <p className="text-3xl font-black text-slate-800 tracking-tight">100%</p>
+              <p className="text-xs text-slate-500 font-semibold mt-1">Zero unverified garages</p>
             </div>
             
             <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-lg overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 opacity-20 rounded-full blur-2xl -translate-y-10 translate-x-10" />
-              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2">Smart Match</p>
+              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2">Pricing Audit</p>
               <div className="flex items-center gap-3 mb-3">
                 <ShieldCheck className="text-emerald-400" size={24} />
-                <p className="text-sm font-bold">Technician Verified</p>
+                <p className="text-sm font-bold">Transparent Billing</p>
               </div>
               <div className="flex gap-2">
-                <span className="bg-white/10 px-2 py-1 rounded text-[10px] font-bold">Skill Match</span>
-                <span className="bg-white/10 px-2 py-1 rounded text-[10px] font-bold">ETA Fast</span>
+                <span className="bg-white/10 px-2 py-1 rounded text-[10px] font-bold">Zero Hidden Fees</span>
               </div>
             </div>
           </div>
@@ -198,42 +179,42 @@ const EnterpriseHero = () => (
               className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm mb-6"
             >
               <Sparkles className="h-3 w-3" />
-              Premium B2B Platform
+              Phase 1: Tier-2 Emergency Roadside Grid
             </motion.div>
             
             <h1 className="text-5xl lg:text-7xl font-black leading-[1.05] tracking-tight text-slate-900 mb-6">
-              The Smart Mobility <br className="hidden lg:block"/>
+              Eradicating Operational Latency in <br className="hidden lg:block"/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-                Assistance Grid
+                Tier-2 Mobility
               </span>
             </h1>
             
             <p className="text-lg lg:text-xl font-medium leading-relaxed text-slate-600 mb-8 max-w-[540px]">
-              ResQNow connects fleets, OEM platforms, and insurers through a high-fidelity roadside support infrastructure built for operational visibility and trust.
+              Replacing fragmented, unorganized garages and 3-hour wait times with a hyper-local, digitally native dispatch network engineered for sub-45 minute response.
             </p>
             
             <div className="flex flex-wrap items-center gap-4">
               <Button size="xl" className="h-14 px-8 rounded-xl bg-slate-900 text-white font-bold hover:bg-blue-600 hover:scale-105 transition-all shadow-[0_10px_20px_-10px_rgba(15,23,42,0.5)]" asChild>
                 <Link to="/contact">
-                  Schedule Enterprise Demo <ArrowRight className="ml-2 h-4 w-4" />
+                  Schedule Demo <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
               <Button size="xl" variant="outline" className="h-14 px-8 rounded-xl bg-white border-slate-200 font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm" asChild>
-                <Link to="/technician/register">
-                  Join Partner Network
+                <Link to="/request-service/emergency">
+                  Emergency SOS
                 </Link>
               </Button>
             </div>
             
             <div className="mt-12 flex items-center gap-8">
               <div>
-                <p className="text-3xl font-black text-slate-900">200+</p>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Verified Partners</p>
+                <p className="text-3xl font-black text-slate-900">45<span className="text-xl text-slate-500">m</span></p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Guaranteed ETA</p>
               </div>
               <div className="w-px h-10 bg-slate-200" />
               <div>
-                <p className="text-3xl font-black text-slate-900">99%</p>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Network Uptime</p>
+                <p className="text-3xl font-black text-slate-900">100%</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Price Transparency</p>
               </div>
             </div>
           </div>
@@ -247,16 +228,22 @@ const EnterpriseHero = () => (
   </section>
 );
 
-const FeaturesSection = () => {
+const TrustDeficitSection = () => {
+  const problems = [
+    { title: "Eradicating the Trust Deficit", desc: "No more aggressive upselling or artificial estimates. ResQNow enforces strict, pre-approved pricing models validated before the mechanic arrives.", icon: IndianRupee },
+    { title: "Navigating Tier-2 Infrastructure", desc: "Our AI dispatch actively monitors hyper-local restrictions like Avinashi Road detours to route our fleet optimally, dodging night-time flyover bans.", icon: Map },
+    { title: "Overcoming Operational Latency", desc: "Legacy aggregators treat dispatch as a call-center cost. ResQNow uses algorithmic matching to slash response times from 180 minutes to under 45 minutes.", icon: Clock3 }
+  ];
+
   return (
-    <section id="ecosystem" className="py-24 bg-white relative">
+    <section id="trust" className="py-24 bg-white relative">
       <div className="container mx-auto max-w-7xl px-4 lg:px-8">
         <Reveal className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl lg:text-5xl font-black tracking-tight text-slate-900 mb-6">
-            Ecosystem Integration
+            Solving the Trust & Latency Collapse
           </h2>
           <p className="text-lg text-slate-600 font-medium">
-            A unified assistance layer seamlessly bridging the gap between demand and highly-vetted service capacity.
+            While vehicle registrations skyrocket in hubs like Coimbatore, the physical support layer remains dangerously broken. ResQNow is the digital remedy.
           </p>
         </Reveal>
 
@@ -265,19 +252,19 @@ const FeaturesSection = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-40px" }}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid md:grid-cols-3 gap-6"
         >
-          {partners.map((partner, i) => (
+          {problems.map((problem, i) => (
             <motion.div key={i} variants={fadeUp} className="group">
               <div className="h-full bg-[#f8fafc] border border-slate-100 p-8 rounded-3xl transition-all duration-300 hover:bg-white hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:-translate-y-1 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-0 group-hover:opacity-10 transition-opacity duration-500">
-                  <partner.icon size={80} />
+                  <problem.icon size={80} />
                 </div>
                 <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-6 text-blue-600 group-hover:scale-110 transition-transform duration-300">
-                  <partner.icon size={24} />
+                  <problem.icon size={24} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">{partner.title}</h3>
-                <p className="text-slate-600 font-medium leading-relaxed">{partner.body}</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">{problem.title}</h3>
+                <p className="text-slate-600 font-medium leading-relaxed">{problem.desc}</p>
               </div>
             </motion.div>
           ))}
@@ -289,10 +276,10 @@ const FeaturesSection = () => {
 
 const WorkflowSection = () => {
   const steps = [
-    { title: "Intelligent Request", desc: "API, app, or call center initiates context-rich SOS.", icon: Smartphone },
-    { title: "AI Dispatch", desc: "Algorithmic matching based on skills, location, and SLA.", icon: Network },
-    { title: "Live Tracking", desc: "Real-time visibility for operators and end-users.", icon: Radar },
-    { title: "Digital Audit", desc: "Tamper-proof service evidence and billing generation.", icon: ShieldCheck }
+    { title: "SOS Initiated", desc: "Stranded driver requests aid via high-intent digital discovery or app.", icon: Smartphone },
+    { title: "Algorithmic Routing", desc: "AI predicts fastest response unit avoiding local Tier-2 traffic bottlenecks.", icon: Navigation },
+    { title: "Verified Dispatch", desc: "Vetted mechanic dispatched instantly. No unorganized sector chaos.", icon: ShieldCheck },
+    { title: "Safe Resolution", desc: "Transparent billing and digital audit completion upon job finish.", icon: CheckCircle2 }
   ];
 
   return (
@@ -300,10 +287,10 @@ const WorkflowSection = () => {
       <div className="container mx-auto max-w-7xl px-4 lg:px-8">
         <Reveal className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl lg:text-5xl font-black tracking-tight text-slate-900 mb-6">
-            Flawless Operations
+            The ResQNow Phase 1 Architecture
           </h2>
           <p className="text-lg text-slate-600 font-medium">
-            Turn unpredictable roadside incidents into a streamlined, trackable workflow.
+            An on-demand system engineered explicitly for the digital-first Indian consumer facing critical roadside emergencies.
           </p>
         </Reveal>
 
@@ -332,114 +319,34 @@ const WorkflowSection = () => {
   );
 };
 
-const AnalyticsMockup = () => (
-  <div className="bg-slate-900 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3" />
-    <div className="relative z-10">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h3 className="text-2xl font-black text-white">Network Analytics</h3>
-          <p className="text-slate-400 text-sm font-semibold mt-1">Live SLA Monitoring</p>
-        </div>
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-2 flex gap-2">
-          <span className="px-4 py-1.5 rounded-lg bg-white text-slate-900 text-xs font-bold">Today</span>
-          <span className="px-4 py-1.5 rounded-lg text-slate-300 text-xs font-bold">Week</span>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Avg Response</p>
-          <p className="text-4xl font-black text-white">14.2<span className="text-xl text-slate-400">m</span></p>
-          <div className="mt-3 flex items-center gap-1 text-emerald-400 text-xs font-bold">
-            <ArrowRight className="w-3 h-3 rotate-45" /> -12% vs last month
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Completion Rate</p>
-          <p className="text-4xl font-black text-white">98.5<span className="text-xl text-slate-400">%</span></p>
-          <div className="mt-3 flex items-center gap-1 text-emerald-400 text-xs font-bold">
-            <CheckCircle2 className="w-3 h-3" /> SLA Met
-          </div>
-        </div>
-      </div>
-
-      <div className="h-40 flex items-end gap-3 px-2">
-        {[40, 70, 55, 90, 65, 80, 100].map((h, i) => (
-          <motion.div 
-            key={i}
-            className="flex-1 bg-gradient-to-t from-blue-600/50 to-blue-400 rounded-t-md"
-            initial={{ height: 0 }}
-            whileInView={{ height: `${h}%` }}
-            transition={{ duration: 1, delay: i * 0.1, ease: "easeOut" }}
-            viewport={{ once: true }}
-          />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const PerformanceSection = () => (
-  <section className="py-24 bg-white overflow-hidden">
-    <div className="container mx-auto max-w-7xl px-4 lg:px-8">
-      <div className="grid lg:grid-cols-2 gap-16 items-center">
-        <Reveal>
-          <h2 className="text-3xl lg:text-5xl font-black tracking-tight text-slate-900 mb-6">
-            Data-Driven Fleet Uptime
-          </h2>
-          <p className="text-lg text-slate-600 font-medium mb-8">
-            Access enterprise-grade dashboards to monitor response timing, partner activity, and service quality across the entire network in real-time.
-          </p>
-          
-          <div className="space-y-6">
-            {[
-              { title: "Real-time SLA tracking", desc: "Monitor partner performance against contracts instantly." },
-              { title: "Geospatial heatmaps", desc: "Understand demand concentration and position fleets proactively." },
-              { title: "Automated billing reconciliation", desc: "Digital audits attached to every completed job." }
-            ].map((item, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div>
-                  <h4 className="text-slate-900 font-bold mb-1">{item.title}</h4>
-                  <p className="text-slate-500 font-medium text-sm">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-        
-        <Reveal delay={0.2}>
-          <AnalyticsMockup />
-        </Reveal>
-      </div>
-    </div>
-  </section>
-);
-
 const CTASection = () => (
   <section className="py-24 bg-white">
     <div className="container mx-auto max-w-5xl px-4 lg:px-8">
-      <div className="bg-slate-900 rounded-[3rem] p-12 lg:p-20 text-center relative overflow-hidden shadow-2xl">
-        <div className="absolute inset-0 bg-[url('https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/13/4096/2727.png')] opacity-10 bg-cover mix-blend-overlay" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-3/4 bg-blue-500 opacity-20 blur-[100px] rounded-full pointer-events-none" />
+      {/* Premium Redesigned Partner CTA */}
+      <div className="bg-white rounded-[3rem] p-12 lg:p-20 text-center relative overflow-hidden shadow-[0_20px_50px_-15px_rgba(0,0,0,0.08)] border border-slate-100">
         
-        <div className="relative z-10">
-          <h2 className="text-4xl lg:text-6xl font-black text-white mb-6 tracking-tight">
-            Ready to upgrade your mobility support?
+        {/* Subtle decorative background elements */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-50 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-50 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/3" />
+        
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-8 shadow-sm border border-blue-100">
+            <Wrench size={40} strokeWidth={1.5} />
+          </div>
+          
+          <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mb-6 tracking-tight">
+            Build the Support Grid with Us
           </h2>
-          <p className="text-xl text-slate-300 font-medium mb-10 max-w-2xl mx-auto">
-            Join the ecosystem of forward-thinking automotive and fleet companies leveraging ResQNow infrastructure.
+          <p className="text-lg text-slate-600 font-medium mb-10 max-w-2xl mx-auto leading-relaxed">
+            We are replacing the unorganized service nightmare with a high-trust, verified gig network. Join ResQNow as a certified technician or fleet partner and multiply your earning potential through our transparent dispatch system.
           </p>
           
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <Button size="xl" className="h-16 px-10 rounded-2xl bg-blue-600 text-white text-lg font-bold hover:bg-blue-500 transition-all shadow-[0_0_30px_rgba(37,99,235,0.4)]" asChild>
-              <Link to="/contact">Contact Enterprise Sales</Link>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full sm:w-auto">
+            <Button size="xl" className="w-full sm:w-auto h-16 px-10 rounded-2xl bg-blue-600 text-white text-lg font-bold hover:bg-blue-700 hover:-translate-y-1 transition-all shadow-[0_10px_30px_rgba(37,99,235,0.3)]" asChild>
+              <Link to="/technician/register">Become a Partner</Link>
             </Button>
-            <Button size="xl" variant="outline" className="h-16 px-10 rounded-2xl bg-white/10 border-white/20 text-white text-lg font-bold hover:bg-white/20 transition-all backdrop-blur-md" asChild>
-              <Link to="/map">View Live Radar</Link>
+            <Button size="xl" variant="outline" className="w-full sm:w-auto h-16 px-10 rounded-2xl bg-white border-slate-200 text-slate-700 text-lg font-bold hover:bg-slate-50 hover:-translate-y-1 transition-all shadow-sm" asChild>
+              <Link to="/about">Read Our Story</Link>
             </Button>
           </div>
         </div>
@@ -452,9 +359,8 @@ const EnterpriseDesktopHome = () => {
   return (
     <div className="min-h-screen bg-white selection:bg-blue-100 selection:text-blue-900 font-sans">
       <EnterpriseHero />
-      <FeaturesSection />
+      <TrustDeficitSection />
       <WorkflowSection />
-      <PerformanceSection />
       <CTASection />
     </div>
   );

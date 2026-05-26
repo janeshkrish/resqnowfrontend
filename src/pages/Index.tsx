@@ -1,16 +1,14 @@
-import { useState } from "react";
-import Hero from "@/components/Hero";
+import { Suspense, lazy, useState } from "react";
 import Services from "@/components/Services";
-import HowItWorks from "@/components/HowItWorks";
 import VehicleTypes from "@/components/VehicleTypes";
 import Testimonials from "@/components/Testimonials";
-import TechnicianCTA from "@/components/TechnicianCTA";
-import Map from "@/components/Map";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import { MapPin, Search, ArrowRight, Bell, Briefcase, Download, Smartphone } from "lucide-react";
 import { apiUrl } from "@/lib/api";
 import msmeLogo from "../../assets/msme-logo.png";
+
+const EnterpriseDesktopHome = lazy(() => import("@/components/desktop/EnterpriseDesktopHome"));
 
 const MsmeAccreditationCard = () => (
   <section className="my-6 flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md">
@@ -223,53 +221,15 @@ const Index = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/50 dark:bg-slate-950">
-      <Hero />
-
-      {/* Services Section pulled up with negative margin to overlap Hero smoothly */}
-      <div className="relative z-20 -mt-12 sm:-mt-24 pb-8 md:pb-16 px-2 sm:px-0">
-        {/* Glowing glass backdrop blending into the page */}
-        <div className="absolute inset-x-0 top-0 bottom-12 bg-gradient-to-b from-white/90 via-slate-50/90 to-transparent dark:from-slate-900/95 dark:via-slate-950/90 dark:to-transparent backdrop-blur-2xl -z-10 rounded-t-[3rem] shadow-[0_-30px_60px_-15px_rgba(0,0,0,0.05)] border-t border-x border-white/60 dark:border-slate-800/60 transition-colors duration-500"></div>
-
-        <div className="max-w-7xl mx-auto w-full pt-8 sm:pt-12 drop-shadow-sm">
-          <Services />
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center bg-white text-sm font-semibold text-slate-500">
+          Loading enterprise platform...
         </div>
-      </div>
-
-      <div className="hidden md:block w-full relative z-30 bg-transparent border-t border-border/40 drop-shadow-sm -mt-8">
-        <Map mode="preview" />
-      </div>
-
-      <div className="bg-white dark:bg-card border-b border-border/40">
-        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-          <HowItWorks />
-        </div>
-      </div>
-
-      <div className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/40">
-        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-          <VehicleTypes />
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-card border-b border-border/40">
-        <div className="max-w-7xl mx-auto w-full py-8 md:py-12">
-          <MsmeAccreditationCard />
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-card border-b border-border/40">
-        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-          <Testimonials />
-        </div>
-      </div>
-
-      <div className="bg-slate-50/50 dark:bg-slate-900/50 w-full pb-20">
-        <div className="max-w-7xl mx-auto w-full py-12 md:py-24">
-          <TechnicianCTA />
-        </div>
-      </div>
-    </div>
+      }
+    >
+      <EnterpriseDesktopHome />
+    </Suspense>
   );
 };
 

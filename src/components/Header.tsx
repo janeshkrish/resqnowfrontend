@@ -18,6 +18,7 @@ const Header = () => {
     { label: "Platform", to: "/", activePath: "/" },
     { label: "Services", to: "/services", activePath: "/services" },
     { label: "Our Story", to: "/about", activePath: "/about" },
+    { label: "Cities We Serve", to: "/#cities", activePath: "/#cities" },
   ];
 
   useEffect(() => {
@@ -36,6 +37,7 @@ const Header = () => {
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/" && !location.hash;
+    if (path.startsWith("/#")) return location.hash === path.substring(1);
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
@@ -61,24 +63,24 @@ const Header = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-6 xl:gap-9 mx-4">
+        <nav className="hidden lg:flex items-center gap-8 xl:gap-12 mx-4 h-full">
           {navItems.map((item) => {
             const active = isActive(item.activePath);
             return (
-              <Link
+              <a
                 key={item.label}
-                to={item.to}
-                className="relative text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors py-2"
+                href={item.to}
+                className="relative text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors flex items-center h-full"
               >
                 {item.label}
                 {active && (
                   <motion.div
                     layoutId="activeNavIndicator"
-                    className="absolute -bottom-[24px] left-0 right-0 h-[3px] rounded-t-full bg-blue-600"
+                    className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full bg-blue-600"
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
-              </Link>
+              </a>
             );
           })}
         </nav>
@@ -138,9 +140,9 @@ const Header = () => {
           >
             <div className="container py-6 px-4 flex flex-col gap-2">
               {navItems.map((item) => (
-                <Link
+                <a
                   key={item.label}
-                  to={item.to}
+                  href={item.to}
                   className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
                     isActive(item.activePath)
                       ? "text-blue-700 bg-blue-50/80"
@@ -149,7 +151,7 @@ const Header = () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {item.label}
-                </Link>
+                </a>
               ))}
               
               <Link

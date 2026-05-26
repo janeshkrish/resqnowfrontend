@@ -49,20 +49,19 @@ const Header = () => {
     >
       <div className="container mx-auto flex h-[76px] max-w-7xl items-center justify-between px-4 lg:px-8">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 group" aria-label="ResQNow home">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-[0_8px_20px_-6px_rgba(79,70,229,0.5)] transition-transform duration-300 group-hover:scale-105">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col leading-none">
-            <span className="text-[22px] font-black tracking-tight text-slate-900 transition-colors group-hover:text-blue-700">ResQNow</span>
-            <span className="mt-1 hidden text-[10px] font-bold uppercase tracking-[0.25em] text-blue-600 lg:block">
-              Enterprise
-            </span>
-          </div>
+        <Link to="/" className="flex items-center gap-2 group shrink-0" aria-label="ResQNow home">
+          <img 
+            src="/logo.png" 
+            alt="ResQNow Logo" 
+            className="h-8 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => {
+              e.currentTarget.src = 'https://placehold.co/150x40/transparent/3b82f6?text=ResQNow';
+            }}
+          />
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-9 absolute left-1/2 -translate-x-1/2">
+        <nav className="hidden lg:flex items-center gap-6 xl:gap-9 mx-4">
           {navItems.map((item) => {
             const active = isActive(item.activePath);
             return (
@@ -85,8 +84,8 @@ const Header = () => {
         </nav>
 
         {/* Desktop Actions */}
-        <div className="flex items-center gap-4">
-          <div className="hidden lg:flex items-center gap-5">
+        <div className="flex items-center gap-3 xl:gap-4 shrink-0">
+          <div className="hidden lg:flex items-center gap-3 xl:gap-5">
             <Link 
               to={partnerRoute}
               className="text-[14px] font-bold text-slate-500 hover:text-blue-600 transition-colors"

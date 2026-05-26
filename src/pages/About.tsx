@@ -1,18 +1,18 @@
-import { Shield, Clock, CheckSquare, MapPin, User, Users, Car, Award, Target, Eye, Sparkles } from "lucide-react";
+import { Shield, Clock, CheckSquare, MapPin, User, Users, Car, Award, Target, Eye, Sparkles, Building2, Globe2, Briefcase, ChevronRight } from "lucide-react";
 import AnimatedCounter from "@/components/AnimatedCounter";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import msmeLogo from "../../assets/msme-logo.png";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+  hidden: { opacity: 0, y: 50 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
 };
 
 const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.15, delayChildren: 0.2 } },
 };
 
 const Reveal = ({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) => (
@@ -21,8 +21,8 @@ const Reveal = ({ children, className = "", delay = 0 }: { children: React.React
     variants={fadeUp}
     initial="hidden"
     whileInView="visible"
-    viewport={{ once: true, margin: "-40px" }}
-    transition={{ delay }}
+    viewport={{ once: true, margin: "-100px" }}
+    transition={{ delay, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
   >
     {children}
   </motion.div>
@@ -34,6 +34,9 @@ const About = () => {
     technicians: 0,
     completedServices: 0
   });
+
+  const { scrollYProgress } = useScroll();
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -55,123 +58,160 @@ const About = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FAFCFF] selection:bg-blue-100 selection:text-blue-900 font-sans pb-24">
-      {/* Hero Section */}
-      <div className="relative pt-24 pb-16 lg:pt-32 lg:pb-24 overflow-hidden border-b border-slate-100">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 right-0 w-[600px] h-[600px] rounded-full bg-gradient-to-b from-blue-50/80 to-transparent blur-3xl" />
-          <div className="absolute top-20 -left-20 w-[500px] h-[500px] rounded-full bg-gradient-to-t from-emerald-50/60 to-transparent blur-3xl" />
-        </div>
+    <div className="min-h-screen bg-[#FAFCFF] selection:bg-blue-100 selection:text-blue-900 font-sans pb-32">
+      {/* Heavy Corporate Hero Section */}
+      <div className="relative pt-32 pb-24 lg:pt-48 lg:pb-32 overflow-hidden border-b border-slate-200/50">
+        <motion.div style={{ y }} className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-[20%] right-[-10%] w-[1000px] h-[1000px] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.12)_0%,rgba(255,255,255,0)_70%)] blur-[100px]" />
+          <div className="absolute top-[30%] left-[-20%] w-[800px] h-[800px] rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.08)_0%,rgba(255,255,255,0)_70%)] blur-[100px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] bg-[size:60px_60px] opacity-70 mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)" />
+        </motion.div>
 
-        <div className="container relative mx-auto max-w-5xl px-4 lg:px-8 text-center flex flex-col items-center">
+        <div className="container relative mx-auto max-w-6xl px-4 lg:px-8 text-center flex flex-col items-center">
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm mb-6"
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            className="inline-flex items-center gap-3 rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-xl px-5 py-2.5 text-xs font-black uppercase tracking-[0.25em] text-slate-800 shadow-sm mb-10"
           >
-            <Sparkles className="h-3 w-3" />
-            Our Origins
+            <Building2 className="h-4 w-4 text-blue-600" />
+            Corporate Overview
           </motion.div>
 
           <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-4xl lg:text-7xl font-black text-slate-900 tracking-tight leading-none mb-6"
+            transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+            className="text-5xl lg:text-[5rem] font-black text-slate-900 tracking-tight leading-[1.05] mb-8"
           >
-            Engineering the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Future of Mobility</span>
+            Pioneering India's <br className="hidden lg:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-600">
+              Mobility Infrastructure
+            </span>
           </motion.h1>
           
           <motion.p 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-lg lg:text-2xl font-medium text-slate-600 max-w-3xl leading-relaxed"
+            transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="text-xl lg:text-2xl font-medium text-slate-600 max-w-4xl leading-relaxed"
           >
-            From a solitary breakdown in 2025 to a nationwide support grid. We are on a mission to eradicate roadside vulnerability.
+            A high-availability, digitally native super-app engineering the systemic eradication of roadside vulnerability and operational latency across the nation.
           </motion.p>
         </div>
       </div>
 
-      <div className="container mx-auto max-w-7xl px-4 lg:px-8 py-16">
+      <div className="container mx-auto max-w-7xl px-4 lg:px-8 py-24">
         
-        {/* MSME Udyam Card */}
+        {/* Enterprise MSME Certification */}
         <Reveal>
-          <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col sm:flex-row items-center gap-6 lg:gap-10 max-w-4xl mx-auto mb-20 hover:shadow-[0_20px_50px_-15px_rgba(37,99,235,0.1)] transition-all">
-            <div className="w-32 h-32 shrink-0 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden p-4">
-              <img src={msmeLogo} alt="MSME Udyam Registered" className="w-full h-full object-contain" />
+          <div className="relative bg-white/60 backdrop-blur-3xl rounded-[3rem] p-10 lg:p-14 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mx-auto mb-32 group overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/30 to-blue-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="relative z-10 w-40 h-40 lg:w-48 lg:h-48 shrink-0 bg-white rounded-3xl flex items-center justify-center border border-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.06)] p-6 group-hover:scale-105 transition-transform duration-700">
+              <img src={msmeLogo} alt="MSME Udyam Registered" className="w-full h-full object-contain filter contrast-125" />
             </div>
-            <div className="text-center sm:text-left">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-600 mb-2">Government Recognized</p>
-              <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mb-3">MSME Udyam Registered</h3>
-              <p className="text-slate-600 font-medium leading-relaxed">
-                ResQNow is a recognized Indian startup actively contributing to the formalization of the automotive aftermarket and gig-economy enablement in Tier-2 districts.
+            <div className="relative z-10 text-center lg:text-left flex-1">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <Shield className="h-5 w-5 text-emerald-600" />
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-600">Government Verified</p>
+              </div>
+              <h3 className="text-4xl lg:text-5xl font-black text-slate-900 mb-6 tracking-tight">MSME Udyam Registration</h3>
+              <p className="text-xl text-slate-600 font-medium leading-relaxed max-w-3xl">
+                ResQNow operates as a fully compliant, state-recognized entity, driving massive formalization within the Indian automotive aftermarket. We are actively deploying scalable infrastructure that fuels the gig-economy in Tier-2 demographic centers.
               </p>
             </div>
           </div>
         </Reveal>
 
-        {/* Vision & Mission */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-24">
+        {/* Corporate Pillars (Vision & Mission) */}
+        <div className="grid lg:grid-cols-2 gap-10 mb-32">
           <Reveal delay={0.1}>
-            <div className="bg-white h-full rounded-[2.5rem] p-10 lg:p-14 shadow-sm border border-slate-100 hover:shadow-xl transition-shadow relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Target size={120} />
+            <div className="relative bg-white/80 backdrop-blur-xl h-full rounded-[3rem] p-12 lg:p-16 shadow-[0_20px_50px_-20px_rgba(15,23,42,0.08)] border border-slate-100 overflow-hidden group hover:bg-white transition-all duration-700">
+              <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 group-hover:bg-blue-600/10 transition-colors duration-700" />
+              
+              <div className="relative z-10">
+                <div className="w-20 h-20 bg-blue-600 text-white rounded-[1.5rem] flex items-center justify-center mb-10 shadow-[0_10px_30px_rgba(37,99,235,0.3)] group-hover:scale-110 transition-transform duration-500">
+                  <Target size={40} strokeWidth={1.5} />
+                </div>
+                <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tight">Enterprise Mission</h2>
+                <p className="text-xl text-slate-600 leading-relaxed font-medium">
+                  To systematically engineer a seamless, AI-driven dispatch network that connects stranded travelers with vetted technicians in real-time. We are unconditionally committed to eradicating operational latency and enforcing a zero-trust-deficit ecosystem nationwide.
+                </p>
               </div>
-              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-8 border border-blue-100">
-                <Target size={32} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-4">Our Mission</h2>
-              <p className="text-lg text-slate-600 leading-relaxed font-medium">
-                To revolutionize roadside assistance by building a seamless, AI-driven dispatch network that connects stranded travelers with vetted technicians in real-time. We are committed to eradicating operational latency and creating a zero-trust-deficit ecosystem.
-              </p>
             </div>
           </Reveal>
 
           <Reveal delay={0.2}>
-            <div className="bg-white h-full rounded-[2.5rem] p-10 lg:p-14 shadow-sm border border-slate-100 hover:shadow-xl transition-shadow relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Eye size={120} />
+            <div className="relative bg-slate-900 h-full rounded-[3rem] p-12 lg:p-16 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-800 overflow-hidden group">
+              <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 group-hover:bg-indigo-500/30 transition-colors duration-700" />
+              
+              <div className="relative z-10 text-white">
+                <div className="w-20 h-20 bg-white text-slate-900 rounded-[1.5rem] flex items-center justify-center mb-10 shadow-[0_10px_30px_rgba(255,255,255,0.1)] group-hover:scale-110 transition-transform duration-500">
+                  <Globe2 size={40} strokeWidth={1.5} />
+                </div>
+                <h2 className="text-4xl font-black text-white mb-6 tracking-tight">Global Vision</h2>
+                <p className="text-xl text-slate-300 leading-relaxed font-medium">
+                  To become the central, interconnected mobility grid for India's vehicular future. A singular operational layer relied upon by corporate fleets, OEMs, and daily drivers to keep the nation moving with absolute security and unprecedented efficiency.
+                </p>
               </div>
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-8 border border-emerald-100">
-                <Eye size={32} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-4">Our Vision</h2>
-              <p className="text-lg text-slate-600 leading-relaxed font-medium">
-                To become the central, interconnected mobility grid for India's vehicular future. A singular operational layer relied upon by fleets, OEMs, and daily drivers to keep the nation moving securely.
-              </p>
             </div>
           </Reveal>
         </div>
 
-        {/* The Story */}
+        {/* The Enterprise Catalyst */}
         <Reveal>
-          <div className="bg-slate-900 rounded-[3rem] p-10 lg:p-16 text-white relative overflow-hidden mb-24 shadow-2xl">
-            <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:40px_40px] opacity-20 pointer-events-none" />
-            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/3" />
+          <div className="relative bg-white/70 backdrop-blur-3xl rounded-[4rem] p-12 lg:p-24 shadow-[0_40px_100px_-20px_rgba(15,23,42,0.08)] border border-white mb-32 overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_50%)]" />
             
-            <div className="relative z-10 max-w-4xl mx-auto text-center">
-              <h2 className="text-3xl lg:text-5xl font-black mb-8">The Catalyst</h2>
-              <div className="space-y-6 text-lg lg:text-xl text-slate-300 font-medium leading-relaxed">
-                <p>
-                  The concept of ResQNow was born from a pivotal moment in 2025 experienced by Arokiya Aswanth A. Stranded in an isolated area with a vehicle breakdown and no immediate assistance available, the terrifying vulnerability of such a situation became starkly apparent.
-                </p>
-                <p>
-                  It highlighted a critical gap in the traditional roadside assistance landscape: the catastrophic disconnect between drivers in distress and local, available mechanical skill. Stranded motorists were forced into high-anxiety searches leading to unverified local garages that exploited their desperation.
-                </p>
-                <p className="text-white font-bold">
-                  This experience became the foundation for ResQNow. The goal was simple—engineer a hyper-local, digitally native dispatch network that enforces trust and speed, ensuring no traveler is left helpless.
-                </p>
+            <div className="relative z-10 max-w-5xl mx-auto">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-[2px] bg-blue-600" />
+                <h2 className="text-sm font-black uppercase tracking-[0.3em] text-blue-600">The Catalyst</h2>
+              </div>
+              
+              <h3 className="text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] mb-12">
+                Forged from <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-600 to-slate-900">Systemic Failure.</span>
+              </h3>
+
+              <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
+                <div className="space-y-8 text-xl text-slate-600 font-medium leading-relaxed">
+                  <p>
+                    The structural foundation of ResQNow was established following a pivotal breakdown in 2025 experienced by Arokiya Aswanth A. Stranded in an isolated corridor with zero immediate assistance, the terrifying vulnerability of the Indian roadside became starkly apparent.
+                  </p>
+                  <p>
+                    This incident exposed a catastrophic failure in the traditional aftermarket landscape: an absolute disconnect between drivers in distress and localized mechanical skill, forcing victims into high-anxiety environments dominated by unverified, predatory local garages.
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-[2.5rem] p-10 border border-slate-100 relative">
+                  <div className="absolute top-8 left-8">
+                    <Briefcase className="w-10 h-10 text-slate-300" />
+                  </div>
+                  <p className="mt-12 text-2xl font-black text-slate-900 leading-snug">
+                    "The objective was uncompromising—engineer a hyper-local, digitally native dispatch network that enforces strict compliance, trust, and speed at scale."
+                  </p>
+                  <p className="mt-8 text-sm font-bold text-slate-500 uppercase tracking-widest">
+                    — Executive Board, ResQNow
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </Reveal>
 
-        {/* Impact Stats */}
+        {/* Real-time Enterprise Telemetry */}
         <div className="mb-16">
-          <Reveal className="text-center mb-10">
-            <h2 className="text-3xl font-black text-slate-900 mb-2">Platform Impact</h2>
-            <p className="text-slate-500 font-medium uppercase tracking-widest text-xs">Real-time Network Statistics</p>
+          <Reveal className="flex flex-col lg:flex-row justify-between items-end mb-12 gap-6">
+            <div>
+              <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">Network Telemetry</h2>
+              <p className="text-lg text-slate-500 font-medium">Live operational metrics across the ResQNow platform grid.</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Systems Online
+            </div>
           </Reveal>
 
           <motion.div 
@@ -179,23 +219,26 @@ const About = () => {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
             {[
-              { icon: User, count: stats.users, suffix: "+", label: "Registered Users", tone: "blue" },
-              { icon: Users, count: stats.technicians, suffix: "+", label: "Verified Technicians", tone: "emerald" },
-              { icon: Car, count: stats.completedServices, suffix: "+", label: "Services Completed", tone: "indigo" },
-              { icon: Award, count: 24, suffix: "/7", label: "Support Availability", tone: "rose" },
+              { icon: User, count: stats.users, suffix: "+", label: "Active Enterprise Users" },
+              { icon: Users, count: stats.technicians, suffix: "+", label: "Vetted Fleet Partners" },
+              { icon: Car, count: stats.completedServices, suffix: "+", label: "Resolved Incidents" },
+              { icon: Clock, count: 24, suffix: "/7", label: "Algorithmic Uptime" },
             ].map((stat, i) => (
-              <motion.div key={i} variants={fadeUp}>
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-center flex flex-col items-center hover:shadow-lg transition-shadow h-full">
-                  <div className={`w-12 h-12 rounded-xl bg-${stat.tone}-50 text-${stat.tone}-600 flex items-center justify-center mb-6`}>
-                    <stat.icon size={24} />
+              <motion.div key={i} variants={fadeUp} className="group">
+                <div className="bg-white/80 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-[0_15px_40px_-15px_rgba(15,23,42,0.05)] border border-slate-100 flex flex-col items-start hover:shadow-[0_30px_60px_-15px_rgba(37,99,235,0.1)] transition-all duration-500 h-full relative overflow-hidden">
+                  <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:scale-150 transition-transform duration-700">
+                    <stat.icon size={160} />
                   </div>
-                  <p className="text-4xl font-black text-slate-900 mb-2">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-900 flex items-center justify-center mb-8 border border-slate-100 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors duration-500">
+                    <stat.icon size={26} strokeWidth={2} />
+                  </div>
+                  <p className="text-5xl font-black text-slate-900 mb-3 tracking-tighter">
                     <AnimatedCounter end={stat.count} suffix={stat.suffix} duration={2000} />
                   </p>
-                  <p className="text-sm font-bold text-slate-500">{stat.label}</p>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{stat.label}</p>
                 </div>
               </motion.div>
             ))}

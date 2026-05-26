@@ -84,7 +84,7 @@ const ServicesPage = () => {
 
         <motion.div 
           layout
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
         >
           <AnimatePresence>
             {filteredServices.map((service, index) => (
@@ -101,23 +101,20 @@ const ServicesPage = () => {
                 onMouseLeave={() => setHoveredService(null)}
               >
                 <div 
-                  className="relative bg-white/60 backdrop-blur-xl border border-slate-100 rounded-[2.5rem] p-8 h-full flex flex-col cursor-pointer transition-all duration-500 overflow-hidden hover:bg-white hover:border-blue-100 hover:shadow-[0_40px_80px_-20px_rgba(37,99,235,0.12)]"
+                  className="relative bg-white border border-slate-200 rounded-[2rem] p-8 h-full flex flex-col cursor-pointer transition-all duration-500 overflow-hidden hover:-translate-y-2 hover:shadow-[0_40px_80px_-20px_rgba(37,99,235,0.15)] hover:border-blue-200"
                   onClick={() => handleServiceClick(service.id)}
                 >
-                  {/* Glassmorphic Glow Effect */}
-                  <div className={`absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 transition-opacity duration-500 ${hoveredService === service.id ? 'opacity-100' : 'opacity-0'}`} />
-                  
                   <div className="relative z-10 flex flex-col h-full">
-                    {/* Icon Container with Vector Art Feel */}
-                    <div className="w-20 h-20 rounded-[1.5rem] bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/60 shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_10px_20px_rgba(15,23,42,0.03)] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_15px_30px_rgba(37,99,235,0.1)] transition-all duration-500">
-                      <service.icon size={36} strokeWidth={1.5} className="text-blue-600 transition-colors duration-500 group-hover:text-indigo-600" />
+                    {/* Premium Vector Icon Container */}
+                    <div className="w-16 h-16 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors duration-500">
+                      <service.icon size={32} strokeWidth={1.5} className="text-blue-600 transition-colors duration-500 group-hover:text-white" />
                     </div>
 
                     <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-4 group-hover:text-blue-700 transition-colors duration-300">
                       {service.name}
                     </h3>
                     
-                    <p className="text-slate-600 font-medium leading-relaxed mb-8 flex-grow line-clamp-3">
+                    <p className="text-slate-600 font-medium leading-relaxed mb-8 flex-grow">
                       {service.description}
                     </p>
 

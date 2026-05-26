@@ -44,6 +44,8 @@ const ConfirmEmail = lazy(() => import("./pages/ConfirmEmail"));
 const AuthSuccess = lazy(() => import("./pages/AuthSuccess"));
 const ServicesPage = lazy(() => import("./pages/ServicesPage"));
 const About = lazy(() => import("./pages/About"));
+const CitiesPage = lazy(() => import("./pages/CitiesPage"));
+const WhyResQNow = lazy(() => import("./pages/WhyResQNow"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Emergency = lazy(() => import("./pages/Emergency"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -241,6 +243,8 @@ const App = () => {
                               <Route index element={<Index />} />
                               <Route path="services" element={<ServicesPage />} />
                               <Route path="about" element={<About />} />
+                              <Route path="cities" element={<CitiesPage />} />
+                              <Route path="why-resqnow" element={<WhyResQNow />} />
                               <Route path="contact" element={<Contact />} />
                               <Route path="emergency" element={<Emergency />} />
                               <Route path="privacy-policy" element={<PrivacyPolicy />} />

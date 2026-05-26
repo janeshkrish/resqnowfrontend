@@ -16,9 +16,10 @@ const Header = () => {
   const partnerRoute = isTechAuthenticated ? "/technician/dashboard" : "/technician/register";
   const navItems = [
     { label: "Platform", to: "/", activePath: "/" },
+    { label: "Why ResQNow", to: "/why-resqnow", activePath: "/why-resqnow", desktopOnly: true },
     { label: "Services", to: "/services", activePath: "/services" },
     { label: "Our Story", to: "/about", activePath: "/about" },
-    { label: "Cities We Serve", to: "/#cities", activePath: "/#cities" },
+    { label: "Cities We Serve", to: "/cities", activePath: "/cities" },
   ];
 
   useEffect(() => {
@@ -139,7 +140,7 @@ const Header = () => {
             className="lg:hidden absolute top-[76px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-2xl"
           >
             <div className="container py-6 px-4 flex flex-col gap-2">
-              {navItems.map((item) => (
+              {navItems.filter(item => !item.desktopOnly).map((item) => (
                 <a
                   key={item.label}
                   href={item.to}

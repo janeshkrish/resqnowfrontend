@@ -43,15 +43,13 @@ export function ClientAuthShell({
       className="min-h-[100dvh] overflow-x-hidden bg-white px-0 py-0 sm:px-6 sm:py-8 relative"
       style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
     >
-      {/* Corner wave graphic for signup only */}
-      {isSignup && (
-        <div className="pointer-events-none absolute bottom-0 right-0 w-64 h-64 overflow-hidden z-0">
-          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 right-0 w-full h-full transform translate-x-1/4 translate-y-1/4">
-            <path fill="#ef233c" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(100 100) scale(1.4)" opacity="0.9" />
-            <path fill="#ffb3bd" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(100 100) scale(1.6)" opacity="0.3" />
-          </svg>
-        </div>
-      )}
+      {/* Corner wave graphic */}
+      <div className="pointer-events-none absolute bottom-0 right-0 w-64 h-64 overflow-hidden z-0">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 right-0 w-full h-full transform translate-x-1/4 translate-y-1/4">
+          <path fill="#ef233c" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(100 100) scale(1.4)" opacity="0.9" />
+          <path fill="#ffb3bd" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(100 100) scale(1.6)" opacity="0.3" />
+        </svg>
+      </div>
 
       <div className="mx-auto flex min-h-[100dvh] max-w-[440px] items-stretch justify-center relative z-10 sm:min-h-[calc(100dvh-4rem)]">
         <motion.div 
@@ -78,8 +76,16 @@ export function ClientAuthShell({
                 </div>
               ) : null}
 
-              <div className="flex justify-center w-full">
-                <ResQNowWordmark />
+              <div className="flex justify-center w-full mt-6 mb-4">
+                {/* 
+                  REPLACE THIS SRC with the path to your actual logo.
+                  For example: "/assets/my-target-logo.png" or import it at the top of the file.
+                */}
+                <img 
+                  src="/resqnow-logo.png" 
+                  alt="ResQNow Logo" 
+                  className="h-28 w-auto object-contain drop-shadow-sm" 
+                />
               </div>
             </div>
 
@@ -145,38 +151,6 @@ export function ClientAuthShell({
   );
 }
 
-function ResQNowWordmark() {
-  return (
-    <div className="inline-flex flex-col items-center relative mt-6 mb-4">
-      {/* Concentric Circles Background */}
-      <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] pointer-events-none flex items-center justify-center">
-        <div className="absolute w-[180px] h-[180px] rounded-full border border-slate-200/60" />
-        <div className="absolute w-[130px] h-[130px] rounded-full border border-slate-200/80" />
-        <div className="absolute w-[80px] h-[80px] rounded-full border border-slate-200" />
-        
-        {/* Subtle diagonal line across the logo matching the mockup */}
-        <div className="absolute w-[180px] h-px bg-slate-200 rotate-[-35deg]" />
-        {/* Tiny red dots on the ends of the line */}
-        <div className="absolute w-1 h-1 bg-[#ef233c] rounded-full -translate-x-[75px] translate-y-[52px]" />
-        <div className="absolute w-1 h-1 bg-[#ef233c] rounded-full translate-x-[75px] -translate-y-[52px]" />
-      </div>
-
-      <div className="relative inline-flex items-end text-[2.2rem] font-black tracking-[-0.08em] text-[#0f172a]">
-        <span>Res</span>
-        <span className="relative mx-[0.03em] inline-flex h-[1em] w-[0.86em] items-center justify-center z-10">
-          <span className="absolute inset-[14%_8%_14%_8%] rounded-full border-[0.14em] border-[#ef233c]" />
-          <span className="absolute right-[7%] top-[2%] h-[0.55em] w-[0.12em] origin-top rotate-[-36deg] rounded-full bg-[#ef233c]" />
-        </span>
-        <span>Now</span>
-        <span className="pointer-events-none absolute left-[34.5%] top-[65%] h-[0.11em] w-[1.05em] rotate-[128deg] rounded-full bg-[#ef233c] z-20" />
-      </div>
-      <div className="mt-1 text-[0.45rem] font-extrabold uppercase tracking-[0.22em] text-[#0f172a] relative z-10 bg-white px-2 rounded-full hidden">
-        {/* Hidden wordmark since mockup doesn't seem to show "On time. Every time." */}
-        On time. <span className="text-[#ef233c]">Every time.</span>
-      </div>
-    </div>
-  );
-}
 
 
 function GoogleMark({ className }: { className?: string }) {

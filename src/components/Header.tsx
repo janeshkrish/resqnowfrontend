@@ -64,14 +64,14 @@ const Header = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-8 xl:gap-12 mx-4 h-full">
+        <nav className="hidden lg:flex items-center gap-6 xl:gap-8 mx-4 h-full">
           {navItems.map((item) => {
             const active = isActive(item.activePath);
             return (
               <a
                 key={item.label}
                 href={item.to}
-                className="relative text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors flex items-center h-full"
+                className="relative text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors flex items-center h-full whitespace-nowrap"
               >
                 {item.label}
                 {active && (
@@ -91,13 +91,13 @@ const Header = () => {
           <div className="hidden lg:flex items-center gap-3 xl:gap-5">
             <Link 
               to={partnerRoute}
-              className="text-[14px] font-bold text-slate-500 hover:text-blue-600 transition-colors"
+              className="text-[14px] font-bold text-slate-500 hover:text-blue-600 transition-colors whitespace-nowrap"
             >
               Partner Network
             </Link>
             <Link 
               to="/contact"
-              className="text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors mr-2"
+              className="text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors mr-2 whitespace-nowrap"
             >
               Contact
             </Link>

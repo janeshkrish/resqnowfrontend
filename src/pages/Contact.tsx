@@ -1,13 +1,17 @@
-
-import { MapPin, Phone, Mail, Clock } from "lucide-react";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { MapPin, Phone, Mail, Clock, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
 import { toast } from "sonner";
-import { useState } from "react";
 import { apiFetch } from "@/lib/api";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
 
 const Contact = () => {
   const [loading, setLoading] = useState(false);
@@ -51,75 +55,135 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="bg-red-600 text-white py-16">
-        <div className="container">
-          <h1 className="text-4xl md:text-5xl font-bold text-center">Contact Us</h1>
-          <p className="text-xl text-center mt-4 max-w-3xl mx-auto">
-            Have questions or need assistance? We're here to help 24/7.
+    <div className="min-h-screen bg-[#fafafa] selection:bg-blue-100 selection:text-blue-900 font-sans pb-24 relative overflow-hidden">
+      
+      {/* Sleek Minimalist Header */}
+      <div className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 flex flex-col items-center justify-center text-center px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-white" />
+        <div className="absolute top-0 inset-x-0 h-[500px] bg-[radial-gradient(ellipse_at_top,rgba(37,99,235,0.08)_0%,transparent_70%)]" />
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="relative z-10"
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-[11px] font-bold uppercase tracking-[0.15em] text-slate-600 shadow-sm mb-6">
+            <Sparkles size={12} className="text-blue-600" />
+            24/7 Support Desk
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight mb-6">
+            Let's keep you <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">moving.</span>
+          </h1>
+          <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed">
+            Whether you have questions about our dispatch network, need technical support, or want to partner with us, our team is ready.
           </p>
-        </div>
+        </motion.div>
       </div>
 
-      <div className="container py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Get In Touch</h2>
-            <p className="text-muted-foreground mb-8">
-              Whether you have questions about our services, need technical support, or want to provide feedback, our team is ready to assist you. Fill out the form, and we'll get back to you as soon as possible.
-            </p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" name="name" placeholder="Your full name" required />
+      <div className="container relative mx-auto max-w-6xl px-4 lg:px-8 -mt-10 lg:-mt-16 z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          
+          {/* Form Side */}
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-3 bg-white/70 backdrop-blur-2xl p-8 lg:p-12 rounded-[2rem] shadow-[0_20px_50px_-15px_rgba(15,23,42,0.08)] border border-white"
+          >
+            <h2 className="text-2xl font-bold text-slate-900 mb-8">Send a message</h2>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2 group">
+                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Full Name</Label>
+                  <Input id="name" name="name" placeholder="John Doe" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner text-base" />
                 </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" placeholder="you@example.com" required />
+                <div className="space-y-2 group">
+                  <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Email Address</Label>
+                  <Input id="email" name="email" type="email" placeholder="john@example.com" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner text-base" />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="subject">Subject</Label>
-                <Input id="subject" name="subject" placeholder="Subject" required />
+              <div className="space-y-2 group">
+                <Label htmlFor="subject" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Subject</Label>
+                <Input id="subject" name="subject" placeholder="How can we help?" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner text-base" />
               </div>
 
-              <div>
-                <Label htmlFor="message">Message</Label>
-                <Textarea id="message" name="message" rows={6} placeholder="Write your message..." required />
+              <div className="space-y-2 group">
+                <Label htmlFor="message" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Message</Label>
+                <Textarea id="message" name="message" rows={5} placeholder="Tell us more about your inquiry..." required className="p-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner resize-none text-base" />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">We reply within 24 hours.</div>
-                <Button type="submit" disabled={loading}>{loading ? "Sending..." : "Send Message"}</Button>
+              <div className="pt-4 flex items-center justify-between">
+                <div className="text-[13px] font-medium text-slate-400">Response within <span className="font-bold text-slate-600">2 hours</span>.</div>
+                <Button type="submit" disabled={loading} size="xl" className="h-14 px-8 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                  {loading ? "Sending..." : (
+                    <>
+                      Send Message <Send className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
               </div>
             </form>
-          </div>
+          </motion.div>
 
-          <div>
-            <div className="bg-muted p-6 rounded-lg shadow-sm">
-              <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
-              <ul className="space-y-4 text-muted-foreground">
-                <li className="flex items-start gap-3">
-                  <MapPin className="mt-1" />
-                  <div>KGISL Institute of Technology, KGISL Campus,Thudiyalur Road, Saravanampatti,Coimbatore -641 035</div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Phone className="mt-1" />
-                  <div><a href="tel:+919566510080" className="hover:text-red-500">+91 9566510080</a></div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Mail className="mt-1" />
-                  <div><a href="mailto:support@resqnow.com" className="hover:text-red-500">resqnow01@gmail.com</a></div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Clock className="mt-1" />
-                  <div>24/7 Emergency Support</div>
-                </li>
-              </ul>
-            </div>
-          </div>
+          {/* Info Side */}
+          <motion.div 
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-2 bg-slate-900 rounded-[2rem] p-8 lg:p-12 text-white relative overflow-hidden shadow-2xl"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[60px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+            
+            <h3 className="text-2xl font-bold mb-8 relative z-10">Direct Contact</h3>
+            
+            <ul className="space-y-10 relative z-10">
+              <li className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 text-blue-400">
+                  <MapPin size={20} />
+                  <span className="text-xs font-bold uppercase tracking-widest">Headquarters</span>
+                </div>
+                <div className="text-slate-300 font-medium leading-relaxed pl-8">
+                  KGISL Institute of Technology,<br />
+                  KGISL Campus, Thudiyalur Road,<br />
+                  Saravanampatti, Coimbatore - 641 035
+                </div>
+              </li>
+              
+              <li className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 text-blue-400">
+                  <Phone size={20} />
+                  <span className="text-xs font-bold uppercase tracking-widest">Phone</span>
+                </div>
+                <div className="text-slate-300 font-medium pl-8">
+                  <a href="tel:+919566510080" className="text-lg hover:text-white transition-colors block">+91 9566510080</a>
+                </div>
+              </li>
+              
+              <li className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 text-blue-400">
+                  <Mail size={20} />
+                  <span className="text-xs font-bold uppercase tracking-widest">Email</span>
+                </div>
+                <div className="text-slate-300 font-medium pl-8">
+                  <a href="mailto:resqnow01@gmail.com" className="hover:text-white transition-colors block">resqnow01@gmail.com</a>
+                </div>
+              </li>
+              
+              <li className="flex flex-col gap-2 pt-6 border-t border-white/10">
+                <div className="flex items-center gap-3 text-emerald-400">
+                  <Clock size={20} />
+                  <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Operating Hours</span>
+                </div>
+                <div className="text-white font-bold text-lg pl-8">
+                  24/7 Emergency Support Grid
+                </div>
+              </li>
+            </ul>
+          </motion.div>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, ChevronLeft } from "lucide-react";
+import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -19,10 +20,10 @@ type ClientAuthShellProps = {
 };
 
 export const clientAuthInputClassName =
-  "h-[3.25rem] sm:h-14 rounded-[1.25rem] border border-slate-200 bg-white/95 pl-12 pr-12 text-[15px] font-medium text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition-all placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#ef233c]/15 focus-visible:ring-offset-0 focus-visible:border-[#ef233c]";
+  "h-[3.25rem] sm:h-14 rounded-full border border-slate-200 bg-white pl-12 pr-12 text-[15px] font-medium text-slate-900 shadow-sm transition-all placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#ef233c]/20 focus-visible:ring-offset-0 focus-visible:border-[#ef233c]";
 
 export const clientAuthPrimaryButtonClassName =
-  "mt-2 h-[3.25rem] sm:h-14 w-full rounded-[1.25rem] bg-[#ef233c] px-4 text-[15px] sm:text-base font-bold text-white shadow-[0_18px_35px_rgba(239,35,60,0.32)] transition-all hover:bg-[#dc1f38] active:scale-[0.99]";
+  "mt-2 h-[3.25rem] sm:h-14 w-full rounded-full bg-[#ef233c] px-4 text-[15px] sm:text-base font-bold text-white shadow-[0_8px_20px_rgba(239,35,60,0.25)] transition-all hover:bg-[#dc1f38] hover:shadow-[0_12px_25px_rgba(239,35,60,0.35)] active:scale-[0.98]";
 
 export function ClientAuthShell({
   mode,
@@ -39,88 +40,110 @@ export function ClientAuthShell({
 
   return (
     <div
-      className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.92),_rgba(235,240,247,0.96)_46%,_rgba(228,233,242,1)_100%)] px-0 py-0 sm:px-6 sm:py-8"
+      className="min-h-[100dvh] overflow-x-hidden bg-white px-0 py-0 sm:px-6 sm:py-8 relative"
       style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
     >
-      <div className="mx-auto flex min-h-[100dvh] max-w-[440px] items-stretch justify-center sm:min-h-[calc(100dvh-4rem)]">
-        <div className="relative flex w-full flex-col overflow-hidden bg-white sm:rounded-[34px] sm:border sm:border-white/70 sm:shadow-[0_30px_80px_rgba(15,23,42,0.16)]">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_rgba(248,250,252,0.98)_0%,_rgba(255,255,255,1)_34%,_rgba(248,250,252,1)_100%)]" />
-          <div className="pointer-events-none absolute inset-x-4 top-0 h-48 rounded-full bg-[radial-gradient(circle,_rgba(239,35,60,0.16),_rgba(239,35,60,0)_72%)] blur-3xl sm:inset-x-6 sm:top-16 sm:h-44" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 overflow-hidden sm:h-28">
-            <div className="absolute -bottom-12 -left-8 h-24 w-40 rounded-[999px] bg-slate-900 sm:-bottom-10 sm:-left-10 sm:h-28 sm:w-44" />
-            <div className="absolute -bottom-10 -left-2 h-16 w-32 rounded-[999px] rotate-[-11deg] bg-[#ef233c] sm:-bottom-8 sm:-left-4 sm:h-20 sm:w-36" />
-            <div className="absolute -bottom-10 left-10 h-14 w-36 rounded-[999px] rotate-[-8deg] bg-[#f7f8fb] sm:left-12 sm:h-16 sm:w-48" />
-          </div>
+      {/* Corner wave graphic */}
+      <div className="pointer-events-none absolute bottom-0 left-0 w-64 h-64 overflow-hidden z-0">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute -bottom-8 -left-8 w-full h-full">
+          {/* Deep Navy/Black Blob */}
+          <path fill="#0f172a" d="M34.8,-53.4C46.8,-46.8,59.3,-39.8,65.8,-29.1C72.3,-18.4,72.9,-4,68.9,8.5C65,21,56.5,31.7,46.7,39.6C36.9,47.5,25.7,52.6,13.8,55.9C1.8,59.2,-11,60.7,-22.4,57.4C-33.8,54.1,-43.8,46,-51.7,36C-59.5,26,-65.2,14.1,-66.1,1.8C-67,-10.5,-63.1,-23.3,-55.4,-33.5C-47.7,-43.7,-36.2,-51.4,-24.5,-57.8C-12.8,-64.2,-1,-69.3,10.6,-68.8C22.2,-68.3,34.4,-62.1,34.8,-53.4Z" transform="translate(40 160) scale(1.1)" />
+          {/* Red Blob */}
+          <path fill="#ef233c" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(60 190) scale(1.1)" />
+        </svg>
+      </div>
 
-          <div className="relative z-10 flex min-h-[100dvh] w-full flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-0 sm:px-6 sm:pb-10 sm:pt-5">
-            <div className={cn("mb-4 flex items-center sm:mb-5", isSignup ? "justify-between" : "justify-center")}>
+      <div className="mx-auto flex min-h-[100dvh] max-w-[440px] items-stretch justify-center relative z-10 sm:min-h-[calc(100dvh-4rem)]">
+        <motion.div 
+          className="relative flex w-full flex-col overflow-hidden bg-white/60 backdrop-blur-xl sm:rounded-[34px] sm:border sm:border-slate-100 sm:shadow-[0_20px_60px_-15px_rgba(15,23,42,0.08)]"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="relative z-10 flex min-h-[100dvh] w-full flex-col px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-0 sm:pb-10 sm:pt-8">
+            {/* Header */}
+            <div className="mb-4 sm:mb-6 mt-4 relative">
               {isSignup ? (
-                <Button
-                  asChild
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 rounded-2xl border-slate-200 bg-white/90 text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  <Link to="/login" aria-label="Back to login">
-                    <ChevronLeft className="h-5 w-5" />
-                  </Link>
-                </Button>
+                <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 rounded-full border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 transition-all hover:scale-105 active:scale-95"
+                  >
+                    <Link to="/login" aria-label="Back to login">
+                      <ChevronLeft className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                </div>
               ) : null}
 
-              <div className={cn("flex-1", isSignup ? "pr-10 text-center" : "text-center")}>
+              <div className="flex justify-center w-full">
                 <ResQNowWordmark />
               </div>
             </div>
 
-            {!isSignup ? <RoadsideScene /> : null}
+            {!isSignup ? (
+              <div className="mb-2 flex justify-center">
+                <RoadsideScene />
+              </div>
+            ) : null}
 
-            <div className={cn("text-center", isSignup ? "mb-4 mt-1 sm:mt-2" : "mb-4 sm:mb-5")}>
-              <h1 className="text-[1.72rem] font-extrabold tracking-[-0.04em] text-slate-900 sm:text-[1.9rem]">
+            <div className={cn("text-center", isSignup ? "mb-6 mt-2" : "mb-6")}>
+              <h1 className="text-[1.75rem] font-bold tracking-tight text-[#0f172a] sm:text-[2rem]">
                 {title}
               </h1>
-              <p className="mt-1.5 text-[13px] font-medium text-slate-500 sm:mt-2 sm:text-sm">{subtitle}</p>
+              <p className="mt-1.5 text-[14px] font-medium text-slate-500 sm:mt-2">
+                {subtitle}
+              </p>
             </div>
 
             <div className="flex flex-1 flex-col">
               {error ? (
-                <div className="mb-3 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm sm:mb-4">
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm"
+                >
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{error}</span>
-                </div>
+                </motion.div>
               ) : null}
 
               <div className="flex-1">{children}</div>
 
-              <div className="mt-5 sm:mt-6">
-                <div className="relative">
+              <div className="mt-6 sm:mt-8">
+                <div className="relative mb-5">
                   <div className="absolute inset-0 flex items-center">
-                    <Separator className="bg-slate-200" />
+                    <Separator className="bg-slate-100" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-white px-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 sm:text-[11px]">
+                    <span className="bg-white px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
                       or continue with
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-3 sm:mt-5">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-[3.25rem] sm:h-14 w-full justify-center rounded-[1.25rem] border-slate-200 bg-white text-[15px] font-semibold text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.05)] hover:bg-slate-50"
+                    className="h-[3.25rem] sm:h-14 w-full justify-center rounded-full border border-slate-200 bg-white text-[15px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-colors"
                     onClick={onGoogleAction}
                     disabled={isLoading}
                   >
                     <GoogleMark className="mr-3 h-5 w-5" />
                     {googleLabel}
                   </Button>
-                </div>
+                </motion.div>
               </div>
 
-              <div className="mt-5 text-center text-[13px] font-medium text-slate-600 sm:mt-6 sm:text-sm">{footer}</div>
+              <div className="mt-8 text-center text-[13.5px] font-medium text-slate-500 mb-6 sm:mb-0">
+                {footer}
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
@@ -128,17 +151,28 @@ export function ClientAuthShell({
 
 function ResQNowWordmark() {
   return (
-    <div className="inline-flex flex-col items-center">
-      <div className="relative inline-flex items-end text-[1.9rem] font-black tracking-[-0.08em] text-slate-900 sm:text-[2.2rem]">
+    <div className="inline-flex flex-col items-center relative">
+      {/* Concentric Circles Background */}
+      <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] pointer-events-none flex items-center justify-center">
+        <div className="absolute w-[180px] h-[180px] rounded-full border border-slate-200/60" />
+        <div className="absolute w-[130px] h-[130px] rounded-full border border-slate-200/80" />
+        <div className="absolute w-[80px] h-[80px] rounded-full border border-slate-200" />
+        {/* Subtle dashed ring to give that precision/target feel */}
+        <svg className="absolute w-[100px] h-[100px] text-slate-200 animate-[spin_60s_linear_infinite]" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 4" />
+        </svg>
+      </div>
+
+      <div className="relative inline-flex items-end text-[2.2rem] font-black tracking-[-0.08em] text-[#1e293b]">
         <span>Res</span>
-        <span className="relative mx-[0.03em] inline-flex h-[1em] w-[0.86em] items-center justify-center">
-          <span className="absolute inset-[14%_8%_14%_8%] rounded-full border-[0.14em] border-[#ef233c]" />
-          <span className="absolute right-[7%] top-[2%] h-[0.55em] w-[0.12em] origin-top rotate-[-36deg] rounded-full bg-[#ef233c]" />
+        <span className="relative mx-[0.03em] inline-flex h-[1em] w-[0.86em] items-center justify-center z-10">
+          <span className="absolute inset-[14%_8%_14%_8%] rounded-full border-[0.14em] border-[#ef233c] shadow-[0_2px_10px_rgba(239,35,60,0.2)]" />
+          <span className="absolute right-[7%] top-[2%] h-[0.55em] w-[0.12em] origin-top rotate-[-36deg] rounded-full bg-[#ef233c] shadow-[0_2px_5px_rgba(239,35,60,0.2)]" />
         </span>
         <span>Now</span>
-        <span className="pointer-events-none absolute left-[34.5%] top-[65%] h-[0.11em] w-[1.05em] rotate-[128deg] rounded-full bg-[#ef233c]" />
+        <span className="pointer-events-none absolute left-[34.5%] top-[65%] h-[0.11em] w-[1.05em] rotate-[128deg] rounded-full bg-[#ef233c] shadow-[0_2px_5px_rgba(239,35,60,0.2)] z-20" />
       </div>
-      <div className="mt-1 text-[0.45rem] font-extrabold uppercase tracking-[0.22em] text-slate-400 sm:text-[0.5rem]">
+      <div className="mt-1 text-[0.45rem] font-extrabold uppercase tracking-[0.22em] text-slate-400 relative z-10 bg-white/50 px-2 rounded-full backdrop-blur-sm">
         On time. <span className="text-[#ef233c]">Every time.</span>
       </div>
     </div>
@@ -147,37 +181,54 @@ function ResQNowWordmark() {
 
 function RoadsideScene() {
   return (
-    <div className="relative mb-4 flex justify-center sm:mb-6">
-      <svg viewBox="0 0 320 144" className="h-[96px] w-full max-w-[224px] sm:h-[132px] sm:max-w-[300px]" aria-hidden="true">
-        <path
-          d="M24 104c11-28 18-41 31-46l14 46H24Zm26-14c8-16 13-24 19-28l10 42H50V90Zm44-7c7-11 13-16 22-17l9 38H94V83Zm50-4c5-8 10-13 18-14l8 39h-26V79Zm44-10c5-7 12-11 21-12l11 47h-32V69Zm57 31c8-18 14-27 26-30l18 34h-44V100Z"
-          fill="#f4f6fb"
-        />
-        <rect x="34" y="106" width="214" height="4" rx="2" fill="#d5dbe6" />
-        <g transform="translate(42 68)">
-          <rect x="2" y="26" width="114" height="12" rx="6" fill="#394150" />
-          <rect x="28" y="12" width="68" height="10" rx="4" fill="#9aa3b2" />
-          <rect x="0" y="7" width="30" height="22" rx="6" fill="#ffffff" stroke="#d7dde8" strokeWidth="2" />
-          <path d="M7 7h16l6 8H7Z" fill="#ef233c" />
-          <rect x="10" y="13" width="10" height="6" rx="2" fill="#dbe6f6" />
-          <rect x="21" y="34" width="10" height="10" rx="5" fill="#111827" />
-          <rect x="88" y="34" width="10" height="10" rx="5" fill="#111827" />
-          <rect x="62" y="8" width="34" height="14" rx="7" fill="#4b5563" />
-          <path d="M60 22h40c2 0 4 2 4 4v1H58v-1c0-2 2-4 2-4Z" fill="#6b7280" />
-          <circle cx="72" cy="22" r="3" fill="#cbd5e1" />
-          <circle cx="29" cy="22" r="3" fill="#ef233c" />
-          <path d="M28 20c9-1 17-7 23-17" stroke="#ef233c" strokeWidth="3" strokeLinecap="round" />
-          <path d="M48 4l6 2-2 7" stroke="#ef233c" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M120 26h14" stroke="#9aa3b2" strokeWidth="3" strokeLinecap="round" />
-        </g>
-        <g transform="translate(261 78)">
-          <path
-            d="M13.5 0C7.15 0 2 5.12 2 11.43c0 8.9 11.5 19.57 11.5 19.57S25 20.33 25 11.43C25 5.12 19.85 0 13.5 0Zm0 15.86a4.43 4.43 0 1 1 0-8.86 4.43 4.43 0 0 1 0 8.86Z"
-            fill="#ef233c"
-            opacity="0.82"
-          />
-        </g>
-      </svg>
+    <div className="relative mb-2 mt-4 flex justify-center">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+      >
+        <svg viewBox="0 0 200 60" className="h-[45px] w-auto max-w-[200px]" aria-hidden="true">
+          {/* Ground Line */}
+          <line x1="20" y1="50" x2="160" y2="50" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" />
+          
+          {/* Background subtle elements */}
+          <path d="M120 48 L130 25 L145 48 Z" fill="#f1f5f9" />
+          <path d="M140 48 L155 15 L175 48 Z" fill="#f8fafc" />
+
+          {/* Simple Truck */}
+          <g transform="translate(30 25)">
+            {/* Truck Body */}
+            <path d="M0 15 h35 v10 h-35 z" fill="#1e293b" />
+            <path d="M35 10 h15 l5 5 v10 h-20 z" fill="#334155" />
+            <path d="M37 12 h10 l3 3 v5 h-13 z" fill="#e2e8f0" />
+            
+            {/* Wheels */}
+            <circle cx="10" cy="25" r="4" fill="#0f172a" />
+            <circle cx="45" cy="25" r="4" fill="#0f172a" />
+            
+            {/* Flatbed & Car */}
+            <path d="M-15 15 h15 v2 h-15 z" fill="#64748b" />
+            {/* Car outline on bed */}
+            <path d="M-10 13 v-5 h5 l3-3 h8 l2 3 h4 v5 z" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+            <circle cx="-5" cy="13" r="2" fill="#94a3b8" />
+            <circle cx="7" cy="13" r="2" fill="#94a3b8" />
+
+            {/* Tow boom */}
+            <line x1="15" y1="15" x2="-2" y2="0" stroke="#ef233c" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="15" cy="15" r="2" fill="#1e293b" />
+          </g>
+
+          {/* Location Pin */}
+          <motion.g 
+            transform="translate(135 15)"
+            animate={{ y: [0, -5, 0] }}
+            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+          >
+            <path d="M10 0 C4.5 0 0 4.5 0 10 C0 17 10 25 10 25 C10 25 20 17 20 10 C20 4.5 15.5 0 10 0 Z" fill="#ef233c" />
+            <circle cx="10" cy="9" r="3.5" fill="#ffffff" />
+          </motion.g>
+        </svg>
+      </motion.div>
     </div>
   );
 }

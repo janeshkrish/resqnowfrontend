@@ -84,7 +84,7 @@ export function ClientAuthShell({
                 <img 
                   src="/resqnow-logo.png" 
                   alt="ResQNow Logo" 
-                  className="h-28 w-auto object-contain drop-shadow-sm" 
+                  className="h-44 w-auto max-w-[280px] object-contain drop-shadow-sm transition-transform hover:scale-105" 
                 />
               </div>
             </div>

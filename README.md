@@ -1,6 +1,6 @@
 # ResQNow - Advanced Roadside Assistance Platform
 
-ResQNow is a modern, real-time roadside assistance platform connecting vehicle owners with nearby technicians. Built with a mobile-first approach, it features live tracking, smart dispatching, and secure payments.
+ResQNow is a modern, real-time roadside assistance platform connecting vehicle owners with nearby technicians. Built with a mobile-first approach, it features live tracking, smart dispatching, and secure payments..
 ## 🚀 Key Features
 
 - **Smart Dispatch System:** Automatically finds the nearest and best-rated technicians using Google Maps Distance Matrix.

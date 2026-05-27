@@ -65,6 +65,7 @@ const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const ServiceCommunicationPage = lazy(() => import("./pages/ServiceCommunicationPage"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const TechnicianLayout = lazy(() => import("./components/technician/TechnicianLayout"));
+const TechnicianLanding = lazy(() => import("./pages/technician/TechnicianLanding"));
 const TechnicianLogin = lazy(() => import("./pages/technician/TechnicianLogin"));
 const TechnicianRegister = lazy(() => import("./pages/technician/TechnicianRegister"));
 const TechnicianVerification = lazy(() => import("./pages/technician/TechnicianVerification"));
@@ -273,6 +274,7 @@ const App = () => {
 
                             {/* Technician portal routes */}
                             <Route path="/technician" element={<TechnicianLayout />}>
+                              <Route path="landing" element={<TechnicianLanding />} />
                               <Route path="login" element={<TechnicianLogin />} />
                               <Route path="register" element={<TechnicianRegister />} />
                               <Route path="verification" element={<TechnicianProtectedRoute><TechnicianVerification /></TechnicianProtectedRoute>} />

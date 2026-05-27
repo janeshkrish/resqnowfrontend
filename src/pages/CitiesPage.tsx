@@ -40,18 +40,30 @@ const Node = ({ x, y, label, active = false, delay = 0 }: { x: string, y: string
   </motion.div>
 );
 
-const Path = ({ d, delay = 0 }: { d: string, delay?: number }) => (
-  <motion.path 
-    d={d}
-    fill="none"
-    stroke="url(#pathGrad)"
-    strokeWidth="2"
-    strokeDasharray="6 6"
-    initial={{ pathLength: 0, opacity: 0 }}
-    whileInView={{ pathLength: 1, opacity: 0.4 }}
-    viewport={{ once: true }}
-    transition={{ duration: 1.5, delay, ease: "easeInOut" }}
-  />
+const PremiumPath = ({ d, delay = 0 }: { d: string, delay?: number }) => (
+  <>
+    <motion.path 
+      d={d}
+      fill="none"
+      stroke="url(#pathGrad)"
+      strokeWidth="2"
+      strokeDasharray="4 4"
+      initial={{ pathLength: 0, opacity: 0 }}
+      whileInView={{ pathLength: 1, opacity: 0.5 }}
+      viewport={{ once: true }}
+      transition={{ duration: 2, delay, ease: "easeInOut" }}
+    />
+    <motion.path 
+      d={d}
+      fill="none"
+      stroke="#3b82f6"
+      strokeWidth="2"
+      strokeDasharray="15 1000"
+      initial={{ strokeDashoffset: 1015, opacity: 0 }}
+      animate={{ strokeDashoffset: -15, opacity: [0, 1, 0] }}
+      transition={{ duration: 2.5, delay, repeat: Infinity, ease: "linear" }}
+    />
+  </>
 );
 
 const CitiesPage = () => {
@@ -97,10 +109,10 @@ const CitiesPage = () => {
                   </linearGradient>
                 </defs>
                 {/* Paths emanating from Coimbatore (approximate relative positions) */}
-                <Path d="M 120 200 Q 150 150 250 100" delay={0.5} /> {/* To Chennai approx */}
-                <Path d="M 120 200 Q 180 220 200 280" delay={0.7} /> {/* To Madurai approx */}
-                <Path d="M 120 200 Q 140 280 150 320" delay={0.9} /> {/* To Kanyakumari approx */}
-                <Path d="M 120 200 Q 180 180 220 160" delay={1.1} /> {/* To Trichy approx */}
+                <PremiumPath d="M 120 200 Q 150 150 250 100" delay={0.5} /> {/* To Chennai approx */}
+                <PremiumPath d="M 120 200 Q 180 220 200 280" delay={0.7} /> {/* To Madurai approx */}
+                <PremiumPath d="M 120 200 Q 140 280 150 320" delay={0.9} /> {/* To Kanyakumari approx */}
+                <PremiumPath d="M 120 200 Q 180 180 220 160" delay={1.1} /> {/* To Trichy approx */}
               </svg>
 
               <Node x="30%" y="50%" label="Coimbatore (Phase 1)" active={true} delay={0.3} />

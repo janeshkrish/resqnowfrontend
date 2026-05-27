@@ -328,23 +328,52 @@ const WorkflowSection = () => {
         </Reveal>
 
         <div className="relative">
-          {/* Connecting Line */}
-          <div className="hidden lg:block absolute top-12 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+          {/* Animated Connecting Line (Desktop Only) */}
+          <div className="hidden lg:block absolute top-12 left-[12%] right-[12%] h-0.5 overflow-visible z-0">
+            <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
+              <motion.line 
+                x1="0%" y1="0" x2="100%" y2="0"
+                stroke="url(#lineGradient)"
+                strokeWidth="2"
+                strokeDasharray="6 6"
+                initial={{ pathLength: 0, opacity: 0 }}
+                whileInView={{ pathLength: 1, opacity: 1 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
+              />
+              <defs>
+                <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#cbd5e1" stopOpacity="0" />
+                  <stop offset="50%" stopColor="#94a3b8" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           
-          <div className="grid lg:grid-cols-4 gap-12 lg:gap-8">
+          <div className="grid lg:grid-cols-4 gap-12 lg:gap-8 relative z-10">
             {steps.map((step, i) => (
-              <Reveal key={i} delay={i * 0.1}>
-                <div className="relative flex flex-col items-center text-center group">
-                  <div className="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 flex items-center justify-center mb-8 relative z-10 group-hover:-translate-y-2 group-hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-all duration-300">
-                    <step.icon size={32} className="text-slate-700 group-hover:text-blue-600 transition-colors" />
-                    <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shadow-lg">
-                      {i + 1}
-                    </div>
+              <motion.div 
+                key={i} 
+                className="relative flex flex-col items-center text-center cursor-default group"
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.7, delay: i * 0.15, type: "spring", stiffness: 100 }}
+              >
+                <motion.div 
+                  className="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 flex items-center justify-center mb-8 relative z-10"
+                  whileHover={{ y: -8, scale: 1.05 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <step.icon size={32} className="text-slate-700 transition-colors group-hover:text-blue-600" />
+                  <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shadow-lg border-2 border-white">
+                    {i + 1}
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-3">{step.title}</h3>
-                  <p className="text-slate-500 font-medium leading-relaxed">{step.desc}</p>
-                </div>
-              </Reveal>
+                </motion.div>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">{step.title}</h3>
+                <p className="text-slate-500 font-medium leading-relaxed">{step.desc}</p>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -354,37 +383,50 @@ const WorkflowSection = () => {
 };
 
 const CTASection = () => (
-  <section className="py-24 lg:py-32 bg-white">
+  <section className="py-24 lg:py-32 bg-white relative overflow-hidden">
     <div className="container mx-auto max-w-5xl px-4 lg:px-8">
-      <Reveal>
-        <div className="bg-slate-900 rounded-[3rem] p-12 lg:p-24 text-center relative overflow-hidden shadow-2xl">
+      <motion.div
+        initial={{ opacity: 0, y: 50 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 0.8, type: "spring", stiffness: 80 }}
+      >
+        <div className="bg-slate-50 border border-slate-200/60 rounded-[3rem] p-12 lg:p-24 text-center relative overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
           
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3" />
-          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3" />
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
           
           <div className="relative z-10 flex flex-col items-center">
-            <div className="w-20 h-20 bg-white/10 text-white rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm border border-white/10">
+            <motion.div 
+              className="w-20 h-20 bg-white shadow-sm text-blue-600 rounded-2xl flex items-center justify-center mb-8 border border-slate-100"
+              whileHover={{ rotate: 180, scale: 1.1 }}
+              transition={{ duration: 0.5, type: "spring" }}
+            >
               <Wrench size={32} />
-            </div>
+            </motion.div>
             
-            <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6 tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mb-6 tracking-tight">
               Build the Support Grid with Us
             </h2>
-            <p className="text-lg text-slate-300 font-medium mb-12 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-lg text-slate-500 font-medium mb-12 max-w-2xl mx-auto leading-relaxed">
               We are replacing the unorganized service nightmare with a high-trust, verified gig network. Join ResQNow and multiply your earning potential through our transparent dispatch system.
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full sm:w-auto">
-              <Button size="xl" className="w-full sm:w-auto h-16 px-10 rounded-2xl bg-blue-600 text-white text-lg font-bold hover:bg-blue-500 hover:-translate-y-1 transition-all shadow-[0_10px_30px_rgba(37,99,235,0.4)]" asChild>
-                <Link to="/technician/register">Become a Partner</Link>
-              </Button>
-              <Button size="xl" variant="outline" className="w-full sm:w-auto h-16 px-10 rounded-2xl bg-white/10 border-white/20 text-white text-lg font-bold hover:bg-white/20 hover:-translate-y-1 transition-all backdrop-blur-md" asChild>
-                <Link to="/about">Read Our Story</Link>
-              </Button>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
+                <Button size="xl" className="w-full h-16 px-10 rounded-2xl bg-slate-900 text-white text-lg font-bold hover:bg-slate-800 shadow-xl border border-slate-800" asChild>
+                  <Link to="/technician/landing">Become a Partner</Link>
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
+                <Button size="xl" variant="outline" className="w-full h-16 px-10 rounded-2xl bg-white border-slate-200 text-slate-700 text-lg font-bold hover:bg-slate-50 shadow-sm" asChild>
+                  <Link to="/about">Read Our Story</Link>
+                </Button>
+              </motion.div>
             </div>
           </div>
         </div>
-      </Reveal>
+      </motion.div>
     </div>
   </section>
 );

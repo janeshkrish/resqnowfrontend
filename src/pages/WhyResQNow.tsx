@@ -4,7 +4,8 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { 
   ArrowRight, Activity, Clock, CheckCircle2, Navigation,
-  Banknote, AlertTriangle, Zap
+  Banknote, AlertTriangle, Zap,
+  Car, Building2, Shield, Truck as TruckIcon
 } from "lucide-react";
 
 // --- Framer Motion variants ---
@@ -263,6 +264,77 @@ const LiveTrackingSection = () => (
   </section>
 );
 
+const TargetAudienceSection = () => {
+  const partners = [
+    { title: "Fleet Operators", desc: "Commercial fleet owners minimizing downtime and protecting margins.", icon: TruckIcon, color: "blue" },
+    { title: "OEM & Dealerships", desc: "Automobile manufacturers providing white-labeled roadside support.", icon: Building2, color: "indigo" },
+    { title: "Insurance Firms", desc: "Seamless claim integration and instant dispatch for policyholders.", icon: Shield, color: "emerald" },
+    { title: "Individual Owners", desc: "Car and bike owners seeking premium, high-trust emergency care.", icon: Car, color: "orange" }
+  ];
+
+  const getColorClasses = (color: string) => {
+    switch(color) {
+      case 'blue': return 'text-blue-600 bg-blue-50 border-blue-100 group-hover:bg-blue-600';
+      case 'indigo': return 'text-indigo-600 bg-indigo-50 border-indigo-100 group-hover:bg-indigo-600';
+      case 'emerald': return 'text-emerald-600 bg-emerald-50 border-emerald-100 group-hover:bg-emerald-600';
+      case 'orange': return 'text-orange-600 bg-orange-50 border-orange-100 group-hover:bg-orange-600';
+      default: return 'text-slate-600 bg-slate-50 border-slate-100 group-hover:bg-slate-600';
+    }
+  };
+
+  return (
+    <section className="py-32 bg-[#fafafa] relative overflow-hidden border-t border-slate-200/50">
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+      
+      <div className="container mx-auto max-w-7xl px-8 relative z-10">
+        <Reveal className="text-center max-w-3xl mx-auto mb-20">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-6">Strategic Partners</h2>
+          <h3 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1] mb-6">
+            Who builds with ResQNow?
+          </h3>
+          <p className="text-lg text-slate-500 font-medium leading-relaxed">
+            Our algorithmic dispatch network is engineered for scale. From individual vehicle owners to massive enterprise fleets, we ensure mobility never stops.
+          </p>
+        </Reveal>
+
+        <motion.div 
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }}
+          className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
+        >
+          {partners.map((partner, i) => (
+            <motion.div 
+              key={i}
+              variants={fadeUp}
+              whileHover={{ y: -10, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="bg-white border border-slate-200/60 rounded-[2rem] p-8 shadow-sm hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-shadow duration-300 group cursor-default relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white to-slate-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              
+              <div className="relative z-10 flex flex-col h-full">
+                <div className={`w-14 h-14 rounded-2xl shadow-sm flex items-center justify-center mb-8 transition-colors duration-500 border ${getColorClasses(partner.color)}`}>
+                  <partner.icon className="h-6 w-6 group-hover:text-white transition-colors duration-500" />
+                </div>
+                
+                <h4 className="text-xl font-bold text-slate-900 mb-3">{partner.title}</h4>
+                <p className="text-sm font-medium text-slate-500 leading-relaxed mb-6 flex-grow">{partner.desc}</p>
+                
+                <div className="mt-auto flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-600 transition-colors">
+                  <span>Learn More</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+};
+
 const ServicesSection = () => (
   <section className="py-32 bg-white text-slate-900 overflow-hidden relative border-t border-slate-200/50">
     <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
@@ -316,6 +388,7 @@ const WhyResQNow = () => {
       <HeroSection />
       <ProblemSection />
       <LiveTrackingSection />
+      <TargetAudienceSection />
       <ServicesSection />
       <FinalCTASection />
     </div>

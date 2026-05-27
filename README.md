@@ -4,7 +4,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 ## 🚀 Key Features
 
 - **Smart Dispatch System:** Automatically finds the nearest and best-rated technicians using Google Maps Distance Matrix.
-- **Real-time Tracking:** Live GPS tracking of technicians and users with route visualization.
+- **Real-time Tracking:** Live GPS tracking of technicians and users with route visualization..
 - **Secure Authentication:** Google OAuth and email-based login (JWT) for users and technicians.
 - **Technician Dashboard:** Comprehensive tools for managing jobs, earnings, and availability.
 - **Admin Console:** Manage technicians, users, and service categories.

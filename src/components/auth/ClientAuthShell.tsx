@@ -20,10 +20,10 @@ type ClientAuthShellProps = {
 };
 
 export const clientAuthInputClassName =
-  "h-[3.25rem] sm:h-14 rounded-full border border-slate-200 bg-white pl-12 pr-12 text-[15px] font-medium text-slate-900 shadow-sm transition-all placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#ef233c]/20 focus-visible:ring-offset-0 focus-visible:border-[#ef233c]";
+  "h-[3.25rem] sm:h-14 rounded-2xl border border-slate-200 bg-white pl-12 pr-12 text-[15px] font-medium text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.02)] transition-all placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#ef233c]/20 focus-visible:ring-offset-0 focus-visible:border-[#ef233c]";
 
 export const clientAuthPrimaryButtonClassName =
-  "mt-2 h-[3.25rem] sm:h-14 w-full rounded-full bg-[#ef233c] px-4 text-[15px] sm:text-base font-bold text-white shadow-[0_8px_20px_rgba(239,35,60,0.25)] transition-all hover:bg-[#dc1f38] hover:shadow-[0_12px_25px_rgba(239,35,60,0.35)] active:scale-[0.98]";
+  "mt-2 h-[3.25rem] sm:h-14 w-full rounded-[1.25rem] bg-[#ef233c] px-4 text-[15px] sm:text-base font-bold text-white shadow-[0_8px_20px_rgba(239,35,60,0.25)] transition-all hover:bg-[#dc1f38] hover:shadow-[0_12px_25px_rgba(239,35,60,0.35)] active:scale-[0.98]";
 
 export function ClientAuthShell({
   mode,
@@ -43,15 +43,15 @@ export function ClientAuthShell({
       className="min-h-[100dvh] overflow-x-hidden bg-white px-0 py-0 sm:px-6 sm:py-8 relative"
       style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
     >
-      {/* Corner wave graphic */}
-      <div className="pointer-events-none absolute bottom-0 left-0 w-64 h-64 overflow-hidden z-0">
-        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute -bottom-8 -left-8 w-full h-full">
-          {/* Deep Navy/Black Blob */}
-          <path fill="#0f172a" d="M34.8,-53.4C46.8,-46.8,59.3,-39.8,65.8,-29.1C72.3,-18.4,72.9,-4,68.9,8.5C65,21,56.5,31.7,46.7,39.6C36.9,47.5,25.7,52.6,13.8,55.9C1.8,59.2,-11,60.7,-22.4,57.4C-33.8,54.1,-43.8,46,-51.7,36C-59.5,26,-65.2,14.1,-66.1,1.8C-67,-10.5,-63.1,-23.3,-55.4,-33.5C-47.7,-43.7,-36.2,-51.4,-24.5,-57.8C-12.8,-64.2,-1,-69.3,10.6,-68.8C22.2,-68.3,34.4,-62.1,34.8,-53.4Z" transform="translate(40 160) scale(1.1)" />
-          {/* Red Blob */}
-          <path fill="#ef233c" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(60 190) scale(1.1)" />
-        </svg>
-      </div>
+      {/* Corner wave graphic for signup only */}
+      {isSignup && (
+        <div className="pointer-events-none absolute bottom-0 right-0 w-64 h-64 overflow-hidden z-0">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 right-0 w-full h-full transform translate-x-1/4 translate-y-1/4">
+            <path fill="#ef233c" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(100 100) scale(1.4)" opacity="0.9" />
+            <path fill="#ffb3bd" d="M41.4,-57.8C54,-48.5,64.8,-35.6,69.5,-21C74.3,-6.4,73,9.8,65.4,22.8C57.7,35.7,43.6,45.4,29.3,51.8C15,58.1,0.5,61.1,-13.4,59.5C-27.3,57.9,-40.6,51.8,-52.1,42.1C-63.5,32.4,-73.1,19.2,-74.6,5.1C-76.1,-9,-69.4,-23.8,-59.1,-34.5C-48.8,-45.3,-34.9,-51.9,-21.5,-60C-8.1,-68.1,4.7,-77.6,17.4,-77.2C30,-76.8,42.6,-66.4,41.4,-57.8Z" transform="translate(100 100) scale(1.6)" opacity="0.3" />
+          </svg>
+        </div>
+      )}
 
       <div className="mx-auto flex min-h-[100dvh] max-w-[440px] items-stretch justify-center relative z-10 sm:min-h-[calc(100dvh-4rem)]">
         <motion.div 
@@ -83,11 +83,7 @@ export function ClientAuthShell({
               </div>
             </div>
 
-            {!isSignup ? (
-              <div className="mb-2 flex justify-center">
-                <RoadsideScene />
-              </div>
-            ) : null}
+            {/* No Roadside Scene */}
 
             <div className={cn("text-center", isSignup ? "mb-6 mt-2" : "mb-6")}>
               <h1 className="text-[1.75rem] font-bold tracking-tight text-[#0f172a] sm:text-[2rem]">
@@ -128,7 +124,7 @@ export function ClientAuthShell({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-[3.25rem] sm:h-14 w-full justify-center rounded-full border border-slate-200 bg-white text-[15px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    className="h-[3.25rem] sm:h-14 w-full justify-center rounded-2xl border border-slate-200 bg-white text-[15px] font-semibold text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.02)] hover:bg-slate-50 hover:text-slate-900 transition-colors"
                     onClick={onGoogleAction}
                     disabled={isLoading}
                   >
@@ -151,87 +147,37 @@ export function ClientAuthShell({
 
 function ResQNowWordmark() {
   return (
-    <div className="inline-flex flex-col items-center relative">
+    <div className="inline-flex flex-col items-center relative mt-6 mb-4">
       {/* Concentric Circles Background */}
       <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] pointer-events-none flex items-center justify-center">
         <div className="absolute w-[180px] h-[180px] rounded-full border border-slate-200/60" />
         <div className="absolute w-[130px] h-[130px] rounded-full border border-slate-200/80" />
         <div className="absolute w-[80px] h-[80px] rounded-full border border-slate-200" />
-        {/* Subtle dashed ring to give that precision/target feel */}
-        <svg className="absolute w-[100px] h-[100px] text-slate-200 animate-[spin_60s_linear_infinite]" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 4" />
-        </svg>
+        
+        {/* Subtle diagonal line across the logo matching the mockup */}
+        <div className="absolute w-[180px] h-px bg-slate-200 rotate-[-35deg]" />
+        {/* Tiny red dots on the ends of the line */}
+        <div className="absolute w-1 h-1 bg-[#ef233c] rounded-full -translate-x-[75px] translate-y-[52px]" />
+        <div className="absolute w-1 h-1 bg-[#ef233c] rounded-full translate-x-[75px] -translate-y-[52px]" />
       </div>
 
-      <div className="relative inline-flex items-end text-[2.2rem] font-black tracking-[-0.08em] text-[#1e293b]">
+      <div className="relative inline-flex items-end text-[2.2rem] font-black tracking-[-0.08em] text-[#0f172a]">
         <span>Res</span>
         <span className="relative mx-[0.03em] inline-flex h-[1em] w-[0.86em] items-center justify-center z-10">
-          <span className="absolute inset-[14%_8%_14%_8%] rounded-full border-[0.14em] border-[#ef233c] shadow-[0_2px_10px_rgba(239,35,60,0.2)]" />
-          <span className="absolute right-[7%] top-[2%] h-[0.55em] w-[0.12em] origin-top rotate-[-36deg] rounded-full bg-[#ef233c] shadow-[0_2px_5px_rgba(239,35,60,0.2)]" />
+          <span className="absolute inset-[14%_8%_14%_8%] rounded-full border-[0.14em] border-[#ef233c]" />
+          <span className="absolute right-[7%] top-[2%] h-[0.55em] w-[0.12em] origin-top rotate-[-36deg] rounded-full bg-[#ef233c]" />
         </span>
         <span>Now</span>
-        <span className="pointer-events-none absolute left-[34.5%] top-[65%] h-[0.11em] w-[1.05em] rotate-[128deg] rounded-full bg-[#ef233c] shadow-[0_2px_5px_rgba(239,35,60,0.2)] z-20" />
+        <span className="pointer-events-none absolute left-[34.5%] top-[65%] h-[0.11em] w-[1.05em] rotate-[128deg] rounded-full bg-[#ef233c] z-20" />
       </div>
-      <div className="mt-1 text-[0.45rem] font-extrabold uppercase tracking-[0.22em] text-slate-400 relative z-10 bg-white/50 px-2 rounded-full backdrop-blur-sm">
+      <div className="mt-1 text-[0.45rem] font-extrabold uppercase tracking-[0.22em] text-[#0f172a] relative z-10 bg-white px-2 rounded-full hidden">
+        {/* Hidden wordmark since mockup doesn't seem to show "On time. Every time." */}
         On time. <span className="text-[#ef233c]">Every time.</span>
       </div>
     </div>
   );
 }
 
-function RoadsideScene() {
-  return (
-    <div className="relative mb-2 mt-4 flex justify-center">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-      >
-        <svg viewBox="0 0 200 60" className="h-[45px] w-auto max-w-[200px]" aria-hidden="true">
-          {/* Ground Line */}
-          <line x1="20" y1="50" x2="160" y2="50" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" />
-          
-          {/* Background subtle elements */}
-          <path d="M120 48 L130 25 L145 48 Z" fill="#f1f5f9" />
-          <path d="M140 48 L155 15 L175 48 Z" fill="#f8fafc" />
-
-          {/* Simple Truck */}
-          <g transform="translate(30 25)">
-            {/* Truck Body */}
-            <path d="M0 15 h35 v10 h-35 z" fill="#1e293b" />
-            <path d="M35 10 h15 l5 5 v10 h-20 z" fill="#334155" />
-            <path d="M37 12 h10 l3 3 v5 h-13 z" fill="#e2e8f0" />
-            
-            {/* Wheels */}
-            <circle cx="10" cy="25" r="4" fill="#0f172a" />
-            <circle cx="45" cy="25" r="4" fill="#0f172a" />
-            
-            {/* Flatbed & Car */}
-            <path d="M-15 15 h15 v2 h-15 z" fill="#64748b" />
-            {/* Car outline on bed */}
-            <path d="M-10 13 v-5 h5 l3-3 h8 l2 3 h4 v5 z" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
-            <circle cx="-5" cy="13" r="2" fill="#94a3b8" />
-            <circle cx="7" cy="13" r="2" fill="#94a3b8" />
-
-            {/* Tow boom */}
-            <line x1="15" y1="15" x2="-2" y2="0" stroke="#ef233c" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="15" cy="15" r="2" fill="#1e293b" />
-          </g>
-
-          {/* Location Pin */}
-          <motion.g 
-            transform="translate(135 15)"
-            animate={{ y: [0, -5, 0] }}
-            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-          >
-            <path d="M10 0 C4.5 0 0 4.5 0 10 C0 17 10 25 10 25 C10 25 20 17 20 10 C20 4.5 15.5 0 10 0 Z" fill="#ef233c" />
-            <circle cx="10" cy="9" r="3.5" fill="#ffffff" />
-          </motion.g>
-        </svg>
-      </motion.div>
-    </div>
-  );
-}
 
 function GoogleMark({ className }: { className?: string }) {
   return (

@@ -205,7 +205,7 @@ const Login = () => {
       googleLabel="Continue with Google"
       footer={
         <p>
-          New to ResQNow?{" "}
+          Don't have an account?{" "}
           <Link to="/register" className="font-bold text-[#ef233c] transition-colors hover:text-[#dc1f38]">
             Sign up
           </Link>
@@ -268,6 +268,23 @@ const Login = () => {
             )}
           />
 
+          <div className="flex items-center justify-between pb-1 pt-1">
+            <div className="flex items-center space-x-2 relative cursor-pointer">
+              <input type="checkbox" id="remember" className="peer absolute h-4 w-4 opacity-0 cursor-pointer" />
+              <div className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border border-slate-300 bg-white transition-colors peer-checked:bg-[#ef233c] peer-checked:border-[#ef233c]">
+                <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <label htmlFor="remember" className="text-[13px] font-medium text-slate-500 cursor-pointer select-none">
+                Remember me
+              </label>
+            </div>
+            <Link to="/forgot-password" className="text-[13px] font-semibold text-[#ef233c] hover:text-[#dc1f38]">
+              Forgot password?
+            </Link>
+          </div>
+
           <Button type="submit" className={clientAuthPrimaryButtonClassName} disabled={isLoading}>
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -276,7 +293,7 @@ const Login = () => {
               </span>
             ) : (
               <span className="relative flex w-full items-center justify-center">
-                <span>Login</span>
+                <span>Log in</span>
                 <span className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#ef233c] shadow-sm">
                   <ArrowRight className="h-4 w-4" />
                 </span>

@@ -149,7 +149,7 @@ const Register = () => {
         <p>
           Already have an account?{" "}
           <Link to="/login" className="font-bold text-[#ef233c] transition-colors hover:text-[#dc1f38]">
-            Login
+            Log in
           </Link>
         </p>
       }
@@ -267,17 +267,25 @@ const Register = () => {
             )}
           />
 
-          <p className="px-1 text-[11px] font-medium leading-4 text-slate-500 sm:text-xs sm:leading-5">
-            By signing up, you agree to the{" "}
-            <Link to="/terms-of-service" className="font-semibold text-[#ef233c] hover:text-[#dc1f38]">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link to="/privacy-policy" className="font-semibold text-[#ef233c] hover:text-[#dc1f38]">
-              Privacy Policy
-            </Link>
-            .
-          </p>
+          <div className="flex items-start space-x-3 px-1 py-1 relative cursor-pointer">
+            <input type="checkbox" id="terms" className="peer absolute h-4 w-4 opacity-0 cursor-pointer" required />
+            <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border border-slate-300 bg-white transition-colors peer-checked:bg-[#ef233c] peer-checked:border-[#ef233c]">
+              <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <label htmlFor="terms" className="text-[12px] font-medium leading-5 text-slate-500 cursor-pointer select-none">
+              I agree to the{" "}
+              <Link to="/terms-of-service" className="font-semibold text-[#ef233c] hover:text-[#dc1f38]">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy-policy" className="font-semibold text-[#ef233c] hover:text-[#dc1f38]">
+                Privacy Policy
+              </Link>
+              .
+            </label>
+          </div>
 
           <Button type="submit" className={clientAuthPrimaryButtonClassName} disabled={isLoading}>
             {isLoading ? (

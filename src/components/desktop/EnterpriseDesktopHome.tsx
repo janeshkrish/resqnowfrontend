@@ -209,14 +209,14 @@ const EnterpriseHero = () => (
             </motion.div>
             
             <h1 className="text-5xl lg:text-7xl font-bold leading-[1.05] tracking-tighter text-slate-900 mb-6">
-              Eliminating Operational Latency in <br className="hidden lg:block"/>
+              Intelligent Roadside Assistance for <br className="hidden lg:block"/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 bg-300% animate-gradient">
-                Tier-2 Mobility.
+                Modern Mobility.
               </span>
             </h1>
             
             <p className="text-lg lg:text-xl font-medium leading-relaxed text-slate-500 mb-10 max-w-[540px]">
-              We're replacing unorganized service chaos and 3-hour waits with a hyper-local, digitally native dispatch network engineered for sub-45 minute response times.
+              We're replacing unorganized service chaos and 3-hour waits with a premium, digitally native dispatch network engineered for sub-45 minute response times.
             </p>
             
             <div className="flex flex-wrap items-center gap-4">

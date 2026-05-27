@@ -133,20 +133,22 @@ const Contact = () => {
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-2 bg-slate-900 rounded-[2rem] p-8 lg:p-12 text-white relative overflow-hidden shadow-2xl"
+            className="lg:col-span-2 bg-gradient-to-b from-blue-50 to-white rounded-[2rem] p-8 lg:p-12 text-slate-900 relative overflow-hidden shadow-lg border border-blue-100/50"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[60px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
             
-            <h3 className="text-2xl font-bold mb-8 relative z-10">Direct Contact</h3>
+            <h3 className="text-2xl font-bold mb-8 relative z-10 text-slate-900">Direct Contact</h3>
             
             <ul className="space-y-10 relative z-10">
               <li className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 text-blue-400">
-                  <MapPin size={20} />
-                  <span className="text-xs font-bold uppercase tracking-widest">Headquarters</span>
+                <div className="flex items-center gap-3 text-blue-600">
+                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <MapPin size={18} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Headquarters</span>
                 </div>
-                <div className="text-slate-300 font-medium leading-relaxed pl-8">
+                <div className="text-slate-600 font-medium leading-relaxed pl-13 ml-[52px]">
                   KGISL Institute of Technology,<br />
                   KGISL Campus, Thudiyalur Road,<br />
                   Saravanampatti, Coimbatore - 641 035
@@ -154,31 +156,37 @@ const Contact = () => {
               </li>
               
               <li className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 text-blue-400">
-                  <Phone size={20} />
-                  <span className="text-xs font-bold uppercase tracking-widest">Phone</span>
+                <div className="flex items-center gap-3 text-blue-600">
+                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <Phone size={18} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Phone</span>
                 </div>
-                <div className="text-slate-300 font-medium pl-8">
-                  <a href="tel:+919566510080" className="text-lg hover:text-white transition-colors block">+91 9566510080</a>
+                <div className="text-slate-600 font-medium pl-13 ml-[52px]">
+                  <a href="tel:+919566510080" className="text-lg font-bold text-slate-900 hover:text-blue-600 transition-colors block">+91 9566510080</a>
                 </div>
               </li>
               
               <li className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 text-blue-400">
-                  <Mail size={20} />
-                  <span className="text-xs font-bold uppercase tracking-widest">Email</span>
+                <div className="flex items-center gap-3 text-blue-600">
+                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <Mail size={18} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Email</span>
                 </div>
-                <div className="text-slate-300 font-medium pl-8">
-                  <a href="mailto:resqnow01@gmail.com" className="hover:text-white transition-colors block">resqnow01@gmail.com</a>
+                <div className="text-slate-600 font-medium pl-13 ml-[52px]">
+                  <a href="mailto:resqnow01@gmail.com" className="font-bold text-slate-900 hover:text-blue-600 transition-colors block">resqnow01@gmail.com</a>
                 </div>
               </li>
               
-              <li className="flex flex-col gap-2 pt-6 border-t border-white/10">
-                <div className="flex items-center gap-3 text-emerald-400">
-                  <Clock size={20} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Operating Hours</span>
+              <li className="flex flex-col gap-2 pt-6 border-t border-slate-200">
+                <div className="flex items-center gap-3 text-emerald-600">
+                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <Clock size={18} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Operating Hours</span>
                 </div>
-                <div className="text-white font-bold text-lg pl-8">
+                <div className="text-slate-900 font-bold text-lg pl-13 ml-[52px]">
                   24/7 Emergency Support Grid
                 </div>
               </li>

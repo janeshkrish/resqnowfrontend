@@ -43,37 +43,37 @@ const HeroSection = () => {
   const opacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
 
   return (
-    <section ref={ref} className="relative pt-40 pb-32 overflow-hidden bg-slate-950 text-white min-h-[90vh] flex items-center">
+    <section ref={ref} className="relative pt-40 pb-32 overflow-hidden bg-[#fafafa] text-slate-900 min-h-[90vh] flex items-center border-b border-slate-200/60">
       <motion.div style={{ y, opacity }} className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-red-600/10 rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[100px] translate-y-1/4 -translate-x-1/4" />
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-600/5 rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-600/5 rounded-full blur-[100px] translate-y-1/4 -translate-x-1/4" />
       </motion.div>
 
       <div className="container relative mx-auto max-w-7xl px-8 z-10">
         <div className="grid grid-cols-12 gap-12 items-center">
           <div className="col-span-12 lg:col-span-7">
             <Reveal>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-xs font-bold tracking-[0.2em] uppercase text-slate-300">Mission Control</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 mb-8 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-xs font-bold tracking-[0.2em] uppercase text-slate-600">Mission Control</span>
               </div>
-              <h1 className="text-5xl lg:text-[5.5rem] font-black leading-[1.05] tracking-tighter mb-8">
+              <h1 className="text-5xl lg:text-[5.5rem] font-black leading-[1.05] tracking-tighter mb-8 text-slate-900">
                 Built for people who <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
                   can't afford to stop.
                 </span>
               </h1>
-              <p className="text-xl lg:text-2xl text-slate-400 font-medium leading-relaxed max-w-2xl mb-12">
+              <p className="text-xl lg:text-2xl text-slate-500 font-medium leading-relaxed max-w-2xl mb-12">
                 Real-time roadside assistance platform designed for modern mobility. 
                 We replace chaos with transparent, algorithmic dispatch.
               </p>
-              <div className="flex items-center gap-6">
-                <Button size="xl" className="h-16 px-10 rounded-full bg-white text-slate-950 font-bold hover:bg-slate-200 transition-all hover:scale-105" asChild>
+              <div className="flex flex-wrap items-center gap-4">
+                <Button size="xl" className="h-14 px-8 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300" asChild>
                   <Link to="/map">
-                    Open Live Radar <ArrowRight className="ml-2 h-5 w-5" />
+                    Open Live Radar <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
-                <Button size="xl" variant="outline" className="h-16 px-10 rounded-full border-white/20 text-white font-bold hover:bg-white/10 transition-all" asChild>
+                <Button size="xl" variant="outline" className="h-14 px-8 rounded-xl bg-white border-slate-200 font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 shadow-sm" asChild>
                   <Link to="/services">
                     Explore Services
                   </Link>
@@ -84,18 +84,17 @@ const HeroSection = () => {
 
           <div className="col-span-12 lg:col-span-5 relative hidden lg:block">
             <Reveal delay={0.2}>
-              <div className="relative rounded-[2rem] bg-slate-900/50 border border-white/10 p-2 shadow-2xl backdrop-blur-xl transform rotate-y-[-10deg] rotate-x-[5deg] perspective-1000">
-                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-red-500/10 rounded-[2rem]" />
-                <div className="bg-slate-950 rounded-[1.5rem] p-6 relative overflow-hidden border border-white/5">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Dispatch</div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-red-500 bg-red-500/10 px-3 py-1 rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              <div className="relative rounded-[2rem] bg-white border border-slate-200 p-2 shadow-[0_40px_100px_-20px_rgba(15,23,42,0.15)] transform rotate-y-[-10deg] rotate-x-[5deg] perspective-1000">
+                <div className="bg-slate-50 rounded-[1.5rem] p-6 relative overflow-hidden border border-slate-100 shadow-inner">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-6">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Dispatch</div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       LIVE
                     </div>
                   </div>
                   
-                  <div className="bg-slate-900/50 h-[280px] rounded-xl mb-6 relative overflow-hidden border border-white/5">
+                  <div className="bg-white h-[280px] rounded-xl mb-6 relative overflow-hidden border border-slate-200 shadow-sm">
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:24px_24px]" />
                     
                     <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -117,9 +116,9 @@ const HeroSection = () => {
                       </defs>
                     </svg>
                     
-                    <div className="absolute top-[35%] right-[15%] w-3 h-3 bg-red-500 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.6)]" />
+                    <div className="absolute top-[35%] right-[15%] w-3 h-3 bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.6)]" />
                     <motion.div 
-                      className="absolute bottom-[15%] left-[15%] w-8 h-8 bg-blue-600 rounded-full border-[3px] border-slate-950 flex items-center justify-center shadow-lg"
+                      className="absolute bottom-[15%] left-[15%] w-8 h-8 bg-slate-900 rounded-full border-[3px] border-white flex items-center justify-center shadow-lg"
                       animate={{ y: [0, -5, 0] }}
                       transition={{ duration: 2, repeat: Infinity }}
                     >
@@ -129,11 +128,11 @@ const HeroSection = () => {
 
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-sm font-bold text-white mb-1">Tech Assigned: Raj Kumar</p>
-                      <p className="text-[11px] font-medium text-slate-400">Distance: 4.2 km</p>
+                      <p className="text-sm font-bold text-slate-900 mb-1">Tech Assigned: Raj Kumar</p>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase">Distance: 4.2 km</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-3xl font-black text-white tracking-tighter">12<span className="text-sm font-bold text-slate-500 ml-1">min</span></p>
+                      <p className="text-3xl font-black text-slate-900 tracking-tighter">12<span className="text-sm font-bold text-slate-400 ml-1">min</span></p>
                     </div>
                   </div>
                 </div>
@@ -182,12 +181,12 @@ const ProblemSection = () => (
           { icon: AlertTriangle, title: "Zero Visibility", desc: "No tracking, no accountability, high anxiety during emergencies." }
         ].map((item, i) => (
           <motion.div key={i} variants={fadeUp} className="group cursor-pointer">
-            <div className="h-full bg-slate-50 rounded-[2rem] p-10 transition-all duration-500 hover:bg-slate-900 hover:text-white hover:-translate-y-2">
-              <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-8 group-hover:bg-slate-800 transition-colors duration-500">
-                <item.icon className="h-8 w-8 text-slate-900 group-hover:text-white transition-colors duration-500" />
+            <div className="h-full bg-white border border-slate-200/60 rounded-[2rem] p-10 transition-all duration-500 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] hover:-translate-y-2 relative overflow-hidden group-hover:border-blue-100">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50/50 shadow-sm flex items-center justify-center mb-8 group-hover:bg-blue-600 transition-colors duration-500 border border-slate-100">
+                <item.icon className="h-8 w-8 text-blue-600 group-hover:text-white transition-colors duration-500" />
               </div>
-              <h4 className="text-2xl font-bold mb-4">{item.title}</h4>
-              <p className="text-slate-500 font-medium leading-relaxed group-hover:text-slate-400 transition-colors duration-500">{item.desc}</p>
+              <h4 className="text-2xl font-bold mb-4 text-slate-900 group-hover:text-blue-900 transition-colors">{item.title}</h4>
+              <p className="text-slate-500 font-medium leading-relaxed">{item.desc}</p>
             </div>
           </motion.div>
         ))}
@@ -265,22 +264,23 @@ const LiveTrackingSection = () => (
 );
 
 const ServicesSection = () => (
-  <section className="py-32 bg-slate-950 text-white overflow-hidden relative">
+  <section className="py-32 bg-white text-slate-900 overflow-hidden relative border-t border-slate-200/50">
+    <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
     <div className="container mx-auto max-w-7xl px-8 relative z-10">
       <Reveal className="mb-20 text-center">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-6">Capabilities</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-6">Capabilities</h2>
         <h3 className="text-4xl lg:text-6xl font-black tracking-tight leading-tight">
           Comprehensive recovery.
         </h3>
       </Reveal>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 rounded-[2rem] overflow-hidden border border-white/10">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200/60 rounded-[2rem] overflow-hidden border border-slate-200">
         {[
           "Towing", "Battery", "Flat Tire", "Fuel Delivery",
           "Lockout", "Winching", "Mechanical", "EV Charging"
         ].map((service, i) => (
-          <div key={i} className="bg-slate-900/50 backdrop-blur-sm p-10 hover:bg-white/5 transition-colors flex flex-col justify-center items-center text-center group cursor-pointer">
-            <span className="text-xl font-bold text-slate-300 group-hover:text-white group-hover:scale-105 transition-all">{service}</span>
+          <div key={i} className="bg-slate-50 backdrop-blur-sm p-10 hover:bg-white transition-colors flex flex-col justify-center items-center text-center group cursor-pointer">
+            <span className="text-xl font-bold text-slate-600 group-hover:text-slate-900 group-hover:scale-105 transition-all">{service}</span>
           </div>
         ))}
       </div>

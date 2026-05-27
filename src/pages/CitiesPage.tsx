@@ -125,29 +125,33 @@ const CitiesPage = () => {
           </Reveal>
         </div>
 
-        {/* Roadmap Section */}
+        {/* Expansion Section */}
         <Reveal>
           <div className="mt-32">
-            <h2 className="text-3xl font-black text-slate-900 mb-12 text-center tracking-tight">The Expansion Roadmap</h2>
-            
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                { phase: "Phase 1: Foundation", title: "Mastering Coimbatore", desc: "Establishing a sub-45 minute dispatch grid across the city. Building trust with 500+ local mechanics and fleets.", status: "Active Now", icon: Milestone },
-                { phase: "Phase 2: The Kongu Belt", title: "Tiruppur & Erode", desc: "Expanding along major industrial corridors. Connecting the textile and manufacturing hubs with reliable support.", status: "Coming Q3", icon: Route },
-                { phase: "Phase 3: Statewide", title: "Pan-Tamil Nadu", desc: "Scaling the algorithmic dispatch to Chennai, Madurai, and Trichy. A unified roadside network for the entire state.", status: "Future Vision", icon: MapPin }
-              ].map((item, i) => (
-                <div key={i} className="bg-white rounded-[2rem] p-10 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
-                    <item.icon className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-2">{item.phase}</p>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-4">{item.title}</h3>
-                  <p className="text-slate-500 font-medium leading-relaxed mb-8">{item.desc}</p>
-                  <div className="inline-flex items-center justify-center bg-slate-100 text-slate-600 text-xs font-bold px-4 py-2 rounded-full mt-auto">
-                    {item.status}
-                  </div>
-                </div>
-              ))}
+            <div className="relative bg-white rounded-[3rem] p-12 lg:p-20 border border-slate-200/60 shadow-[0_20px_50px_-15px_rgba(15,23,42,0.05)] overflow-hidden text-center flex flex-col items-center">
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+              <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+              
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 border border-blue-100 mb-8 shadow-sm">
+                <MapPin size={32} className="text-blue-600" />
+              </div>
+              
+              <h2 className="text-4xl lg:text-6xl font-black text-slate-900 mb-6 tracking-tight leading-[1.1]">
+                Coming soon across all of <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Tamil Nadu.</span>
+              </h2>
+              
+              <p className="text-xl text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed mb-12">
+                We're aggressively expanding our premium dispatch network. Soon, you'll experience sub-45 minute, high-trust roadside assistance no matter where you travel in the state.
+              </p>
+              
+              <div className="inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full text-sm font-bold shadow-lg">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-500" />
+                </span>
+                Statewide Network Active Soon
+              </div>
             </div>
           </div>
         </Reveal>

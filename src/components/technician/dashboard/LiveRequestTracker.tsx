@@ -58,6 +58,8 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
   };
 
   const nextAction = getNextAction();
+  const routeDistanceKm = Number(request.routeDistanceKm ?? request.route_distance_km);
+  const dropAddress = request.dropLocation?.address || request.drop_address || null;
 
   return (
     <Card className="border-2 border-primary/20">
@@ -142,6 +144,15 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
             Service Location
           </h4>
           <p className="text-sm">{request.address || 'Address not provided'}</p>
+          {dropAddress && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Drop location</p>
+              <p className="mt-1 text-sm font-medium">{dropAddress}</p>
+              {Number.isFinite(routeDistanceKm) && (
+                <p className="mt-1 text-xs text-muted-foreground">{routeDistanceKm.toFixed(1)} km towing distance</p>
+              )}
+            </div>
+          )}
           {request.location_lat && request.location_lng && (
             <Button
               variant="outline"

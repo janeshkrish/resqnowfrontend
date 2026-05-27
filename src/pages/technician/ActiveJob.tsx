@@ -396,8 +396,14 @@ const ActiveJob = () => {
   // 5. Navigation Logic
   const openNavigation = () => {
     if (!job) return;
-    const destLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
-    const destLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
+    const useDrop = ['arrived', 'in-progress', 'payment_pending'].includes(normalizeTechnicianStatus(status));
+    const pickupLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
+    const pickupLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
+    const towDropLat = toOptionalNumber(job.destinationLatitude ?? job.dropLocation?.lat ?? job.drop_latitude);
+    const towDropLng = toOptionalNumber(job.destinationLongitude ?? job.dropLocation?.lng ?? job.drop_longitude);
+    const useFullTowRoute = !useDrop && Number.isFinite(towDropLat) && Number.isFinite(towDropLng);
+    const destLat = useFullTowRoute ? towDropLat : (useDrop ? towDropLat ?? pickupLat : pickupLat);
+    const destLng = useFullTowRoute ? towDropLng : (useDrop ? towDropLng ?? pickupLng : pickupLng);
 
     if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) {
       toast.error('Customer location coordinates are missing.');
@@ -405,7 +411,10 @@ const ActiveJob = () => {
     }
 
     const originParam = currentLocation ? `&origin=${currentLocation.lat},${currentLocation.lng}` : '';
-    const url = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${destLat},${destLng}`;
+    const waypointParam = useFullTowRoute && Number.isFinite(pickupLat) && Number.isFinite(pickupLng)
+      ? `&waypoints=${pickupLat},${pickupLng}`
+      : '';
+    const url = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${destLat},${destLng}${waypointParam}`;
     window.open(url, '_blank');
 
   };
@@ -437,6 +446,11 @@ const ActiveJob = () => {
   const customerLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
   const customerLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
   const hasCustomerLocation = Number.isFinite(customerLat) && Number.isFinite(customerLng);
+  const dropLat = toOptionalNumber(job.destinationLatitude ?? job.dropLocation?.lat ?? job.drop_latitude);
+  const dropLng = toOptionalNumber(job.destinationLongitude ?? job.dropLocation?.lng ?? job.drop_longitude);
+  const dropAddress = toOptionalString(job.destinationAddress ?? job.dropAddress ?? job.drop_address ?? job.dropLocation?.address);
+  const hasDropLocation = Number.isFinite(dropLat) && Number.isFinite(dropLng);
+  const routeDistanceKm = toOptionalNumber(job.routeDistanceKm ?? job.route_distance_km);
   const jobAddress = toOptionalString(job.address ?? job.location?.address ?? state?.job?.address) || 'Location not available';
   const estimatedDistanceKm =
     currentLocation && Number.isFinite(customerLat) && Number.isFinite(customerLng)
@@ -456,6 +470,7 @@ const ActiveJob = () => {
             <ActiveJobMap
               technicianLocation={currentLocation || { lat: 28.6139, lng: 77.209 }}
               customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
+              destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
             />
 
             <div className="absolute left-4 top-4 z-[400]">
@@ -501,6 +516,15 @@ const ActiveJob = () => {
                 </div>
                 <p className="leading-snug">{jobAddress}</p>
               </div>
+              {(dropAddress || Number.isFinite(routeDistanceKm)) && (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Towing destination</p>
+                  {dropAddress && <p className="mt-1 text-sm font-bold text-foreground">{dropAddress}</p>}
+                  {Number.isFinite(routeDistanceKm) && (
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{routeDistanceKm.toFixed(1)} km estimated tow</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

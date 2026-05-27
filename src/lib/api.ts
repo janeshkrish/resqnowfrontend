@@ -206,6 +206,30 @@ const MOCK_PRICING_CONFIG = {
     winching: { car: 599, bike: 399, commercial: 1999, ev: 699 },
     other: { car: 500, bike: 500, commercial: 500, ev: 500 },
   },
+  towing_pricing_rules: {
+    base_includes_km: 5,
+    per_km_price: 25,
+    night_charge: 0,
+    night_type: "flat",
+    tax_percent: 0,
+    vehicle_multipliers: {
+      bike: 1,
+      scooter: 1,
+      hatchback: 1.05,
+      sedan: 1.1,
+      suv: 1.25,
+      luxury_car: 1.5,
+      ev: 1.2,
+      truck: 1.8,
+      car: 1.1,
+      commercial: 1.8,
+    },
+    surge: { enabled: true, max_multiplier: 1.75 },
+    weather_multiplier: 1,
+    highway_multiplier: 1,
+    highway_min_km: 25,
+    emergency_multiplier: 1,
+  },
   subscription_plans: [
     {
       id: "free",
@@ -553,6 +577,89 @@ const buildMockPaymentQuote = (
       reserved_coupon_count: reservedCouponCount,
       remaining_eligible_uses: remainingEligibleUses,
     },
+  };
+};
+
+const haversineKm = (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
+  const toRad = (degree: number) => degree * (Math.PI / 180);
+  const radiusKm = 6371;
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const buildMockTowingEstimate = (body: AnyRecord) => {
+  const rules = MOCK_PRICING_CONFIG.towing_pricing_rules;
+  const pickup = {
+    address: String(body.pickupAddress || body.pickupLocation || body.address || "Pickup"),
+    lat: Number(body.pickupLat || body.location_lat || 12.9716),
+    lng: Number(body.pickupLng || body.location_lng || 77.5946),
+  };
+  const drop = {
+    address: String(body.dropAddress || body.dropLocation || "Drop"),
+    lat: Number(body.dropLat || body.drop_latitude || 12.9352),
+    lng: Number(body.dropLng || body.drop_longitude || 77.6245),
+  };
+  const distanceKm = roundMoney(Math.max(1, haversineKm(pickup, drop) * 1.28));
+  const durationMinutes = Math.max(5, Math.round((distanceKm / 28) * 60));
+  const vehicleType = String(body.vehicleType || body.vehicle_type || "car").toLowerCase();
+  const base = Number(MOCK_PRICING_CONFIG.service_base_prices.towing[vehicleType as keyof typeof MOCK_PRICING_CONFIG.service_base_prices.towing] || 599);
+  const extraKm = Math.max(0, distanceKm - Number(rules.base_includes_km || 5));
+  const distanceCharge = roundMoney(extraKm * Number(rules.per_km_price || 25));
+  const vehicleMultiplier = Number(rules.vehicle_multipliers[vehicleType as keyof typeof rules.vehicle_multipliers] || rules.vehicle_multipliers.car || 1);
+  const surgeMultiplier = 1.1;
+  const baseAmount = roundMoney((base + distanceCharge) * vehicleMultiplier * surgeMultiplier);
+  const platformFee = roundMoney(baseAmount * SERVICE_REQUEST_PLATFORM_FEE_PERCENT);
+  const paymentFee = SERVICE_REQUEST_RAZORPAY_FEE;
+  const finalEstimatedPrice = roundMoney(baseAmount + platformFee + paymentFee);
+  const pricingBreakdown = {
+    currency: "INR",
+    pricing_source: "demo",
+    distance_km: distanceKm,
+    estimated_duration_minutes: durationMinutes,
+    base_towing_charge: base,
+    included_km: rules.base_includes_km,
+    per_km_rate: rules.per_km_price,
+    distance_charge: distanceCharge,
+    night_charge: 0,
+    subtotal_before_factors: base + distanceCharge,
+    vehicle_category: vehicleType,
+    vehicle_multiplier: vehicleMultiplier,
+    surge_multiplier: surgeMultiplier,
+    weather_factor: 1,
+    highway_factor: 1,
+    emergency_factor: 1,
+    tax_percent: 0,
+    tax_amount: 0,
+    base_amount: baseAmount,
+    platform_fee: platformFee,
+    payment_fee: paymentFee,
+    final_estimated_price: finalEstimatedPrice,
+    peak_hour: false,
+  };
+  return {
+    success: true,
+    quote: {
+      service_type: `${vehicleType}-towing`,
+      vehicle_type: vehicleType,
+      pickup,
+      drop,
+      distance_km: distanceKm,
+      estimated_duration: durationMinutes,
+      route_metadata: { source: "demo_route", traffic_aware: false, toll_detected: false },
+      pricing_breakdown: pricingBreakdown,
+      base_amount: baseAmount,
+      final_estimated_price: finalEstimatedPrice,
+    },
+    distanceKm,
+    estimatedDuration: durationMinutes,
+    pricingBreakdown,
+    finalEstimatedPrice,
   };
 };
 
@@ -1383,10 +1490,46 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     return json({ success: true });
   }
 
+  if (path === "/api/pricing/towing-estimate" && method === "POST") return json(buildMockTowingEstimate(body));
+
   if (path === "/api/service-requests" && method === "GET") return json(getRequests().map(withTechnician));
   if (path === "/api/service-requests" && method === "POST") {
     const id = `req-${Date.now()}`;
-    const request = { id, service_type: body.service_type || "other", vehicle_type: body.vehicle_type || "car", vehicle_model: body.vehicle_model || "Vehicle", address: body.address || "Demo address", status: "pending", payment_status: "pending", amount: Number(body.amount || 500), service_charge: Number(body.amount || 500), location_lat: Number(body.location_lat || 12.9716), location_lng: Number(body.location_lng || 77.5946), technician_id: body.technician_id || null, has_review: false, created_at: nowIso(), updated_at: nowIso() };
+    const isTowing = String(body.service_type || "").toLowerCase().includes("towing");
+    const estimate = isTowing ? buildMockTowingEstimate({
+      ...body,
+      pickupAddress: body.address,
+      pickupLat: body.location_lat,
+      pickupLng: body.location_lng,
+    }) : null;
+    const pricingBreakdown = body.pricingBreakdown || estimate?.pricingBreakdown || estimate?.quote?.pricing_breakdown || null;
+    const baseAmount = Number(pricingBreakdown?.base_amount || body.amount || 500);
+    const request = {
+      id,
+      service_type: body.service_type || "other",
+      vehicle_type: body.vehicle_type || "car",
+      vehicle_model: body.vehicle_model || "Vehicle",
+      address: body.address || "Demo address",
+      drop_address: body.dropAddress || body.dropLocation || estimate?.quote?.drop?.address || null,
+      drop_latitude: Number(body.dropLat || estimate?.quote?.drop?.lat || 0) || null,
+      drop_longitude: Number(body.dropLng || estimate?.quote?.drop?.lng || 0) || null,
+      route_distance_km: Number(body.distanceKm || estimate?.distanceKm || 0) || null,
+      estimated_duration: Number(body.estimatedDuration || estimate?.estimatedDuration || 0) || null,
+      pricing_breakdown_json: pricingBreakdown,
+      pricingBreakdown,
+      estimated_price: Number(body.finalEstimatedPrice || estimate?.finalEstimatedPrice || 0) || null,
+      final_price: Number(body.finalEstimatedPrice || estimate?.finalEstimatedPrice || 0) || null,
+      status: "pending",
+      payment_status: "pending",
+      amount: baseAmount,
+      service_charge: baseAmount,
+      location_lat: Number(body.location_lat || 12.9716),
+      location_lng: Number(body.location_lng || 77.5946),
+      technician_id: body.technician_id || null,
+      has_review: false,
+      created_at: nowIso(),
+      updated_at: nowIso()
+    };
     upsertRequest(request);
     return json(request);
   }

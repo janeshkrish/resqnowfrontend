@@ -19,6 +19,7 @@ L.Marker.prototype.options.icon = DefaultIcon;
 interface ActiveJobMapProps {
     technicianLocation?: { lat: number; lng: number };
     customerLocation?: { lat: number; lng: number };
+    destinationLocation?: { lat: number; lng: number };
 }
 
 const getCustomIcon = (color: string) => {
@@ -39,36 +40,41 @@ const getCustomIcon = (color: string) => {
 
 const techIcon = getCustomIcon('#3B82F6'); // Blue
 const customerIcon = getCustomIcon('#EF4444'); // Red
+const destinationIcon = getCustomIcon('#111827');
 
-function MapController({ techLoc, custLoc }: { techLoc?: { lat: number, lng: number }, custLoc?: { lat: number, lng: number } }) {
+function MapController({ techLoc, custLoc, destLoc }: { techLoc?: { lat: number, lng: number }, custLoc?: { lat: number, lng: number }, destLoc?: { lat: number, lng: number } }) {
     const map = useMap();
 
     useEffect(() => {
-        if (techLoc && custLoc) {
-            const bounds = L.latLngBounds([techLoc.lat, techLoc.lng], [custLoc.lat, custLoc.lng]);
+        const points = [techLoc, custLoc, destLoc].filter(Boolean) as { lat: number; lng: number }[];
+        if (points.length > 1) {
+            const bounds = L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number]));
             map.fitBounds(bounds, { padding: [50, 50] });
         } else if (techLoc) {
             map.setView([techLoc.lat, techLoc.lng], 13);
         } else if (custLoc) {
             map.setView([custLoc.lat, custLoc.lng], 13);
         }
-    }, [map, techLoc, custLoc]);
+    }, [map, techLoc, custLoc, destLoc]);
 
     return null;
 }
 
 const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     technicianLocation,
-    customerLocation
+    customerLocation,
+    destinationLocation
 }) => {
     const [routePath, setRoutePath] = useState<[number, number][]>([]);
 
     useEffect(() => {
-        if (technicianLocation && customerLocation) {
+        const waypoints = [technicianLocation, customerLocation, destinationLocation].filter(Boolean) as { lat: number; lng: number }[];
+        if (waypoints.length >= 2) {
             // Fetch route from OSRM
             const fetchRoute = async () => {
                 try {
-                    const url = `https://router.project-osrm.org/route/v1/driving/${technicianLocation.lng},${technicianLocation.lat};${customerLocation.lng},${customerLocation.lat}?overview=full&geometries=geojson`;
+                    const coordParam = waypoints.map((point) => `${point.lng},${point.lat}`).join(';');
+                    const url = `https://router.project-osrm.org/route/v1/driving/${coordParam}?overview=full&geometries=geojson`;
                     const res = await fetch(url);
                     const data = await res.json();
 
@@ -81,8 +87,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
                     console.error("OSRM Fetch Error:", e);
                     // Fallback to straight line
                     setRoutePath([
-                        [technicianLocation.lat, technicianLocation.lng],
-                        [customerLocation.lat, customerLocation.lng]
+                        ...waypoints.map((point) => [point.lat, point.lng] as [number, number])
                     ]);
                 }
             };
@@ -90,7 +95,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         } else {
             setRoutePath([]);
         }
-    }, [technicianLocation, customerLocation]);
+    }, [technicianLocation, customerLocation, destinationLocation]);
 
     const center: [number, number] = technicianLocation
         ? [technicianLocation.lat, technicianLocation.lng]
@@ -111,7 +116,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                <MapController techLoc={technicianLocation} custLoc={customerLocation} />
+                <MapController techLoc={technicianLocation} custLoc={customerLocation} destLoc={destinationLocation} />
 
                 {technicianLocation && (
                     <Marker position={[technicianLocation.lat, technicianLocation.lng]} icon={techIcon}>
@@ -121,7 +126,13 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
 
                 {customerLocation && (
                     <Marker position={[customerLocation.lat, customerLocation.lng]} icon={customerIcon}>
-                        <Popup>Customer</Popup>
+                        <Popup>Pickup</Popup>
+                    </Marker>
+                )}
+
+                {destinationLocation && (
+                    <Marker position={[destinationLocation.lat, destinationLocation.lng]} icon={destinationIcon}>
+                        <Popup>Drop</Popup>
                     </Marker>
                 )}
 

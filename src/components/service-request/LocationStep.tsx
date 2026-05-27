@@ -1,14 +1,14 @@
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
-import { Card } from "../ui/card";
 import { ServiceRequestFormData } from "./types";
-import { MapPin, Loader2 } from "lucide-react";
+import { MapPin, Loader2, Navigation } from "lucide-react";
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import GooglePlaceInput from "./GooglePlaceInput";
+import TowingEstimateCard from "./TowingEstimateCard";
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -29,9 +29,15 @@ interface LocationStepProps {
   isGettingLocation: boolean;
   onGetCurrentLocation: () => void;
   onLocationSelect?: (lat: number, lng: number) => void;
+  requiresDropLocation?: boolean;
+  onDropLocationSelect?: (lat: number, lng: number, address?: string) => void;
+  onGetCurrentDropLocation?: () => void;
+  towingEstimate?: any;
+  isEstimatingTowing?: boolean;
+  towingEstimateError?: string | null;
 }
 
-const LocationMarker = ({ position, onDragEnd }: { position: { lat: number, lng: number } | null, onDragEnd: (lat: number, lng: number) => void }) => {
+const LocationMarker = ({ position, label, onDragEnd }: { position: { lat: number, lng: number } | null, label: string, onDragEnd: (lat: number, lng: number) => void }) => {
   const map = useMap();
   const markerRef = useRef<L.Marker>(null);
 
@@ -63,9 +69,24 @@ const LocationMarker = ({ position, onDragEnd }: { position: { lat: number, lng:
       position={position}
       ref={markerRef}
     >
-      <Popup>Your Location</Popup>
+      <Popup>{label}</Popup>
     </Marker>
   );
+};
+
+const RouteBounds = ({ pickup, drop }: { pickup: { lat: number, lng: number } | null, drop: { lat: number, lng: number } | null }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!pickup || !drop) return;
+    map.fitBounds(
+      [
+        [pickup.lat, pickup.lng],
+        [drop.lat, drop.lng],
+      ],
+      { padding: [32, 32] }
+    );
+  }, [drop, map, pickup]);
+  return null;
 };
 
 const LocationStep = ({
@@ -74,12 +95,27 @@ const LocationStep = ({
   currentLocation,
   isGettingLocation,
   onGetCurrentLocation,
-  onLocationSelect
+  onLocationSelect,
+  requiresDropLocation = false,
+  onDropLocationSelect,
+  onGetCurrentDropLocation,
+  towingEstimate,
+  isEstimatingTowing,
+  towingEstimateError
 }: LocationStepProps) => {
 
   const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(
-    formData.locationCoordinates ? { lat: formData.locationCoordinates.lat, lng: formData.locationCoordinates.lng } : { lat: 12.9716, lng: 77.5946 }
+    formData.locationCoordinates
+      ? { lat: formData.locationCoordinates.lat, lng: formData.locationCoordinates.lng }
+      : formData.locationLat && formData.locationLng
+        ? { lat: Number(formData.locationLat), lng: Number(formData.locationLng) }
+        : { lat: 12.9716, lng: 77.5946 }
   );
+  const dropPosition = formData.dropLocationCoordinates
+    ? { lat: formData.dropLocationCoordinates.lat, lng: formData.dropLocationCoordinates.lng }
+    : formData.dropLat && formData.dropLng
+      ? { lat: Number(formData.dropLat), lng: Number(formData.dropLng) }
+      : null;
 
   // Update map center if we have coordinates from props
   useEffect(() => {
@@ -88,21 +124,44 @@ const LocationStep = ({
     }
   }, [formData.locationCoordinates]);
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  useEffect(() => {
+    if (formData.locationLat && formData.locationLng) {
+      setMarkerPosition({ lat: Number(formData.locationLat), lng: Number(formData.locationLng) });
+    }
+  }, [formData.locationLat, formData.locationLng]);
+
+  const emitTextChange = (name: string, value: string) => {
     const inputEvent = {
       target: {
-        name: e.target.name,
-        value: e.target.value
+        name,
+        value
       }
     } as React.ChangeEvent<HTMLInputElement>;
     onInputChange(inputEvent);
   };
 
-  const handleMarkerDragEnd = async (lat: number, lng: number) => {
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    emitTextChange(e.target.name, e.target.value);
+  };
+
+  const handlePickupPlaceSelect = (place: { address: string; lat: number; lng: number }) => {
+    emitTextChange("location", place.address);
+    setMarkerPosition({ lat: place.lat, lng: place.lng });
+    onLocationSelect?.(place.lat, place.lng);
+  };
+
+  const handleDropPlaceSelect = (place: { address: string; lat: number; lng: number }) => {
+    emitTextChange("dropLocation", place.address);
+    onDropLocationSelect?.(place.lat, place.lng, place.address);
+  };
+
+  const handleMarkerDragEnd = async (lat: number, lng: number, type: "pickup" | "drop" = "pickup") => {
     // 1. Update coordinates
-    setMarkerPosition({ lat, lng });
-    if (onLocationSelect) {
-      onLocationSelect(lat, lng);
+    if (type === "pickup") {
+      setMarkerPosition({ lat, lng });
+      onLocationSelect?.(lat, lng);
+    } else {
+      onDropLocationSelect?.(lat, lng);
     }
 
     // 2. Reverse Geocode
@@ -114,11 +173,12 @@ const LocationStep = ({
         const address = data.display_name;
         const inputEvent = {
           target: {
-            name: 'location',
+            name: type === "pickup" ? "location" : "dropLocation",
             value: address
           }
         } as React.ChangeEvent<HTMLInputElement>;
         onInputChange(inputEvent);
+        if (type === "drop") onDropLocationSelect?.(lat, lng, address);
       }
     } catch (error) {
       console.error("Reverse geocoding failed", error);
@@ -128,8 +188,12 @@ const LocationStep = ({
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="mb-4 px-1">
-        <h3 className="text-2xl font-black tracking-tight text-foreground mb-2">Service Location</h3>
-        <p className="text-sm font-medium text-muted-foreground/80">Pinpoint your exact location for fastest arrival.</p>
+        <h3 className="text-2xl font-black tracking-tight text-foreground mb-2">
+          {requiresDropLocation ? "Towing Route" : "Service Location"}
+        </h3>
+        <p className="text-sm font-medium text-muted-foreground/80">
+          {requiresDropLocation ? "Choose pickup and drop points for a verified towing fare." : "Pinpoint your exact location for fastest arrival."}
+        </p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-5">
@@ -145,13 +209,30 @@ const LocationStep = ({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <LocationMarker position={markerPosition} onDragEnd={handleMarkerDragEnd} />
+              <LocationMarker position={markerPosition} label="Pickup" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "pickup")} />
+              {requiresDropLocation && (
+                <>
+                  <LocationMarker position={dropPosition} label="Drop" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "drop")} />
+                  {markerPosition && dropPosition && (
+                    <>
+                      <Polyline
+                        positions={[
+                          [markerPosition.lat, markerPosition.lng],
+                          [dropPosition.lat, dropPosition.lng],
+                        ]}
+                        pathOptions={{ color: "#0f172a", weight: 4, opacity: 0.75, dashArray: "8 8" }}
+                      />
+                      <RouteBounds pickup={markerPosition} drop={dropPosition} />
+                    </>
+                  )}
+                </>
+              )}
             </MapContainer>
 
             {/* Premium Floating Badge */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] text-[10px] font-bold tracking-widest uppercase text-white z-[400] pointer-events-none flex items-center gap-2 border border-white/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Drag to refine location
+              {requiresDropLocation ? "Drag pins to refine route" : "Drag to refine location"}
             </div>
           </div>
         </div>
@@ -164,7 +245,9 @@ const LocationStep = ({
             <div className="p-4 border-b border-border bg-muted/50 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <MapPin className="h-4 w-4 text-slate-400" />
-                <Label className="text-[11px] uppercase font-bold tracking-widest text-muted-foreground/80">Address Details</Label>
+                <Label className="text-[11px] uppercase font-bold tracking-widest text-muted-foreground/80">
+                  {requiresDropLocation ? "Route Details" : "Address Details"}
+                </Label>
               </div>
               <Button
                 type="button"
@@ -191,17 +274,44 @@ const LocationStep = ({
               </div>
             )}
 
-            {/* Address Textarea */}
-            <div className="p-4 border-b border-border">
-              <Textarea
-                id="location"
-                name="location"
-                value={formData.location}
-                onChange={handleTextareaChange}
-                placeholder="Enter complete address..."
-                className="min-h-[80px] border-0 px-0 focus-visible:ring-0 text-base font-bold text-foreground resize-none rounded-none shadow-none placeholder:text-slate-300"
-                required
-              />
+            <div className="space-y-3 p-4 border-b border-border">
+              <div className="space-y-2">
+                <Label htmlFor="location" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Pickup Location</Label>
+                <GooglePlaceInput
+                  id="location"
+                  name="location"
+                  value={formData.location}
+                  placeholder="Search pickup address..."
+                  onTextChange={emitTextChange}
+                  onPlaceSelect={handlePickupPlaceSelect}
+                />
+              </div>
+              {requiresDropLocation && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="dropLocation" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Drop Location</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={onGetCurrentDropLocation}
+                      className="h-7 gap-1 rounded-full px-2 text-[11px] font-bold text-slate-500"
+                    >
+                      <Navigation className="h-3 w-3" />
+                      Use current
+                    </Button>
+                  </div>
+                  <GooglePlaceInput
+                    id="dropLocation"
+                    name="dropLocation"
+                    value={formData.dropLocation || ""}
+                    placeholder="Search garage, home, or service center..."
+                    iconTone="drop"
+                    onTextChange={emitTextChange}
+                    onPlaceSelect={handleDropPlaceSelect}
+                  />
+                </div>
+              )}
               <p className="text-[11px] text-slate-400 font-medium mt-1">
                 Include landmarks (e.g., "Opposite to City Mall")
               </p>
@@ -217,12 +327,19 @@ const LocationStep = ({
                 name="details"
                 placeholder="Gate code, parking spot..."
                 value={formData.details}
-                onChange={handleTextareaChange as any}
+                onChange={handleTextareaChange}
                 className="h-10 text-sm border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-semibold text-muted-foreground shadow-none"
               />
             </div>
 
           </div>
+          {requiresDropLocation && (
+            <TowingEstimateCard
+              estimate={towingEstimate}
+              loading={isEstimatingTowing}
+              error={towingEstimateError}
+            />
+          )}
         </div>
       </div>
     </div>

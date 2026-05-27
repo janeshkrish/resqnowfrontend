@@ -60,11 +60,14 @@ const normalizeJob = (job: any) => {
       job.customer_location_lng
   );
   const destinationLatitude = toOptionalNumber(
-    job.destinationLatitude ?? job.destination_latitude ?? job.destination_lat
+    job.destinationLatitude ?? job.destination_latitude ?? job.destination_lat ?? job.dropLocation?.lat ?? job.drop_latitude
   );
   const destinationLongitude = toOptionalNumber(
-    job.destinationLongitude ?? job.destination_longitude ?? job.destination_lng
+    job.destinationLongitude ?? job.destination_longitude ?? job.destination_lng ?? job.dropLocation?.lng ?? job.drop_longitude
   );
+  const destinationAddress = toOptionalString(job.destinationAddress ?? job.dropAddress ?? job.drop_address ?? job.dropLocation?.address);
+  const routeDistanceKm = toOptionalNumber(job.routeDistanceKm ?? job.route_distance_km);
+  const estimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
   const serviceDescription = toOptionalString(job.service?.description ?? job.description);
   const paymentDetails = resolveServiceRequestPaymentDetails(job);
   const amount = toOptionalNumber(
@@ -87,6 +90,17 @@ const normalizeJob = (job: any) => {
     pickupLongitude,
     destinationLatitude,
     destinationLongitude,
+    destinationAddress,
+    dropAddress: destinationAddress,
+    drop_address: destinationAddress,
+    dropLocation: destinationAddress || destinationLatitude != null || destinationLongitude != null
+      ? { lat: destinationLatitude, lng: destinationLongitude, address: destinationAddress }
+      : null,
+    routeDistanceKm,
+    route_distance_km: routeDistanceKm,
+    estimatedDuration,
+    estimated_duration: estimatedDuration,
+    pricingBreakdown: job.pricingBreakdown ?? job.pricing_breakdown ?? null,
     amount,
     baseAmount: paymentDetails.baseAmount,
     base_amount: paymentDetails.baseAmount,

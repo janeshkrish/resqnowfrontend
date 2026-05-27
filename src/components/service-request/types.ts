@@ -23,6 +23,14 @@ export type ServiceRequestFormData = {
   locationLat?: number;
   locationLng?: number;
   locationCoordinates?: { lat: number; lng: number };
+  dropLocation?: string;
+  dropLat?: number;
+  dropLng?: number;
+  dropLocationCoordinates?: { lat: number; lng: number };
+  routeDistanceKm?: number;
+  estimatedDuration?: number;
+  pricingBreakdown?: Record<string, any> | null;
+  finalEstimatedPrice?: number | null;
   details: string;
   selectedTechnicianId: string | null;
   [key: string]: any; // Catch-all for service-specific fields like batteryLevel, companyName

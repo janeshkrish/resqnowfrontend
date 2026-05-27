@@ -12,6 +12,7 @@ type TrackingMapMode = "map" | "balanced" | "sheet";
 interface LiveTrackingMapProps {
   techLocation: { lat: number; lng: number } | null;
   userLocation: { lat: number; lng: number } | null;
+  dropLocation?: { lat: number; lng: number } | null;
   eta?: string;
   className?: string;
   variant?: "card" | "fullscreen";
@@ -113,6 +114,7 @@ const destinationIcon = createDestinationIcon();
 function MapViewport({
   techLoc,
   userLoc,
+  dropLoc,
   topPadding,
   bottomPadding,
   reduceMotion,
@@ -120,6 +122,7 @@ function MapViewport({
 }: {
   techLoc: { lat: number; lng: number } | null;
   userLoc: { lat: number; lng: number } | null;
+  dropLoc: { lat: number; lng: number } | null;
   topPadding: number;
   bottomPadding: number;
   reduceMotion: boolean;
@@ -132,8 +135,9 @@ function MapViewport({
       map.invalidateSize();
     }, 170);
 
-    if (techLoc && userLoc) {
-      map.fitBounds(L.latLngBounds([techLoc.lat, techLoc.lng], [userLoc.lat, userLoc.lng]), {
+    const points = [techLoc, userLoc, dropLoc].filter(Boolean) as { lat: number; lng: number }[];
+    if (points.length > 1) {
+      map.fitBounds(L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number])), {
         paddingTopLeft: [24, topPadding],
         paddingBottomRight: [24, bottomPadding],
         maxZoom: 15,
@@ -150,7 +154,7 @@ function MapViewport({
     return () => {
       window.clearTimeout(invalidateTimer);
     };
-  }, [bottomPadding, map, recenterKey, reduceMotion, techLoc, topPadding, userLoc]);
+  }, [bottomPadding, dropLoc, map, recenterKey, reduceMotion, techLoc, topPadding, userLoc]);
 
   return null;
 }
@@ -180,6 +184,7 @@ function MapInteractionBridge({
 const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   techLocation,
   userLocation,
+  dropLocation,
   eta,
   className,
   variant = "card",
@@ -200,31 +205,50 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     () => (userLocation ? [userLocation.lat, userLocation.lng] : null),
     [userLocation],
   );
+  const dropPosition = useMemo<[number, number] | null>(
+    () => (dropLocation ? [dropLocation.lat, dropLocation.lng] : null),
+    [dropLocation],
+  );
 
   const routeFallback = useMemo(
-    () => (techPosition && userPosition ? buildRouteCurve(techPosition, userPosition) : []),
-    [techPosition, userPosition],
+    () => {
+      if (techPosition && userPosition && dropPosition) return [...buildRouteCurve(techPosition, userPosition), ...buildRouteCurve(userPosition, dropPosition).slice(1)];
+      if (techPosition && userPosition) return buildRouteCurve(techPosition, userPosition);
+      if (userPosition && dropPosition) return buildRouteCurve(userPosition, dropPosition);
+      return [];
+    },
+    [dropPosition, techPosition, userPosition],
   );
 
   const techIcon = useMemo(() => createTechnicianIcon(normalizeEtaLabel(eta) || "Live"), [eta]);
 
   useEffect(() => {
-    if (!techLocation || !userLocation) {
+    if ((!techLocation && !userLocation) || (!userLocation && !dropLocation)) {
       setRoutePath([]);
       return;
     }
 
-    const fallbackPath = buildRouteCurve(
-      [techLocation.lat, techLocation.lng],
-      [userLocation.lat, userLocation.lng],
-    );
+    const waypointObjects = [techLocation, userLocation, dropLocation].filter(Boolean) as { lat: number; lng: number }[];
+    const waypointPositions = waypointObjects.map((point) => [point.lat, point.lng] as [number, number]);
+    const fallbackPath =
+      waypointPositions.length >= 2
+        ? waypointPositions.slice(1).reduce<[number, number][]>(
+            (path, current, index) => {
+              const previous = waypointPositions[index];
+              const segment = buildRouteCurve(previous, current);
+              return path.length ? [...path, ...segment.slice(1)] : segment;
+            },
+            [],
+          )
+        : [];
     setRoutePath(fallbackPath);
 
     const controller = new AbortController();
 
     const fetchRoute = async () => {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${techLocation.lng},${techLocation.lat};${userLocation.lng},${userLocation.lat}?overview=full&geometries=geojson`;
+        const coordinatesParam = waypointObjects.map((point) => `${point.lng},${point.lat}`).join(";");
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordinatesParam}?overview=full&geometries=geojson`;
         const response = await fetch(url, { signal: controller.signal });
         const data = await response.json();
         const coordinates = Array.isArray(data?.routes?.[0]?.geometry?.coordinates)
@@ -246,7 +270,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     return () => {
       controller.abort();
     };
-  }, [techLocation, userLocation]);
+  }, [dropLocation, techLocation, userLocation]);
 
   const mapCenter: [number, number] = userPosition || techPosition || FALLBACK_CENTER;
   const statusLabel = normalizeStatusLabel(status);
@@ -279,6 +303,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       <MapViewport
         techLoc={techLocation}
         userLoc={userLocation}
+        dropLoc={dropLocation || null}
         topPadding={topPadding}
         bottomPadding={bottomPadding}
         reduceMotion={Boolean(reduceMotion)}
@@ -299,6 +324,10 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           />
           <Marker position={userPosition} icon={destinationIcon} zIndexOffset={640} />
         </>
+      )}
+
+      {dropPosition && (
+        <Marker position={dropPosition} icon={destinationIcon} zIndexOffset={620} />
       )}
 
       {techPosition && (

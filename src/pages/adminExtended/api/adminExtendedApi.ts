@@ -59,6 +59,15 @@ export type AdminRequestRow = {
   user: string;
   issueType: string;
   location: string;
+  pickupLocation?: string;
+  dropLocation?: string | null;
+  routeDistanceKm?: number | null;
+  estimatedDuration?: number | null;
+  estimatedPrice?: number | null;
+  finalPrice?: number | null;
+  amount?: number | null;
+  pricingBreakdown?: Record<string, any> | null;
+  pricingFactors?: Record<string, any> | null;
   assignedTechnician: string;
   status: string;
   priority: string;
@@ -351,6 +360,16 @@ export async function markAdminRequestHighPriority(payload: { requestId: number;
 
 export async function closeAdminRequest(payload: { requestId: number; status?: string; reason?: string }) {
   const { data } = await adminApi.post("/requests/close", payload);
+  return data;
+}
+
+export async function overrideAdminRequestPricing(payload: {
+  requestId: number;
+  baseAmount: number;
+  finalPrice?: number;
+  reason?: string;
+}) {
+  const { data } = await adminApi.post("/requests/pricing-override", payload);
   return data;
 }
 

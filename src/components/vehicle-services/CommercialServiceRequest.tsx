@@ -32,6 +32,12 @@ const CommercialServiceRequest = () => {
     handleInputChange,
     handleLocationSelect,
     handleGetCurrentLocation,
+    handleDropLocationSelect,
+    handleGetCurrentDropLocation,
+    requiresDropLocation,
+    towingEstimate,
+    isEstimatingTowing,
+    towingEstimateError,
     canProceed,
     submitRequest,
     handleNext,
@@ -50,6 +56,9 @@ const CommercialServiceRequest = () => {
       location: "",
       locationLat: 0,
       locationLng: 0,
+      dropLocation: "",
+      dropLat: 0,
+      dropLng: 0,
       name: "",
       phone: "",
       email: "",
@@ -125,6 +134,12 @@ const CommercialServiceRequest = () => {
                 isGettingLocation={loadingGeo}
                 onGetCurrentLocation={handleGetCurrentLocation}
                 onLocationSelect={handleLocationSelect}
+                requiresDropLocation={requiresDropLocation}
+                onDropLocationSelect={handleDropLocationSelect}
+                onGetCurrentDropLocation={handleGetCurrentDropLocation}
+                towingEstimate={towingEstimate}
+                isEstimatingTowing={isEstimatingTowing}
+                towingEstimateError={towingEstimateError}
               />
             )}
 
@@ -173,7 +188,7 @@ const CommercialServiceRequest = () => {
                     onClick={() => {
                       if (!canProceed()) {
                         if (currentStep === 1) toast.error("Please complete vehicle details first");
-                        else if (currentStep === 2) toast.error("Please provide your location");
+                        else if (currentStep === 2) toast.error(requiresDropLocation ? "Please complete pickup, drop, and fare estimate" : "Please provide your location");
                         return;
                       }
                       handleNext();

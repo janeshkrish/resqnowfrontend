@@ -13,9 +13,10 @@ import {
   escalateAdminRequest,
   getAdminRequests,
   markAdminRequestHighPriority,
+  overrideAdminRequestPricing,
 } from "./api/adminExtendedApi";
 
-type RequestActionType = "assign" | "escalate" | "priority" | "close";
+type RequestActionType = "assign" | "escalate" | "priority" | "close" | "pricing";
 
 const PAGE_LIMIT = 10;
 
@@ -56,6 +57,7 @@ export default function AdminExtendedRequestsPage() {
   const [reason, setReason] = useState("");
   const [radiusKm, setRadiusKm] = useState("35");
   const [closeStatus, setCloseStatus] = useState("cancelled");
+  const [overrideAmount, setOverrideAmount] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -81,6 +83,7 @@ export default function AdminExtendedRequestsPage() {
 
     socket.on("admin:request_status_updated", refresh);
     socket.on("admin:analytics_update", refresh);
+    socket.on("admin:request_pricing_updated", refresh);
 
     const fallbackRefreshId = window.setInterval(refresh, 45000);
 
@@ -88,6 +91,7 @@ export default function AdminExtendedRequestsPage() {
       window.clearInterval(fallbackRefreshId);
       socket.off("admin:request_status_updated", refresh);
       socket.off("admin:analytics_update", refresh);
+      socket.off("admin:request_pricing_updated", refresh);
       socket.disconnect();
     };
   }, [queryClient]);
@@ -151,11 +155,22 @@ export default function AdminExtendedRequestsPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const pricingOverrideMutation = useMutation({
+    mutationFn: overrideAdminRequestPricing,
+    onSuccess: () => {
+      toast.success("Pricing override saved.");
+      refreshRequests();
+      closeModal();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const isActionLoading =
     assignMutation.isPending ||
     escalateMutation.isPending ||
     highPriorityMutation.isPending ||
-    closeMutation.isPending;
+    closeMutation.isPending ||
+    pricingOverrideMutation.isPending;
 
   const openModal = (action: RequestActionType, request: AdminRequestRow) => {
     setModalAction(action);
@@ -164,6 +179,7 @@ export default function AdminExtendedRequestsPage() {
     setTechnicianId("");
     setRadiusKm("35");
     setCloseStatus("cancelled");
+    setOverrideAmount(request.amount ? String(request.amount) : "");
   };
 
   const closeModal = () => {
@@ -200,6 +216,21 @@ export default function AdminExtendedRequestsPage() {
       return;
     }
 
+    if (modalAction === "pricing") {
+      const baseAmount = Number(overrideAmount);
+      if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
+        toast.error("Enter a valid override amount.");
+        return;
+      }
+      pricingOverrideMutation.mutate({
+        requestId,
+        baseAmount,
+        finalPrice: selectedRequest.finalPrice || selectedRequest.estimatedPrice || undefined,
+        reason: reason || undefined,
+      });
+      return;
+    }
+
     closeMutation.mutate({
       requestId,
       status: closeStatus,
@@ -228,8 +259,28 @@ export default function AdminExtendedRequestsPage() {
       },
       {
         key: "location",
-        header: "Location",
-        render: (row: AdminRequestRow) => <span className="line-clamp-2 max-w-[220px]">{row.location || "-"}</span>,
+        header: "Route",
+        render: (row: AdminRequestRow) => (
+          <div className="max-w-[260px] space-y-1 text-xs">
+            <p className="line-clamp-1 font-semibold text-slate-800">Pickup: {row.pickupLocation || row.location || "-"}</p>
+            {row.dropLocation && <p className="line-clamp-1 text-slate-600">Drop: {row.dropLocation}</p>}
+            {row.routeDistanceKm != null && (
+              <p className="font-bold text-slate-500">{Number(row.routeDistanceKm).toFixed(1)} km</p>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "fare",
+        header: "Fare",
+        render: (row: AdminRequestRow) => (
+          <div className="text-xs">
+            <p className="font-bold text-slate-900">INR {Number(row.finalPrice || row.estimatedPrice || row.amount || 0).toLocaleString("en-IN")}</p>
+            {row.pricingFactors?.surgeMultiplier && (
+              <p className="text-slate-500">Surge {Number(row.pricingFactors.surgeMultiplier).toFixed(2)}x</p>
+            )}
+          </div>
+        ),
       },
       {
         key: "assignedTechnician",
@@ -305,6 +356,13 @@ export default function AdminExtendedRequestsPage() {
               onClick={() => openModal("close", row)}
             >
               Close Request
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+              onClick={() => openModal("pricing", row)}
+            >
+              Override Fare
             </button>
           </div>
         ),
@@ -394,7 +452,9 @@ export default function AdminExtendedRequestsPage() {
               ? "Escalate Request"
               : modalAction === "priority"
                 ? "Mark High Priority"
-                : "Close Request"
+                : modalAction === "pricing"
+                  ? "Override Fare"
+                  : "Close Request"
         }
         description={selectedRequest ? `Request #${selectedRequest.requestId}` : ""}
         onConfirm={submitModalAction}
@@ -407,7 +467,9 @@ export default function AdminExtendedRequestsPage() {
               ? "Escalate"
               : modalAction === "priority"
                 ? "Mark High"
-                : "Close"
+                : modalAction === "pricing"
+                  ? "Save Override"
+                  : "Close"
         }
       >
         {modalAction === "assign" ? (
@@ -459,6 +521,33 @@ export default function AdminExtendedRequestsPage() {
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               placeholder="Optional note"
             />
+          </div>
+        ) : null}
+
+        {modalAction === "pricing" ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+              This updates the base service amount. Customer totals are still recalculated by the payment service.
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Base Amount (INR)</label>
+              <input
+                value={overrideAmount}
+                onChange={(event) => setOverrideAmount(event.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
+                placeholder="Enter revised base fare"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Reason</label>
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Explain the override for audit"
+              />
+            </div>
           </div>
         ) : null}
 

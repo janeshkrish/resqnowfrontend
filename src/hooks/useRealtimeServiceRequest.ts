@@ -15,6 +15,16 @@ interface RequestData {
   address?: string;
   location_lat?: number;
   location_lng?: number;
+  drop_address?: string | null;
+  dropLocation?: { lat?: number | null; lng?: number | null; address?: string | null } | null;
+  drop_latitude?: number | string | null;
+  drop_longitude?: number | string | null;
+  route_distance_km?: number | string | null;
+  routeDistanceKm?: number | string | null;
+  estimated_duration?: number | string | null;
+  estimatedDuration?: number | string | null;
+  pricingBreakdown?: Record<string, any> | null;
+  pricing_breakdown?: Record<string, any> | null;
   created_at: string;
   payment_status: string;
   started_at?: string | null;

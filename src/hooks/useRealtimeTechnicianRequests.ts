@@ -21,6 +21,15 @@ export interface TechnicianServiceRequest {
   user_id: string;
   location_lat: number | null;
   location_lng: number | null;
+  drop_address?: string | null;
+  dropLocation?: { lat?: number | null; lng?: number | null; address?: string | null } | null;
+  drop_latitude?: number | null;
+  drop_longitude?: number | null;
+  routeDistanceKm?: number | null;
+  route_distance_km?: number | null;
+  estimatedDuration?: number | null;
+  estimated_duration?: number | null;
+  pricingBreakdown?: Record<string, any> | null;
 }
 
 interface UseRealtimeTechnicianRequestsOptions {
@@ -115,6 +124,15 @@ export const useRealtimeTechnicianRequests = (
         user_id: String(raw.user_id || ''),
         location_lat: raw.location?.lat ?? raw.location_lat ?? null,
         location_lng: raw.location?.lng ?? raw.location_lng ?? null,
+        drop_address: raw.dropAddress || raw.drop_address || raw.dropLocation?.address || null,
+        dropLocation: raw.dropLocation || (raw.drop_address ? { lat: raw.drop_latitude ?? null, lng: raw.drop_longitude ?? null, address: raw.drop_address } : null),
+        drop_latitude: raw.dropLocation?.lat ?? raw.drop_latitude ?? null,
+        drop_longitude: raw.dropLocation?.lng ?? raw.drop_longitude ?? null,
+        routeDistanceKm: raw.routeDistanceKm ?? raw.route_distance_km ?? null,
+        route_distance_km: raw.route_distance_km ?? raw.routeDistanceKm ?? null,
+        estimatedDuration: raw.estimatedDuration ?? raw.estimated_duration ?? null,
+        estimated_duration: raw.estimated_duration ?? raw.estimatedDuration ?? null,
+        pricingBreakdown: raw.pricingBreakdown || raw.pricing_breakdown || null,
       };
 
       setRequests(prev => {

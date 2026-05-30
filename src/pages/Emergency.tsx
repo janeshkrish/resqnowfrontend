@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, MapPin, AlertTriangle, Loader } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { reverseGeocode } from "@/lib/geo";
 
 const Emergency = () => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
@@ -47,15 +48,8 @@ const Emergency = () => {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Use reverse geocoding to get human-readable address
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-          );
-
-          if (!response.ok) throw new Error("Failed to fetch location data");
-
-          const data = await response.json();
-          const address = data.display_name || "Unknown location";
+          const data = await reverseGeocode(latitude, longitude);
+          const address = data.address || "Unknown location";
 
           setCurrentLocation(address);
           toast.success("Location detected", {

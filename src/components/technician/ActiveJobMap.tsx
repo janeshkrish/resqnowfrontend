@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Loader2 } from "lucide-react";
+import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -20,6 +20,7 @@ interface ActiveJobMapProps {
     technicianLocation?: { lat: number; lng: number };
     customerLocation?: { lat: number; lng: number };
     destinationLocation?: { lat: number; lng: number };
+    routePolyline?: Array<[number, number]> | null;
 }
 
 const getCustomIcon = (color: string) => {
@@ -63,39 +64,36 @@ function MapController({ techLoc, custLoc, destLoc }: { techLoc?: { lat: number,
 const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     technicianLocation,
     customerLocation,
-    destinationLocation
+    destinationLocation,
+    routePolyline
 }) => {
     const [routePath, setRoutePath] = useState<[number, number][]>([]);
 
     useEffect(() => {
         const waypoints = [technicianLocation, customerLocation, destinationLocation].filter(Boolean) as { lat: number; lng: number }[];
+        const suppliedRoute = routePolylineFromMetadata({ polyline: routePolyline });
+        if (suppliedRoute.length > 1) {
+            setRoutePath(suppliedRoute);
+            return;
+        }
         if (waypoints.length >= 2) {
-            // Fetch route from OSRM
-            const fetchRoute = async () => {
+            const loadRoute = async () => {
                 try {
-                    const coordParam = waypoints.map((point) => `${point.lng},${point.lat}`).join(';');
-                    const url = `https://router.project-osrm.org/route/v1/driving/${coordParam}?overview=full&geometries=geojson`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-
-                    if (data.routes && data.routes[0]) {
-                        // OSRM returns [lng, lat], Leaflet needs [lat, lng]
-                        const coords = data.routes[0].geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
+                    const route = await fetchRoute(waypoints, "full");
+                    const coords = routePolylineFromMetadata(route);
+                    if (coords.length > 1) {
                         setRoutePath(coords);
                     }
                 } catch (e) {
-                    console.error("OSRM Fetch Error:", e);
-                    // Fallback to straight line
-                    setRoutePath([
-                        ...waypoints.map((point) => [point.lat, point.lng] as [number, number])
-                    ]);
+                    console.error("Route Fetch Error:", e);
+                    setRoutePath([]);
                 }
             };
-            fetchRoute();
+            void loadRoute();
         } else {
             setRoutePath([]);
         }
-    }, [technicianLocation, customerLocation, destinationLocation]);
+    }, [technicianLocation, customerLocation, destinationLocation, routePolyline]);
 
     const center: [number, number] = technicianLocation
         ? [technicianLocation.lat, technicianLocation.lng]

@@ -54,6 +54,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
+import { routePolylineFromMetadata } from "@/lib/geo";
 import {
   resolveServiceRequestPaymentDetails,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
@@ -68,6 +69,34 @@ const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   assigned: {
     title: "Technician assigned",
     subtitle: "Your partner has accepted the job and is preparing to move."
+  },
+  accepted: {
+    title: "Technician accepted",
+    subtitle: "Your partner is getting ready to move toward pickup."
+  },
+  en_route_pickup: {
+    title: "Technician is heading to pickup",
+    subtitle: "Live location is active while your towing partner reaches the vehicle."
+  },
+  arrived_pickup: {
+    title: "Technician reached pickup",
+    subtitle: "Please meet the partner and confirm vehicle handover details."
+  },
+  vehicle_loaded: {
+    title: "Vehicle loaded",
+    subtitle: "Your vehicle is secured and ready for towing."
+  },
+  enroute_drop: {
+    title: "Tow in progress",
+    subtitle: "Your vehicle is being moved to the drop location."
+  },
+  arrived_drop: {
+    title: "Reached drop location",
+    subtitle: "The tow has arrived. Final service confirmation is next."
+  },
+  service_completed: {
+    title: "Service completed",
+    subtitle: "Complete payment to close this towing request."
   },
   "en-route": {
     title: "Technician is on the way",
@@ -92,6 +121,10 @@ const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   paid: {
     title: "Payment completed",
     subtitle: "Your request is fully completed. Thank you for choosing ResQNow."
+  },
+  closed: {
+    title: "Request closed",
+    subtitle: "This towing request is closed. Thank you for choosing ResQNow."
   },
   cancelled: {
     title: "Request cancelled",
@@ -173,12 +206,20 @@ const getClosestTrackingSheetMode = (
 
 const normalizeRequestStatus = (value: unknown) => {
   const raw = String(value || "").trim().toLowerCase();
-  if (raw === "accepted" || raw === "technician_assigned") return "assigned";
+  if (raw === "technician_assigned") return "assigned";
   if (raw === "on_the_way" || raw === "on-the-way" || raw === "en_route") return "en-route";
   if (raw === "service_started" || raw === "service-started" || raw === "service started") return "in-progress";
   if (raw === "processing") return "in-progress";
   if (raw === "awaiting_payment") return "payment_pending";
   if (raw === "in_progress") return "in-progress";
+  if (raw === "en-route-pickup" || raw === "en route pickup") return "en_route_pickup";
+  if (raw === "arrived-pickup" || raw === "arrived pickup") return "arrived_pickup";
+  if (raw === "vehicle-loaded" || raw === "vehicle loaded") return "vehicle_loaded";
+  if (raw === "tow_started" || raw === "tow-started" || raw === "tow started" || raw === "start_tow" || raw === "start tow") return "enroute_drop";
+  if (raw === "en_route_drop" || raw === "en-route-drop" || raw === "en route drop") return "enroute_drop";
+  if (raw === "arrived-drop" || raw === "arrived drop") return "arrived_drop";
+  if (raw === "service-completed" || raw === "service completed") return "service_completed";
+  if (raw === "job_closed" || raw === "job-closed") return "closed";
   return raw || "pending";
 };
 
@@ -762,13 +803,39 @@ const RequestTracking = () => {
       : null;
   const routeDistanceKm = Number(request?.routeDistanceKm ?? request?.route_distance_km);
   const routeSummaryVisible = Boolean(request?.drop_address || request?.dropLocation?.address || Number.isFinite(routeDistanceKm));
+  const routePolyline = useMemo(
+    () =>
+      routePolylineFromMetadata(
+        request?.routePolyline
+          ? { polyline: request.routePolyline }
+          : request?.route_polyline
+            ? { polyline: request.route_polyline }
+            : request?.routeMetadata || request?.route_metadata || request?.routeGeometry || request?.route_geometry
+      ),
+    [
+      request?.routePolyline,
+      request?.route_polyline,
+      request?.routeMetadata,
+      request?.route_metadata,
+      request?.routeGeometry,
+      request?.route_geometry,
+    ]
+  );
 
   const stageIndex = (() => {
     if (status === "pending") return 0;
-    if (status === "assigned") return 1;
-    if (status === "en-route") return 2;
-    if (status === "arrived" || status === "in-progress") return 3;
-    if (status === "payment_pending" || status === "completed" || status === "paid") return 4;
+    if (status === "assigned" || status === "accepted") return 1;
+    if (status === "en-route" || status === "en_route_pickup") return 2;
+    if (
+      status === "arrived" ||
+      status === "in-progress" ||
+      status === "arrived_pickup" ||
+      status === "vehicle_loaded" ||
+      status === "enroute_drop" ||
+      status === "arrived_drop" ||
+      status === "service_completed"
+    ) return 3;
+    if (status === "payment_pending" || status === "completed" || status === "paid" || status === "closed") return 4;
     return 0;
   })();
 
@@ -1087,6 +1154,7 @@ const RequestTracking = () => {
               }
               userLocation={request.location_lat ? { lat: request.location_lat, lng: request.location_lng } : null}
               dropLocation={dropLocation}
+              routePolyline={routePolyline}
               eta={eta}
               variant="fullscreen"
               className="h-full w-full"
@@ -1467,6 +1535,7 @@ const RequestTracking = () => {
               techLocation={technician?.location_lat ? { lat: technician.location_lat, lng: technician.location_lng } : null}
               userLocation={request.location_lat ? { lat: request.location_lat, lng: request.location_lng } : null}
               dropLocation={dropLocation}
+              routePolyline={routePolyline}
               eta={eta}
               className="mb-0"
             />

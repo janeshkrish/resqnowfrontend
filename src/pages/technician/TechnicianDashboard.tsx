@@ -87,6 +87,30 @@ const TechnicianDashboard = () => {
   const isMountedRef = useRef(true);
   const celebratedCompletionJobRef = useRef<string | null>(null);
 
+  const isPaidPaymentStatus = (value: unknown) =>
+    ["paid", "completed"].includes(String(value || "").trim().toLowerCase());
+
+  const isTowingJob = (job: any) =>
+    String(job?.service_type || job?.serviceType || "").toLowerCase().includes("towing") ||
+    Boolean(job?.dropAddress || job?.drop_address || job?.dropLocation?.address) ||
+    job?.routeDistanceKm != null ||
+    job?.route_distance_km != null;
+
+  const getTowingAction = (job: any) => {
+    const status = normalizeTechnicianStatus(job?.status);
+    if (status === "assigned" || status === "accepted") return { status: "en_route_pickup", label: "START PICKUP" };
+    if (status === "en_route_pickup") return { status: "arrived_pickup", label: "REACHED PICKUP" };
+    if (status === "arrived_pickup") return { status: "vehicle_loaded", label: "VEHICLE LOADED" };
+    if (status === "vehicle_loaded") return { status: "enroute_drop", label: "START TOW" };
+    if (status === "enroute_drop") return { status: "arrived_drop", label: "REACHED DROP LOCATION" };
+    if (status === "arrived_drop") return { status: "service_completed", label: "COMPLETE SERVICE" };
+    if (status === "service_completed") return { status: "payment_pending", label: "COLLECT PAYMENT" };
+    if (status === "payment_pending" && isPaidPaymentStatus(job?.payment_status ?? job?.paymentStatus)) {
+      return { status: "closed", label: "CLOSE JOB" };
+    }
+    return null;
+  };
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -151,11 +175,21 @@ const TechnicianDashboard = () => {
 
   const normalizeIncomingAssignedJob = (payload: any) => {
     const raw = payload?.request || payload || {};
-    const amountRaw = raw.amount ?? raw.service_charge ?? raw.serviceCharge ?? incomingJob?.amount ?? activeJob?.amount ?? null;
+    const amountRaw =
+      raw.technicianEstimatedEarning ??
+      raw.technician_estimated_earning ??
+      raw.estimatedEarnings ??
+      raw.amount ??
+      raw.service_charge ??
+      raw.serviceCharge ??
+      incomingJob?.amount ??
+      activeJob?.amount ??
+      null;
     const amount = amountRaw != null && !Number.isNaN(Number(amountRaw)) ? Number(amountRaw) : null;
     const lat = raw.location?.lat ?? raw.location_lat ?? raw.locationLat ?? incomingJob?.location?.lat ?? null;
     const lng = raw.location?.lng ?? raw.location_lng ?? raw.locationLng ?? incomingJob?.location?.lng ?? null;
     const address = raw.location?.address ?? raw.address ?? incomingJob?.location?.address ?? activeJob?.address ?? "";
+    const dropLocation = raw.dropLocation || incomingJob?.dropLocation || activeJob?.dropLocation || null;
 
     return {
       ...raw,
@@ -167,6 +201,17 @@ const TechnicianDashboard = () => {
       amount,
       distance: raw.distance ?? incomingJob?.distance ?? activeJob?.distance ?? null,
       eta: raw.eta ?? incomingJob?.eta ?? activeJob?.eta ?? null,
+      dropAddress: raw.dropAddress ?? raw.drop_address ?? dropLocation?.address ?? activeJob?.dropAddress ?? null,
+      drop_address: raw.dropAddress ?? raw.drop_address ?? dropLocation?.address ?? activeJob?.drop_address ?? null,
+      dropLocation,
+      routeDistanceKm: raw.routeDistanceKm ?? raw.route_distance_km ?? incomingJob?.routeDistanceKm ?? activeJob?.routeDistanceKm ?? null,
+      route_distance_km: raw.routeDistanceKm ?? raw.route_distance_km ?? incomingJob?.routeDistanceKm ?? activeJob?.route_distance_km ?? null,
+      estimatedDuration: raw.estimatedDuration ?? raw.estimated_duration ?? incomingJob?.estimatedDuration ?? activeJob?.estimatedDuration ?? null,
+      estimated_duration: raw.estimatedDuration ?? raw.estimated_duration ?? incomingJob?.estimatedDuration ?? activeJob?.estimated_duration ?? null,
+      routeMetadata: raw.routeMetadata ?? raw.route_metadata ?? activeJob?.routeMetadata ?? null,
+      routePolyline: raw.routePolyline ?? raw.route_polyline ?? raw.routeMetadata?.polyline ?? activeJob?.routePolyline ?? null,
+      technicianEstimatedEarning: raw.technicianEstimatedEarning ?? raw.technician_estimated_earning ?? raw.estimatedEarnings ?? amount,
+      vehicleCategory: raw.vehicleCategory ?? raw.vehicle_category ?? incomingJob?.vehicleCategory ?? activeJob?.vehicleCategory ?? null,
       cancelled_at: raw.cancelled_at ?? raw.cancelledAt ?? activeJob?.cancelled_at ?? null,
       location: { lat, lng, address },
       location_lat: lat,
@@ -302,11 +347,11 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     const status = normalizeTechnicianStatus(activeJob?.status);
     const activeJobId = String(activeJob?.id || "").trim();
-    if (activeJobId && status !== "completed" && status !== "cancelled" && status !== "rejected") {
+    if (activeJobId && !["completed", "closed", "cancelled", "rejected"].includes(status)) {
       setAcceptedJobId(activeJobId);
       return;
     }
-    if (!activeJobId || ["completed", "cancelled", "rejected"].includes(status)) {
+    if (!activeJobId || ["completed", "closed", "cancelled", "rejected"].includes(status)) {
       clearAcceptedJobId();
     }
   }, [activeJob?.id, activeJob?.status, setAcceptedJobId, clearAcceptedJobId]);
@@ -460,7 +505,7 @@ const TechnicianDashboard = () => {
       const currentActiveJobId = activeJobIdRef.current;
       if (
         currentActiveJobId &&
-        !["pending", "completed", "cancelled", "rejected"].includes(currentActiveStatus)
+        !["pending", "completed", "closed", "cancelled", "rejected"].includes(currentActiveStatus)
       ) {
         return;
       }
@@ -470,7 +515,7 @@ const TechnicianDashboard = () => {
         const latestStatus = normalizeTechnicianStatus(latestActiveJob?.status);
         if (
           latestActiveJob?.id &&
-          !["pending", "completed", "cancelled", "rejected"].includes(latestStatus)
+          !["pending", "completed", "closed", "cancelled", "rejected"].includes(latestStatus)
         ) {
           return;
         }
@@ -480,6 +525,7 @@ const TechnicianDashboard = () => {
 
       // Map offer payload to JobRequest interface expected by Modal
       const offerLocation = offerData?.location || {};
+      const dropLocation = offerData?.dropLocation || {};
       const jobRequest: JobRequest = {
         id: requestId,
         customerName: String(offerData?.customerName || "Customer"),
@@ -490,8 +536,22 @@ const TechnicianDashboard = () => {
           lng: Number(offerLocation?.lng ?? offerData?.location_lng ?? 0),
           address: String(offerData?.address || offerLocation?.address || "Location not available")
         },
-        distance: parseFloat(String(offerData?.distance ?? 0)) || 0,
-        amount: offerData?.amount != null && !Number.isNaN(Number(offerData?.amount)) ? Number(offerData.amount) : 0
+        distance: parseFloat(String(offerData?.routeDistanceKm ?? offerData?.distance ?? 0)) || 0,
+        routeDistanceKm: Number(offerData?.routeDistanceKm ?? offerData?.route_distance_km ?? 0) || null,
+        estimatedDuration: Number(offerData?.estimatedDuration ?? offerData?.estimated_duration ?? 0) || null,
+        dropLocation: {
+          lat: Number((dropLocation as any)?.lat ?? offerData?.drop_latitude ?? 0) || null,
+          lng: Number((dropLocation as any)?.lng ?? offerData?.drop_longitude ?? 0) || null,
+          address: String((dropLocation as any)?.address || offerData?.dropAddress || offerData?.drop_address || "").trim() || null,
+        },
+        vehicleCategory: String(offerData?.vehicleCategory || offerData?.vehicle_category || "").trim() || null,
+        amount: offerData?.technicianEstimatedEarning != null && !Number.isNaN(Number(offerData?.technicianEstimatedEarning))
+          ? Number(offerData.technicianEstimatedEarning)
+          : offerData?.estimatedEarnings != null && !Number.isNaN(Number(offerData?.estimatedEarnings))
+            ? Number(offerData.estimatedEarnings)
+            : offerData?.amount != null && !Number.isNaN(Number(offerData?.amount))
+              ? Number(offerData.amount)
+              : 0
       };
       (jobRequest as any).eta = offerData.eta ?? null;
       setCancelledJob(null);
@@ -634,7 +694,7 @@ const TechnicianDashboard = () => {
       }
     });
 
-    socket.on('job:status_update', async (data: any) => {
+    const handleStatusUpdate = async (data: any) => {
       const requestId = String(data?.requestId || data?.id || "");
       if (!requestId) return;
       const normalizedStatus = normalizeTechnicianStatus(data?.status);
@@ -686,13 +746,13 @@ const TechnicianDashboard = () => {
         setShowJobModal(false);
       }
 
-      if (['paid', 'completed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
+      if (['paid', 'completed', 'closed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
         if (acceptedJobIdRef.current && acceptedJobIdRef.current === requestId) {
           clearAcceptedJobId();
         }
       }
 
-      if (['payment_pending', 'paid', 'completed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
+      if (['payment_pending', 'paid', 'completed', 'closed', 'cancelled', 'rejected'].includes(normalizedStatus)) {
         try {
           const [activeJobRes, statsRes, historyRes, financialsRes, notificationsRes, walletRes] = await Promise.all([
             apiFetch("/api/technicians/me/active-job", { technician: true }),
@@ -739,6 +799,10 @@ const TechnicianDashboard = () => {
           console.warn("Failed to sync dashboard after status update:", err);
         }
       }
+    };
+    socket.on('job:status_update', handleStatusUpdate);
+    ["vehicle_loaded", "tow_started", "arrived_drop", "service_completed", "payment_pending", "job_closed"].forEach((eventName) => {
+      socket.on(eventName, handleStatusUpdate);
     });
 
     // Polling fallback: Check for new jobs every 10 seconds if socket is not reliable
@@ -773,6 +837,9 @@ const TechnicianDashboard = () => {
       socket.off("job:revoked", handleRevoked);
       socket.off("JOB_TAKEN", handleRevoked);
       socket.off("job:status_update");
+      ["vehicle_loaded", "tow_started", "arrived_drop", "service_completed", "payment_pending", "job_closed"].forEach((eventName) => {
+        socket.off(eventName);
+      });
       socket.off("job:list_update");
       socket.off("dashboard:stats_update");
       socket.off("technician:financials_update");
@@ -1495,16 +1562,27 @@ const TechnicianDashboard = () => {
 
   const openNavigation = () => {
     // Safely read coordinates — activeJob or its location may be null.
-    const lat = activeJob?.location?.lat ?? activeJob?.location_lat ?? null;
-    const lng = activeJob?.location?.lng ?? activeJob?.location_lng ?? null;
-    const address = activeJob?.location?.address || activeJob?.address || "";
+    const status = normalizeTechnicianStatus(activeJob?.status);
+    const navigateToDrop =
+      isTowingJob(activeJob) &&
+      ["vehicle_loaded", "enroute_drop", "arrived_drop", "service_completed", "payment_pending", "closed"].includes(status);
+    const pickupLat = activeJob?.location?.lat ?? activeJob?.location_lat ?? null;
+    const pickupLng = activeJob?.location?.lng ?? activeJob?.location_lng ?? null;
+    const dropLat = activeJob?.dropLocation?.lat ?? activeJob?.drop_latitude ?? activeJob?.destinationLatitude ?? null;
+    const dropLng = activeJob?.dropLocation?.lng ?? activeJob?.drop_longitude ?? activeJob?.destinationLongitude ?? null;
+    const lat = navigateToDrop ? dropLat ?? pickupLat : pickupLat;
+    const lng = navigateToDrop ? dropLng ?? pickupLng : pickupLng;
+    const address = navigateToDrop
+      ? activeJob?.dropLocation?.address || activeJob?.dropAddress || activeJob?.drop_address || activeJob?.address || ""
+      : activeJob?.location?.address || activeJob?.address || "";
 
     if ((lat !== null && lng !== null) && (Number(lat) !== 0 || Number(lng) !== 0)) {
-      // Use precise coordinates if available
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+      const url = currentLocation
+        ? `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${currentLocation.lat}%2C${currentLocation.lng}%3B${Number(lat)}%2C${Number(lng)}`
+        : `https://www.openstreetmap.org/?mlat=${Number(lat)}&mlon=${Number(lng)}#map=16/${Number(lat)}/${Number(lng)}`;
+      window.open(url, '_blank');
     } else if (address) {
-      // Fallback to address string
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`, '_blank');
+      window.open(`https://www.openstreetmap.org/search?query=${encodeURIComponent(address)}`, '_blank');
     } else {
       toast.error('No location details available for navigation.');
     }
@@ -1543,6 +1621,11 @@ const TechnicianDashboard = () => {
     .trim()
     .replace(/[^\d+]/g, "");
   const activeJobStatus = normalizeTechnicianStatus(activeJob?.status);
+  const activeJobIsTowing = isTowingJob(activeJob);
+  const activeJobRouteDistance = activeJob?.routeDistanceKm ?? activeJob?.route_distance_km ?? null;
+  const activeJobEstimatedDuration = activeJob?.estimatedDuration ?? activeJob?.estimated_duration ?? null;
+  const activeJobTowingAction = activeJobIsTowing ? getTowingAction(activeJob) : null;
+  const activeJobDropAddress = activeJob?.dropAddress ?? activeJob?.drop_address ?? activeJob?.dropLocation?.address ?? null;
   const visibleCancelledJob =
     activeJob && isCancelledStatus(activeJob?.status)
       ? buildCancelledJobDetails(activeJob, activeJob)
@@ -1573,7 +1656,7 @@ const TechnicianDashboard = () => {
   };
 
   // Derived state for "Busy"
-  const isBusy = Boolean(showActiveJobCard && !["completed", "cancelled", "rejected"].includes(activeJobStatus));
+  const isBusy = Boolean(showActiveJobCard && !["completed", "closed", "cancelled", "rejected"].includes(activeJobStatus));
 
   // Enhanced Toggle Handler
   const handleToggleAvailability = (checked: boolean) => {
@@ -1882,6 +1965,8 @@ const TechnicianDashboard = () => {
               <TechnicianJobMap
                 techLocation={currentLocation}
                 jobLocation={activeJob?.location && activeJob.location.lat != null && activeJob.location.lng != null ? { lat: Number(activeJob.location.lat), lng: Number(activeJob.location.lng) } : null}
+                destinationLocation={activeJob?.dropLocation && activeJob.dropLocation.lat != null && activeJob.dropLocation.lng != null ? { lat: Number(activeJob.dropLocation.lat), lng: Number(activeJob.dropLocation.lng) } : null}
+                routePolyline={activeJob?.routePolyline || activeJob?.routeMetadata?.polyline || null}
                 showRoute={true}
               />
 
@@ -1916,6 +2001,23 @@ const TechnicianDashboard = () => {
                     {activeJob.address}
                   </p>
                 </div>
+                {activeJobIsTowing && (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tow Route</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Pickup: {activeJob.address || activeJob.location?.address || "Pickup location"}</p>
+                    {activeJobDropAddress && (
+                      <p className="mt-1 text-sm font-semibold text-foreground">Drop: {activeJobDropAddress}</p>
+                    )}
+                    <p className="mt-2 text-xs font-bold text-slate-500">
+                      {[
+                        activeJobRouteDistance != null ? `${Number(activeJobRouteDistance).toFixed(1)} km` : null,
+                        activeJobEstimatedDuration != null ? `${Math.round(Number(activeJobEstimatedDuration))} min` : null,
+                        activeJob.vehicleCategory ? String(activeJob.vehicleCategory).replace(/_/g, " ") : null,
+                        `Status: ${formatTechnicianStatus(activeJobStatus)}`,
+                      ].filter(Boolean).join(" / ")}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-6">
@@ -1925,7 +2027,7 @@ const TechnicianDashboard = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Dist</p>
-                    <p className="text-sm font-black text-foreground leading-none">{jobDistance !== null ? jobDistance.toFixed(1) : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">km</span></p>
+                    <p className="text-sm font-black text-foreground leading-none">{activeJobRouteDistance != null ? Number(activeJobRouteDistance).toFixed(1) : jobDistance !== null ? jobDistance.toFixed(1) : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">km</span></p>
                   </div>
                 </div>
                 <div className="bg-muted rounded-2xl p-3 border border-border flex items-center gap-3">
@@ -1934,7 +2036,7 @@ const TechnicianDashboard = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Time</p>
-                    <p className="text-sm font-black text-foreground leading-none">{etaMinutes !== null ? etaMinutes : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">min</span></p>
+                    <p className="text-sm font-black text-foreground leading-none">{activeJobEstimatedDuration != null ? Math.round(Number(activeJobEstimatedDuration)) : etaMinutes !== null ? etaMinutes : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">min</span></p>
                   </div>
                 </div>
               </div>
@@ -1995,32 +2097,45 @@ const TechnicianDashboard = () => {
                   </div>
                 )}
 
-                {(activeJob.status === 'accepted' || activeJob.status === 'assigned') && (
-                  <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
-                    START JOURNEY
+                {activeJobIsTowing && activeJobTowingAction && (
+                  <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange(activeJobTowingAction.status)}>
+                    {activeJobTowingAction.label}
                   </Button>
                 )}
 
-                {activeJob.status === 'en-route' && (
-                  <Button className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('in-progress')}>
-                    ARRIVED
-                  </Button>
-                )}
-
-                {activeJob.status === 'in-progress' && (
-                  <Button className="w-full h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('completed')}>
-                    COMPLETE WORK
-                  </Button>
-                )}
-
-                {activeJob.status === 'payment_pending' && (
+                {activeJobIsTowing && activeJobStatus === 'payment_pending' && !isPaidPaymentStatus(activeJob?.payment_status ?? activeJob?.paymentStatus) && (
                   <div className="w-full h-14 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-3">
                     <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
                     <span className="font-bold text-orange-700">Waiting for payment...</span>
                   </div>
                 )}
 
-                {activeJob.status === 'paid' && (
+                {!activeJobIsTowing && (activeJobStatus === 'accepted' || activeJobStatus === 'assigned') && (
+                  <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
+                    START JOURNEY
+                  </Button>
+                )}
+
+                {!activeJobIsTowing && activeJobStatus === 'en-route' && (
+                  <Button className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('in-progress')}>
+                    ARRIVED
+                  </Button>
+                )}
+
+                {!activeJobIsTowing && activeJobStatus === 'in-progress' && (
+                  <Button className="w-full h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('completed')}>
+                    COMPLETE WORK
+                  </Button>
+                )}
+
+                {!activeJobIsTowing && activeJobStatus === 'payment_pending' && (
+                  <div className="w-full h-14 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-3">
+                    <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                    <span className="font-bold text-orange-700">Waiting for payment...</span>
+                  </div>
+                )}
+
+                {!activeJobIsTowing && activeJobStatus === 'paid' && (
                   <Button className="w-full h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/20 active:scale-95 text-lg font-black tracking-wide flex items-center justify-center gap-2" onClick={() => handleStatusChange('completed')}>
                     <DollarSign className="w-5 h-5" /> FINISH JOB
                   </Button>

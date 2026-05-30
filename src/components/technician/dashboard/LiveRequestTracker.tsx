@@ -163,8 +163,7 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
                 const destLng = request.location_lng;
 
                 if (!navigator.geolocation) {
-                  // Fallback: open maps with destination only
-                  window.open(`https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`,'_blank');
+                  window.open(`https://www.openstreetmap.org/?mlat=${destLat}&mlon=${destLng}#map=16/${destLat}/${destLng}`,'_blank');
                   return;
                 }
 
@@ -172,13 +171,12 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
                   (pos) => {
                     const originLat = pos.coords.latitude;
                     const originLng = pos.coords.longitude;
-                    const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}`;
+                    const url = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${originLat}%2C${originLng}%3B${destLat}%2C${destLng}`;
                     window.open(url, '_blank');
                   },
                   (err) => {
-                    // Permission denied or other error - open destination only
                     console.warn('Geolocation failed:', err?.message || err);
-                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`,'_blank');
+                    window.open(`https://www.openstreetmap.org/?mlat=${destLat}&mlon=${destLng}#map=16/${destLat}/${destLng}`,'_blank');
                   },
                   { enableHighAccuracy: true, timeout: 5000 }
                 );

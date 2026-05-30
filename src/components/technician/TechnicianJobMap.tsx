@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Card, CardContent } from "../ui/card";
-import { Loader2 } from "lucide-react";
+import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -40,57 +40,58 @@ const customerIcon = getCustomIcon('#EF4444'); // Red
 interface TechnicianJobMapProps {
     techLocation: { lat: number; lng: number } | null;
     jobLocation: { lat: number; lng: number } | null;
+    destinationLocation?: { lat: number; lng: number } | null;
     showRoute?: boolean;
+    routePolyline?: Array<[number, number]> | null;
 }
 
-function MapController({ techLoc, jobLoc }: { techLoc: { lat: number, lng: number } | null, jobLoc: { lat: number, lng: number } | null }) {
+function MapController({ techLoc, jobLoc, destLoc }: { techLoc: { lat: number, lng: number } | null, jobLoc: { lat: number, lng: number } | null, destLoc?: { lat: number, lng: number } | null }) {
     const map = useMap();
 
     useEffect(() => {
-        if (techLoc && jobLoc) {
-            const bounds = L.latLngBounds([techLoc.lat, techLoc.lng], [jobLoc.lat, jobLoc.lng]);
+        const points = [techLoc, jobLoc, destLoc].filter(Boolean) as { lat: number; lng: number }[];
+        if (points.length > 1) {
+            const bounds = L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number]));
             map.fitBounds(bounds, { padding: [50, 50] });
         } else if (techLoc) {
             map.setView([techLoc.lat, techLoc.lng], 13);
         } else if (jobLoc) {
             map.setView([jobLoc.lat, jobLoc.lng], 13);
         }
-    }, [map, techLoc, jobLoc]);
+    }, [map, techLoc, jobLoc, destLoc]);
 
     return null;
 }
 
-const TechnicianJobMap: React.FC<TechnicianJobMapProps> = ({ techLocation, jobLocation, showRoute = false }) => {
+const TechnicianJobMap: React.FC<TechnicianJobMapProps> = ({ techLocation, jobLocation, destinationLocation, showRoute = false, routePolyline }) => {
     const [routePath, setRoutePath] = useState<[number, number][]>([]);
 
     useEffect(() => {
-        if (showRoute && techLocation && jobLocation) {
-            // Fetch route from OSRM
-            const fetchRoute = async () => {
-                try {
-                    const url = `https://router.project-osrm.org/route/v1/driving/${techLocation.lng},${techLocation.lat};${jobLocation.lng},${jobLocation.lat}?overview=full&geometries=geojson`;
-                    const res = await fetch(url);
-                    const data = await res.json();
+        const suppliedRoute = routePolylineFromMetadata({ polyline: routePolyline });
+        if (suppliedRoute.length > 1) {
+            setRoutePath(suppliedRoute);
+            return;
+        }
 
-                    if (data.routes && data.routes[0]) {
-                        // OSRM returns [lng, lat], Leaflet needs [lat, lng]
-                        const coords = data.routes[0].geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
+        const waypoints = [techLocation, jobLocation, destinationLocation].filter(Boolean) as { lat: number; lng: number }[];
+        if (showRoute && waypoints.length >= 2) {
+            const loadRoute = async () => {
+                try {
+                    const route = await fetchRoute(waypoints, "full");
+                    const coords = routePolylineFromMetadata(route);
+                    if (coords.length > 1) {
                         setRoutePath(coords);
                     }
                 } catch (e) {
-                    console.error("OSRM Fetch Error:", e);
-                    // Fallback to straight line
-                    setRoutePath([
-                        [techLocation.lat, techLocation.lng],
-                        [jobLocation.lat, jobLocation.lng]
-                    ]);
+                    console.error("Route Fetch Error:", e);
+                    setRoutePath([]);
                 }
             };
-            fetchRoute();
+            void loadRoute();
         } else {
             setRoutePath([]);
         }
-    }, [showRoute, techLocation, jobLocation]);
+    }, [showRoute, techLocation, jobLocation, destinationLocation, routePolyline]);
 
     const center: [number, number] = techLocation
         ? [techLocation.lat, techLocation.lng]
@@ -113,7 +114,7 @@ const TechnicianJobMap: React.FC<TechnicianJobMapProps> = ({ techLocation, jobLo
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
 
-                        <MapController techLoc={techLocation} jobLoc={jobLocation} />
+                        <MapController techLoc={techLocation} jobLoc={jobLocation} destLoc={destinationLocation} />
 
                         {techLocation && (
                             <Marker position={[techLocation.lat, techLocation.lng]} icon={techIcon}>
@@ -124,6 +125,12 @@ const TechnicianJobMap: React.FC<TechnicianJobMapProps> = ({ techLocation, jobLo
                         {jobLocation && (
                             <Marker position={[jobLocation.lat, jobLocation.lng]} icon={customerIcon}>
                                 <Popup>Customer Location</Popup>
+                            </Marker>
+                        )}
+
+                        {destinationLocation && (
+                            <Marker position={[destinationLocation.lat, destinationLocation.lng]} icon={customerIcon}>
+                                <Popup>Drop Location</Popup>
                             </Marker>
                         )}
 

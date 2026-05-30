@@ -130,8 +130,8 @@ const BasicInfoStep = () => {
 
       <FormField control={control} name="google_maps_link" render={({ field }) => (
         <FormItem>
-          <FormLabel>Google Maps Location Link</FormLabel>
-          <FormControl><Input {...field} placeholder="https://maps.google.com/..." /></FormControl>
+          <FormLabel>Map Location Link</FormLabel>
+          <FormControl><Input {...field} placeholder="https://www.openstreetmap.org/..." /></FormControl>
           <FormMessage />
         </FormItem>
       )} />

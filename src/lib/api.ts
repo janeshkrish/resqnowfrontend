@@ -605,8 +605,28 @@ const buildMockTowingEstimate = (body: AnyRecord) => {
     lat: Number(body.dropLat || body.drop_latitude || 12.9352),
     lng: Number(body.dropLng || body.drop_longitude || 77.6245),
   };
-  const distanceKm = roundMoney(Math.max(1, haversineKm(pickup, drop) * 1.28));
-  const durationMinutes = Math.max(5, Math.round((distanceKm / 28) * 60));
+    const distanceKm = roundMoney(Math.max(1, haversineKm(pickup, drop) * 1.28));
+    const durationMinutes = Math.max(5, Math.round((distanceKm / 28) * 60));
+    const midpoint = {
+      lat: roundMoney((pickup.lat + drop.lat) / 2 + 0.01),
+      lng: roundMoney((pickup.lng + drop.lng) / 2 - 0.01),
+    };
+    const routePolyline = [
+      [pickup.lat, pickup.lng],
+      [midpoint.lat, midpoint.lng],
+      [drop.lat, drop.lng],
+    ];
+    const routeMetadata = {
+      source: "demo_route",
+      provider: "mock-osm",
+      traffic_aware: false,
+      toll_detected: false,
+      polyline: routePolyline,
+      geometry: {
+        type: "LineString",
+        coordinates: routePolyline.map(([lat, lng]) => [lng, lat]),
+      },
+    };
   const vehicleType = String(body.vehicleType || body.vehicle_type || "car").toLowerCase();
   const base = Number(MOCK_PRICING_CONFIG.service_base_prices.towing[vehicleType as keyof typeof MOCK_PRICING_CONFIG.service_base_prices.towing] || 599);
   const extraKm = Math.max(0, distanceKm - Number(rules.base_includes_km || 5));
@@ -648,20 +668,21 @@ const buildMockTowingEstimate = (body: AnyRecord) => {
       service_type: `${vehicleType}-towing`,
       vehicle_type: vehicleType,
       pickup,
-      drop,
-      distance_km: distanceKm,
-      estimated_duration: durationMinutes,
-      route_metadata: { source: "demo_route", traffic_aware: false, toll_detected: false },
-      pricing_breakdown: pricingBreakdown,
+        drop,
+        distance_km: distanceKm,
+        estimated_duration: durationMinutes,
+        route_metadata: routeMetadata,
+        pricing_breakdown: pricingBreakdown,
       base_amount: baseAmount,
       final_estimated_price: finalEstimatedPrice,
     },
     distanceKm,
-    estimatedDuration: durationMinutes,
-    pricingBreakdown,
-    finalEstimatedPrice,
+      estimatedDuration: durationMinutes,
+      routeMetadata,
+      pricingBreakdown,
+      finalEstimatedPrice,
+    };
   };
-};
 
 const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   const path = url.pathname;
@@ -1704,7 +1725,63 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (path === "/api/public/android-app/download" && (method === "GET" || method === "HEAD")) {
     return json({ error: "Android app package is not available in frontend-only demo mode." }, 404);
   }
-  if (path === "/api/public/contact" && method === "POST") return json({ success: true, message: "Message received (demo mode)." });
+    if (path === "/api/public/contact" && method === "POST") return json({ success: true, message: "Message received (demo mode)." });
+  if (path === "/api/public/location-search" && method === "GET") {
+    const query = String(q.get("q") || q.get("query") || "Coimbatore").trim();
+    const known: Record<string, [number, number, string]> = {
+      "lotus hyundai coimbatore": [11.0168, 76.9558, "Lotus Hyundai, Coimbatore, Tamil Nadu"],
+      "fun republic mall": [11.0247, 76.9966, "Fun Republic Mall, Peelamedu, Coimbatore"],
+      airport: [11.0298, 77.0434, "Coimbatore International Airport, Tamil Nadu"],
+      codissia: [11.0535, 77.0265, "CODISSIA Trade Fair Complex, Coimbatore"],
+      gandhipuram: [11.0183, 76.9676, "Gandhipuram, Coimbatore, Tamil Nadu"],
+      saravanampatti: [11.0754, 76.9997, "Saravanampatti, Coimbatore, Tamil Nadu"],
+    };
+    const matchKey = Object.keys(known).find((key) => query.toLowerCase().includes(key));
+    const [lat, lng, address] = known[matchKey || "gandhipuram"];
+    return json({
+      provider: "mock-osm",
+      query,
+      results: [
+        {
+          id: `mock-${matchKey || "coimbatore"}`,
+          label: address,
+          name: address.split(",")[0],
+          address,
+          lat,
+          lng,
+          provider: "mock-osm",
+        },
+      ],
+      cached: false,
+    });
+  }
+  if (path === "/api/public/route" && method === "GET") {
+    const rawPoints = String(q.get("points") || "");
+    const points = rawPoints.split(";").map((item) => {
+      const [lat, lng] = item.split(",").map(Number);
+      return { lat, lng };
+    }).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+    const pickup = points[0] || { lat: 11.0183, lng: 76.9676 };
+    const drop = points[points.length - 1] || { lat: 11.0298, lng: 77.0434 };
+    const distanceKm = roundMoney(Math.max(1, haversineKm(pickup, drop) * 1.28));
+    const durationMinutes = Math.max(5, Math.round((distanceKm / 28) * 60));
+    const polyline = [
+      [pickup.lat, pickup.lng],
+      [roundMoney((pickup.lat + drop.lat) / 2 + 0.01), roundMoney((pickup.lng + drop.lng) / 2 - 0.01)],
+      [drop.lat, drop.lng],
+    ];
+    return json({
+      provider: "mock-osm",
+      source: "demo_route",
+      distanceKm,
+      distance_km: distanceKm,
+      durationMinutes,
+      estimatedDuration: durationMinutes,
+      estimated_duration: durationMinutes,
+      polyline,
+      geometry: { type: "LineString", coordinates: polyline.map(([lat, lng]) => [lng, lat]) },
+    });
+  }
   if (path === "/api/public/reverse-geocode" && method === "GET") return json({ display_name: `Demo Location (${Number(q.get("lat") || 12.9716).toFixed(4)}, ${Number(q.get("lng") || 77.5946).toFixed(4)}), Bengaluru, Karnataka`, address: { suburb: "Indiranagar", city: "Bengaluru", district: "Bengaluru Urban", state: "Karnataka", postcode: "560038" } });
   if (path === "/api/chatbot/message" && method === "POST") return json({ text: "Demo mode: backend chatbot is disconnected, but UI remains fully usable." });
 

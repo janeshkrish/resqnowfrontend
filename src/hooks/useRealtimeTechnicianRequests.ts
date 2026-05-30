@@ -29,6 +29,13 @@ export interface TechnicianServiceRequest {
   route_distance_km?: number | null;
   estimatedDuration?: number | null;
   estimated_duration?: number | null;
+  routeMetadata?: Record<string, any> | null;
+  routeGeometry?: Record<string, any> | null;
+  routePolyline?: Array<[number, number]> | null;
+  vehicleCategory?: string | null;
+  technicianEstimatedEarning?: number | null;
+  estimatedEarnings?: number | null;
+  amount?: number | null;
   pricingBreakdown?: Record<string, any> | null;
 }
 
@@ -36,6 +43,15 @@ interface UseRealtimeTechnicianRequestsOptions {
   onNewRequest?: (request: TechnicianServiceRequest) => void;
   onRequestUpdated?: (request: TechnicianServiceRequest) => void;
 }
+
+const TOWING_STATUS_EVENTS = [
+  "vehicle_loaded",
+  "tow_started",
+  "arrived_drop",
+  "service_completed",
+  "payment_pending",
+  "job_closed",
+];
 
 export const useRealtimeTechnicianRequests = (
   technicianId: string | undefined,
@@ -132,6 +148,13 @@ export const useRealtimeTechnicianRequests = (
         route_distance_km: raw.route_distance_km ?? raw.routeDistanceKm ?? null,
         estimatedDuration: raw.estimatedDuration ?? raw.estimated_duration ?? null,
         estimated_duration: raw.estimated_duration ?? raw.estimatedDuration ?? null,
+        routeMetadata: raw.routeMetadata || raw.route_metadata || null,
+        routeGeometry: raw.routeGeometry || raw.route_geometry || raw.routeMetadata?.geometry || null,
+        routePolyline: raw.routePolyline || raw.route_polyline || raw.routeMetadata?.polyline || null,
+        vehicleCategory: raw.vehicleCategory || raw.vehicle_category || null,
+        technicianEstimatedEarning: raw.technicianEstimatedEarning ?? raw.technician_estimated_earning ?? null,
+        estimatedEarnings: raw.estimatedEarnings ?? raw.technicianEstimatedEarning ?? raw.technician_estimated_earning ?? null,
+        amount: raw.technicianEstimatedEarning ?? raw.estimatedEarnings ?? raw.amount ?? raw.priceAmount ?? null,
         pricingBreakdown: raw.pricingBreakdown || raw.pricing_breakdown || null,
       };
 
@@ -164,6 +187,9 @@ export const useRealtimeTechnicianRequests = (
     socket.on('job_assigned', handleNewRequest);
     socket.on('job:status_update', handleRequestUpdate);
     socket.on('job:list_update', handleListUpdate);
+    TOWING_STATUS_EVENTS.forEach((eventName) => {
+      socket.on(eventName, handleRequestUpdate);
+    });
 
     // Initial fetch
     fetchRequests();
@@ -175,6 +201,9 @@ export const useRealtimeTechnicianRequests = (
       socket.off('job_assigned', handleNewRequest);
       socket.off('job:status_update', handleRequestUpdate);
       socket.off('job:list_update', handleListUpdate);
+      TOWING_STATUS_EVENTS.forEach((eventName) => {
+        socket.off(eventName, handleRequestUpdate);
+      });
     };
   }, [socket, technicianId, fetchRequests, options?.onNewRequest, options?.onRequestUpdated]);
 

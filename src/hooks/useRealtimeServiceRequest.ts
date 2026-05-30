@@ -23,6 +23,12 @@ interface RequestData {
   routeDistanceKm?: number | string | null;
   estimated_duration?: number | string | null;
   estimatedDuration?: number | string | null;
+  routeMetadata?: Record<string, any> | null;
+  route_metadata?: Record<string, any> | null;
+  routeGeometry?: Record<string, any> | null;
+  route_geometry?: Record<string, any> | null;
+  routePolyline?: Array<[number, number]> | null;
+  route_polyline?: Array<[number, number]> | null;
   pricingBreakdown?: Record<string, any> | null;
   pricing_breakdown?: Record<string, any> | null;
   created_at: string;
@@ -65,6 +71,15 @@ interface RealtimeOptions {
   onStatusChange?: (oldStatus: string | null, newStatus: string | null) => void;
   onTechnicianAssigned?: () => void;
 }
+
+const TOWING_STATUS_EVENTS = [
+  "vehicle_loaded",
+  "tow_started",
+  "arrived_drop",
+  "service_completed",
+  "payment_pending",
+  "job_closed",
+];
 
 const normalizeRequestData = (data: any): RequestData => {
   const paymentDetails = resolveServiceRequestPaymentDetails(data);
@@ -199,6 +214,9 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       };
       socket.on("job:status_update", handleStatusUpdate);
       socket.on(`job_update_${requestId}`, handleStatusUpdate);
+      TOWING_STATUS_EVENTS.forEach((eventName) => {
+        socket.on(eventName, handleStatusUpdate);
+      });
 
       // Listen for technician location updates
       handleLocationUpdate = (data: any) => {
@@ -228,6 +246,9 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       if (handleStatusUpdate) {
         socket.off("job:status_update", handleStatusUpdate);
         if (requestId) socket.off(`job_update_${requestId}`, handleStatusUpdate);
+        TOWING_STATUS_EVENTS.forEach((eventName) => {
+          socket.off(eventName, handleStatusUpdate);
+        });
       }
       if (handleLocationUpdate) {
         socket.off("location_update", handleLocationUpdate);

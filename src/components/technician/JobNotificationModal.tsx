@@ -14,6 +14,12 @@ interface JobRequest {
   id: string;
   service_type: string;
   amount: number;
+  pickupAddress?: string;
+  dropAddress?: string | null;
+  distanceKm?: number | null;
+  durationMinutes?: number | null;
+  vehicleType?: string | null;
+  vehicleCategory?: string | null;
 }
 
 const JobNotificationModal = () => {
@@ -71,7 +77,13 @@ const JobNotificationModal = () => {
       const normalized: JobRequest = {
         id: normalizedId,
         service_type: String(data.serviceType || data.service_type || 'Service'),
-        amount: Number(data.amount || 0),
+        amount: Number(data.technicianEstimatedEarning || data.estimatedEarnings || data.amount || 0),
+        pickupAddress: String((data.location as any)?.address || data.address || ''),
+        dropAddress: String((data.dropLocation as any)?.address || data.dropAddress || data.drop_address || '').trim() || null,
+        distanceKm: Number(data.routeDistanceKm || data.route_distance_km || 0) || null,
+        durationMinutes: Number(data.estimatedDuration || data.estimated_duration || 0) || null,
+        vehicleType: String(data.vehicleType || data.vehicle_type || '').trim() || null,
+        vehicleCategory: String(data.vehicleCategory || data.vehicle_category || '').trim() || null,
       };
       setJobRequest(normalized);
       setIsUnavailable(false);
@@ -204,6 +216,20 @@ const JobNotificationModal = () => {
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <DollarSign className="w-3 h-3" /> Est. Earnings: INR {jobRequest.amount}
               </span>
+              {jobRequest.pickupAddress && (
+                <span className="mt-2 text-xs text-muted-foreground">Pickup: {jobRequest.pickupAddress}</span>
+              )}
+              {jobRequest.dropAddress && (
+                <span className="text-xs text-muted-foreground">Drop: {jobRequest.dropAddress}</span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {[jobRequest.distanceKm ? `${jobRequest.distanceKm.toFixed(1)} km` : null, jobRequest.durationMinutes ? `${Math.round(jobRequest.durationMinutes)} min` : null].filter(Boolean).join(' / ')}
+              </span>
+              {(jobRequest.vehicleType || jobRequest.vehicleCategory) && (
+                <span className="text-xs text-muted-foreground">
+                  Vehicle: {[jobRequest.vehicleType, jobRequest.vehicleCategory].filter(Boolean).join(' / ')}
+                </span>
+              )}
             </div>
           </div>
           {isUnavailable && (

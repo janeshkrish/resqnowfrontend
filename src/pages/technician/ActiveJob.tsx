@@ -66,6 +66,21 @@ const formatMoney = (value: number | null, maximumFractionDigits = 0) => {
   }).format(Number(value))}`;
 };
 
+const isPaidPaymentStatus = (value: unknown) =>
+  ['paid', 'completed'].includes(String(value || '').trim().toLowerCase());
+
+const getTowingAction = (status: string, paymentStatus: unknown) => {
+  if (status === 'assigned' || status === 'accepted') return { status: 'en_route_pickup', label: 'START PICKUP', icon: Navigation };
+  if (status === 'en_route_pickup') return { status: 'arrived_pickup', label: 'REACHED PICKUP', icon: MapPin };
+  if (status === 'arrived_pickup') return { status: 'vehicle_loaded', label: 'VEHICLE LOADED', icon: Car };
+  if (status === 'vehicle_loaded') return { status: 'enroute_drop', label: 'START TOW', icon: Navigation };
+  if (status === 'enroute_drop') return { status: 'arrived_drop', label: 'REACHED DROP LOCATION', icon: MapPin };
+  if (status === 'arrived_drop') return { status: 'service_completed', label: 'COMPLETE SERVICE', icon: CheckCircle };
+  if (status === 'service_completed') return { status: 'payment_pending', label: 'COLLECT PAYMENT', icon: CreditCard };
+  if (status === 'payment_pending' && isPaidPaymentStatus(paymentStatus)) return { status: 'closed', label: 'CLOSE JOB', icon: CheckCircle };
+  return null;
+};
+
 const ActiveJob = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
@@ -396,25 +411,23 @@ const ActiveJob = () => {
   // 5. Navigation Logic
   const openNavigation = () => {
     if (!job) return;
-    const useDrop = ['arrived', 'in-progress', 'payment_pending'].includes(normalizeTechnicianStatus(status));
+    const normalizedStatus = normalizeTechnicianStatus(status);
+    const useDrop = ['vehicle_loaded', 'enroute_drop', 'arrived_drop', 'service_completed', 'payment_pending', 'closed'].includes(normalizedStatus);
     const pickupLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
     const pickupLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
     const towDropLat = toOptionalNumber(job.destinationLatitude ?? job.dropLocation?.lat ?? job.drop_latitude);
     const towDropLng = toOptionalNumber(job.destinationLongitude ?? job.dropLocation?.lng ?? job.drop_longitude);
-    const useFullTowRoute = !useDrop && Number.isFinite(towDropLat) && Number.isFinite(towDropLng);
-    const destLat = useFullTowRoute ? towDropLat : (useDrop ? towDropLat ?? pickupLat : pickupLat);
-    const destLng = useFullTowRoute ? towDropLng : (useDrop ? towDropLng ?? pickupLng : pickupLng);
+    const destLat = useDrop ? towDropLat ?? pickupLat : pickupLat;
+    const destLng = useDrop ? towDropLng ?? pickupLng : pickupLng;
 
     if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) {
       toast.error('Customer location coordinates are missing.');
       return;
     }
 
-    const originParam = currentLocation ? `&origin=${currentLocation.lat},${currentLocation.lng}` : '';
-    const waypointParam = useFullTowRoute && Number.isFinite(pickupLat) && Number.isFinite(pickupLng)
-      ? `&waypoints=${pickupLat},${pickupLng}`
-      : '';
-    const url = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${destLat},${destLng}${waypointParam}`;
+    const url = currentLocation
+      ? `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${currentLocation.lat}%2C${currentLocation.lng}%3B${destLat}%2C${destLng}`
+      : `https://www.openstreetmap.org/?mlat=${destLat}&mlon=${destLng}#map=16/${destLat}/${destLng}`;
     window.open(url, '_blank');
 
   };
@@ -451,7 +464,14 @@ const ActiveJob = () => {
   const dropAddress = toOptionalString(job.destinationAddress ?? job.dropAddress ?? job.drop_address ?? job.dropLocation?.address);
   const hasDropLocation = Number.isFinite(dropLat) && Number.isFinite(dropLng);
   const routeDistanceKm = toOptionalNumber(job.routeDistanceKm ?? job.route_distance_km);
+  const estimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
   const jobAddress = toOptionalString(job.address ?? job.location?.address ?? state?.job?.address) || 'Location not available';
+  const isTowingActiveJob =
+    String(displayService || '').toLowerCase().includes('towing') ||
+    Boolean(dropAddress) ||
+    Number.isFinite(routeDistanceKm);
+  const towingAction = isTowingActiveJob ? getTowingAction(status, job.payment_status ?? job.paymentStatus) : null;
+  const TowingActionIcon = towingAction?.icon;
   const estimatedDistanceKm =
     currentLocation && Number.isFinite(customerLat) && Number.isFinite(customerLng)
       ? Math.sqrt(
@@ -471,6 +491,7 @@ const ActiveJob = () => {
               technicianLocation={currentLocation || { lat: 28.6139, lng: 77.209 }}
               customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
               destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
+              routePolyline={job.routePolyline || job.route_polyline || job.routeMetadata?.polyline || null}
             />
 
             <div className="absolute left-4 top-4 z-[400]">
@@ -516,13 +537,20 @@ const ActiveJob = () => {
                 </div>
                 <p className="leading-snug">{jobAddress}</p>
               </div>
-              {(dropAddress || Number.isFinite(routeDistanceKm)) && (
+              {isTowingActiveJob && (
                 <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Towing destination</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Towing job</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">Pickup</p>
+                  <p className="text-sm font-bold text-foreground">{jobAddress}</p>
                   {dropAddress && <p className="mt-1 text-sm font-bold text-foreground">{dropAddress}</p>}
-                  {Number.isFinite(routeDistanceKm) && (
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{routeDistanceKm.toFixed(1)} km estimated tow</p>
-                  )}
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    {[
+                      Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : null,
+                      Number.isFinite(estimatedDuration) ? `${Math.round(estimatedDuration)} min` : null,
+                      displayVehicle,
+                      `Status: ${formatTechnicianStatus(status)}`,
+                    ].filter(Boolean).join(' / ')}
+                  </p>
                 </div>
               )}
             </div>
@@ -576,7 +604,7 @@ const ActiveJob = () => {
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Distance</p>
                     <p className="text-sm font-black text-foreground">
-                      {estimatedDistanceKm !== null ? `${estimatedDistanceKm.toFixed(1)} km` : '--'}
+                      {Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : estimatedDistanceKm !== null ? `${estimatedDistanceKm.toFixed(1)} km` : '--'}
                     </p>
                   </div>
                 </div>
@@ -640,7 +668,25 @@ const ActiveJob = () => {
             </div>
 
             <div className="space-y-3">
-              {(status === 'accepted' || status === 'assigned') && (
+              {isTowingActiveJob && towingAction && (
+                <Button
+                  className="h-14 w-full rounded-2xl bg-blue-600 text-lg font-black tracking-wide text-white shadow-xl shadow-blue-600/20 hover:bg-blue-700"
+                  onClick={() => updateStatus(towingAction.status)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : TowingActionIcon ? <TowingActionIcon className="mr-2 h-5 w-5" /> : null}
+                  {towingAction.label}
+                </Button>
+              )}
+
+              {isTowingActiveJob && status === 'payment_pending' && !isPaidPaymentStatus(job.payment_status ?? job.paymentStatus) && (
+                <div className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                  <span className="font-bold text-orange-700">Waiting for customer payment...</span>
+                </div>
+              )}
+
+              {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
                 <Button
                   className="h-14 w-full rounded-2xl bg-blue-600 text-lg font-black tracking-wide text-white shadow-xl shadow-blue-600/20 hover:bg-blue-700"
                   onClick={() => updateStatus('en-route')}
@@ -651,7 +697,7 @@ const ActiveJob = () => {
                 </Button>
               )}
 
-              {status === 'en-route' && (
+              {!isTowingActiveJob && status === 'en-route' && (
                 <Button
                   className="h-14 w-full rounded-2xl bg-indigo-600 text-lg font-black tracking-wide text-white shadow-xl shadow-indigo-600/20 hover:bg-indigo-700"
                   onClick={() => updateStatus('arrived')}
@@ -662,7 +708,7 @@ const ActiveJob = () => {
                 </Button>
               )}
 
-              {status === 'arrived' && (
+              {!isTowingActiveJob && status === 'arrived' && (
                 <Button
                   className="h-14 w-full rounded-2xl bg-zinc-900 text-lg font-black tracking-wide text-white shadow-xl shadow-zinc-900/20 hover:bg-zinc-800"
                   onClick={() => updateStatus('completed')}
@@ -673,14 +719,14 @@ const ActiveJob = () => {
                 </Button>
               )}
 
-              {status === 'payment_pending' && (
+              {!isTowingActiveJob && status === 'payment_pending' && (
                 <div className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4">
                   <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
                   <span className="font-bold text-orange-700">Waiting for customer payment...</span>
                 </div>
               )}
 
-              {!['payment_pending', 'completed', 'paid'].includes(status) && (
+              {!['payment_pending', 'completed', 'paid', 'closed'].includes(status) && (
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"

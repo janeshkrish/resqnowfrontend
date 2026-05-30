@@ -7,8 +7,9 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import GooglePlaceInput from "./GooglePlaceInput";
+import OpenStreetMapPlaceInput from "./OpenStreetMapPlaceInput";
 import TowingEstimateCard from "./TowingEstimateCard";
+import { fetchRoute, reverseGeocode, routePolylineFromMetadata } from "@/lib/geo";
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -74,10 +75,14 @@ const LocationMarker = ({ position, label, onDragEnd }: { position: { lat: numbe
   );
 };
 
-const RouteBounds = ({ pickup, drop }: { pickup: { lat: number, lng: number } | null, drop: { lat: number, lng: number } | null }) => {
+const RouteBounds = ({ pickup, drop, routePath }: { pickup: { lat: number, lng: number } | null, drop: { lat: number, lng: number } | null, routePath?: Array<[number, number]> }) => {
   const map = useMap();
   useEffect(() => {
     if (!pickup || !drop) return;
+    if (routePath && routePath.length > 1) {
+      map.fitBounds(routePath, { padding: [32, 32] });
+      return;
+    }
     map.fitBounds(
       [
         [pickup.lat, pickup.lng],
@@ -85,7 +90,7 @@ const RouteBounds = ({ pickup, drop }: { pickup: { lat: number, lng: number } | 
       ],
       { padding: [32, 32] }
     );
-  }, [drop, map, pickup]);
+  }, [drop, map, pickup, routePath]);
   return null;
 };
 
@@ -116,6 +121,7 @@ const LocationStep = ({
     : formData.dropLat && formData.dropLng
       ? { lat: Number(formData.dropLat), lng: Number(formData.dropLng) }
       : null;
+  const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
 
   // Update map center if we have coordinates from props
   useEffect(() => {
@@ -164,13 +170,10 @@ const LocationStep = ({
       onDropLocationSelect?.(lat, lng);
     }
 
-    // 2. Reverse Geocode
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-      const data = await res.json();
-
-      if (data && data.display_name) {
-        const address = data.display_name;
+      const result = await reverseGeocode(lat, lng);
+      if (result.address) {
+        const address = result.address;
         const inputEvent = {
           target: {
             name: type === "pickup" ? "location" : "dropLocation",
@@ -184,6 +187,42 @@ const LocationStep = ({
       console.error("Reverse geocoding failed", error);
     }
   };
+
+  useEffect(() => {
+    if (!requiresDropLocation || !markerPosition || !dropPosition) {
+      setRoutePath([]);
+      return;
+    }
+
+    const quote = towingEstimate?.quote || towingEstimate;
+    const metadataRoute = routePolylineFromMetadata(
+      quote?.route_metadata || quote?.routeMetadata || towingEstimate?.routeMetadata
+    );
+    if (metadataRoute.length > 1) {
+      setRoutePath(metadataRoute);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const route = await fetchRoute([markerPosition, dropPosition], "full");
+        if (!cancelled) {
+          setRoutePath(routePolylineFromMetadata(route));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Route calculation failed", error);
+          setRoutePath([]);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [dropPosition?.lat, dropPosition?.lng, markerPosition?.lat, markerPosition?.lng, requiresDropLocation, towingEstimate]);
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
@@ -215,14 +254,13 @@ const LocationStep = ({
                   <LocationMarker position={dropPosition} label="Drop" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "drop")} />
                   {markerPosition && dropPosition && (
                     <>
-                      <Polyline
-                        positions={[
-                          [markerPosition.lat, markerPosition.lng],
-                          [dropPosition.lat, dropPosition.lng],
-                        ]}
-                        pathOptions={{ color: "#0f172a", weight: 4, opacity: 0.75, dashArray: "8 8" }}
-                      />
-                      <RouteBounds pickup={markerPosition} drop={dropPosition} />
+                      {routePath.length > 1 && (
+                        <Polyline
+                          positions={routePath}
+                          pathOptions={{ color: "#0f172a", weight: 4, opacity: 0.8 }}
+                        />
+                      )}
+                      <RouteBounds pickup={markerPosition} drop={dropPosition} routePath={routePath} />
                     </>
                   )}
                 </>
@@ -277,7 +315,7 @@ const LocationStep = ({
             <div className="space-y-3 p-4 border-b border-border">
               <div className="space-y-2">
                 <Label htmlFor="location" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Pickup Location</Label>
-                <GooglePlaceInput
+                <OpenStreetMapPlaceInput
                   id="location"
                   name="location"
                   value={formData.location}
@@ -301,7 +339,7 @@ const LocationStep = ({
                       Use current
                     </Button>
                   </div>
-                  <GooglePlaceInput
+                  <OpenStreetMapPlaceInput
                     id="dropLocation"
                     name="dropLocation"
                     value={formData.dropLocation || ""}

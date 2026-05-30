@@ -70,8 +70,20 @@ const normalizeJob = (job: any) => {
   const estimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
   const serviceDescription = toOptionalString(job.service?.description ?? job.description);
   const paymentDetails = resolveServiceRequestPaymentDetails(job);
+  const isTowingJob =
+    String(serviceType || job.service_type || "").toLowerCase().includes("towing") ||
+    destinationAddress != null ||
+    routeDistanceKm != null;
+  const technicianEstimatedEarning = toOptionalNumber(
+    job.technicianEstimatedEarning ??
+      job.technician_estimated_earning ??
+      job.estimatedEarnings ??
+      job.estimated_earnings
+  );
   const amount = toOptionalNumber(
-    job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
+    isTowingJob
+      ? technicianEstimatedEarning ?? job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
+      : job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
   );
   const cancellationReason = toOptionalString(job.cancellation_reason ?? job.reason);
   const cancelledAt = toOptionalString(job.cancelled_at ?? job.cancelledAt);
@@ -100,7 +112,14 @@ const normalizeJob = (job: any) => {
     route_distance_km: routeDistanceKm,
     estimatedDuration,
     estimated_duration: estimatedDuration,
+    routeMetadata: job.routeMetadata ?? job.route_metadata ?? null,
+    routeGeometry: job.routeGeometry ?? job.route_geometry ?? null,
+    routePolyline: job.routePolyline ?? job.route_polyline ?? job.routeMetadata?.polyline ?? null,
     pricingBreakdown: job.pricingBreakdown ?? job.pricing_breakdown ?? null,
+    vehicleCategory: job.vehicleCategory ?? job.vehicle_category ?? job.pricingBreakdown?.vehicle_category ?? null,
+    technicianEstimatedEarning,
+    technician_estimated_earning: technicianEstimatedEarning,
+    estimatedEarnings: technicianEstimatedEarning,
     amount,
     baseAmount: paymentDetails.baseAmount,
     base_amount: paymentDetails.baseAmount,
@@ -293,12 +312,24 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
     socket.on("job:assigned", handleAssigned);
     socket.on("job_assigned", handleAssigned);
     socket.on("job:status_update", handleStatusUpdate);
+    socket.on("vehicle_loaded", handleStatusUpdate);
+    socket.on("tow_started", handleStatusUpdate);
+    socket.on("arrived_drop", handleStatusUpdate);
+    socket.on("service_completed", handleStatusUpdate);
+    socket.on("payment_pending", handleStatusUpdate);
+    socket.on("job_closed", handleStatusUpdate);
     socket.on("technician:financials_update", handleFinancialsUpdate);
 
     return () => {
       socket.off("job:assigned", handleAssigned);
       socket.off("job_assigned", handleAssigned);
       socket.off("job:status_update", handleStatusUpdate);
+      socket.off("vehicle_loaded", handleStatusUpdate);
+      socket.off("tow_started", handleStatusUpdate);
+      socket.off("arrived_drop", handleStatusUpdate);
+      socket.off("service_completed", handleStatusUpdate);
+      socket.off("payment_pending", handleStatusUpdate);
+      socket.off("job_closed", handleStatusUpdate);
       socket.off("technician:financials_update", handleFinancialsUpdate);
     };
   }, [socket, technicianId, refreshActiveJob, refreshDues]);

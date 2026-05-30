@@ -21,6 +21,14 @@ export interface JobRequest {
     distance: number; // km
     amount: number;
     eta?: string | number | null;
+    dropLocation?: {
+        lat?: number | null;
+        lng?: number | null;
+        address?: string | null;
+    } | null;
+    routeDistanceKm?: number | null;
+    estimatedDuration?: number | null;
+    vehicleCategory?: string | null;
 }
 
 interface TechnicianJobModalProps {
@@ -88,9 +96,9 @@ export function TechnicianJobModal({
     };
 
     const payoutText = Number(job.amount || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
-    const distanceKm = Number(job.distance || 0);
+    const distanceKm = Number(job.routeDistanceKm || job.distance || 0);
     const distanceText = Number.isFinite(distanceKm) ? distanceKm.toFixed(1) : "--";
-    const etaRaw = job.eta != null && job.eta !== "" ? Number(job.eta) : null;
+    const etaRaw = job.estimatedDuration ?? (job.eta != null && job.eta !== "" ? Number(job.eta) : null);
     const etaMinutes = Number.isFinite(etaRaw)
         ? Math.max(1, Math.round(etaRaw))
         : Number.isFinite(distanceKm)
@@ -202,6 +210,26 @@ export function TechnicianJobModal({
                             </p>
                         </div>
                     </div>
+
+                    {job.dropLocation?.address && (
+                        <div className="mt-3 flex items-start gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+                            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800">
+                                <MapPin className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Drop</p>
+                                <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2">
+                                    {job.dropLocation.address}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {job.vehicleCategory && (
+                        <div className="mt-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-200">
+                            Vehicle category: {String(job.vehicleCategory).replace(/_/g, " ")}
+                        </div>
+                    )}
 
                     {isUnavailable && (
                         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">

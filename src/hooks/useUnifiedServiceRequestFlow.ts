@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { ServiceRequestFormData } from "@/components/service-request/types";
 import { apiFetch } from "@/lib/api";
+import { searchLocations } from "@/lib/geo";
 import { toast } from "sonner";
 
 type UnifiedRequestFlowOptions = {
@@ -159,18 +160,8 @@ export function useUnifiedServiceRequestFlow({
 
   const geocodeAddress = async (addressText: string) => {
     try {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) return null;
-
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressText)}&key=${apiKey}`
-      );
-      const data = await response.json();
-      if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
-        const { lat, lng } = data.results[0].geometry.location;
-        return { lat, lng };
-      }
-      return null;
+      const [result] = await searchLocations(addressText, 1);
+      return result ? { lat: result.lat, lng: result.lng, address: result.address } : null;
     } catch {
       return null;
     }
@@ -242,9 +233,10 @@ export function useUnifiedServiceRequestFlow({
           dropLat: formData.dropLat || null,
           dropLng: formData.dropLng || null,
           distanceKm: formData.routeDistanceKm || towingEstimate?.distanceKm || towingEstimate?.quote?.distance_km || null,
-          estimatedDuration: formData.estimatedDuration || towingEstimate?.estimatedDuration || towingEstimate?.quote?.estimated_duration || null,
-          pricingBreakdown: formData.pricingBreakdown || towingEstimate?.pricingBreakdown || towingEstimate?.quote?.pricing_breakdown || null,
-          finalEstimatedPrice: formData.finalEstimatedPrice || towingEstimate?.finalEstimatedPrice || towingEstimate?.quote?.final_estimated_price || null
+            estimatedDuration: formData.estimatedDuration || towingEstimate?.estimatedDuration || towingEstimate?.quote?.estimated_duration || null,
+            pricingBreakdown: formData.pricingBreakdown || towingEstimate?.pricingBreakdown || towingEstimate?.quote?.pricing_breakdown || null,
+          finalEstimatedPrice: formData.finalEstimatedPrice || towingEstimate?.finalEstimatedPrice || towingEstimate?.quote?.final_estimated_price || null,
+          timeOfDay: new Date().toISOString()
         });
       }
 
@@ -312,8 +304,10 @@ export function useUnifiedServiceRequestFlow({
         if (coords) {
           setFormData((prev) => ({
             ...prev,
+            location: coords.address || prev.location,
             locationLat: coords.lat,
-            locationLng: coords.lng
+            locationLng: coords.lng,
+            locationCoordinates: { lat: coords.lat, lng: coords.lng }
           }));
         }
       }
@@ -322,9 +316,10 @@ export function useUnifiedServiceRequestFlow({
         if (coords) {
           setFormData((prev) => ({
             ...prev,
+            dropLocation: coords.address || prev.dropLocation,
             dropLat: coords.lat,
             dropLng: coords.lng,
-            dropLocationCoordinates: coords
+            dropLocationCoordinates: { lat: coords.lat, lng: coords.lng }
           }));
         }
       }
@@ -379,7 +374,8 @@ export function useUnifiedServiceRequestFlow({
             dropAddress: formData.dropLocation,
             dropLat: formData.dropLat,
             dropLng: formData.dropLng,
-            paymentMode: "upi"
+            paymentMode: "upi",
+            timeOfDay: new Date().toISOString()
           }),
           signal: controller.signal
         } as RequestInit);

@@ -6,6 +6,7 @@ import { useReducedMotion } from "framer-motion";
 import { LocateFixed, RadioTower } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { cn } from "@/lib/utils";
+import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
 
 type TrackingMapMode = "map" | "balanced" | "sheet";
 
@@ -20,6 +21,7 @@ interface LiveTrackingMapProps {
   distanceLabel?: string;
   mapMode?: TrackingMapMode;
   onInteract?: () => void;
+  routePolyline?: Array<[number, number]> | null;
 }
 
 const FALLBACK_CENTER: [number, number] = [20.5937, 78.9629];
@@ -192,6 +194,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   distanceLabel,
   mapMode = "balanced",
   onInteract,
+  routePolyline,
 }) => {
   const reduceMotion = useReducedMotion();
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
@@ -228,6 +231,12 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       return;
     }
 
+    const suppliedRoute = routePolylineFromMetadata({ polyline: routePolyline });
+    if (suppliedRoute.length > 1) {
+      setRoutePath(suppliedRoute);
+      return;
+    }
+
     const waypointObjects = [techLocation, userLocation, dropLocation].filter(Boolean) as { lat: number; lng: number }[];
     const waypointPositions = waypointObjects.map((point) => [point.lat, point.lng] as [number, number]);
     const fallbackPath =
@@ -243,34 +252,21 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         : [];
     setRoutePath(fallbackPath);
 
-    const controller = new AbortController();
-
-    const fetchRoute = async () => {
+    const loadRoute = async () => {
       try {
-        const coordinatesParam = waypointObjects.map((point) => `${point.lng},${point.lat}`).join(";");
-        const url = `https://router.project-osrm.org/route/v1/driving/${coordinatesParam}?overview=full&geometries=geojson`;
-        const response = await fetch(url, { signal: controller.signal });
-        const data = await response.json();
-        const coordinates = Array.isArray(data?.routes?.[0]?.geometry?.coordinates)
-          ? data.routes[0].geometry.coordinates.map((entry: number[]) => [entry[1], entry[0]] as [number, number])
-          : [];
+        const route = await fetchRoute(waypointObjects, "full");
+        const coordinates = routePolylineFromMetadata(route);
 
         if (coordinates.length > 1) {
           setRoutePath(coordinates);
         }
       } catch (error) {
-        if ((error as Error).name !== "AbortError") {
-          setRoutePath(fallbackPath);
-        }
+        setRoutePath(fallbackPath);
       }
     };
 
-    void fetchRoute();
-
-    return () => {
-      controller.abort();
-    };
-  }, [dropLocation, techLocation, userLocation]);
+    void loadRoute();
+  }, [dropLocation, routePolyline, techLocation, userLocation]);
 
   const mapCenter: [number, number] = userPosition || techPosition || FALLBACK_CENTER;
   const statusLabel = normalizeStatusLabel(status);

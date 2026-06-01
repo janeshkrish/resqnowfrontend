@@ -38,7 +38,7 @@ ResQNow is a modern, real-time roadside assistance platform connecting vehicle o
 
 ### Prerequisites
 
-- Node.js (v18+),
+- Node.js (v18+)
 - MySQL Database (or TiDB Cloud),
 - Google Maps API Key (with Maps JS, Geocoding, Distance Matrix enabled).
 

@@ -66,9 +66,11 @@ export async function searchLocations(query: string, limit = 6): Promise<Locatio
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 2) return [];
 
-  const response = await apiFetch(
-    `/api/public/location-search?q=${encodeURIComponent(normalizedQuery)}&limit=${encodeURIComponent(String(limit))}`
-  );
+  const queryString = `q=${encodeURIComponent(normalizedQuery)}&limit=${encodeURIComponent(String(limit))}`;
+  let response = await apiFetch(`/api/public/location-search?${queryString}`);
+  if (response.status === 404) {
+    response = await apiFetch(`/api/location-search?${queryString}`);
+  }
   const data = await readJsonSafely<{ results?: Array<Partial<LocationSearchResult>>; error?: string }>(response);
   if (!response.ok) {
     throw new Error(data?.error || "Location search failed.");
@@ -93,9 +95,11 @@ export async function searchLocations(query: string, limit = 6): Promise<Locatio
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<LocationSearchResult> {
-  const response = await apiFetch(
-    `/api/public/reverse-geocode?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`
-  );
+  const queryString = `lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`;
+  let response = await apiFetch(`/api/public/reverse-geocode?${queryString}`);
+  if (response.status === 404) {
+    response = await apiFetch(`/api/reverse-geocode?${queryString}`);
+  }
   const data = await readJsonSafely<any>(response);
   if (!response.ok) {
     throw new Error(data?.error || "Reverse geocoding failed.");
@@ -123,9 +127,11 @@ export async function fetchRoute(points: GeoPoint[], overview: "full" | "simplif
   }
 
   const encodedPoints = validPoints.map((point) => `${point.lat},${point.lng}`).join(";");
-  const response = await apiFetch(
-    `/api/public/route?points=${encodeURIComponent(encodedPoints)}&overview=${encodeURIComponent(overview)}`
-  );
+  const queryString = `points=${encodeURIComponent(encodedPoints)}&overview=${encodeURIComponent(overview)}`;
+  let response = await apiFetch(`/api/public/route?${queryString}`);
+  if (response.status === 404) {
+    response = await apiFetch(`/api/route?${queryString}`);
+  }
   const data = await readJsonSafely<RouteResponse>(response);
   if (!response.ok) {
     throw new Error(data?.error || "Route calculation failed.");

@@ -4,7 +4,7 @@ import { Input } from "../ui/input";
 import { ServiceRequestFormData } from "./types";
 import { MapPin, Loader2, Navigation } from "lucide-react";
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import OpenStreetMapPlaceInput from "./OpenStreetMapPlaceInput";
@@ -46,7 +46,7 @@ const LocationMarker = ({ position, label, onDragEnd }: { position: { lat: numbe
     if (position) {
       map.flyTo([position.lat, position.lng], 16);
     }
-  }, [position, map]);
+  }, [position?.lat, position?.lng, map]);
 
   const eventHandlers = useMemo(
     () => ({
@@ -94,6 +94,24 @@ const RouteBounds = ({ pickup, drop, routePath }: { pickup: { lat: number, lng: 
   return null;
 };
 
+const MapPinClickHandler = ({
+  enabled,
+  target,
+  onSelect,
+}: {
+  enabled: boolean;
+  target: "pickup" | "drop";
+  onSelect: (lat: number, lng: number, type: "pickup" | "drop") => void;
+}) => {
+  useMapEvents({
+    click(event) {
+      if (!enabled) return;
+      onSelect(event.latlng.lat, event.latlng.lng, target);
+    },
+  });
+  return null;
+};
+
 const LocationStep = ({
   formData,
   onInputChange,
@@ -122,6 +140,9 @@ const LocationStep = ({
       ? { lat: Number(formData.dropLat), lng: Number(formData.dropLng) }
       : null;
   const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
+  const [activePin, setActivePin] = useState<"pickup" | "drop">(
+    requiresDropLocation ? "drop" : "pickup"
+  );
 
   // Update map center if we have coordinates from props
   useEffect(() => {
@@ -135,6 +156,10 @@ const LocationStep = ({
       setMarkerPosition({ lat: Number(formData.locationLat), lng: Number(formData.locationLng) });
     }
   }, [formData.locationLat, formData.locationLng]);
+
+  useEffect(() => {
+    setActivePin(requiresDropLocation ? "drop" : "pickup");
+  }, [requiresDropLocation]);
 
   const emitTextChange = (name: string, value: string) => {
     const inputEvent = {
@@ -154,19 +179,23 @@ const LocationStep = ({
     emitTextChange("location", place.address);
     setMarkerPosition({ lat: place.lat, lng: place.lng });
     onLocationSelect?.(place.lat, place.lng);
+    if (requiresDropLocation) setActivePin("drop");
   };
 
   const handleDropPlaceSelect = (place: { address: string; lat: number; lng: number }) => {
     emitTextChange("dropLocation", place.address);
+    setActivePin("drop");
     onDropLocationSelect?.(place.lat, place.lng, place.address);
   };
 
   const handleMarkerDragEnd = async (lat: number, lng: number, type: "pickup" | "drop" = "pickup") => {
     // 1. Update coordinates
     if (type === "pickup") {
+      setActivePin("pickup");
       setMarkerPosition({ lat, lng });
       onLocationSelect?.(lat, lng);
     } else {
+      setActivePin("drop");
       onDropLocationSelect?.(lat, lng);
     }
 
@@ -249,6 +278,11 @@ const LocationStep = ({
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               <LocationMarker position={markerPosition} label="Pickup" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "pickup")} />
+              <MapPinClickHandler
+                enabled={requiresDropLocation || activePin === "pickup"}
+                target={requiresDropLocation ? activePin : "pickup"}
+                onSelect={handleMarkerDragEnd}
+              />
               {requiresDropLocation && (
                 <>
                   <LocationMarker position={dropPosition} label="Drop" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "drop")} />
@@ -272,6 +306,28 @@ const LocationStep = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
               {requiresDropLocation ? "Drag pins to refine route" : "Drag to refine location"}
             </div>
+            {requiresDropLocation && (
+              <div className="absolute bottom-3 left-1/2 z-[400] flex -translate-x-1/2 rounded-full border border-white/70 bg-white/95 p-1 shadow-lg backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setActivePin("pickup")}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                    activePin === "pickup" ? "bg-emerald-600 text-white" : "text-slate-600"
+                  }`}
+                >
+                  Pickup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePin("drop")}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                    activePin === "drop" ? "bg-rose-600 text-white" : "text-slate-600"
+                  }`}
+                >
+                  Drop
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -332,11 +388,11 @@ const LocationStep = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={onGetCurrentDropLocation}
+                      onClick={() => setActivePin("drop")}
                       className="h-7 gap-1 rounded-full px-2 text-[11px] font-bold text-slate-500"
                     >
                       <Navigation className="h-3 w-3" />
-                      Use current
+                      Map pin
                     </Button>
                   </div>
                   <OpenStreetMapPlaceInput

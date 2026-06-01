@@ -1726,7 +1726,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     return json({ error: "Android app package is not available in frontend-only demo mode." }, 404);
   }
     if (path === "/api/public/contact" && method === "POST") return json({ success: true, message: "Message received (demo mode)." });
-  if (path === "/api/public/location-search" && method === "GET") {
+  if ((path === "/api/public/location-search" || path === "/api/location-search") && method === "GET") {
     const query = String(q.get("q") || q.get("query") || "Coimbatore").trim();
     const known: Record<string, [number, number, string]> = {
       "lotus hyundai coimbatore": [11.0168, 76.9558, "Lotus Hyundai, Coimbatore, Tamil Nadu"],
@@ -1755,7 +1755,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
       cached: false,
     });
   }
-  if (path === "/api/public/route" && method === "GET") {
+  if ((path === "/api/public/route" || path === "/api/route") && method === "GET") {
     const rawPoints = String(q.get("points") || "");
     const points = rawPoints.split(";").map((item) => {
       const [lat, lng] = item.split(",").map(Number);
@@ -1782,7 +1782,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
       geometry: { type: "LineString", coordinates: polyline.map(([lat, lng]) => [lng, lat]) },
     });
   }
-  if (path === "/api/public/reverse-geocode" && method === "GET") return json({ display_name: `Demo Location (${Number(q.get("lat") || 12.9716).toFixed(4)}, ${Number(q.get("lng") || 77.5946).toFixed(4)}), Bengaluru, Karnataka`, address: { suburb: "Indiranagar", city: "Bengaluru", district: "Bengaluru Urban", state: "Karnataka", postcode: "560038" } });
+  if ((path === "/api/public/reverse-geocode" || path === "/api/reverse-geocode") && method === "GET") return json({ display_name: `Demo Location (${Number(q.get("lat") || 12.9716).toFixed(4)}, ${Number(q.get("lng") || 77.5946).toFixed(4)}), Bengaluru, Karnataka`, address: { suburb: "Indiranagar", city: "Bengaluru", district: "Bengaluru Urban", state: "Karnataka", postcode: "560038" } });
   if (path === "/api/chatbot/message" && method === "POST") return json({ text: "Demo mode: backend chatbot is disconnected, but UI remains fully usable." });
 
   return json({ success: true });

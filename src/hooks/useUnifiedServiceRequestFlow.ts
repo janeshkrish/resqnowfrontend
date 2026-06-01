@@ -22,6 +22,15 @@ type UnifiedRequestFlowOptions = {
   allowDirectTechnician?: boolean;
 };
 
+const isTowingServiceId = (value?: string | null) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^(car|bike|ev|commercial)-/, "")
+    .replace(/[_\s]+/g, "-");
+  return normalized === "towing" || normalized === "tow" || normalized === "tow-truck" || normalized === "flatbed-towing";
+};
+
 export function useUnifiedServiceRequestFlow({
   serviceId,
   vehicleType,
@@ -77,7 +86,7 @@ export function useUnifiedServiceRequestFlow({
   const [isEstimatingTowing, setIsEstimatingTowing] = useState(false);
   const [towingEstimate, setTowingEstimate] = useState<any>(null);
   const [towingEstimateError, setTowingEstimateError] = useState<string | null>(null);
-  const requiresDropLocation = serviceId === "towing";
+  const requiresDropLocation = isTowingServiceId(serviceId);
 
   const {
     coordinates,

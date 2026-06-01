@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { ServiceRequestFormData } from "@/components/service-request/types";
 import { apiFetch } from "@/lib/api";
 import { searchLocations } from "@/lib/geo";
+import { geocodeAddressWithGoogle, reverseGeocodeWithGoogle } from "@/lib/googlePlaces";
 import { toast } from "sonner";
 
 type UnifiedRequestFlowOptions = {
@@ -29,6 +30,16 @@ const isTowingServiceId = (value?: string | null) => {
     .replace(/^(car|bike|ev|commercial)-/, "")
     .replace(/[_\s]+/g, "-");
   return normalized === "towing" || normalized === "tow" || normalized === "tow-truck" || normalized === "flatbed-towing";
+};
+
+const normalizeAddressValue = (value: unknown): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return String(record.formatted_address || record.address || record.description || "").trim();
+  }
+  return String(value).trim();
 };
 
 export function useUnifiedServiceRequestFlow({
@@ -86,6 +97,8 @@ export function useUnifiedServiceRequestFlow({
   const [isEstimatingTowing, setIsEstimatingTowing] = useState(false);
   const [towingEstimate, setTowingEstimate] = useState<any>(null);
   const [towingEstimateError, setTowingEstimateError] = useState<string | null>(null);
+  const [isDetectingGoogleLocation, setIsDetectingGoogleLocation] = useState(false);
+  const googleAutoDetectAttemptedRef = useRef(false);
   const requiresDropLocation = isTowingServiceId(serviceId);
 
   const {
@@ -110,6 +123,7 @@ export function useUnifiedServiceRequestFlow({
   }, [user]);
 
   useEffect(() => {
+    if (requiresDropLocation) return;
     if (!coordinates || !address) return;
     setCurrentLocation(address);
     setFormData((prev) => ({
@@ -118,7 +132,7 @@ export function useUnifiedServiceRequestFlow({
       locationLat: coordinates.lat,
       locationLng: coordinates.lng
     }));
-  }, [coordinates, address]);
+  }, [coordinates, address, requiresDropLocation]);
 
   useEffect(() => {
     if (geoError) {
@@ -126,33 +140,136 @@ export function useUnifiedServiceRequestFlow({
     }
   }, [geoError]);
 
+  const detectCurrentPickupWithGoogle = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation API not available. Please use a modern browser.");
+      return;
+    }
+
+    if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
+      toast.error("Geolocation requires HTTPS. Please connect securely.");
+      return;
+    }
+
+    setIsDetectingGoogleLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const coordinates = { lat: latitude, lng: longitude };
+
+        try {
+          const resolved = await reverseGeocodeWithGoogle(latitude, longitude);
+          const addressText = normalizeAddressValue(resolved) || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+          setCurrentLocation(addressText);
+          setFormData((prev) => ({
+            ...prev,
+            location: addressText,
+            locationLat: coordinates.lat,
+            locationLng: coordinates.lng,
+            locationCoordinates: coordinates,
+            locationPlaceId: resolved.placeId || null,
+            locationPlace: {
+              address: addressText,
+              formatted_address: addressText,
+              lat: coordinates.lat,
+              lng: coordinates.lng,
+              placeId: resolved.placeId || null,
+            },
+          }));
+        } catch (error) {
+          const fallbackAddress = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+          setCurrentLocation(fallbackAddress);
+          setFormData((prev) => ({
+            ...prev,
+            location: fallbackAddress,
+            locationLat: coordinates.lat,
+            locationLng: coordinates.lng,
+            locationCoordinates: coordinates,
+          }));
+          toast.error(error instanceof Error ? error.message : "Unable to fetch locations");
+        } finally {
+          setIsDetectingGoogleLocation(false);
+        }
+      },
+      (error) => {
+        let errorMessage = "Unable to get location. Please try again.";
+        if (error.code === 1) errorMessage = "Location permission denied. Please enable location access in browser settings.";
+        if (error.code === 2) errorMessage = "Location unavailable. Check GPS/location services.";
+        if (error.code === 3) errorMessage = "Location request timed out. Please try again.";
+        toast.error(errorMessage);
+        setIsDetectingGoogleLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!requiresDropLocation || googleAutoDetectAttemptedRef.current) return;
+    if (normalizeAddressValue(formData.location) || (Number(formData.locationLat) && Number(formData.locationLng))) return;
+    googleAutoDetectAttemptedRef.current = true;
+    detectCurrentPickupWithGoogle();
+  }, [detectCurrentPickupWithGoogle, formData.location, formData.locationLat, formData.locationLng, requiresDropLocation]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const nextValue = name === "location" || name === "dropLocation" ? normalizeAddressValue(value) : value;
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
   };
 
-  const handleLocationSelect = (lat: number, lng: number) => {
+  const handleLocationSelect = (lat: number, lng: number, addressText?: string, placeId?: string | null) => {
+    const addressValue = normalizeAddressValue(addressText);
     setFormData((prev) => ({
       ...prev,
+      location: addressValue || normalizeAddressValue(prev.location),
       locationLat: lat,
       locationLng: lng,
-      locationCoordinates: { lat, lng }
+      locationCoordinates: { lat, lng },
+      locationPlaceId: placeId ?? prev.locationPlaceId ?? null,
+      locationPlace: addressValue
+        ? {
+            address: addressValue,
+            formatted_address: addressValue,
+            lat,
+            lng,
+            placeId: placeId ?? prev.locationPlaceId ?? null,
+          }
+        : prev.locationPlace ?? null,
     }));
   };
 
   const handleGetCurrentLocation = () => {
+    if (requiresDropLocation) {
+      googleAutoDetectAttemptedRef.current = true;
+      detectCurrentPickupWithGoogle();
+      return;
+    }
     requestLocation();
   };
 
-  const handleDropLocationSelect = (lat: number, lng: number, addressText?: string) => {
+  const handleDropLocationSelect = (lat: number, lng: number, addressText?: string, placeId?: string | null) => {
+    const addressValue = normalizeAddressValue(addressText);
     setFormData((prev) => ({
       ...prev,
       dropLat: lat,
       dropLng: lng,
-      dropLocation: addressText ?? prev.dropLocation ?? "",
-      dropLocationCoordinates: { lat, lng }
+      dropLocation: addressValue || normalizeAddressValue(prev.dropLocation),
+      dropLocationCoordinates: { lat, lng },
+      dropPlaceId: placeId ?? prev.dropPlaceId ?? null,
+      dropPlace: addressValue
+        ? {
+            address: addressValue,
+            formatted_address: addressValue,
+            lat,
+            lng,
+            placeId: placeId ?? prev.dropPlaceId ?? null,
+          }
+        : prev.dropPlace ?? null,
     }));
   };
 
@@ -169,6 +286,9 @@ export function useUnifiedServiceRequestFlow({
 
   const geocodeAddress = async (addressText: string) => {
     try {
+      if (requiresDropLocation) {
+        return await geocodeAddressWithGoogle(addressText);
+      }
       const [result] = await searchLocations(addressText, 1);
       return result ? { lat: result.lat, lng: result.lng, address: result.address } : null;
     } catch {
@@ -181,10 +301,12 @@ export function useUnifiedServiceRequestFlow({
       return validateStep1(formData);
     }
     if (currentStep === 2) {
-      if (!formData.location) return false;
+      const pickupAddress = normalizeAddressValue(formData.location);
+      const dropAddress = normalizeAddressValue(formData.dropLocation);
+      if (!pickupAddress) return false;
       if (!requiresDropLocation) return true;
       return !!(
-        formData.dropLocation &&
+        dropAddress &&
         Number(formData.locationLat) &&
         Number(formData.locationLng) &&
         Number(formData.dropLat) &&
@@ -220,12 +342,14 @@ export function useUnifiedServiceRequestFlow({
         buildDescription?.(formData, serviceId) ||
         formData.details ||
         `Request for ${serviceId}`;
+      const pickupAddress = normalizeAddressValue(formData.location);
+      const dropAddress = normalizeAddressValue(formData.dropLocation);
 
       const payload = {
         service_type: `${vehicleType}-${serviceId}`,
         vehicle_type: vehicleType,
         vehicle_model: buildVehicleModel(formData),
-        address: formData.location,
+        address: pickupAddress,
         description,
         contact_phone: formData.phone,
         contact_email: formData.email,
@@ -237,13 +361,16 @@ export function useUnifiedServiceRequestFlow({
 
       if (requiresDropLocation) {
         Object.assign(payload, {
-          dropLocation: formData.dropLocation,
-          dropAddress: formData.dropLocation,
+          pickupPlaceId: formData.locationPlaceId || formData.locationPlace?.placeId || null,
+          locationPlaceId: formData.locationPlaceId || formData.locationPlace?.placeId || null,
+          dropLocation: dropAddress,
+          dropAddress,
+          dropPlaceId: formData.dropPlaceId || formData.dropPlace?.placeId || null,
           dropLat: formData.dropLat || null,
           dropLng: formData.dropLng || null,
           distanceKm: formData.routeDistanceKm || towingEstimate?.distanceKm || towingEstimate?.quote?.distance_km || null,
-            estimatedDuration: formData.estimatedDuration || towingEstimate?.estimatedDuration || towingEstimate?.quote?.estimated_duration || null,
-            pricingBreakdown: formData.pricingBreakdown || towingEstimate?.pricingBreakdown || towingEstimate?.quote?.pricing_breakdown || null,
+          estimatedDuration: formData.estimatedDuration || towingEstimate?.estimatedDuration || towingEstimate?.quote?.estimated_duration || null,
+          pricingBreakdown: formData.pricingBreakdown || towingEstimate?.pricingBreakdown || towingEstimate?.quote?.pricing_breakdown || null,
           finalEstimatedPrice: formData.finalEstimatedPrice || towingEstimate?.finalEstimatedPrice || towingEstimate?.quote?.final_estimated_price || null,
           timeOfDay: new Date().toISOString()
         });
@@ -308,27 +435,45 @@ export function useUnifiedServiceRequestFlow({
 
   const handleNext = async () => {
     if (currentStep < 3) {
-      if (currentStep === 2 && formData.location && (!formData.locationLat || !formData.locationLng)) {
-        const coords = await geocodeAddress(formData.location);
+      const pickupAddress = normalizeAddressValue(formData.location);
+      const dropAddress = normalizeAddressValue(formData.dropLocation);
+      if (currentStep === 2 && pickupAddress && (!formData.locationLat || !formData.locationLng)) {
+        const coords = await geocodeAddress(pickupAddress);
         if (coords) {
           setFormData((prev) => ({
             ...prev,
             location: coords.address || prev.location,
             locationLat: coords.lat,
             locationLng: coords.lng,
-            locationCoordinates: { lat: coords.lat, lng: coords.lng }
+            locationCoordinates: { lat: coords.lat, lng: coords.lng },
+            locationPlaceId: "placeId" in coords ? coords.placeId || prev.locationPlaceId || null : prev.locationPlaceId || null,
+            locationPlace: {
+              address: coords.address || normalizeAddressValue(prev.location),
+              formatted_address: coords.address || normalizeAddressValue(prev.location),
+              lat: coords.lat,
+              lng: coords.lng,
+              placeId: "placeId" in coords ? coords.placeId || prev.locationPlaceId || null : prev.locationPlaceId || null,
+            },
           }));
         }
       }
-      if (currentStep === 2 && requiresDropLocation && formData.dropLocation && (!formData.dropLat || !formData.dropLng)) {
-        const coords = await geocodeAddress(formData.dropLocation);
+      if (currentStep === 2 && requiresDropLocation && dropAddress && (!formData.dropLat || !formData.dropLng)) {
+        const coords = await geocodeAddress(dropAddress);
         if (coords) {
           setFormData((prev) => ({
             ...prev,
             dropLocation: coords.address || prev.dropLocation,
             dropLat: coords.lat,
             dropLng: coords.lng,
-            dropLocationCoordinates: { lat: coords.lat, lng: coords.lng }
+            dropLocationCoordinates: { lat: coords.lat, lng: coords.lng },
+            dropPlaceId: "placeId" in coords ? coords.placeId || prev.dropPlaceId || null : prev.dropPlaceId || null,
+            dropPlace: {
+              address: coords.address || normalizeAddressValue(prev.dropLocation),
+              formatted_address: coords.address || normalizeAddressValue(prev.dropLocation),
+              lat: coords.lat,
+              lng: coords.lng,
+              placeId: "placeId" in coords ? coords.placeId || prev.dropPlaceId || null : prev.dropPlaceId || null,
+            },
           }));
         }
       }
@@ -356,8 +501,10 @@ export function useUnifiedServiceRequestFlow({
       return;
     }
 
-    const pickupReady = formData.location && Number(formData.locationLat) && Number(formData.locationLng);
-    const dropReady = formData.dropLocation && Number(formData.dropLat) && Number(formData.dropLng);
+    const pickupAddress = normalizeAddressValue(formData.location);
+    const dropAddress = normalizeAddressValue(formData.dropLocation);
+    const pickupReady = pickupAddress && Number(formData.locationLat) && Number(formData.locationLng);
+    const dropReady = dropAddress && Number(formData.dropLat) && Number(formData.dropLng);
     const vehicleReady = formData.vehicleType && formData.vehicleSubtype;
     if (!pickupReady || !dropReady || !vehicleReady) {
       setTowingEstimate(null);
@@ -377,10 +524,10 @@ export function useUnifiedServiceRequestFlow({
             serviceType: `${vehicleType}-towing`,
             vehicleType,
             vehicleModel: buildVehicleModel(formData),
-            pickupAddress: formData.location,
+            pickupAddress,
             pickupLat: formData.locationLat,
             pickupLng: formData.locationLng,
-            dropAddress: formData.dropLocation,
+            dropAddress,
             dropLat: formData.dropLat,
             dropLng: formData.dropLng,
             paymentMode: "upi",
@@ -440,7 +587,7 @@ export function useUnifiedServiceRequestFlow({
     setCurrentStep,
     currentLocation,
     isSubmitting,
-    loadingGeo,
+    loadingGeo: loadingGeo || isDetectingGoogleLocation,
     requiresDropLocation,
     towingEstimate,
     isEstimatingTowing,

@@ -1,21 +1,23 @@
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
-import { ServiceRequestFormData } from "./types";
+import { LocationSelection, ServiceRequestFormData } from "./types";
 import { MapPin, Loader2, Navigation } from "lucide-react";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import OpenStreetMapPlaceInput from "./OpenStreetMapPlaceInput";
+import GooglePlacesAutocomplete from "./GooglePlacesAutocomplete.jsx";
 import TowingEstimateCard from "./TowingEstimateCard";
 import { fetchRoute, reverseGeocode, routePolylineFromMetadata } from "@/lib/geo";
+import { reverseGeocodeWithGoogle } from "@/lib/googlePlaces";
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-let DefaultIcon = L.icon({
+const DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
   iconSize: [25, 41],
@@ -29,14 +31,34 @@ interface LocationStepProps {
   currentLocation: string;
   isGettingLocation: boolean;
   onGetCurrentLocation: () => void;
-  onLocationSelect?: (lat: number, lng: number) => void;
+  onLocationSelect?: (lat: number, lng: number, address?: string, placeId?: string | null) => void;
   requiresDropLocation?: boolean;
-  onDropLocationSelect?: (lat: number, lng: number, address?: string) => void;
+  onDropLocationSelect?: (lat: number, lng: number, address?: string, placeId?: string | null) => void;
   onGetCurrentDropLocation?: () => void;
   towingEstimate?: any;
   isEstimatingTowing?: boolean;
   towingEstimateError?: string | null;
 }
+
+const normalizeAddressValue = (value: unknown): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return String(record.formatted_address || record.address || record.description || "").trim();
+  }
+  return String(value).trim();
+};
+
+const normalizePlaceSelection = (place: LocationSelection): LocationSelection => {
+  const address = normalizeAddressValue(place.formatted_address || place.address);
+  return {
+    ...place,
+    address,
+    formatted_address: address,
+    placeId: place.placeId || null,
+  };
+};
 
 const LocationMarker = ({ position, label, onDragEnd }: { position: { lat: number, lng: number } | null, label: string, onDragEnd: (lat: number, lng: number) => void }) => {
   const map = useMap();
@@ -175,17 +197,19 @@ const LocationStep = ({
     emitTextChange(e.target.name, e.target.value);
   };
 
-  const handlePickupPlaceSelect = (place: { address: string; lat: number; lng: number }) => {
-    emitTextChange("location", place.address);
-    setMarkerPosition({ lat: place.lat, lng: place.lng });
-    onLocationSelect?.(place.lat, place.lng);
+  const handlePickupPlaceSelect = (place: LocationSelection) => {
+    const normalizedPlace = normalizePlaceSelection(place);
+    emitTextChange("location", normalizedPlace.address);
+    setMarkerPosition({ lat: normalizedPlace.lat, lng: normalizedPlace.lng });
+    onLocationSelect?.(normalizedPlace.lat, normalizedPlace.lng, normalizedPlace.address, normalizedPlace.placeId);
     if (requiresDropLocation) setActivePin("drop");
   };
 
-  const handleDropPlaceSelect = (place: { address: string; lat: number; lng: number }) => {
-    emitTextChange("dropLocation", place.address);
+  const handleDropPlaceSelect = (place: LocationSelection) => {
+    const normalizedPlace = normalizePlaceSelection(place);
+    emitTextChange("dropLocation", normalizedPlace.address);
     setActivePin("drop");
-    onDropLocationSelect?.(place.lat, place.lng, place.address);
+    onDropLocationSelect?.(normalizedPlace.lat, normalizedPlace.lng, normalizedPlace.address, normalizedPlace.placeId);
   };
 
   const handleMarkerDragEnd = async (lat: number, lng: number, type: "pickup" | "drop" = "pickup") => {
@@ -200,9 +224,10 @@ const LocationStep = ({
     }
 
     try {
-      const result = await reverseGeocode(lat, lng);
+      const result = requiresDropLocation ? await reverseGeocodeWithGoogle(lat, lng) : await reverseGeocode(lat, lng);
       if (result.address) {
         const address = result.address;
+        const placeId = "placeId" in result ? result.placeId : null;
         const inputEvent = {
           target: {
             name: type === "pickup" ? "location" : "dropLocation",
@@ -210,7 +235,8 @@ const LocationStep = ({
           }
         } as React.ChangeEvent<HTMLInputElement>;
         onInputChange(inputEvent);
-        if (type === "drop") onDropLocationSelect?.(lat, lng, address);
+        if (type === "pickup") onLocationSelect?.(lat, lng, address, placeId);
+        if (type === "drop") onDropLocationSelect?.(lat, lng, address, placeId);
       }
     } catch (error) {
       console.error("Reverse geocoding failed", error);
@@ -371,14 +397,25 @@ const LocationStep = ({
             <div className="space-y-3 p-4 border-b border-border">
               <div className="space-y-2">
                 <Label htmlFor="location" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Pickup Location</Label>
-                <OpenStreetMapPlaceInput
-                  id="location"
-                  name="location"
-                  value={formData.location}
-                  placeholder="Search pickup address..."
-                  onTextChange={emitTextChange}
-                  onPlaceSelect={handlePickupPlaceSelect}
-                />
+                {requiresDropLocation ? (
+                  <GooglePlacesAutocomplete
+                    id="location"
+                    name="location"
+                    value={normalizeAddressValue(formData.location)}
+                    placeholder="Search pickup address..."
+                    onTextChange={emitTextChange}
+                    onPlaceSelect={handlePickupPlaceSelect}
+                  />
+                ) : (
+                  <OpenStreetMapPlaceInput
+                    id="location"
+                    name="location"
+                    value={normalizeAddressValue(formData.location)}
+                    placeholder="Search pickup address..."
+                    onTextChange={emitTextChange}
+                    onPlaceSelect={handlePickupPlaceSelect}
+                  />
+                )}
               </div>
               {requiresDropLocation && (
                 <div className="space-y-2">
@@ -395,10 +432,10 @@ const LocationStep = ({
                       Map pin
                     </Button>
                   </div>
-                  <OpenStreetMapPlaceInput
+                  <GooglePlacesAutocomplete
                     id="dropLocation"
                     name="dropLocation"
-                    value={formData.dropLocation || ""}
+                    value={normalizeAddressValue(formData.dropLocation)}
                     placeholder="Search garage, home, or service center..."
                     iconTone="drop"
                     onTextChange={emitTextChange}

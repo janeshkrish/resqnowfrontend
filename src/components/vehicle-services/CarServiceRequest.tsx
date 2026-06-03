@@ -44,6 +44,7 @@ const CarServiceRequest = () => {
     towingEstimate,
     isEstimatingTowing,
     towingEstimateError,
+    towingEstimateWarning,
     canProceed,
     submitRequest,
     handleNext,
@@ -121,6 +122,7 @@ const CarServiceRequest = () => {
                 towingEstimate={towingEstimate}
                 isEstimatingTowing={isEstimatingTowing}
                 towingEstimateError={towingEstimateError}
+                towingEstimateWarning={towingEstimateWarning}
               />
             )}
 

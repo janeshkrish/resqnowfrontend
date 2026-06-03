@@ -61,6 +61,22 @@ import {
   normalizeServiceRequestPaymentMode,
 } from "@/utils/serviceRequestPayment";
 
+type MapLocation = { lat: number; lng: number };
+
+const normalizeMapCoordinate = (value: unknown): number | null => {
+  if (value == null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const buildMapLocation = (latValue: unknown, lngValue: unknown): MapLocation | null => {
+  const lat = normalizeMapCoordinate(latValue);
+  const lng = normalizeMapCoordinate(lngValue);
+  return lat === null || lng === null ? null : { lat, lng };
+};
+
 const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   pending: {
     title: "Finding a nearby technician",
@@ -723,14 +739,16 @@ const RequestTracking = () => {
   const technicianRatingLabel =
     Number.isFinite(technicianRating) && technicianRating > 0 ? technicianRating.toFixed(1) : "N/A";
   const technicianJobs = Number(technician?.completedJobs || 0);
+  const technicianMapLocation = useMemo(
+    () => buildMapLocation(technician?.location_lat, technician?.location_lng),
+    [technician?.location_lat, technician?.location_lng]
+  );
+  const requestMapLocation = useMemo(
+    () => buildMapLocation(request?.location_lat, request?.location_lng),
+    [request?.location_lat, request?.location_lng]
+  );
   const liveTrackingMetrics = useMemo(() => {
-    const hasBothLocations =
-      Number.isFinite(Number(technician?.location_lat)) &&
-      Number.isFinite(Number(technician?.location_lng)) &&
-      Number.isFinite(Number(request?.location_lat)) &&
-      Number.isFinite(Number(request?.location_lng));
-
-    if (!hasBothLocations) {
+    if (!technicianMapLocation || !requestMapLocation) {
       return {
         eta:
           status === "arrived"
@@ -753,10 +771,10 @@ const RequestTracking = () => {
       };
     }
 
-    const technicianLat = Number(technician?.location_lat);
-    const technicianLng = Number(technician?.location_lng);
-    const requestLat = Number(request?.location_lat);
-    const requestLng = Number(request?.location_lng);
+    const technicianLat = technicianMapLocation.lat;
+    const technicianLng = technicianMapLocation.lng;
+    const requestLat = requestMapLocation.lat;
+    const requestLng = requestMapLocation.lng;
     const toRad = (value: number) => (value * Math.PI) / 180;
     const earthRadiusKm = 6371;
     const deltaLat = toRad(requestLat - technicianLat);
@@ -787,11 +805,9 @@ const RequestTracking = () => {
       distanceLabel: `${distanceKm.toFixed(1)} km away`,
     };
   }, [
-    request?.location_lat,
-    request?.location_lng,
+    requestMapLocation,
     status,
-    technician?.location_lat,
-    technician?.location_lng,
+    technicianMapLocation,
   ]);
   const eta = liveTrackingMetrics.eta;
   const distanceLabel = liveTrackingMetrics.distanceLabel;
@@ -983,8 +999,8 @@ const RequestTracking = () => {
     setSheetMode("sheet");
   };
 
-  const serviceLocationLabel = request.address?.trim() || "Location is being updated";
-  const serviceTypeLabel = [formatDisplayLabel(request.vehicle_type), formatDisplayLabel(request.service_type)]
+  const serviceLocationLabel = request?.address?.trim() || "Location is being updated";
+  const serviceTypeLabel = [formatDisplayLabel(request?.vehicle_type), formatDisplayLabel(request?.service_type)]
     .filter(Boolean)
     .join(" ");
   const paymentMethodLabel = paymentCompleted
@@ -1061,7 +1077,7 @@ const RequestTracking = () => {
   const trackingSteps = [
     {
       label: "Placed",
-      caption: formatCompactTime(request.created_at) || "Created",
+      caption: formatCompactTime(request?.created_at) || "Created",
       complete: stageIndex >= 0,
       active: stageIndex === 0,
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
@@ -1082,14 +1098,14 @@ const RequestTracking = () => {
     },
     {
       label: "Service",
-      caption: formatCompactTime(request.started_at) || "Pending",
+      caption: formatCompactTime(request?.started_at) || "Pending",
       complete: stageIndex >= 3,
       active: stageIndex === 3,
       icon: <Wrench className="h-3.5 w-3.5" />,
     },
     {
       label: "Completed",
-      caption: paymentCompleted ? "Paid" : formatCompactTime(request.completed_at) || "Pending",
+      caption: paymentCompleted ? "Paid" : formatCompactTime(request?.completed_at) || "Pending",
       complete: stageIndex >= 4,
       active: stageIndex === 4,
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
@@ -1149,10 +1165,8 @@ const RequestTracking = () => {
             />
           ) : (
             <LiveTrackingMap
-              techLocation={
-                technician?.location_lat ? { lat: technician.location_lat, lng: technician.location_lng } : null
-              }
-              userLocation={request.location_lat ? { lat: request.location_lat, lng: request.location_lng } : null}
+              techLocation={technicianMapLocation}
+              userLocation={requestMapLocation}
               dropLocation={dropLocation}
               routePolyline={routePolyline}
               eta={eta}
@@ -1532,8 +1546,8 @@ const RequestTracking = () => {
         <Card className="overflow-hidden rounded-2xl border-border/80">
           <CardContent className="p-0">
             <LiveTrackingMap
-              techLocation={technician?.location_lat ? { lat: technician.location_lat, lng: technician.location_lng } : null}
-              userLocation={request.location_lat ? { lat: request.location_lat, lng: request.location_lng } : null}
+              techLocation={technicianMapLocation}
+              userLocation={requestMapLocation}
               dropLocation={dropLocation}
               routePolyline={routePolyline}
               eta={eta}

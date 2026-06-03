@@ -38,6 +38,7 @@ interface LocationStepProps {
   towingEstimate?: any;
   isEstimatingTowing?: boolean;
   towingEstimateError?: string | null;
+  towingEstimateWarning?: string | null;
 }
 
 const normalizeAddressValue = (value: unknown): string => {
@@ -146,7 +147,8 @@ const LocationStep = ({
   onGetCurrentDropLocation,
   towingEstimate,
   isEstimatingTowing,
-  towingEstimateError
+  towingEstimateError,
+  towingEstimateWarning
 }: LocationStepProps) => {
 
   const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(
@@ -469,6 +471,7 @@ const LocationStep = ({
               estimate={towingEstimate}
               loading={isEstimatingTowing}
               error={towingEstimateError}
+              warning={towingEstimateWarning}
             />
           )}
         </div>

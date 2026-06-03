@@ -42,6 +42,70 @@ const normalizeAddressValue = (value: unknown): string => {
   return String(value).trim();
 };
 
+const normalizeCoordinateValue = (value: unknown): number | null => {
+  if (value == null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const hasFiniteCoordinate = (value: unknown) => normalizeCoordinateValue(value) !== null;
+
+const normalizeCoordinateKey = (value: unknown) => {
+  const parsed = normalizeCoordinateValue(value);
+  return parsed !== null ? parsed.toFixed(6) : "";
+};
+
+const buildTowingEstimateInputKey = ({
+  formData,
+  serviceId,
+  vehicleType,
+}: {
+  formData: ServiceRequestFormData;
+  serviceId?: string;
+  vehicleType: string;
+}) =>
+  [
+    String(serviceId || "").trim().toLowerCase(),
+    String(vehicleType || "").trim().toLowerCase(),
+    normalizeAddressValue(formData.location).toLowerCase(),
+    normalizeCoordinateKey(formData.locationLat),
+    normalizeCoordinateKey(formData.locationLng),
+    normalizeAddressValue(formData.dropLocation).toLowerCase(),
+    normalizeCoordinateKey(formData.dropLat),
+    normalizeCoordinateKey(formData.dropLng),
+    String(formData.vehicleType || "").trim().toLowerCase(),
+    String(formData.vehicleSubtype || "").trim().toLowerCase(),
+    String(formData.vehicleModel || "").trim().toLowerCase(),
+  ].join("|");
+
+const clearTowingEstimateDerivedFields = (formData: ServiceRequestFormData): ServiceRequestFormData => {
+  const hasDerivedFields =
+    formData.routeDistanceKm != null ||
+    formData.estimatedDuration != null ||
+    formData.pricingBreakdown != null ||
+    formData.finalEstimatedPrice != null;
+
+  if (!hasDerivedFields) return formData;
+
+  return {
+    ...formData,
+    routeDistanceKm: undefined,
+    estimatedDuration: undefined,
+    pricingBreakdown: null,
+    finalEstimatedPrice: null,
+  };
+};
+
+const isNonBlockingTowingEstimateEndpointFailure = (error: unknown) => {
+  const status = Number((error as { status?: unknown })?.status);
+  return status === 404 || status === 405 || status === 410 || status === 501;
+};
+
+const TOWING_ESTIMATE_UNAVAILABLE_MESSAGE =
+  "Live fare preview is temporarily unavailable. Continue and the verified fare will be confirmed when booking is created.";
+
 export function useUnifiedServiceRequestFlow({
   serviceId,
   vehicleType,
@@ -97,6 +161,9 @@ export function useUnifiedServiceRequestFlow({
   const [isEstimatingTowing, setIsEstimatingTowing] = useState(false);
   const [towingEstimate, setTowingEstimate] = useState<any>(null);
   const [towingEstimateError, setTowingEstimateError] = useState<string | null>(null);
+  const [towingEstimateWarning, setTowingEstimateWarning] = useState<string | null>(null);
+  const [towingEstimateInputKey, setTowingEstimateInputKey] = useState<string | null>(null);
+  const [towingEstimateWarningInputKey, setTowingEstimateWarningInputKey] = useState<string | null>(null);
   const [isDetectingGoogleLocation, setIsDetectingGoogleLocation] = useState(false);
   const googleAutoDetectAttemptedRef = useRef(false);
   const requiresDropLocation = isTowingServiceId(serviceId);
@@ -209,7 +276,8 @@ export function useUnifiedServiceRequestFlow({
 
   useEffect(() => {
     if (!requiresDropLocation || googleAutoDetectAttemptedRef.current) return;
-    if (normalizeAddressValue(formData.location) || (Number(formData.locationLat) && Number(formData.locationLng))) return;
+    const hasPickupCoordinates = hasFiniteCoordinate(formData.locationLat) && hasFiniteCoordinate(formData.locationLng);
+    if (normalizeAddressValue(formData.location) || hasPickupCoordinates) return;
     googleAutoDetectAttemptedRef.current = true;
     detectCurrentPickupWithGoogle();
   }, [detectCurrentPickupWithGoogle, formData.location, formData.locationLat, formData.locationLng, requiresDropLocation]);
@@ -303,16 +371,19 @@ export function useUnifiedServiceRequestFlow({
     if (currentStep === 2) {
       const pickupAddress = normalizeAddressValue(formData.location);
       const dropAddress = normalizeAddressValue(formData.dropLocation);
+      const pickupCoordinatesReady = hasFiniteCoordinate(formData.locationLat) && hasFiniteCoordinate(formData.locationLng);
+      const dropCoordinatesReady = hasFiniteCoordinate(formData.dropLat) && hasFiniteCoordinate(formData.dropLng);
+      const currentEstimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType });
+      const towingPreviewSatisfied =
+        Boolean(towingEstimate && !towingEstimateError && towingEstimateInputKey === currentEstimateInputKey) ||
+        Boolean(towingEstimateWarning && towingEstimateWarningInputKey === currentEstimateInputKey);
       if (!pickupAddress) return false;
       if (!requiresDropLocation) return true;
       return !!(
         dropAddress &&
-        Number(formData.locationLat) &&
-        Number(formData.locationLng) &&
-        Number(formData.dropLat) &&
-        Number(formData.dropLng) &&
-        towingEstimate &&
-        !towingEstimateError
+        pickupCoordinatesReady &&
+        dropCoordinatesReady &&
+        towingPreviewSatisfied
       );
     }
     if (currentStep === 3) {
@@ -344,6 +415,10 @@ export function useUnifiedServiceRequestFlow({
         `Request for ${serviceId}`;
       const pickupAddress = normalizeAddressValue(formData.location);
       const dropAddress = normalizeAddressValue(formData.dropLocation);
+      const pickupLat = normalizeCoordinateValue(formData.locationLat);
+      const pickupLng = normalizeCoordinateValue(formData.locationLng);
+      const dropLat = normalizeCoordinateValue(formData.dropLat);
+      const dropLng = normalizeCoordinateValue(formData.dropLng);
 
       const payload = {
         service_type: `${vehicleType}-${serviceId}`,
@@ -355,8 +430,8 @@ export function useUnifiedServiceRequestFlow({
         contact_email: formData.email,
         contact_name: formData.name,
         technician_id: allowDirectTechnician ? (techId || formData.selectedTechnicianId || null) : null,
-        location_lat: formData.locationLat || null,
-        location_lng: formData.locationLng || null
+        location_lat: pickupLat,
+        location_lng: pickupLng
       };
 
       if (requiresDropLocation) {
@@ -366,12 +441,12 @@ export function useUnifiedServiceRequestFlow({
           dropLocation: dropAddress,
           dropAddress,
           dropPlaceId: formData.dropPlaceId || formData.dropPlace?.placeId || null,
-          dropLat: formData.dropLat || null,
-          dropLng: formData.dropLng || null,
-          distanceKm: formData.routeDistanceKm || towingEstimate?.distanceKm || towingEstimate?.quote?.distance_km || null,
-          estimatedDuration: formData.estimatedDuration || towingEstimate?.estimatedDuration || towingEstimate?.quote?.estimated_duration || null,
-          pricingBreakdown: formData.pricingBreakdown || towingEstimate?.pricingBreakdown || towingEstimate?.quote?.pricing_breakdown || null,
-          finalEstimatedPrice: formData.finalEstimatedPrice || towingEstimate?.finalEstimatedPrice || towingEstimate?.quote?.final_estimated_price || null,
+          dropLat,
+          dropLng,
+          distanceKm: formData.routeDistanceKm ?? towingEstimate?.distanceKm ?? towingEstimate?.quote?.distance_km ?? null,
+          estimatedDuration: formData.estimatedDuration ?? towingEstimate?.estimatedDuration ?? towingEstimate?.quote?.estimated_duration ?? null,
+          pricingBreakdown: formData.pricingBreakdown ?? towingEstimate?.pricingBreakdown ?? towingEstimate?.quote?.pricing_breakdown ?? null,
+          finalEstimatedPrice: formData.finalEstimatedPrice ?? towingEstimate?.finalEstimatedPrice ?? towingEstimate?.quote?.final_estimated_price ?? null,
           timeOfDay: new Date().toISOString()
         });
       }
@@ -437,7 +512,7 @@ export function useUnifiedServiceRequestFlow({
     if (currentStep < 3) {
       const pickupAddress = normalizeAddressValue(formData.location);
       const dropAddress = normalizeAddressValue(formData.dropLocation);
-      if (currentStep === 2 && pickupAddress && (!formData.locationLat || !formData.locationLng)) {
+      if (currentStep === 2 && pickupAddress && (!hasFiniteCoordinate(formData.locationLat) || !hasFiniteCoordinate(formData.locationLng))) {
         const coords = await geocodeAddress(pickupAddress);
         if (coords) {
           setFormData((prev) => ({
@@ -457,7 +532,7 @@ export function useUnifiedServiceRequestFlow({
           }));
         }
       }
-      if (currentStep === 2 && requiresDropLocation && dropAddress && (!formData.dropLat || !formData.dropLng)) {
+      if (currentStep === 2 && requiresDropLocation && dropAddress && (!hasFiniteCoordinate(formData.dropLat) || !hasFiniteCoordinate(formData.dropLng))) {
         const coords = await geocodeAddress(dropAddress);
         if (coords) {
           setFormData((prev) => ({
@@ -498,25 +573,42 @@ export function useUnifiedServiceRequestFlow({
     if (!requiresDropLocation) {
       setTowingEstimate(null);
       setTowingEstimateError(null);
+      setTowingEstimateWarning(null);
+      setTowingEstimateInputKey(null);
+      setTowingEstimateWarningInputKey(null);
+      setFormData((prev) => clearTowingEstimateDerivedFields(prev));
       return;
     }
 
     const pickupAddress = normalizeAddressValue(formData.location);
     const dropAddress = normalizeAddressValue(formData.dropLocation);
-    const pickupReady = pickupAddress && Number(formData.locationLat) && Number(formData.locationLng);
-    const dropReady = dropAddress && Number(formData.dropLat) && Number(formData.dropLng);
+    const pickupLat = normalizeCoordinateValue(formData.locationLat);
+    const pickupLng = normalizeCoordinateValue(formData.locationLng);
+    const dropLat = normalizeCoordinateValue(formData.dropLat);
+    const dropLng = normalizeCoordinateValue(formData.dropLng);
+    const pickupReady = pickupAddress && pickupLat !== null && pickupLng !== null;
+    const dropReady = dropAddress && dropLat !== null && dropLng !== null;
     const vehicleReady = formData.vehicleType && formData.vehicleSubtype;
     if (!pickupReady || !dropReady || !vehicleReady) {
       setTowingEstimate(null);
       setTowingEstimateError(null);
+      setTowingEstimateWarning(null);
+      setTowingEstimateInputKey(null);
+      setTowingEstimateWarningInputKey(null);
+      setFormData((prev) => clearTowingEstimateDerivedFields(prev));
       return;
     }
 
     let cancelled = false;
     const controller = new AbortController();
+    const estimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType });
+    setFormData((prev) => clearTowingEstimateDerivedFields(prev));
     const timer = window.setTimeout(async () => {
       setIsEstimatingTowing(true);
       setTowingEstimateError(null);
+      setTowingEstimateWarning(null);
+      setTowingEstimateInputKey(null);
+      setTowingEstimateWarningInputKey(null);
       try {
         const response = await apiFetch("/api/pricing/towing-estimate", {
           method: "POST",
@@ -525,11 +617,11 @@ export function useUnifiedServiceRequestFlow({
             vehicleType,
             vehicleModel: buildVehicleModel(formData),
             pickupAddress,
-            pickupLat: formData.locationLat,
-            pickupLng: formData.locationLng,
+            pickupLat,
+            pickupLng,
             dropAddress,
-            dropLat: formData.dropLat,
-            dropLng: formData.dropLng,
+            dropLat,
+            dropLng,
             paymentMode: "upi",
             timeOfDay: new Date().toISOString()
           }),
@@ -538,12 +630,20 @@ export function useUnifiedServiceRequestFlow({
 
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new Error(data?.error || "Unable to estimate towing fare.");
+          const estimateError = new Error(data?.error || "Unable to estimate towing fare.") as Error & {
+            status?: number;
+            code?: string;
+          };
+          estimateError.status = response.status;
+          estimateError.code = data?.code;
+          throw estimateError;
         }
         if (cancelled) return;
         const quote = data?.quote || data;
         const pricingBreakdown = quote?.pricing_breakdown || data?.pricingBreakdown || null;
         setTowingEstimate(data);
+        setTowingEstimateInputKey(estimateInputKey);
+        setTowingEstimateWarningInputKey(null);
         setFormData((prev) => ({
           ...prev,
           routeDistanceKm: quote?.distance_km ?? data?.distanceKm ?? prev.routeDistanceKm,
@@ -554,6 +654,18 @@ export function useUnifiedServiceRequestFlow({
       } catch (error: any) {
         if (cancelled || error?.name === "AbortError") return;
         setTowingEstimate(null);
+        if (isNonBlockingTowingEstimateEndpointFailure(error)) {
+          setTowingEstimateWarning(TOWING_ESTIMATE_UNAVAILABLE_MESSAGE);
+          setTowingEstimateWarningInputKey(estimateInputKey);
+          setTowingEstimateInputKey(null);
+          setTowingEstimateError(null);
+          setFormData((prev) => clearTowingEstimateDerivedFields(prev));
+          return;
+        }
+        setTowingEstimateWarning(null);
+        setTowingEstimateInputKey(null);
+        setTowingEstimateWarningInputKey(null);
+        setFormData((prev) => clearTowingEstimateDerivedFields(prev));
         setTowingEstimateError(error?.message || "Unable to estimate towing fare.");
       } finally {
         if (!cancelled) setIsEstimatingTowing(false);
@@ -575,6 +687,7 @@ export function useUnifiedServiceRequestFlow({
     formData.dropLng,
     formData.vehicleType,
     formData.vehicleSubtype,
+    formData.vehicleModel,
     requiresDropLocation,
     serviceId,
     vehicleType
@@ -592,6 +705,7 @@ export function useUnifiedServiceRequestFlow({
     towingEstimate,
     isEstimatingTowing,
     towingEstimateError,
+    towingEstimateWarning,
     handleInputChange,
     handleLocationSelect,
     handleGetCurrentLocation,

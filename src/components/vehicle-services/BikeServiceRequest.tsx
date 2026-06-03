@@ -38,6 +38,7 @@ const BikeServiceRequest = () => {
     towingEstimate,
     isEstimatingTowing,
     towingEstimateError,
+    towingEstimateWarning,
     canProceed,
     submitRequest,
     handleNext,
@@ -120,6 +121,7 @@ const BikeServiceRequest = () => {
                 towingEstimate={towingEstimate}
                 isEstimatingTowing={isEstimatingTowing}
                 towingEstimateError={towingEstimateError}
+                towingEstimateWarning={towingEstimateWarning}
               />
             )}
 

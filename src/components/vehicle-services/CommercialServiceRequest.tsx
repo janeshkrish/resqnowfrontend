@@ -38,6 +38,7 @@ const CommercialServiceRequest = () => {
     towingEstimate,
     isEstimatingTowing,
     towingEstimateError,
+    towingEstimateWarning,
     canProceed,
     submitRequest,
     handleNext,
@@ -140,6 +141,7 @@ const CommercialServiceRequest = () => {
                 towingEstimate={towingEstimate}
                 isEstimatingTowing={isEstimatingTowing}
                 towingEstimateError={towingEstimateError}
+                towingEstimateWarning={towingEstimateWarning}
               />
             )}
 

@@ -6,6 +6,7 @@ type TowingEstimateCardProps = {
   estimate?: any;
   loading?: boolean;
   error?: string | null;
+  warning?: string | null;
 };
 
 const money = (value: unknown) => {
@@ -31,7 +32,7 @@ function SkeletonEstimate() {
   );
 }
 
-export default function TowingEstimateCard({ estimate, loading, error }: TowingEstimateCardProps) {
+export default function TowingEstimateCard({ estimate, loading, error, warning }: TowingEstimateCardProps) {
   const quote = estimate?.quote || estimate;
   const breakdown = quote?.pricing_breakdown || estimate?.pricingBreakdown || {};
   const distanceKm = quote?.distance_km ?? estimate?.distanceKm ?? breakdown.distance_km;
@@ -40,16 +41,16 @@ export default function TowingEstimateCard({ estimate, loading, error }: TowingE
 
   return (
     <AnimatePresence mode="wait">
-      {(loading || error || quote) && (
+      {(loading || error || warning || quote) && (
         <motion.div
-          key={loading ? "loading" : error ? "error" : "ready"}
+          key={loading ? "loading" : error ? "error" : warning ? "warning" : "ready"}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.22 }}
           className={cn(
             "rounded-2xl border bg-white p-4 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)]",
-            error ? "border-rose-200" : "border-slate-200"
+            error ? "border-rose-200" : warning ? "border-amber-200" : "border-slate-200"
           )}
         >
           <div className="mb-4 flex items-start justify-between gap-3">
@@ -69,6 +70,11 @@ export default function TowingEstimateCard({ estimate, loading, error }: TowingE
             <div className="flex gap-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
+            </div>
+          ) : warning ? (
+            <div className="flex gap-3 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{warning}</span>
             </div>
           ) : (
             <div className="space-y-4">

@@ -37,6 +37,7 @@ const EVServiceRequest = () => {
     towingEstimate,
     isEstimatingTowing,
     towingEstimateError,
+    towingEstimateWarning,
     canProceed,
     submitRequest,
     handleNext,
@@ -138,6 +139,7 @@ const EVServiceRequest = () => {
                 towingEstimate={towingEstimate}
                 isEstimatingTowing={isEstimatingTowing}
                 towingEstimateError={towingEstimateError}
+                towingEstimateWarning={towingEstimateWarning}
               />
             )}
 

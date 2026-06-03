@@ -1209,26 +1209,32 @@ const RequestTracking = () => {
         </div>
 
         <div className="absolute inset-x-0 bottom-0 z-40">
-          <div
+          <motion.section
+            ref={panelRef}
+            initial={reduceMotion ? undefined : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            drag="y"
+            dragListener={false}
+            dragControls={dragControls}
+            dragElastic={0.05}
+            dragMomentum={false}
+            dragConstraints={{ top: 0, bottom: sheetOffsets.map }}
+            onDragEnd={handleSheetDragEnd}
             className="mx-3 mb-[calc(env(safe-area-inset-bottom)+0.6rem)] overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/95 shadow-[0_-12px_36px_rgba(15,23,42,0.22)] backdrop-blur"
-            style={{ height: `${sheetHeightVh}dvh` }}
+            style={{ height: `${sheetPanelHeightVh}dvh`, y: sheetY, willChange: "transform" }}
           >
-            <div
-              role="slider"
-              aria-label="Resize tracking panel"
-              aria-valuemin={SHEET_MIN_VH}
-              aria-valuemax={SHEET_MAX_VH}
-              aria-valuenow={Math.round(sheetHeightVh)}
-              className="flex cursor-grab touch-none justify-center pb-1 pt-2 active:cursor-grabbing"
-              onPointerDown={handleSheetPointerDown}
-              onPointerMove={handleSheetPointerMove}
-              onPointerUp={handleSheetPointerUp}
-              onPointerCancel={handleSheetPointerUp}
-            >
-              <div className="h-1.5 w-12 rounded-full bg-slate-300" />
-            </div>
+            <div className="flex h-full flex-col">
+              <div
+                role="presentation"
+                className="shrink-0 cursor-grab touch-none pb-1 pt-2 active:cursor-grabbing"
+                onPointerDown={handleSheetDragStart}
+                style={{ touchAction: "none" }}
+              >
+                <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300" />
+              </div>
 
-            <div className="h-[calc(100%-2.25rem)] overflow-y-auto px-5 pb-5 pt-3">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">
@@ -1495,8 +1501,9 @@ const RequestTracking = () => {
                   </div>
                 </div>
               )}
+              </div>
             </div>
-          </div>
+          </motion.section>
         </div>
 
         <PaymentSummaryDialog

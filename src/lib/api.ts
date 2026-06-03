@@ -1869,7 +1869,13 @@ export async function apiFetch(
   try {
     return await fetch(apiUrl(path), { ...rest, headers: h });
   } catch (networkError) {
-    console.error("[apiFetch] network failure for", path, networkError);
+    const errorName =
+      typeof networkError === "object" && networkError !== null && "name" in networkError
+        ? String((networkError as { name?: unknown }).name || "")
+        : "";
+    if (errorName !== "AbortError") {
+      console.error("[apiFetch] network failure for", path, networkError);
+    }
     throw networkError;
   }
 }

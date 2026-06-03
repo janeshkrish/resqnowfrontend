@@ -1185,7 +1185,7 @@ const RequestTracking = () => {
               onClick={() => navigate("/")}
               className="h-10 w-10 rounded-full bg-card/95 text-foreground shadow-lg backdrop-blur"
             >
-              <ArrowRight className="h-5 w-5 rotate-180" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
             <Badge
               className={cn(

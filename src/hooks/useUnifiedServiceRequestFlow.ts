@@ -166,7 +166,14 @@ export function useUnifiedServiceRequestFlow({
   const [towingEstimateWarningInputKey, setTowingEstimateWarningInputKey] = useState<string | null>(null);
   const [isDetectingGoogleLocation, setIsDetectingGoogleLocation] = useState(false);
   const googleAutoDetectAttemptedRef = useRef(false);
+  const buildVehicleModelRef = useRef(buildVehicleModel);
+  const activeTowingEstimateInputKeyRef = useRef<string | null>(null);
+  const settledTowingEstimateInputKeyRef = useRef<string | null>(null);
   const requiresDropLocation = isTowingServiceId(serviceId);
+
+  useEffect(() => {
+    buildVehicleModelRef.current = buildVehicleModel;
+  }, [buildVehicleModel]);
 
   const {
     coordinates,
@@ -571,6 +578,8 @@ export function useUnifiedServiceRequestFlow({
 
   useEffect(() => {
     if (!requiresDropLocation) {
+      activeTowingEstimateInputKeyRef.current = null;
+      settledTowingEstimateInputKeyRef.current = null;
       setTowingEstimate(null);
       setTowingEstimateError(null);
       setTowingEstimateWarning(null);
@@ -590,6 +599,8 @@ export function useUnifiedServiceRequestFlow({
     const dropReady = dropAddress && dropLat !== null && dropLng !== null;
     const vehicleReady = formData.vehicleType && formData.vehicleSubtype;
     if (!pickupReady || !dropReady || !vehicleReady) {
+      activeTowingEstimateInputKeyRef.current = null;
+      settledTowingEstimateInputKeyRef.current = null;
       setTowingEstimate(null);
       setTowingEstimateError(null);
       setTowingEstimateWarning(null);
@@ -602,6 +613,14 @@ export function useUnifiedServiceRequestFlow({
     let cancelled = false;
     const controller = new AbortController();
     const estimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType });
+    if (
+      activeTowingEstimateInputKeyRef.current === estimateInputKey ||
+      settledTowingEstimateInputKeyRef.current === estimateInputKey
+    ) {
+      return;
+    }
+
+    activeTowingEstimateInputKeyRef.current = estimateInputKey;
     setFormData((prev) => clearTowingEstimateDerivedFields(prev));
     const timer = window.setTimeout(async () => {
       setIsEstimatingTowing(true);
@@ -615,7 +634,7 @@ export function useUnifiedServiceRequestFlow({
           body: JSON.stringify({
             serviceType: `${vehicleType}-towing`,
             vehicleType,
-            vehicleModel: buildVehicleModel(formData),
+            vehicleModel: buildVehicleModelRef.current(formData),
             pickupAddress,
             pickupLat,
             pickupLng,
@@ -641,6 +660,7 @@ export function useUnifiedServiceRequestFlow({
         if (cancelled) return;
         const quote = data?.quote || data;
         const pricingBreakdown = quote?.pricing_breakdown || data?.pricingBreakdown || null;
+        settledTowingEstimateInputKeyRef.current = estimateInputKey;
         setTowingEstimate(data);
         setTowingEstimateInputKey(estimateInputKey);
         setTowingEstimateWarningInputKey(null);
@@ -655,6 +675,7 @@ export function useUnifiedServiceRequestFlow({
         if (cancelled || error?.name === "AbortError") return;
         setTowingEstimate(null);
         if (isNonBlockingTowingEstimateEndpointFailure(error)) {
+          settledTowingEstimateInputKeyRef.current = estimateInputKey;
           setTowingEstimateWarning(TOWING_ESTIMATE_UNAVAILABLE_MESSAGE);
           setTowingEstimateWarningInputKey(estimateInputKey);
           setTowingEstimateInputKey(null);
@@ -666,19 +687,25 @@ export function useUnifiedServiceRequestFlow({
         setTowingEstimateInputKey(null);
         setTowingEstimateWarningInputKey(null);
         setFormData((prev) => clearTowingEstimateDerivedFields(prev));
+        settledTowingEstimateInputKeyRef.current = null;
         setTowingEstimateError(error?.message || "Unable to estimate towing fare.");
       } finally {
+        if (activeTowingEstimateInputKeyRef.current === estimateInputKey) {
+          activeTowingEstimateInputKeyRef.current = null;
+        }
         if (!cancelled) setIsEstimatingTowing(false);
       }
     }, 650);
 
     return () => {
       cancelled = true;
+      if (activeTowingEstimateInputKeyRef.current === estimateInputKey) {
+        activeTowingEstimateInputKeyRef.current = null;
+      }
       controller.abort();
       window.clearTimeout(timer);
     };
   }, [
-    buildVehicleModel,
     formData.location,
     formData.locationLat,
     formData.locationLng,

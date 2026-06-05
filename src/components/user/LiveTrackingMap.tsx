@@ -22,6 +22,7 @@ interface LiveTrackingMapProps {
   mapMode?: TrackingMapMode;
   onInteract?: () => void;
   routePolyline?: Array<[number, number]> | null;
+  showRoutePath?: boolean;
 }
 
 const FALLBACK_CENTER: [number, number] = [20.5937, 78.9629];
@@ -195,6 +196,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   mapMode = "balanced",
   onInteract,
   routePolyline,
+  showRoutePath = true,
 }) => {
   const reduceMotion = useReducedMotion();
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
@@ -215,17 +217,23 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
 
   const routeFallback = useMemo(
     () => {
+      if (!showRoutePath) return [];
       if (techPosition && userPosition && dropPosition) return [...buildRouteCurve(techPosition, userPosition), ...buildRouteCurve(userPosition, dropPosition).slice(1)];
       if (techPosition && userPosition) return buildRouteCurve(techPosition, userPosition);
       if (userPosition && dropPosition) return buildRouteCurve(userPosition, dropPosition);
       return [];
     },
-    [dropPosition, techPosition, userPosition],
+    [dropPosition, showRoutePath, techPosition, userPosition],
   );
 
   const techIcon = useMemo(() => createTechnicianIcon(normalizeEtaLabel(eta) || "Live"), [eta]);
 
   useEffect(() => {
+    if (!showRoutePath) {
+      setRoutePath([]);
+      return;
+    }
+
     if ((!techLocation && !userLocation) || (!userLocation && !dropLocation)) {
       setRoutePath([]);
       return;
@@ -266,7 +274,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     };
 
     void loadRoute();
-  }, [dropLocation, routePolyline, techLocation, userLocation]);
+  }, [dropLocation, routePolyline, showRoutePath, techLocation, userLocation]);
 
   const mapCenter: [number, number] = userPosition || techPosition || FALLBACK_CENTER;
   const statusLabel = normalizeStatusLabel(status);
@@ -337,7 +345,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         </>
       )}
 
-      {(routePath.length > 1 ? routePath : routeFallback).length > 1 && (
+      {showRoutePath && (routePath.length > 1 ? routePath : routeFallback).length > 1 && (
         <>
           <Polyline
             positions={routePath.length > 1 ? routePath : routeFallback}

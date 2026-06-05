@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Clock, Gauge, Loader2, ShieldCheck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,16 +37,12 @@ export default function TowingEstimateCard({ estimate, loading, error, warning }
   const distanceKm = quote?.distance_km ?? estimate?.distanceKm ?? breakdown.distance_km;
   const duration = quote?.estimated_duration ?? estimate?.estimatedDuration ?? breakdown.estimated_duration_minutes;
   const finalPrice = quote?.final_estimated_price ?? estimate?.finalEstimatedPrice ?? breakdown.final_estimated_price;
+  const showSkeleton = loading && !quote && !error && !warning;
 
   return (
-    <AnimatePresence mode="wait">
+    <>
       {(loading || error || warning || quote) && (
-        <motion.div
-          key={loading ? "loading" : error ? "error" : warning ? "warning" : "ready"}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.22 }}
+        <div
           className={cn(
             "rounded-2xl border bg-white p-4 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)]",
             error ? "border-rose-200" : warning ? "border-amber-200" : "border-slate-200"
@@ -64,7 +59,7 @@ export default function TowingEstimateCard({ estimate, loading, error, warning }
             {loading && <Loader2 className="h-5 w-5 animate-spin text-slate-500" />}
           </div>
 
-          {loading ? (
+          {showSkeleton ? (
             <SkeletonEstimate />
           ) : error ? (
             <div className="flex gap-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
@@ -121,9 +116,9 @@ export default function TowingEstimateCard({ estimate, loading, error, warning }
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }
 

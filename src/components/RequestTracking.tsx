@@ -55,6 +55,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { routePolylineFromMetadata } from "@/lib/geo";
+import { canonicalizeServiceKey } from "@/config/technicianNormalization";
 import {
   resolveServiceRequestPaymentDetails,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
@@ -371,12 +372,20 @@ const RequestTracking = () => {
     if (!isMobile) return;
 
     const updateViewportHeight = () => {
-      setViewportHeight(window.innerHeight);
+      const nextHeight = Math.round(window.visualViewport?.height || window.innerHeight);
+      setViewportHeight(nextHeight);
     };
 
+    const visualViewport = window.visualViewport;
     updateViewportHeight();
     window.addEventListener("resize", updateViewportHeight);
-    return () => window.removeEventListener("resize", updateViewportHeight);
+    visualViewport?.addEventListener("resize", updateViewportHeight);
+    visualViewport?.addEventListener("scroll", updateViewportHeight);
+    return () => {
+      window.removeEventListener("resize", updateViewportHeight);
+      visualViewport?.removeEventListener("resize", updateViewportHeight);
+      visualViewport?.removeEventListener("scroll", updateViewportHeight);
+    };
   }, [isMobile]);
 
   const selectedBackendPaymentMode = selectedPaymentMethod === "cash" ? "cash" : "upi";
@@ -730,6 +739,8 @@ const RequestTracking = () => {
   const status = normalizeRequestStatus(request?.status || "pending");
   const paymentStatus = normalizeRequestPaymentStatus(request?.payment_status);
   const paymentCompleted = paymentStatus === "paid" || status === "paid";
+  const requestServiceType = request?.service_type || (request as { serviceType?: string } | null)?.serviceType;
+  const isTowingRequest = canonicalizeServiceKey(requestServiceType) === "towing";
   const statusMeta = STATUS_COPY[status] || {
     title: "Request status updated",
     subtitle: "Your request is being processed."
@@ -818,17 +829,20 @@ const RequestTracking = () => {
       ? { lat: dropLat, lng: dropLng }
       : null;
   const routeDistanceKm = Number(request?.routeDistanceKm ?? request?.route_distance_km);
-  const routeSummaryVisible = Boolean(request?.drop_address || request?.dropLocation?.address || Number.isFinite(routeDistanceKm));
+  const routeSummaryVisible = isTowingRequest && Boolean(request?.drop_address || request?.dropLocation?.address || Number.isFinite(routeDistanceKm));
   const routePolyline = useMemo(
-    () =>
-      routePolylineFromMetadata(
+    () => {
+      if (!isTowingRequest) return [];
+      return routePolylineFromMetadata(
         request?.routePolyline
           ? { polyline: request.routePolyline }
           : request?.route_polyline
             ? { polyline: request.route_polyline }
             : request?.routeMetadata || request?.route_metadata || request?.routeGeometry || request?.route_geometry
-      ),
+      );
+    },
     [
+      isTowingRequest,
       request?.routePolyline,
       request?.route_polyline,
       request?.routeMetadata,
@@ -837,6 +851,12 @@ const RequestTracking = () => {
       request?.route_geometry,
     ]
   );
+  const trackingDropLocation = isTowingRequest ? dropLocation : null;
+  const trackingRoutePolyline = isTowingRequest ? routePolyline : null;
+  const mapDistanceLabel =
+    isTowingRequest && Number.isFinite(routeDistanceKm)
+      ? `${routeDistanceKm.toFixed(1)} km towing route`
+      : distanceLabel || undefined;
 
   const stageIndex = (() => {
     if (status === "pending") return 0;
@@ -1000,7 +1020,7 @@ const RequestTracking = () => {
   };
 
   const serviceLocationLabel = request?.address?.trim() || "Location is being updated";
-  const serviceTypeLabel = [formatDisplayLabel(request?.vehicle_type), formatDisplayLabel(request?.service_type)]
+  const serviceTypeLabel = [formatDisplayLabel(request?.vehicle_type), formatDisplayLabel(requestServiceType)]
     .filter(Boolean)
     .join(" ");
   const paymentMethodLabel = paymentCompleted
@@ -1011,6 +1031,30 @@ const RequestTracking = () => {
       ? "Cash on service"
       : "Online payment";
   const trackingSummary = useMemo(() => {
+    if (isTowingRequest && (status === "en_route_pickup" || status === "accepted" || status === "assigned")) {
+      return {
+        eyebrow: "Tow partner heading to pickup",
+        value: eta || "Live",
+        detail: distanceLabel || serviceLocationLabel,
+      };
+    }
+
+    if (isTowingRequest && (status === "vehicle_loaded" || status === "enroute_drop")) {
+      return {
+        eyebrow: "Towing route active",
+        value: Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : "In transit",
+        detail: request?.dropLocation?.address || request?.drop_address || "Moving toward drop location",
+      };
+    }
+
+    if (isTowingRequest && (status === "arrived_drop" || status === "service_completed")) {
+      return {
+        eyebrow: "Tow reached drop location",
+        value: status === "service_completed" ? "Complete" : "Arrived",
+        detail: showPayment ? "Payment is pending" : "Final confirmation is next",
+      };
+    }
+
     if (status === "en-route") {
       return {
         eyebrow: "Technician arriving in",
@@ -1061,7 +1105,11 @@ const RequestTracking = () => {
     currency,
     distanceLabel,
     elapsedSeconds,
+    isTowingRequest,
     paymentCompleted,
+    request?.dropLocation?.address,
+    request?.drop_address,
+    routeDistanceKm,
     serviceLocationLabel,
     showPayment,
     status,
@@ -1167,10 +1215,15 @@ const RequestTracking = () => {
             <LiveTrackingMap
               techLocation={technicianMapLocation}
               userLocation={requestMapLocation}
-              dropLocation={dropLocation}
-              routePolyline={routePolyline}
+              dropLocation={trackingDropLocation}
+              routePolyline={trackingRoutePolyline}
               eta={eta}
               variant="fullscreen"
+              status={status}
+              distanceLabel={mapDistanceLabel}
+              mapMode={sheetMode}
+              onInteract={handleMapInteract}
+              showRoutePath={isTowingRequest}
               className="h-full w-full"
             />
           )}
@@ -1234,7 +1287,44 @@ const RequestTracking = () => {
                 <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300" />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
+              <div
+                className={cn(
+                  "min-h-0 flex-1 px-5 pb-5 pt-3",
+                  sheetMode === "map" ? "overflow-hidden" : "overflow-y-auto"
+                )}
+              >
+              {sheetMode === "map" && (
+                <button
+                  type="button"
+                  onClick={() => setSheetMode("balanced")}
+                  className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-3.5 py-3 text-left shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] transition hover:border-slate-300"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                        {trackingSummary.eyebrow}
+                      </p>
+                      <div className="mt-1 flex items-baseline gap-2">
+                        <h2 className="truncate text-xl font-black tracking-tight text-slate-950">
+                          {trackingSummary.value}
+                        </h2>
+                        {serviceTypeLabel && (
+                          <span className="truncate text-[11px] font-bold text-orange-600">
+                            {serviceTypeLabel}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                        {collapsedPreviewLabel}
+                      </p>
+                    </div>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white">
+                      <ChevronUp className="h-5 w-5" />
+                    </span>
+                  </div>
+                </button>
+              )}
+              <div className={cn(sheetMode === "map" ? "hidden" : "block")}>
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">
@@ -1406,7 +1496,7 @@ const RequestTracking = () => {
                 </div>
               )}
 
-              {!showPayment && (status === "en-route" || status === "in-progress") && (
+              {!showPayment && (status === "en-route" || status === "in-progress" || status === "en_route_pickup" || status === "vehicle_loaded" || status === "enroute_drop") && (
                 <div className="mt-4 rounded-2xl border border-border p-3">
                   <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
@@ -1503,6 +1593,7 @@ const RequestTracking = () => {
               )}
               </div>
             </div>
+            </div>
           </motion.section>
         </div>
 
@@ -1555,9 +1646,12 @@ const RequestTracking = () => {
             <LiveTrackingMap
               techLocation={technicianMapLocation}
               userLocation={requestMapLocation}
-              dropLocation={dropLocation}
-              routePolyline={routePolyline}
+              dropLocation={trackingDropLocation}
+              routePolyline={trackingRoutePolyline}
               eta={eta}
+              status={status}
+              distanceLabel={mapDistanceLabel}
+              showRoutePath={isTowingRequest}
               className="mb-0"
             />
           </CardContent>

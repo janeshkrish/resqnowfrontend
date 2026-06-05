@@ -95,21 +95,21 @@ const FindingTechnician = ({ vehicleType = 'car', serviceType = '' }: FindingTec
             />
             
             {/* Soft Core Ambient Glow */}
-            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-50 rounded-full blur-[80px] pointer-events-none" />
+            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[80px] pointer-events-none" />
 
             <div className="relative z-10 flex flex-col items-center justify-center -mt-24">
                 {/* Radar System Wrapper */}
                 <div className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center">
                     
                     {/* Clean expanding radar rings in brand color */}
-                    <div className="absolute inset-0 border border-rose-400 rounded-full radar-pulse shadow-[0_0_30px_rgba(225,29,72,0.1)]" />
-                    <div className="absolute inset-0 border border-rose-300/60 rounded-full radar-pulse-delayed shadow-[0_0_20px_rgba(225,29,72,0.05)]" />
+                    <div className="absolute inset-0 border border-primary/50 rounded-full radar-pulse shadow-[0_0_30px_rgba(var(--primary),0.1)]" />
+                    <div className="absolute inset-0 border border-primary/30 rounded-full radar-pulse-delayed shadow-[0_0_20px_rgba(var(--primary),0.05)]" />
                     
                     {/* Orbiting Map Pin */}
                     <div className="absolute inset-0 radar-spin">
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center justify-center border border-slate-100">
-                             <div className="w-6 h-6 bg-rose-50 rounded-full flex items-center justify-center">
-                                <ContextIcon className="w-3.5 h-3.5 text-rose-500" strokeWidth={2.5} />
+                             <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                                <ContextIcon className="w-3.5 h-3.5 text-primary" strokeWidth={2.5} />
                              </div>
                         </div>
                     </div>
@@ -125,8 +125,8 @@ const FindingTechnician = ({ vehicleType = 'car', serviceType = '' }: FindingTec
                         </div>
                         {/* Minimalist Live Data Ping */}
                         <div className="absolute top-1 right-2 sm:top-2 sm:right-3 flex h-4 w-4">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60"></span>
-                            <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 border-2 border-white"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60"></span>
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-primary border-2 border-white"></span>
                         </div>
                     </div>
                 </div>
@@ -138,16 +138,13 @@ const FindingTechnician = ({ vehicleType = 'car', serviceType = '' }: FindingTec
                     </h3>
                     
                     <div className="inline-flex items-center gap-2.5 bg-white border border-slate-200/60 py-2.5 px-5 sm:px-6 rounded-full shadow-[0_8px_20px_rgba(0,0,0,0.04)] max-w-full overflow-hidden shrink-0">
-                        <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
+                        <Sparkles className="w-4 h-4 text-primary shrink-0" />
                         <span className="text-xs sm:text-[13px] font-semibold text-slate-600 truncate animate-[shimmer_3s_linear_infinite] bg-[linear-gradient(110deg,#475569,45%,#0f172a,55%,#475569)] bg-[length:200%_100%] bg-clip-text text-transparent">
                             {subtitle}
                         </span>
                     </div>
                 </div>
             </div>
-
-            {/* Bottom Gradient Fade to merge with white bottom sheet */}
-            <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none z-10" />
         </div>
     );
 };

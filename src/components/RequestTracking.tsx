@@ -1261,7 +1261,8 @@ const RequestTracking = () => {
           </div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-40">
+        {status !== "pending" && (
+          <div className="absolute inset-x-0 bottom-0 z-40">
           <motion.section
             ref={panelRef}
             initial={reduceMotion ? undefined : { opacity: 0 }}
@@ -1274,7 +1275,7 @@ const RequestTracking = () => {
             dragMomentum={false}
             dragConstraints={{ top: 0, bottom: sheetOffsets.map }}
             onDragEnd={handleSheetDragEnd}
-            className="mx-3 mb-[calc(env(safe-area-inset-bottom)+0.6rem)] overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/95 shadow-[0_-12px_36px_rgba(15,23,42,0.22)] backdrop-blur"
+            className="mx-0 mb-0 w-full overflow-hidden rounded-t-[28px] border-t border-slate-200/80 bg-white/95 shadow-[0_-20px_40px_rgba(0,0,0,0.08)] backdrop-blur pb-[max(env(safe-area-inset-bottom),1rem)]"
             style={{ height: `${sheetPanelHeightVh}dvh`, y: sheetY, willChange: "transform" }}
           >
             <div className="flex h-full flex-col">
@@ -1309,7 +1310,7 @@ const RequestTracking = () => {
                           {trackingSummary.value}
                         </h2>
                         {serviceTypeLabel && (
-                          <span className="truncate text-[11px] font-bold text-orange-600">
+                          <span className="truncate text-[11px] font-bold text-primary">
                             {serviceTypeLabel}
                           </span>
                         )}
@@ -1347,7 +1348,7 @@ const RequestTracking = () => {
               {routeSummaryVisible && (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                    <MapPin className="h-3.5 w-3.5 text-orange-500" />
+                    <MapPin className="h-3.5 w-3.5 text-primary" />
                     Towing route
                   </div>
                   <div className="space-y-2 text-xs font-semibold text-slate-700">
@@ -1375,7 +1376,7 @@ const RequestTracking = () => {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-700"
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-700"
                     style={{ width: `${stageProgress}%` }}
                   />
                 </div>
@@ -1386,7 +1387,7 @@ const RequestTracking = () => {
                         <CircleDot
                           className={cn(
                             "h-4 w-4",
-                            index <= stageIndex ? "text-orange-500" : "text-muted-foreground/40"
+                            index <= stageIndex ? "text-primary" : "text-muted-foreground/40"
                           )}
                         />
                       </div>
@@ -1422,7 +1423,7 @@ const RequestTracking = () => {
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate text-sm font-bold text-foreground">{technician.name}</h3>
                         <div className="mt-0.5 flex items-center text-[11px] font-medium text-muted-foreground">
-                          <Star className="mr-1 h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                          <Star className="mr-1 h-3.5 w-3.5 fill-primary text-primary" />
                           <span className="mr-1 text-foreground">{technicianRatingLabel}</span>
                           <span>| {Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
                         </div>
@@ -1431,7 +1432,7 @@ const RequestTracking = () => {
                         <Button
                           size="icon"
                           variant="outline"
-                          className="h-10 w-10 rounded-full border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                          className="h-10 w-10 rounded-full border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
                           asChild
                         >
                           <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
@@ -1440,7 +1441,7 @@ const RequestTracking = () => {
                         </Button>
                         <Button
                           size="icon"
-                          className="h-10 w-10 rounded-full bg-orange-600 text-white hover:bg-orange-500"
+                          className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
                           asChild
                         >
                           <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
@@ -1454,7 +1455,7 @@ const RequestTracking = () => {
               ) : status === "pending" ? (
                 <div className="mt-4 rounded-2xl border border-border bg-muted/50 p-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <RefreshCw className="h-4 w-4 animate-spin text-orange-500" />
+                    <RefreshCw className="h-4 w-4 animate-spin text-primary" />
                     Matching with nearby partners...
                   </div>
                 </div>
@@ -1462,7 +1463,7 @@ const RequestTracking = () => {
 
               {showPayment && !paymentCompleted && (
                 <div className="mt-4 space-y-2">
-                  <div className="overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 text-white shadow-lg">
+                  <div className="overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-primary text-white shadow-lg">
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div>
@@ -1520,7 +1521,7 @@ const RequestTracking = () => {
 
               <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-3">
                 <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                  <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <p className="leading-relaxed">
                     Request ID #{request.id} | Keep this screen open for real-time updates and payment confirmation.
                   </p>
@@ -1596,6 +1597,7 @@ const RequestTracking = () => {
             </div>
           </motion.section>
         </div>
+        )}
 
         <PaymentSummaryDialog
           isOpen={showPaymentSummary}

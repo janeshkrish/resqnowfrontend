@@ -355,12 +355,14 @@ export async function getAdminRequests(params: {
 }
 
 export async function assignAdminRequest(payload: { requestId: number; technicianId: number }) {
-  const { data } = await adminApi.post("/assign", payload);
+  const { data } = await adminApi.post(`/requests/${payload.requestId}/assign`, {
+    technicianId: payload.technicianId,
+  });
   return data;
 }
 
 export async function escalateAdminRequest(payload: { requestId: number; reason?: string; radiusKm?: number }) {
-  const { data } = await adminApi.post("/escalate", payload);
+  const { data } = await adminApi.post(`/requests/${payload.requestId}/escalate`, payload);
   return data;
 }
 
@@ -380,7 +382,7 @@ export async function overrideAdminRequestPricing(payload: {
   finalPrice?: number;
   reason?: string;
 }) {
-  const { data } = await adminApi.post("/requests/pricing-override", payload);
+  const { data } = await adminApi.post(`/requests/${payload.requestId}/fare`, payload);
   return data;
 }
 

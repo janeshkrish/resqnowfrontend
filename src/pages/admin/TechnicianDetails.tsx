@@ -10,6 +10,11 @@ import { mapTechnicianData } from "@/utils/technicianMappers";
 import { io } from "socket.io-client";
 import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianReviews from "@/components/rating/TechnicianReviews";
+import TechnicianImageGallery from "@/components/admin/TechnicianImageGallery";
+import {
+  AdminTechnicianProfile,
+  getAdminTechnicianProfile,
+} from "@/services/adminDetailsService";
 import {
   User,
   MapPin,
@@ -23,7 +28,12 @@ import {
   Smartphone,
   Wrench,
   Plus,
-  Trash2
+  Trash2,
+  IndianRupee,
+  CircleCheckBig,
+  CircleX,
+  ClipboardList,
+  Truck
 } from "lucide-react";
 
 type EditableServiceCostRow = {
@@ -89,6 +99,33 @@ const toEditableServiceCostRows = (value: any): EditableServiceCostRow[] => {
   }));
 };
 
+const formatLabel = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const displayValue = (value: any) => {
+  if (value == null || value === "") return "-";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.length ? value.map((item) => displayValue(item)).join(", ") : "-";
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    return entries.length
+      ? entries.map(([key, item]) => `${formatLabel(key)}: ${displayValue(item)}`).join(" | ")
+      : "-";
+  }
+  return String(value);
+};
+
+const VerificationBadge = ({ status }: { status?: string }) => (
+  <Badge
+    variant={status === "verified" ? "success" : status === "rejected" ? "destructive" : "secondary"}
+    className="capitalize"
+  >
+    {status || "pending"}
+  </Badge>
+);
+
 const TechnicianDetails = () => {
   const { technicianId } = useParams<{ technicianId: string }>();
   const [technician, setTechnician] = useState<Technician | null>(null);
@@ -99,6 +136,7 @@ const TechnicianDetails = () => {
   const [isPricingEditMode, setIsPricingEditMode] = useState(false);
   const [decisionReason, setDecisionReason] = useState("");
   const [approvalAudit, setApprovalAudit] = useState<any[]>([]);
+  const [adminProfile, setAdminProfile] = useState<AdminTechnicianProfile | null>(null);
   const [editForm, setEditForm] = useState<EditableTechnicianForm>({
     shop_name: "",
     proprietor_name: "",
@@ -125,7 +163,10 @@ const TechnicianDetails = () => {
   const fetchTechnicianDetails = useCallback(async () => {
     if (!technicianId) return;
     try {
-      const res = await apiFetch(`/api/technicians/${technicianId}`, { method: "GET", admin: true });
+      const [res, profile] = await Promise.all([
+        apiFetch(`/api/technicians/${technicianId}`, { method: "GET", admin: true }),
+        getAdminTechnicianProfile(technicianId).catch(() => null),
+      ]);
       if (!res.ok) {
         setTechnician(null);
         return;
@@ -133,6 +174,7 @@ const TechnicianDetails = () => {
       const data = await res.json();
       const mapped = mapTechnicianData(data);
       setTechnician(mapped);
+      setAdminProfile(profile);
       setEditForm({
         shop_name: mapped.name || "",
         proprietor_name: mapped.proprietor_name || "",
@@ -434,45 +476,57 @@ const TechnicianDetails = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {[
+              { label: "Total Jobs", value: adminProfile?.statistics.totalJobs ?? technician.jobs_completed ?? 0, icon: ClipboardList },
+              { label: "Completed", value: adminProfile?.statistics.completedJobs ?? technician.jobs_completed ?? 0, icon: CircleCheckBig },
+              { label: "Cancelled", value: adminProfile?.statistics.cancelledJobs ?? 0, icon: CircleX },
+              { label: "Rating", value: Number(adminProfile?.statistics.rating ?? technician.rating ?? 0).toFixed(1), icon: Star },
+              {
+                label: "Revenue",
+                value: `INR ${Number(adminProfile?.statistics.revenueEarned ?? technician.total_earnings ?? 0).toLocaleString("en-IN")}`,
+                icon: IndianRupee,
+              },
+            ].map((stat) => (
+              <Card key={stat.label}>
+                <CardContent className="p-4">
+                  <stat.icon className="mb-2 h-5 w-5 text-primary" />
+                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="mt-1 text-lg font-bold">{stat.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           {/* --- PHOTOS SECTION --- */}
           <Card>
-            <CardHeader><CardTitle>Shop & Identity Verification</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Image Gallery</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { key: "profile_photo", label: "Profile", icon: User },
-                  { key: "garage_front", label: "Shop Front", icon: MapPin },
-                  { key: "tools_photo", label: "Tools", icon: Wrench },
-                  { key: "facilities_photo", label: "Facilities", icon: Briefcase },
-                ].map((item, i) => {
-                  const imageSrc = resolveDocumentUrl(editForm.documents[item.key as keyof EditableTechnicianForm["documents"]]);
-                  return (
-                  <div key={i} className="border rounded-lg p-2 text-center">
-                    <div className="mb-2 h-24 bg-muted/50 rounded flex items-center justify-center overflow-hidden">
-                      {imageSrc ? (
-                        <img src={imageSrc} alt={item.label} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => window.open(imageSrc, "_blank", "noopener,noreferrer")} />
-                      ) : (
-                        <item.icon className="h-8 w-8 text-slate-300" />
-                      )}
-                    </div>
-                    <p className="text-xs font-medium">{item.label}</p>
+              <TechnicianImageGallery
+                documents={adminProfile?.documents || editForm.documents}
+                resolveUrl={resolveDocumentUrl}
+              />
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {Object.keys(editForm.documents).map((key) => (
+                  <label key={key} className="text-xs font-medium text-muted-foreground">
+                    {formatLabel(key)}
                     <input
                       type="text"
-                      className="mt-2 w-full rounded border border-input bg-transparent px-2 py-1 text-[11px]"
+                      className="mt-1 w-full rounded border border-input bg-transparent px-2 py-1.5 text-xs"
                       placeholder="Image URL / path"
-                      value={editForm.documents[item.key as keyof EditableTechnicianForm["documents"]] || ""}
+                      value={editForm.documents[key as keyof EditableTechnicianForm["documents"]] || ""}
                       onChange={(e) =>
                         setEditForm((prev) => ({
                           ...prev,
                           documents: {
                             ...prev.documents,
-                            [item.key]: e.target.value
+                            [key]: e.target.value
                           }
                         }))
                       }
                     />
-                  </div>
-                )})}
+                  </label>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -737,6 +791,79 @@ const TechnicianDetails = () => {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader><CardTitle>Services & Fleet</CardTitle></CardHeader>
+            <CardContent className="space-y-5">
+              <div>
+                <p className="mb-2 text-sm text-muted-foreground">Selected Services</p>
+                <div className="flex flex-wrap gap-2">
+                  {(adminProfile?.services || technician.specialties || []).map((service) => (
+                    <Badge key={service} variant="secondary">{formatLabel(service)}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-sm text-muted-foreground">Fleet Selected</p>
+                <div className="flex flex-wrap gap-2">
+                  {adminProfile?.fleet.selectedTypes.length
+                    ? adminProfile.fleet.selectedTypes.map((fleetType) => (
+                        <Badge key={fleetType} variant="outline">
+                          <Truck className="mr-1 h-3 w-3" /> {formatLabel(fleetType)}
+                        </Badge>
+                      ))
+                    : <span className="text-sm text-muted-foreground">No towing fleet selected.</span>}
+                </div>
+              </div>
+              {adminProfile?.fleet.vehicles.length ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {adminProfile.fleet.vehicles.map((vehicle) => (
+                    <div key={vehicle.id} className="rounded-xl border p-3 text-sm">
+                      <p className="font-semibold">{formatLabel(vehicle.vehicleType)} - {vehicle.vehicleNumber}</p>
+                      <p className="text-muted-foreground">Capacity: {vehicle.capacity || "-"} | Status: {formatLabel(vehicle.status)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Pricing Information</CardTitle></CardHeader>
+            <CardContent>
+              {adminProfile?.pricing.rows.length ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {adminProfile.pricing.rows.map((price) => (
+                    <div key={`${price.id}-${price.serviceDomain}-${price.vehicleType}`} className="rounded-xl border p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <p className="font-semibold">{formatLabel(price.serviceDomain)}</p>
+                        <Badge variant="outline">{formatLabel(price.vehicleType || "All Vehicles")}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {Object.entries({
+                          "Base Charge": price.baseCharge,
+                          "Free Distance": price.freeDistance == null ? null : `${price.freeDistance} km`,
+                          "Cost/KM": price.costPerKm,
+                          "Delivery Charge": price.deliveryCharge,
+                          "Service Charge": price.serviceCharge,
+                          "Visit Charge": price.visitCharge,
+                          "Labour Min": price.labourMin,
+                          "Labour Max": price.labourMax,
+                        }).map(([label, value]) => (
+                          <div key={label} className="rounded-lg bg-muted/40 p-2">
+                            <p className="text-xs text-muted-foreground">{label}</p>
+                            <p className="font-medium">{value == null ? "-" : label === "Free Distance" ? String(value) : `INR ${value}`}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No structured pricing configured.</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* --- CUSTOMER REVIEWS (HEAD Feature) --- */}
           <Card>
             <CardHeader>
@@ -840,14 +967,44 @@ const TechnicianDetails = () => {
           <Card>
             <CardHeader><CardTitle>Documents & IDs</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex justify-between border-b pb-2"><span>Aadhaar</span> <span className="font-medium">{technician.aadhaar_number || "-"}</span></div>
-              <div className="flex justify-between border-b pb-2"><span>PAN</span> <span className="font-medium">{technician.pan_number || "-"}</span></div>
-              <div className="flex justify-between border-b pb-2"><span>GST</span> <span className="font-medium">{technician.gst_number || "-"}</span></div>
+              {[
+                ["Aadhaar", adminProfile?.verification.aadhaar.number || technician.aadhaar_number, adminProfile?.verification.aadhaar.status],
+                ["PAN", adminProfile?.verification.pan.number || technician.pan_number, adminProfile?.verification.pan.status],
+                ["Driving License", adminProfile?.verification.drivingLicense.number, adminProfile?.verification.drivingLicense.status],
+                ["GST", adminProfile?.verification.gst.number || technician.gst_number, adminProfile?.verification.gst.status],
+                ["Business Registration", adminProfile?.verification.businessRegistration.number || technician.trade_license_number, adminProfile?.verification.businessRegistration.status],
+              ].map(([label, number, status]) => (
+                <div key={String(label)} className="flex items-center justify-between gap-3 border-b pb-2 text-sm">
+                  <div>
+                    <p>{label}</p>
+                    <p className="text-xs text-muted-foreground">{number || "-"}</p>
+                  </div>
+                  <VerificationBadge status={String(status || technician.verification_status)} />
+                </div>
+              ))}
               {technician.resume_url && (
                 <Button variant="outline" className="w-full" asChild>
                   <a href={technician.resume_url} target="_blank">View Resume</a>
                 </Button>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Complete Registration Data</CardTitle></CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {[
+                ["Business Information", adminProfile?.businessInfo],
+                ["Vehicle Categories", adminProfile?.fleet.vehicleCategories],
+                ["Working Hours", adminProfile?.registration.workingHours || technician.working_hours],
+                ["App Readiness", adminProfile?.appReadiness || technician.app_readiness],
+                ["Payment Details", adminProfile?.paymentDetails || technician.payment_details],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-xl border p-3">
+                  <p className="mb-2 font-semibold">{label}</p>
+                  <p className="break-words text-muted-foreground">{displayValue(value)}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
 

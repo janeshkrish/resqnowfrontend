@@ -71,9 +71,14 @@ export const mapTechnicianData = (data: any): Technician => {
 
     // Mapped missing fields
     proprietor_name: data.proprietor_name,
+    alternate_phone: data.alternate_phone,
+    whatsapp_number: data.whatsapp_number,
+    google_maps_link: data.google_maps_link,
     aadhaar_number: data.aadhaar_number,
     pan_number: data.pan_number,
+    business_type: data.business_type,
     gst_number: data.gst_number,
+    trade_license_number: data.trade_license_number,
     resume_url: resolveUrl(data.resume_url),
     documents: mappedDocuments,
     working_hours: parsedWorkingHours,

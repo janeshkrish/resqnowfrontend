@@ -23,6 +23,7 @@ type DataTableProps<T> = {
   emptyMessage?: string;
   pagination?: PaginationInfo;
   onPageChange?: (page: number) => void;
+  onRowClick?: (row: T) => void;
 };
 
 export default function DataTable<T>({
@@ -33,6 +34,7 @@ export default function DataTable<T>({
   emptyMessage = "No records found.",
   pagination,
   onPageChange,
+  onRowClick,
 }: DataTableProps<T>) {
   const resolveRowKey = (row: T, index: number) => {
     if (typeof rowKey === "function") return rowKey(row, index);
@@ -69,7 +71,22 @@ export default function DataTable<T>({
                   </tr>
                 ))
               : data.map((row, index) => (
-                  <tr key={resolveRowKey(row, index)} className="border-t border-slate-100 hover:bg-slate-50/60">
+                  <tr
+                    key={resolveRowKey(row, index)}
+                    className={`border-t border-slate-100 hover:bg-slate-50/60 ${onRowClick ? "cursor-pointer" : ""}`}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={(event) => {
+                      if (!onRowClick) return;
+                      if ((event.target as HTMLElement).closest("button, a, input, select, textarea")) return;
+                      onRowClick(row);
+                    }}
+                    onKeyDown={(event) => {
+                      if (onRowClick && (event.key === "Enter" || event.key === " ")) {
+                        event.preventDefault();
+                        onRowClick(row);
+                      }
+                    }}
+                  >
                     {columns.map((column) => (
                       <td
                         key={`${resolveRowKey(row, index)}-${column.key}`}

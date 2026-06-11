@@ -12,6 +12,7 @@ type ModalProps = {
   cancelText?: string;
   confirmDisabled?: boolean;
   loading?: boolean;
+  size?: "sm" | "lg" | "xl" | "full";
 };
 
 export default function Modal({
@@ -25,6 +26,7 @@ export default function Modal({
   cancelText = "Cancel",
   confirmDisabled = false,
   loading = false,
+  size = "sm",
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -40,11 +42,17 @@ export default function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
+  const sizeClass = {
+    sm: "max-w-lg",
+    lg: "max-w-3xl",
+    xl: "max-w-6xl",
+    full: "max-w-[96rem]",
+  }[size];
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+        className={`flex max-h-[94vh] w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl ${sizeClass}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -61,7 +69,7 @@ export default function Modal({
           </button>
         </div>
 
-        <div className="space-y-4">{children}</div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">{children}</div>
 
         <div className="mt-6 flex justify-end gap-2">
           <button

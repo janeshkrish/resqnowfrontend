@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import LocationDetector from "./LocationDetector";
+import DynamicPricingStep from "./DynamicPricingStep";
 import { technicianAuthService } from "@/services/technicianAuthService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -764,6 +765,14 @@ const ServiceConfigCard = ({ serviceId, index, register, watch, setValue, select
 
 const TechnicianSignupWizard = () => {
     const [currentStep, setCurrentStep] = useState(0);
+    const [pricingTemplate, setPricingTemplate] = useState<any>(null);
+
+    useEffect(() => {
+        apiFetch("/api/technicians/pricing-template")
+            .then(res => res.json())
+            .then(data => setPricingTemplate(data))
+            .catch(err => console.error(err));
+    }, []);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isTechnicianAgreementOpen, setIsTechnicianAgreementOpen] = useState(false);
     const [hasAcceptedTechnicianAgreement, setHasAcceptedTechnicianAgreement] = useState(false);
@@ -878,30 +887,10 @@ const TechnicianSignupWizard = () => {
             const normalizedSpecialties = normalizeSpecialtiesForApi(data.specialties);
             const normalizedVehicleTypes = normalizeVehicleTypesForApi(data.vehicle_types);
             const selectedSignupVehicleTypes = getSelectedSignupVehicleTypes(normalizedVehicleTypes);
-            const normalizedPricingConfig = normalizePricingConfigForApi(
-                Array.isArray(data.pricing_config)
-                    ? data.pricing_config.map((entry: Record<string, unknown>) => {
-                        const currentVehicleCategories = Array.isArray(entry?.vehicle_categories)
-                            ? entry.vehicle_categories.filter((vehicleType) => selectedSignupVehicleTypes.includes(vehicleType as SignupVehicleType))
-                            : [];
-
-                        return {
-                            ...entry,
-                            vehicle_categories:
-                                currentVehicleCategories.length > 0 ? currentVehicleCategories : [...selectedSignupVehicleTypes],
-                            towing_fleet_types:
-                                entry?.service_domain === "towing" || entry?.service_name === "towing"
-                                    ? data.towing_fleet_types || []
-                                    : entry?.towing_fleet_types,
-                        };
-                    })
-                    : []
-            );
-            const { serviceCosts, pricingSummary } = buildSignupPricingPayload(normalizedPricingConfig);
             const payload = {
                 ...data,
-                specialties: normalizedSpecialties,
-                vehicle_types: normalizedVehicleTypes,
+                specialties: data.specialties,
+                vehicle_types: data.vehicle_types,
                 address: data.location.address,
                 latitude: data.location.latitude,
                 longitude: data.location.longitude,
@@ -909,12 +898,24 @@ const TechnicianSignupWizard = () => {
                 locality: data.location.locality,
                 district: data.location.district,
                 state: data.location.state,
-                service_type: normalizedSpecialties[0] || "other",
-                service_costs: serviceCosts,
-                pricing: pricingSummary,
+                service_type: data.specialties[0] || "other",
+                service_costs: {}, // legacy format fallback
+                pricing: {}, // legacy format fallback
                 whatsapp_number: data.whatsapp_number || data.phone
             };
-            await technicianAuthService.register(payload);
+            
+            const techResult = await technicianAuthService.register(payload);
+            
+            // Now submit the new dynamic pricing
+            if (data.pricing_config && data.pricing_config.length > 0) {
+                await apiFetch("/api/technicians/service-pricing", {
+                    method: "POST",
+                    technician: true,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pricing_data: data.pricing_config })
+                });
+            }
+
             toast.success("Submitted!");
             navigate("/technician/login");
         } catch (error: any) {
@@ -1361,40 +1362,19 @@ const TechnicianSignupWizard = () => {
                                 <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-900/20 p-4 rounded-[1.5rem] border border-amber-200 dark:border-amber-900/50 flex items-start gap-3 shadow-sm">
                                     <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full shrink-0"><AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>
                                     <div>
-                                        <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Base Pricing Config</h4>
-                                        <p className="text-xs text-amber-800/80 dark:text-amber-400/80 mt-0.5 leading-relaxed">Set your standard base prices. We know every job is different; you can adjust the final price after physically inspecting the vehicle.</p>
+                                        <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Dynamic Base Pricing Config</h4>
+                                        <p className="text-xs text-amber-800/80 dark:text-amber-400/80 mt-0.5 leading-relaxed">Set your standard base prices.</p>
                                     </div>
                                 </div>
-                                <div className="space-y-4">
-                                    {selectedServices.map((s, i) => (
-                                        <div
-                                            className="[&>div]:rounded-[1.5rem] [&>div]:shadow-sm [&>div]:border-border/60 [&_input]:h-11 [&_input]:rounded-lg [&_input]:bg-muted/50 [&_input]:border-transparent [&_input:focus]:border-primary"
-                                            key={s}
-                                        >
-                                            <ServiceConfigCard
-                                                serviceId={s}
-                                                index={i}
-                                                register={register}
-                                                watch={watch}
-                                                setValue={setValue}
-                                                selectedVehicleTypes={selectedVehicleTypes}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
+                                <DynamicPricingStep 
+                                    services={pricingTemplate?.services || []} 
+                                    categories={pricingTemplate?.categories || []} 
+                                    pricingFields={pricingTemplate?.pricingFields || []} 
+                                    selectedServiceIds={selectedServices.map((id: string) => parseInt(id, 10))} 
+                                    onChange={(data: any) => setValue('pricing_config', data)} 
+                                />
                             </div>
-                        )}
-
-                        {/* STEP 5: BANKING */}
-                        {currentStep === 5 && (
-                            <div className="space-y-6 animate-in fade-in">
-                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
-                                    <div className="pb-2 border-b border-border/50">
-                                        <h3 className="font-bold text-lg flex items-center gap-2"><Wallet className="w-5 h-5 text-primary" /> Fastest Payout</h3>
-                                        <p className="text-xs text-muted-foreground mt-1">Receive earnings directly to your UPI.</p>
-                                    </div>
-                                    <div className="pt-2">
-                                        <FormField control={control} name="payment_details.upi_id" render={({ field }) => (
+                        )} => (
                                             <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">UPI ID</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono" placeholder="e.g. number@upi" /></FormControl></FormItem>
                                         )} />
                                     </div>

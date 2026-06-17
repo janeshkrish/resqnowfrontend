@@ -11,7 +11,7 @@ import { io } from "socket.io-client";
 import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianReviews from "@/components/rating/TechnicianReviews";
 import TechnicianImageGallery from "@/components/admin/TechnicianImageGallery";
-import TechnicianDynamicPricing from "@/components/admin/TechnicianDynamicPricing";
+import AdminTechnicianPricingEditor from "@/components/admin/AdminTechnicianPricingEditor";
 import {
   AdminTechnicianProfile,
   getAdminTechnicianProfile,
@@ -37,24 +37,13 @@ import {
   Truck
 } from "lucide-react";
 
-type EditableServiceCostRow = {
-  service_name: string;
-  vehicle_type_pricing: string;
-  visit_charge: string;
-  service_charge: string;
-  delivery_charge: string;
-  labour_min: string;
-  labour_max: string;
-  extra_km_charge: string;
-};
-
 type EditableTechnicianForm = {
   shop_name: string;
   proprietor_name: string;
   contact: string;
   address: string;
   services: string;
-  service_costs: EditableServiceCostRow[];
+  service_costs: any[];
   documents: {
     profile_photo: string;
     garage_front: string;
@@ -63,42 +52,6 @@ type EditableTechnicianForm = {
   };
 };
 
-const EMPTY_SERVICE_COST_ROW: EditableServiceCostRow = {
-  service_name: "",
-  vehicle_type_pricing: "",
-  visit_charge: "",
-  service_charge: "",
-  delivery_charge: "",
-  labour_min: "",
-  labour_max: "",
-  extra_km_charge: "",
-};
-
-const toEditableServiceCostRows = (value: any): EditableServiceCostRow[] => {
-  const rows: any[] = [];
-  if (Array.isArray(value)) {
-    rows.push(...value);
-  } else if (value && typeof value === "object") {
-    Object.entries(value).forEach(([serviceName, config]) => {
-      if (config && typeof config === "object") {
-        rows.push({ service_name: serviceName, ...config });
-      } else {
-        rows.push({ service_name: serviceName, service_charge: config });
-      }
-    });
-  }
-
-  return rows.map((row) => ({
-    service_name: String(row?.service_name || row?.service_domain || "").trim(),
-    vehicle_type_pricing: String(row?.vehicle_type_pricing || row?.vehicle_type || "").trim(),
-    visit_charge: String(row?.visit_charge ?? row?.visitCharge ?? row?.base_charge ?? ""),
-    service_charge: String(row?.service_charge ?? row?.serviceCharge ?? row?.amount ?? row?.price ?? ""),
-    delivery_charge: String(row?.delivery_charge ?? row?.deliveryCharge ?? ""),
-    labour_min: String(row?.labour_min ?? row?.labourMin ?? ""),
-    labour_max: String(row?.labour_max ?? row?.labourMax ?? ""),
-    extra_km_charge: String(row?.extra_km_charge ?? row?.extraKmCharge ?? ""),
-  }));
-};
 
 const formatLabel = (value: string) =>
   value
@@ -182,7 +135,7 @@ const TechnicianDetails = () => {
         contact: mapped.phone || "",
         address: mapped.address || "",
         services: Array.isArray(mapped.specialties) ? mapped.specialties.join(", ") : "",
-        service_costs: toEditableServiceCostRows(mapped.service_costs),
+        service_costs: Array.isArray(mapped.service_costs) ? mapped.service_costs : [],
         documents: {
           profile_photo: String(mapped.documents?.profile_photo || ""),
           garage_front: String(mapped.documents?.garage_front || ""),
@@ -298,74 +251,6 @@ const TechnicianDetails = () => {
     }
   };
 
-  const handleServiceCostChange = (
-    index: number,
-    field: keyof EditableServiceCostRow,
-    value: string
-  ) => {
-    setEditForm((prev) => {
-      const nextRows = [...prev.service_costs];
-      nextRows[index] = { ...nextRows[index], [field]: value };
-      return { ...prev, service_costs: nextRows };
-    });
-  };
-
-  const addServiceCostRow = () => {
-    setEditForm((prev) => ({
-      ...prev,
-      service_costs: [...prev.service_costs, { ...EMPTY_SERVICE_COST_ROW }]
-    }));
-  };
-
-  const removeServiceCostRow = (index: number) => {
-    setEditForm((prev) => ({
-      ...prev,
-      service_costs: prev.service_costs.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleSavePricing = async () => {
-    if (!technicianId) return;
-    setIsSaving(true);
-    try {
-      const toNumberOrNull = (value: string) => {
-        const parsed = Number(value);
-        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      };
-
-      const service_costs = editForm.service_costs
-        .map((row) => ({
-          service_name: row.service_name.trim(),
-          vehicle_type_pricing: row.vehicle_type_pricing.trim() || null,
-          visit_charge: toNumberOrNull(row.visit_charge),
-          service_charge: toNumberOrNull(row.service_charge),
-          delivery_charge: toNumberOrNull(row.delivery_charge),
-          labour_min: toNumberOrNull(row.labour_min),
-          labour_max: toNumberOrNull(row.labour_max),
-          extra_km_charge: toNumberOrNull(row.extra_km_charge),
-        }))
-        .filter((row) => row.service_name);
-
-      const res = await apiFetch(`/api/admin/technician/${technicianId}/pricing`, {
-        method: "PUT",
-        admin: true,
-        body: JSON.stringify({ service_costs }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Failed to update pricing.");
-      }
-
-      toast.success("Pricing updated successfully");
-      setIsPricingEditMode(false);
-      await fetchTechnicianDetails();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update pricing.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleSaveChanges = async () => {
     if (!technicianId) return;
     setIsSaving(true);
@@ -384,18 +269,7 @@ const TechnicianDetails = () => {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
-        service_costs: editForm.service_costs
-          .map((row) => ({
-            service_name: row.service_name.trim(),
-            vehicle_type_pricing: row.vehicle_type_pricing.trim() || null,
-            visit_charge: toNumberOrNull(row.visit_charge),
-            service_charge: toNumberOrNull(row.service_charge),
-            delivery_charge: toNumberOrNull(row.delivery_charge),
-            labour_min: toNumberOrNull(row.labour_min),
-            labour_max: toNumberOrNull(row.labour_max),
-            extra_km_charge: toNumberOrNull(row.extra_km_charge),
-          }))
-          .filter((row) => row.service_name),
+        service_costs: editForm.service_costs,
         verification_images: { ...editForm.documents },
       };
 
@@ -634,7 +508,10 @@ const TechnicianDetails = () => {
               </div>
 
               <div className="mt-8">
-                {technicianId && <TechnicianDynamicPricing technicianId={technicianId} />}
+                <AdminTechnicianPricingEditor 
+                  serviceCosts={editForm.service_costs}
+                  onChange={(newCosts) => setEditForm(prev => ({ ...prev, service_costs: newCosts }))}
+                />
               </div>
             </CardContent>
           </Card>

@@ -1374,7 +1374,21 @@ const TechnicianSignupWizard = () => {
                                     onChange={(data: any) => setValue('pricing_config', data)} 
                                 />
                             </div>
-                        )} => (
+                        )}
+
+                        {/* STEP 5: PAYOUTS */}
+                        {currentStep === 5 && (
+                            <div className="space-y-6 animate-in fade-in">
+                                <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
+                                    <div className="pb-2 border-b border-border/50 flex items-center gap-2 text-foreground">
+                                        <Wallet className="w-5 h-5 text-primary" />
+                                        <div>
+                                            <h3 className="font-bold text-lg">Payout Methods</h3>
+                                            <p className="text-xs text-muted-foreground mt-1">How you receive your earnings.</p>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2">
+                                        <FormField control={control} name="payment_details.upi_id" render={({ field }) => (
                                             <FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">UPI ID</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all font-mono" placeholder="e.g. number@upi" /></FormControl></FormItem>
                                         )} />
                                     </div>

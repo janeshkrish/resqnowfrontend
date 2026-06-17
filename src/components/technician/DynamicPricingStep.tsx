@@ -7,13 +7,13 @@ export default function DynamicPricingStep({
     services, 
     categories, 
     pricingFields, 
-    selectedServiceIds,
+    selectedServiceNames,
     onChange 
 }: { 
     services: any[]; 
     categories: any[]; 
     pricingFields: any[]; 
-    selectedServiceIds: number[];
+    selectedServiceNames: string[];
     onChange: (data: any[]) => void;
 }) {
     // pricingData = [{ service_id, vehicle_category_id, pricing_json: {} }]
@@ -23,7 +23,7 @@ export default function DynamicPricingStep({
         onChange(pricingData);
     }, [pricingData, onChange]);
 
-    const activeServices = services.filter(s => selectedServiceIds.includes(s.id));
+    const activeServices = services.filter(s => selectedServiceNames.includes(s.service_name));
 
     const handleFieldChange = (svcId: number, catId: number, fieldKey: string, value: string) => {
         setPricingData(prev => {

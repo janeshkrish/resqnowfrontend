@@ -1370,7 +1370,7 @@ const TechnicianSignupWizard = () => {
                                     services={pricingTemplate?.services || []} 
                                     categories={pricingTemplate?.categories || []} 
                                     pricingFields={pricingTemplate?.pricingFields || []} 
-                                    selectedServiceIds={selectedServices.map((id: string) => parseInt(id, 10))} 
+                                    selectedServiceNames={selectedServices.map((id: string) => SERVICE_NAME_BY_ID[id] || id)} 
                                     onChange={(data: any) => setValue('pricing_config', data)} 
                                 />
                             </div>

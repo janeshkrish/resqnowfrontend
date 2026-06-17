@@ -30,7 +30,7 @@ import {
     normalizeVehicleTypesForApi,
     normalizePricingConfigForApi,
 } from "@/config/technicianNormalization";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, apiFetch } from "@/lib/api";
 import {
     buildSignupPricingPayload,
     getSelectedSignupVehicleTypes,

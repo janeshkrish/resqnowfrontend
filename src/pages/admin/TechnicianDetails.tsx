@@ -114,6 +114,46 @@ const TechnicianDetails = () => {
     return raw.startsWith("/") ? raw : `/${raw}`;
   };
 
+  const migrateServiceCostsToNested = (costs: any[]): any[] => {
+    if (!costs || !costs.length) return [];
+    if (costs.some(c => c.vehicle_categories)) return costs;
+    const domains: Record<string, any> = {};
+    costs.forEach(row => {
+      const domain = row.service_domain || row.service_name;
+      const vType = row.vehicle_type;
+      if (!domain || !vType) return;
+      if (!domains[domain]) {
+        domains[domain] = { service_domain: domain, vehicle_categories: [], vehicle_pricing: {}, towing_fleet_types: [], towing_vehicle_pricing: {}, flat_tire_vehicle_pricing: {} };
+      }
+      const target = domains[domain];
+      if (!target.vehicle_categories.includes(vType)) target.vehicle_categories.push(vType);
+      
+      if (domain === "towing") {
+        const fleetType = row.fleet_type || row.fleet_category;
+        if (fleetType) {
+          if (!target.towing_fleet_types.includes(fleetType)) target.towing_fleet_types.push(fleetType);
+          if (!target.towing_vehicle_pricing[vType]) target.towing_vehicle_pricing[vType] = { fleet_pricing: {} };
+          if (!target.towing_vehicle_pricing[vType].fleet_pricing) target.towing_vehicle_pricing[vType].fleet_pricing = {};
+          target.towing_vehicle_pricing[vType].fleet_pricing[fleetType] = { base_charge: row.base_price ?? row.visit_charge, extra_km_charge: row.extra_km_charge, free_distance: row.free_distance };
+        }
+      } else if (domain === "flat-tire") {
+         const sub = row.service_name || row.subcategory;
+         if (!target.flat_tire_vehicle_pricing[vType]) target.flat_tire_vehicle_pricing[vType] = { tyre_pricing: {}, selected_subcategories: [] };
+         if (sub && sub !== "flat-tire") {
+             if (!target.flat_tire_vehicle_pricing[vType].selected_subcategories.includes(sub)) target.flat_tire_vehicle_pricing[vType].selected_subcategories.push(sub);
+             target.flat_tire_vehicle_pricing[vType].tyre_pricing[sub] = { repair: row.service_charge ?? row.labour_min, replacement: row.labour_max };
+         }
+         target.flat_tire_vehicle_pricing[vType].visit_charge = row.visit_charge;
+         target.flat_tire_vehicle_pricing[vType].extra_km_charge = row.extra_km_charge;
+         target.flat_tire_vehicle_pricing[vType].free_distance = row.free_distance;
+      } else {
+         if (!target.vehicle_pricing[vType]) target.vehicle_pricing[vType] = {};
+         target.vehicle_pricing[vType] = { visit_charge: row.visit_charge ?? row.base_price, service_charge: row.service_charge, extra_km_charge: row.extra_km_charge, free_distance: row.free_distance };
+      }
+    });
+    return Object.values(domains);
+  };
+
   const fetchTechnicianDetails = useCallback(async () => {
     if (!technicianId) return;
     try {
@@ -135,7 +175,7 @@ const TechnicianDetails = () => {
         contact: mapped.phone || "",
         address: mapped.address || "",
         services: Array.isArray(mapped.specialties) ? mapped.specialties.join(", ") : "",
-        service_costs: Array.isArray(mapped.service_costs) ? mapped.service_costs : [],
+        service_costs: migrateServiceCostsToNested(Array.isArray(mapped.service_costs) ? mapped.service_costs : []),
         documents: {
           profile_photo: String(mapped.documents?.profile_photo || ""),
           garage_front: String(mapped.documents?.garage_front || ""),

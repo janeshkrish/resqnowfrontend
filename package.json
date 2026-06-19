@@ -8,6 +8,7 @@
     "dev:mobile": "node scripts/start-mobile.js",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "test": "vitest run",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.js",

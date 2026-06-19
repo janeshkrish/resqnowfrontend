@@ -11,10 +11,19 @@ import { io } from "socket.io-client";
 import { FRONTEND_ONLY_MODE, getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import TechnicianReviews from "@/components/rating/TechnicianReviews";
 import TechnicianImageGallery from "@/components/admin/TechnicianImageGallery";
+import AdminTechnicianServiceConfiguration from "@/components/admin/AdminTechnicianServiceConfiguration";
 import {
   AdminTechnicianProfile,
   getAdminTechnicianProfile,
 } from "@/services/adminDetailsService";
+import {
+  AdminServicePricingEntry,
+  buildAdminServicePricingPayload,
+  getAdminVehicleTypesFromValue,
+  hydrateAdminServicePricing,
+  parseAdminServiceTokens,
+  syncAdminServicePricing,
+} from "@/utils/adminTechnicianServiceConfiguration";
 import {
   User,
   MapPin,
@@ -27,8 +36,6 @@ import {
   Clock,
   Smartphone,
   Wrench,
-  Plus,
-  Trash2,
   IndianRupee,
   CircleCheckBig,
   CircleX,
@@ -36,24 +43,13 @@ import {
   Truck
 } from "lucide-react";
 
-type EditableServiceCostRow = {
-  service_name: string;
-  vehicle_type_pricing: string;
-  visit_charge: string;
-  service_charge: string;
-  delivery_charge: string;
-  labour_min: string;
-  labour_max: string;
-  extra_km_charge: string;
-};
-
 type EditableTechnicianForm = {
   shop_name: string;
   proprietor_name: string;
   contact: string;
   address: string;
   services: string;
-  service_costs: EditableServiceCostRow[];
+  service_costs: AdminServicePricingEntry[];
   documents: {
     profile_photo: string;
     garage_front: string;
@@ -62,41 +58,23 @@ type EditableTechnicianForm = {
   };
 };
 
-const EMPTY_SERVICE_COST_ROW: EditableServiceCostRow = {
-  service_name: "",
-  vehicle_type_pricing: "",
-  visit_charge: "",
-  service_charge: "",
-  delivery_charge: "",
-  labour_min: "",
-  labour_max: "",
-  extra_km_charge: "",
+type ServiceConfigurationSnapshot = {
+  services: string;
+  service_costs: AdminServicePricingEntry[];
 };
 
-const toEditableServiceCostRows = (value: any): EditableServiceCostRow[] => {
-  const rows: any[] = [];
-  if (Array.isArray(value)) {
-    rows.push(...value);
-  } else if (value && typeof value === "object") {
-    Object.entries(value).forEach(([serviceName, config]) => {
-      if (config && typeof config === "object") {
-        rows.push({ service_name: serviceName, ...config });
-      } else {
-        rows.push({ service_name: serviceName, service_charge: config });
-      }
-    });
-  }
+type ApprovalAuditRow = {
+  id: string | number;
+  action: string;
+  created_at: string;
+  admin_email?: string;
+  previous_status?: string;
+  new_status?: string;
+  reason?: string;
+};
 
-  return rows.map((row) => ({
-    service_name: String(row?.service_name || row?.service_domain || "").trim(),
-    vehicle_type_pricing: String(row?.vehicle_type_pricing || row?.vehicle_type || "").trim(),
-    visit_charge: String(row?.visit_charge ?? row?.visitCharge ?? row?.base_charge ?? ""),
-    service_charge: String(row?.service_charge ?? row?.serviceCharge ?? row?.amount ?? row?.price ?? ""),
-    delivery_charge: String(row?.delivery_charge ?? row?.deliveryCharge ?? ""),
-    labour_min: String(row?.labour_min ?? row?.labourMin ?? ""),
-    labour_max: String(row?.labour_max ?? row?.labourMax ?? ""),
-    extra_km_charge: String(row?.extra_km_charge ?? row?.extraKmCharge ?? ""),
-  }));
+type TechnicianAuditUpdateEvent = {
+  technicianId?: string | number;
 };
 
 const formatLabel = (value: string) =>
@@ -104,12 +82,12 @@ const formatLabel = (value: string) =>
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-const displayValue = (value: any) => {
+const displayValue = (value: unknown) => {
   if (value == null || value === "") return "-";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (Array.isArray(value)) return value.length ? value.map((item) => displayValue(item)).join(", ") : "-";
   if (typeof value === "object") {
-    const entries = Object.entries(value);
+    const entries = Object.entries(value as Record<string, unknown>);
     return entries.length
       ? entries.map(([key, item]) => `${formatLabel(key)}: ${displayValue(item)}`).join(" | ")
       : "-";
@@ -126,6 +104,25 @@ const VerificationBadge = ({ status }: { status?: string }) => (
   </Badge>
 );
 
+const getEditableServiceConfiguration = (
+  technician: Technician
+): ServiceConfigurationSnapshot => {
+  const services = Array.isArray(technician.specialties)
+    ? technician.specialties.join(", ")
+    : "";
+  const serviceTokens = parseAdminServiceTokens(services);
+  const fallbackVehicleTypes = getAdminVehicleTypesFromValue(technician.vehicle_types);
+
+  return {
+    services,
+    service_costs: hydrateAdminServicePricing(
+      technician.service_costs,
+      serviceTokens,
+      fallbackVehicleTypes
+    ),
+  };
+};
+
 const TechnicianDetails = () => {
   const { technicianId } = useParams<{ technicianId: string }>();
   const [technician, setTechnician] = useState<Technician | null>(null);
@@ -135,8 +132,13 @@ const TechnicianDetails = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isPricingEditMode, setIsPricingEditMode] = useState(false);
   const [decisionReason, setDecisionReason] = useState("");
-  const [approvalAudit, setApprovalAudit] = useState<any[]>([]);
+  const [approvalAudit, setApprovalAudit] = useState<ApprovalAuditRow[]>([]);
   const [adminProfile, setAdminProfile] = useState<AdminTechnicianProfile | null>(null);
+  const [savedServiceConfiguration, setSavedServiceConfiguration] =
+    useState<ServiceConfigurationSnapshot>({
+      services: "",
+      service_costs: [],
+    });
   const [editForm, setEditForm] = useState<EditableTechnicianForm>({
     shop_name: "",
     proprietor_name: "",
@@ -173,6 +175,7 @@ const TechnicianDetails = () => {
       }
       const data = await res.json();
       const mapped = mapTechnicianData(data);
+      const serviceConfiguration = getEditableServiceConfiguration(mapped);
       setTechnician(mapped);
       setAdminProfile(profile);
       setEditForm({
@@ -180,8 +183,8 @@ const TechnicianDetails = () => {
         proprietor_name: mapped.proprietor_name || "",
         contact: mapped.phone || "",
         address: mapped.address || "",
-        services: Array.isArray(mapped.specialties) ? mapped.specialties.join(", ") : "",
-        service_costs: toEditableServiceCostRows(mapped.service_costs),
+        services: serviceConfiguration.services,
+        service_costs: serviceConfiguration.service_costs,
         documents: {
           profile_photo: String(mapped.documents?.profile_photo || ""),
           garage_front: String(mapped.documents?.garage_front || ""),
@@ -189,6 +192,7 @@ const TechnicianDetails = () => {
           facilities_photo: String(mapped.documents?.facilities_photo || ""),
         },
       });
+      setSavedServiceConfiguration(serviceConfiguration);
       setIsPricingEditMode(false);
     } catch {
       toast.error("Failed to load technician details");
@@ -228,7 +232,7 @@ const TechnicianDetails = () => {
       auth: { token: getAdminToken() || undefined },
     });
 
-    const onAuditUpdate = (event: any) => {
+    const onAuditUpdate = (event: TechnicianAuditUpdateEvent | null) => {
       if (!event || String(event.technicianId) !== String(technicianId)) return;
       apiFetch(`/api/technicians/${technicianId}/approval-audit`, { method: "GET", admin: true })
         .then((res) => (res.ok ? res.json() : []))
@@ -297,58 +301,49 @@ const TechnicianDetails = () => {
     }
   };
 
-  const handleServiceCostChange = (
-    index: number,
-    field: keyof EditableServiceCostRow,
-    value: string
-  ) => {
+  const getCurrentFallbackVehicleTypes = () =>
+    getAdminVehicleTypesFromValue(technician?.vehicle_types);
+
+  const handleServicesTextChange = (value: string) => {
     setEditForm((prev) => {
-      const nextRows = [...prev.service_costs];
-      nextRows[index] = { ...nextRows[index], [field]: value };
-      return { ...prev, service_costs: nextRows };
+      const services = parseAdminServiceTokens(value);
+      return {
+        ...prev,
+        services: value,
+        service_costs: syncAdminServicePricing(
+          prev.service_costs,
+          services,
+          getCurrentFallbackVehicleTypes()
+        ),
+      };
     });
   };
 
-  const addServiceCostRow = () => {
+  const handleCancelPricing = () => {
     setEditForm((prev) => ({
       ...prev,
-      service_costs: [...prev.service_costs, { ...EMPTY_SERVICE_COST_ROW }]
+      services: savedServiceConfiguration.services,
+      service_costs: savedServiceConfiguration.service_costs,
     }));
-  };
-
-  const removeServiceCostRow = (index: number) => {
-    setEditForm((prev) => ({
-      ...prev,
-      service_costs: prev.service_costs.filter((_, i) => i !== index)
-    }));
+    setIsPricingEditMode(false);
   };
 
   const handleSavePricing = async () => {
     if (!technicianId) return;
     setIsSaving(true);
     try {
-      const toNumberOrNull = (value: string) => {
-        const parsed = Number(value);
-        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      };
-
-      const service_costs = editForm.service_costs
-        .map((row) => ({
-          service_name: row.service_name.trim(),
-          vehicle_type_pricing: row.vehicle_type_pricing.trim() || null,
-          visit_charge: toNumberOrNull(row.visit_charge),
-          service_charge: toNumberOrNull(row.service_charge),
-          delivery_charge: toNumberOrNull(row.delivery_charge),
-          labour_min: toNumberOrNull(row.labour_min),
-          labour_max: toNumberOrNull(row.labour_max),
-          extra_km_charge: toNumberOrNull(row.extra_km_charge),
-        }))
-        .filter((row) => row.service_name);
+      const services = parseAdminServiceTokens(editForm.services);
+      const syncedServiceCosts = syncAdminServicePricing(
+        editForm.service_costs,
+        services,
+        getCurrentFallbackVehicleTypes()
+      );
+      const service_costs = buildAdminServicePricingPayload(syncedServiceCosts);
 
       const res = await apiFetch(`/api/admin/technician/${technicianId}/pricing`, {
         method: "PUT",
         admin: true,
-        body: JSON.stringify({ service_costs }),
+        body: JSON.stringify({ services, service_costs }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -358,8 +353,8 @@ const TechnicianDetails = () => {
       toast.success("Pricing updated successfully");
       setIsPricingEditMode(false);
       await fetchTechnicianDetails();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update pricing.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update pricing.");
     } finally {
       setIsSaving(false);
     }
@@ -369,32 +364,11 @@ const TechnicianDetails = () => {
     if (!technicianId) return;
     setIsSaving(true);
     try {
-      const toNumberOrNull = (value: string) => {
-        const parsed = Number(value);
-        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      };
-
       const payload = {
         shop_name: editForm.shop_name.trim(),
         proprietor_name: editForm.proprietor_name.trim(),
         contact: editForm.contact.trim(),
         address: editForm.address.trim(),
-        services: editForm.services
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        service_costs: editForm.service_costs
-          .map((row) => ({
-            service_name: row.service_name.trim(),
-            vehicle_type_pricing: row.vehicle_type_pricing.trim() || null,
-            visit_charge: toNumberOrNull(row.visit_charge),
-            service_charge: toNumberOrNull(row.service_charge),
-            delivery_charge: toNumberOrNull(row.delivery_charge),
-            labour_min: toNumberOrNull(row.labour_min),
-            labour_max: toNumberOrNull(row.labour_max),
-            extra_km_charge: toNumberOrNull(row.extra_km_charge),
-          }))
-          .filter((row) => row.service_name),
         verification_images: { ...editForm.documents },
       };
 
@@ -410,8 +384,8 @@ const TechnicianDetails = () => {
 
       toast.success("Technician updated successfully");
       await fetchTechnicianDetails();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update technician.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update technician.");
     } finally {
       setIsSaving(false);
     }
@@ -609,187 +583,19 @@ const TechnicianDetails = () => {
           </Card>
 
           {/* --- SERVICES CONFIG --- */}
-          <Card>
-            <CardHeader><CardTitle>Service Configuration</CardTitle></CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <p className="text-sm text-muted-foreground mb-1">Services (comma separated)</p>
-                <input
-                  className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                  value={editForm.services}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, services: e.target.value }))}
-                  placeholder="battery, flat_tire, fuel"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                {editForm.services
-                  .split(",")
-                  .map((service) => service.trim())
-                  .filter(Boolean)
-                  .map((service) => (
-                    <Badge key={service}>{service}</Badge>
-                  ))}
-              </div>
-
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium">Service Pricing</p>
-                <div className="flex items-center gap-2">
-                  {!isPricingEditMode ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setIsPricingEditMode(true)}>
-                      Edit Pricing
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditForm((prev) => ({
-                            ...prev,
-                            service_costs: toEditableServiceCostRows(technician?.service_costs),
-                          }));
-                          setIsPricingEditMode(false);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="button" size="sm" onClick={handleSavePricing} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Save Changes
-                      </Button>
-                    </>
-                  )}
-                  <Button type="button" variant="outline" size="sm" onClick={addServiceCostRow} disabled={!isPricingEditMode}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Service Price
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {editForm.service_costs.length === 0 && (
-                  <div className="rounded border border-dashed p-4 text-sm text-muted-foreground">
-                    No service pricing configured. Add at least one service pricing row.
-                  </div>
-                )}
-
-                {editForm.service_costs.map((row, idx) => (
-                  <div key={`service-cost-${idx}`} className="rounded border p-3">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Service Domain</p>
-                        <input
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.service_name}
-                          onChange={(e) => handleServiceCostChange(idx, "service_name", e.target.value)}
-                          placeholder="battery"
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Vehicle Type</p>
-                        <input
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.vehicle_type_pricing}
-                          onChange={(e) => handleServiceCostChange(idx, "vehicle_type_pricing", e.target.value)}
-                          placeholder="2w / 4w / both"
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mt-3 md:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Visit Charge</p>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.visit_charge}
-                          onChange={(e) => handleServiceCostChange(idx, "visit_charge", e.target.value)}
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Service Charge</p>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.service_charge}
-                          onChange={(e) => handleServiceCostChange(idx, "service_charge", e.target.value)}
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Delivery Charge</p>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.delivery_charge}
-                          onChange={(e) => handleServiceCostChange(idx, "delivery_charge", e.target.value)}
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Extra KM Charge</p>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.extra_km_charge}
-                          onChange={(e) => handleServiceCostChange(idx, "extra_km_charge", e.target.value)}
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mt-3 md:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Labour Min</p>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.labour_min}
-                          onChange={(e) => handleServiceCostChange(idx, "labour_min", e.target.value)}
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Labour Max</p>
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full rounded border border-input bg-transparent px-3 py-2 text-sm"
-                          value={row.labour_max}
-                          onChange={(e) => handleServiceCostChange(idx, "labour_max", e.target.value)}
-                          disabled={!isPricingEditMode || isSaving}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => removeServiceCostRow(idx)}
-                        disabled={!isPricingEditMode || isSaving}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <AdminTechnicianServiceConfiguration
+            servicesText={editForm.services}
+            entries={editForm.service_costs}
+            editing={isPricingEditMode}
+            saving={isSaving}
+            onServicesTextChange={handleServicesTextChange}
+            onEntriesChange={(service_costs) =>
+              setEditForm((prev) => ({ ...prev, service_costs }))
+            }
+            onEdit={() => setIsPricingEditMode(true)}
+            onCancel={handleCancelPricing}
+            onSave={handleSavePricing}
+          />
 
           <Card>
             <CardHeader><CardTitle>Services & Fleet</CardTitle></CardHeader>

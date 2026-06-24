@@ -67,20 +67,20 @@ const AmountCard = ({
   return (
     <Card
       className={cn(
-        "overflow-hidden rounded-2xl border-orange-100/80 bg-gradient-to-br from-orange-50 via-white to-amber-50 shadow-[0_12px_28px_rgba(249,115,22,0.12)]",
+        "overflow-hidden rounded-2xl border-red-100/60 bg-gradient-to-br from-red-50/50 via-white to-rose-50/30 shadow-[0_12px_28px_rgba(239,68,68,0.10)]",
         className
       )}
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700/80">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-red-600/90">
               {title}
             </p>
             <h3
               className={cn(
                 "mt-2 text-2xl font-black tracking-tight sm:text-3xl",
-                hasAmount ? "text-orange-600" : "text-slate-500"
+                hasAmount ? "text-red-600" : "text-slate-500"
               )}
             >
               {resolvedAmount}
@@ -93,7 +93,7 @@ const AmountCard = ({
               className={cn(
                 "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
                 hasAmount
-                  ? "border-orange-200 bg-white text-orange-700 hover:bg-white"
+                  ? "border-red-200 bg-white text-red-700 hover:bg-white"
                   : "border-slate-200 bg-white text-slate-500 hover:bg-white"
               )}
             >
@@ -103,7 +103,7 @@ const AmountCard = ({
         </div>
 
         {hasBreakdown ? (
-          <div className="mt-4 rounded-xl border border-orange-100/80 bg-white/80 p-3">
+          <div className="mt-4 rounded-xl border border-red-100/60 bg-white/80 p-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Technician</span>
               <span className="font-semibold">
@@ -124,9 +124,9 @@ const AmountCard = ({
                 </span>
               </div>
             )}
-            <div className="mt-3 flex items-center justify-between border-t border-orange-100 pt-3 text-sm">
+            <div className="mt-3 flex items-center justify-between border-t border-red-100 pt-3 text-sm">
               <span className="font-semibold text-foreground">Total</span>
-              <span className="text-base font-black text-orange-600">
+              <span className="text-base font-black text-red-600">
                 {formatAmount(Number(resolvedTotal || 0), currency)}
               </span>
             </div>

@@ -1,0 +1,22 @@
+# ResQNow frontend code ownership.
+# GitHub uses this file to request required reviews when branch protection is enabled.
+
+* @janeshkrish
+
+/README.md @janeshkrish
+/LICENSE.md @janeshkrish
+/SECURITY.md @janeshkrish
+/CONTRIBUTING.md @janeshkrish
+/CODEOWNERS @janeshkrish
+
+/package.json @janeshkrish
+/package-lock.json @janeshkrish
+/vite.config.ts @janeshkrish
+/capacitor.config.ts @janeshkrish
+/netlify.toml @janeshkrish
+/vercel.json @janeshkrish
+
+/src/ @janeshkrish
+/public/ @janeshkrish
+/android/ @janeshkrish
+/docs/ @janeshkrish

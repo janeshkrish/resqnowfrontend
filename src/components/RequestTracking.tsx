@@ -1,12 +1,10 @@
-import { useState, useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   animate,
   motion,
-  useDragControls,
   useMotionValue,
   useReducedMotion,
-  type PanInfo,
 } from "framer-motion";
 import {
   ArrowLeft,
@@ -15,6 +13,7 @@ import {
   RefreshCw,
   ShieldCheck,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ChevronUp,
   CreditCard,
@@ -157,12 +156,12 @@ const JOURNEY_STAGES = [
   "Completed"
 ];
 
-type TrackingSheetMode = "map" | "balanced" | "sheet";
+type TrackingSheetMode = "map" | "sheet";
 
 const TRACKING_PANEL_HEIGHT_VH = 82;
 const TRACKING_PAYMENT_PANEL_HEIGHT_VH = 86;
-const TRACKING_COLLAPSED_PEEK = 118;
-const TRACKING_PAYMENT_COLLAPSED_PEEK = 152;
+const TRACKING_COLLAPSED_PEEK = 84;
+const TRACKING_PAYMENT_COLLAPSED_PEEK = 84;
 
 const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -192,11 +191,6 @@ const getTrackingSheetOffsets = (
   showPayment: boolean,
 ): Record<TrackingSheetMode, number> => {
   const peekHeight = showPayment ? TRACKING_PAYMENT_COLLAPSED_PEEK : TRACKING_COLLAPSED_PEEK;
-  const balancedVisibleHeight = clampNumber(
-    Math.round(viewportHeight * (showPayment ? 0.45 : 0.39)),
-    showPayment ? 290 : 260,
-    showPayment ? 420 : 340,
-  );
   const expandedVisibleHeight = clampNumber(
     Math.round(viewportHeight * (showPayment ? 0.83 : 0.76)),
     showPayment ? 470 : 410,
@@ -205,21 +199,9 @@ const getTrackingSheetOffsets = (
 
   return {
     map: Math.max(0, panelHeight - peekHeight),
-    balanced: Math.max(0, panelHeight - balancedVisibleHeight),
     sheet: Math.max(0, panelHeight - expandedVisibleHeight),
   };
 };
-
-const getClosestTrackingSheetMode = (
-  offsets: Record<TrackingSheetMode, number>,
-  projectedY: number,
-): TrackingSheetMode =>
-  (Object.entries(offsets) as [TrackingSheetMode, number][])
-    .reduce(
-      (closest, current) =>
-        Math.abs(current[1] - projectedY) < Math.abs(offsets[closest] - projectedY) ? current[0] : closest,
-      "balanced" as TrackingSheetMode,
-    );
 
 const normalizeRequestStatus = (value: unknown) => {
   const raw = String(value || "").trim().toLowerCase();
@@ -297,12 +279,11 @@ const RequestTracking = () => {
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [couponMessage, setCouponMessage] = useState<CouponMessageState | null>(null);
   const [finalAmount, setFinalAmount] = useState<number | null>(null);
-  const [sheetMode, setSheetMode] = useState<TrackingSheetMode>("balanced");
+  const [sheetMode, setSheetMode] = useState<TrackingSheetMode>("map");
   const [panelHeight, setPanelHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
   const panelRef = useRef<HTMLElement | null>(null);
   const sheetY = useMotionValue(0);
-  const dragControls = useDragControls();
   const reduceMotion = useReducedMotion();
 
   const isMobile = useIsMobile();
@@ -364,7 +345,7 @@ const RequestTracking = () => {
     if (!isMobile) return;
     setSheetMode((current) => {
       if (showPayment) return "sheet";
-      return current === "sheet" ? "balanced" : current;
+      return current;
     });
   }, [isMobile, showPayment]);
 
@@ -1004,19 +985,8 @@ const RequestTracking = () => {
     setSheetMode("map");
   };
 
-  const handleSheetDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isMobile) return;
-    dragControls.start(event);
-  };
-
-  const handleSheetDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (!isMobile || panelHeight === 0 || viewportHeight === 0) return;
-    const projectedY = sheetY.get() + info.velocity.y * 0.14;
-    setSheetMode(getClosestTrackingSheetMode(sheetOffsets, projectedY));
-  };
-
-  const handleSheetExpand = () => {
-    setSheetMode("sheet");
+  const toggleSheet = () => {
+    setSheetMode((current) => (current === "map" ? "sheet" : "map"));
   };
 
   const serviceLocationLabel = request?.address?.trim() || "Location is being updated";
@@ -1268,81 +1238,86 @@ const RequestTracking = () => {
             initial={reduceMotion ? undefined : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.24, ease: "easeOut" }}
-            drag="y"
-            dragListener={false}
-            dragControls={dragControls}
-            dragElastic={0.05}
-            dragMomentum={false}
-            dragConstraints={{ top: 0, bottom: sheetOffsets.map }}
-            onDragEnd={handleSheetDragEnd}
-            className="mx-0 mb-0 w-full overflow-hidden rounded-t-[28px] border-t border-slate-200/80 bg-white/95 shadow-[0_-20px_40px_rgba(0,0,0,0.08)] backdrop-blur pb-[max(env(safe-area-inset-bottom),1rem)]"
+            className="mx-0 mb-0 w-full overflow-hidden rounded-t-[28px] border-t border-slate-200/80 bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.12)] pb-[max(env(safe-area-inset-bottom),1rem)]"
             style={{ height: `${sheetPanelHeightVh}dvh`, y: sheetY, willChange: "transform" }}
           >
             <div className="flex h-full flex-col">
-              <div
-                role="presentation"
-                className="shrink-0 cursor-grab touch-none pb-1 pt-2 active:cursor-grabbing"
-                onPointerDown={handleSheetDragStart}
-                style={{ touchAction: "none" }}
-              >
-                <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300" />
-              </div>
-
-              <div
-                className={cn(
-                  "min-h-0 flex-1 px-5 pb-5 pt-3",
-                  sheetMode === "map" ? "overflow-hidden" : "overflow-y-auto"
-                )}
-              >
+              {/* ── Collapsed compact card ── */}
               {sheetMode === "map" && (
-                <button
-                  type="button"
-                  onClick={() => setSheetMode("balanced")}
-                  className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-3.5 py-3 text-left shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] transition hover:border-slate-300"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        {trackingSummary.eyebrow}
-                      </p>
-                      <div className="mt-1 flex items-baseline gap-2">
-                        <h2 className="truncate text-xl font-black tracking-tight text-slate-950">
-                          {trackingSummary.value}
-                        </h2>
-                        {serviceTypeLabel && (
-                          <span className="truncate text-[11px] font-bold text-primary">
-                            {serviceTypeLabel}
-                          </span>
-                        )}
+                <button type="button" onClick={toggleSheet} className="w-full shrink-0 px-5 py-3 text-left">
+                  <div className="flex items-center gap-3">
+                    {technician ? (
+                      <>
+                        <Avatar className="h-11 w-11 shrink-0 ring-2 ring-white shadow-md">
+                          <AvatarImage src={technician.avatar_url} />
+                          <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] font-extrabold text-slate-900">{technician.name}</p>
+                          <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">
+                            {trackingSummary.eyebrow}{eta ? ` · ${eta}` : ""}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[14px] font-extrabold text-slate-900">{statusMeta.title}</p>
+                        <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{statusMeta.subtitle}</p>
                       </div>
-                      <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                        {collapsedPreviewLabel}
-                      </p>
-                    </div>
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white">
-                      <ChevronUp className="h-5 w-5" />
+                    )}
+                    {technician?.phone && (
+                      <a href={`tel:${technician.phone}`} onClick={(e) => e.stopPropagation()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" aria-label="Call technician">
+                        <Phone className="h-4 w-4 fill-current" />
+                      </a>
+                    )}
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                      <ChevronUp className="h-4 w-4 text-slate-500" />
                     </span>
                   </div>
                 </button>
               )}
-              <div className={cn(sheetMode === "map" ? "hidden" : "block")}>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    On-time assistance
+
+              {/* ── Expanded header with collapse toggle ── */}
+              {sheetMode === "sheet" && (
+                <button type="button" onClick={toggleSheet} className="w-full shrink-0 px-5 pb-1 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                      </span>
+                      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                        {isConnected ? "Live tracking" : "Reconnecting..."}
+                      </span>
+                    </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200">
+                      <ChevronDown className="h-4 w-4 text-slate-500" />
+                    </span>
                   </div>
+                </button>
+              )}
+
+              {/* ── Scrollable expanded content ── */}
+              <div
+                className={cn(
+                  "min-h-0 flex-1 px-5 pb-5",
+                  sheetMode === "map" ? "hidden" : "overflow-y-auto"
+                )}
+              >
+              <div className={cn(sheetMode === "map" ? "hidden" : "block")}>
+              {/* Status header */}
+              <div className="mb-1 mt-1">
+                <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1">
+                  <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">On-time assistance</span>
                   {eta && status === "en-route" && (
-                    <span className="text-[11px] font-semibold text-emerald-700">ETA: {eta}</span>
+                    <span className="ml-1 text-[10px] font-semibold text-emerald-600">· ETA {eta}</span>
                   )}
                 </div>
-              </div>
-
-              <div className="mt-4">
-                <h2 className="text-xl font-black leading-tight tracking-tight text-foreground">
+                <h2 className="text-[20px] font-extrabold leading-tight tracking-tight text-slate-900">
                   {statusMeta.title}
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{statusMeta.subtitle}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-slate-500">{statusMeta.subtitle}</p>
               </div>
 
               {routeSummaryVisible && (
@@ -1369,31 +1344,54 @@ const RequestTracking = () => {
                 </div>
               )}
 
-              <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  <span>Journey progress</span>
-                  <span>{stageProgress}%</span>
+              {/* ── Google Material Stepper ── */}
+              <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-3.5">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Journey progress</span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold text-primary">{stageProgress}%</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-700"
-                    style={{ width: `${stageProgress}%` }}
-                  />
-                </div>
-                <div className="mt-2 grid grid-cols-5 gap-1">
-                  {JOURNEY_STAGES.map((label, index) => (
-                    <div key={label} className="text-center">
-                      <div className="mx-auto flex h-5 w-5 items-center justify-center">
-                        <CircleDot
-                          className={cn(
-                            "h-4 w-4",
-                            index <= stageIndex ? "text-primary" : "text-muted-foreground/40"
-                          )}
-                        />
+                <div className="flex items-start">
+                  {trackingSteps.map((step, index) => {
+                    const isLast = index === trackingSteps.length - 1;
+                    return (
+                      <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            "relative flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-500",
+                            step.complete && !step.active
+                              ? "bg-emerald-500 text-white shadow-[0_0_0_3px_rgba(16,185,129,0.15)]"
+                              : step.active
+                                ? "border-2 border-primary bg-white text-primary shadow-[0_0_0_4px_rgba(239,68,68,0.1)]"
+                                : "border border-slate-200 bg-white text-slate-400"
+                          )}>
+                            {step.complete && !step.active ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <span>{index + 1}</span>
+                            )}
+                          </div>
+                          <p className={cn(
+                            "mt-1 text-center text-[8px] font-semibold leading-tight",
+                            step.complete || step.active ? "text-slate-700" : "text-slate-400"
+                          )}>
+                            {step.label}
+                          </p>
+                        </div>
+                        {!isLast && (
+                          <div className="flex flex-1 items-center px-0.5" style={{ paddingTop: 12 }}>
+                            <div className={cn(
+                              "h-[2px] w-full rounded-full transition-all duration-700",
+                              index < stageIndex
+                                ? "bg-emerald-500"
+                                : index === stageIndex
+                                  ? "bg-gradient-to-r from-primary/60 to-slate-200"
+                                  : "bg-slate-200"
+                            )} />
+                          </div>
+                        )}
                       </div>
-                      <p className="mt-0.5 text-[9px] font-medium leading-tight text-muted-foreground">{label}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1414,25 +1412,26 @@ const RequestTracking = () => {
                       className="mt-4"
                     />
                   ) : null}
-                  <div className="mt-4 rounded-2xl border border-border p-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12 ring-1 ring-border">
+                  <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center gap-3.5">
+                      <Avatar className="h-12 w-12 ring-2 ring-slate-100 shadow-sm">
                         <AvatarImage src={technician.avatar_url} />
-                        <AvatarFallback>{(technician.name || "T")[0]}</AvatarFallback>
+                        <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-bold text-foreground">{technician.name}</h3>
-                        <div className="mt-0.5 flex items-center text-[11px] font-medium text-muted-foreground">
-                          <Star className="mr-1 h-3.5 w-3.5 fill-primary text-primary" />
-                          <span className="mr-1 text-foreground">{technicianRatingLabel}</span>
-                          <span>| {Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
+                        <h3 className="truncate text-[15px] font-extrabold text-slate-900">{technician.name}</h3>
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-bold text-slate-800">{technicianRatingLabel}</span>
+                          <span className="text-slate-300">|</span>
+                          <span>{Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
                           size="icon"
                           variant="outline"
-                          className="h-10 w-10 rounded-full border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                          className="h-10 w-10 rounded-full border-slate-200 text-slate-600 hover:bg-slate-50"
                           asChild
                         >
                           <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
@@ -1441,7 +1440,7 @@ const RequestTracking = () => {
                         </Button>
                         <Button
                           size="icon"
-                          className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+                          className="h-10 w-10 rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-600"
                           asChild
                         >
                           <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">

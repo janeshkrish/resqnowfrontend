@@ -43,20 +43,20 @@ const Header = () => {
   };
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full transition-all duration-500 ease-in-out ${
-        isScrolled
-          ? "border-b border-slate-200/40 bg-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl"
-          : "bg-white/60 backdrop-blur-md border-b border-transparent"
-      }`}
-    >
-      <div className="container mx-auto flex h-[76px] max-w-7xl items-center justify-between px-4 lg:px-8">
+    <header className="sticky top-4 z-50 w-full px-4 md:px-8 transition-all duration-500 ease-in-out">
+      <div
+        className={`mx-auto flex h-[76px] max-w-7xl items-center justify-between px-6 lg:px-8 rounded-full border transition-all duration-500 ${
+          isScrolled
+            ? "border-white/60 bg-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl"
+            : "border-white/40 bg-white/60 shadow-[0_4px_24px_rgba(0,0,0,0.03)] backdrop-blur-md"
+        }`}
+      >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group shrink-0" aria-label="ResQNow home">
           <img 
-            src="/logo.png" 
+            src="/resqnow-logo.png" 
             alt="ResQNow Logo" 
-            className="h-8 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+            className="h-[64px] md:h-[80px] w-auto object-contain scale-110 md:scale-125 origin-left transition-transform duration-300 group-hover:scale-[1.15] md:group-hover:scale-[1.3]"
             onError={(e) => {
               e.currentTarget.src = 'https://placehold.co/150x40/transparent/3b82f6?text=ResQNow';
             }}
@@ -64,20 +64,20 @@ const Header = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-6 xl:gap-8 mx-4 h-full">
+        <nav className="hidden lg:flex items-center gap-6 xl:gap-8 mx-4">
           {navItems.map((item) => {
             const active = isActive(item.activePath);
             return (
               <a
                 key={item.label}
                 href={item.to}
-                className="relative text-[14px] font-bold text-slate-500 hover:text-slate-900 transition-colors flex items-center h-full whitespace-nowrap"
+                className="relative text-[15px] font-bold text-slate-600 hover:text-slate-900 transition-colors flex items-center py-2 whitespace-nowrap"
               >
                 {item.label}
                 {active && (
                   <motion.div
                     layoutId="activeNavIndicator"
-                    className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full bg-blue-600"
+                    className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-full bg-blue-600"
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
@@ -91,7 +91,7 @@ const Header = () => {
           <div className="hidden lg:flex items-center gap-3 xl:gap-5">
             <Link 
               to={partnerRoute}
-              className="text-[14px] font-bold text-slate-500 hover:text-blue-600 transition-colors whitespace-nowrap"
+              className="text-[14px] font-bold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-full border border-slate-300 hover:border-slate-400 bg-white/50 hover:bg-white/80 transition-all whitespace-nowrap shadow-sm"
             >
               Partner Network
             </Link>
@@ -105,7 +105,7 @@ const Header = () => {
             {!isLiveMapPage && (
               <Button
                 variant="outline"
-                className="rounded-xl border-slate-200 bg-white/50 backdrop-blur-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                className="rounded-full border-slate-200 bg-white/50 backdrop-blur-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                 asChild
               >
                 <Link to="/request-service/emergency">
@@ -137,7 +137,7 @@ const Header = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="lg:hidden absolute top-[76px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-2xl"
+            className="lg:hidden absolute top-[90px] left-4 right-4 rounded-3xl bg-white/95 backdrop-blur-xl border border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden"
           >
             <div className="container py-6 px-4 flex flex-col gap-2">
               {navItems.filter(item => !item.desktopOnly).map((item) => (

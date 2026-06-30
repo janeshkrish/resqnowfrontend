@@ -1,5 +1,6 @@
 import React, { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import AppDemoContainer from "./app-demo/AppDemoContainer";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -187,15 +188,15 @@ const PremiumDashboardMockup = () => {
 
 const EnterpriseHero = () => (
   <section id="platform" className="relative pt-32 pb-24 lg:pt-48 lg:pb-40 overflow-hidden bg-[#fafafa]">
-    {/* Premium Background Elements */}
-    <div className="absolute inset-0 pointer-events-none">
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-500/10 blur-[100px] rounded-full" />
-      <div className="absolute top-[20%] -right-40 w-[600px] h-[600px] bg-indigo-500/5 blur-[120px] rounded-full" />
+    {/* Clean Background with Subtle Ambient Glows */}
+    <div className="absolute inset-0 pointer-events-none bg-[#fafafa]">
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent z-10" />
+      <div className="absolute top-[10%] -left-[10%] w-[600px] h-[600px] bg-blue-500/5 blur-[120px] rounded-full" />
+      <div className="absolute top-[60%] left-[20%] w-[500px] h-[500px] bg-red-500/5 blur-[100px] rounded-full" />
     </div>
 
-    <div className="container relative mx-auto max-w-7xl px-4 lg:px-8">
-      <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-16 lg:gap-12 items-center">
+    <div className="container relative mx-auto max-w-7xl px-4 lg:px-8 z-20">
+      <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 items-center pt-4 pb-10">
         <Reveal>
           <div className="max-w-2xl">
             <motion.div 
@@ -251,8 +252,8 @@ const EnterpriseHero = () => (
           </div>
         </Reveal>
 
-        <div className="relative z-10 w-full hidden lg:block">
-          <PremiumDashboardMockup />
+        <div className="relative z-10 w-full hidden lg:flex justify-end">
+          <AppDemoContainer />
         </div>
       </div>
     </div>

@@ -1,0 +1,55 @@
+import React, { useState, useEffect } from 'react';
+import AppMapBackground from './AppMapBackground';
+import AppMapNodes from './AppMapNodes';
+import AppRouteMotion from './AppRouteMotion';
+import AppBottomSheet from './AppBottomSheet';
+
+export type DemoState = 'SEARCHING' | 'FOUND' | 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED';
+
+const AppDemoContainer = () => {
+  const [demoState, setDemoState] = useState<DemoState>('SEARCHING');
+
+  useEffect(() => {
+    let mounted = true;
+
+    // 10 second loop orchestrator
+    const runSequence = () => {
+      if (!mounted) return;
+      setDemoState('SEARCHING');
+      
+      setTimeout(() => mounted && setDemoState('FOUND'), 3000);
+      setTimeout(() => mounted && setDemoState('ASSIGNED'), 4000);
+      setTimeout(() => mounted && setDemoState('EN_ROUTE'), 5000);
+      setTimeout(() => mounted && setDemoState('ARRIVED'), 9000);
+    };
+
+    runSequence();
+    const interval = setInterval(runSequence, 10500);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <div className="relative w-[320px] h-[650px] bg-slate-50 rounded-[44px] shadow-[0_30px_60px_rgba(0,0,0,0.15)] border-[10px] border-slate-900 overflow-hidden mx-auto transform hover:-translate-y-2 transition-transform duration-500">
+      {/* iPhone Dynamic Island Mock */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[110px] h-[28px] bg-slate-900 rounded-b-2xl z-[60]"></div>
+      
+      {/* Map Background */}
+      <AppMapBackground />
+
+      {/* Nodes & Radar (Customer & Mechanics) */}
+      <AppMapNodes demoState={demoState} />
+
+      {/* Routing & Vehicle */}
+      <AppRouteMotion demoState={demoState} />
+
+      {/* Bottom Dispatch Card */}
+      <AppBottomSheet demoState={demoState} />
+    </div>
+  );
+};
+
+export default AppDemoContainer;

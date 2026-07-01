@@ -9,7 +9,7 @@ type MetricCardProps = {
 };
 
 const accentClasses: Record<NonNullable<MetricCardProps["accent"]>, string> = {
-  blue: "from-sky-500/10 to-blue-500/5 text-blue-700",
+  blue: "from-sky-500/10 to-red-500/5 text-red-700",
   teal: "from-teal-500/10 to-cyan-500/5 text-teal-700",
   amber: "from-amber-500/10 to-orange-500/5 text-amber-700",
   rose: "from-rose-500/10 to-red-500/5 text-rose-700",

@@ -41,10 +41,10 @@ const ServiceVehicleSelector = ({
   // Handle EV charging service specially
   if (serviceId === "ev-charging") {
     return (
-      <div className="mt-8 p-8 bg-gradient-to-br from-emerald-50 via-white to-blue-50 rounded-3xl shadow-xl border border-emerald-200/50 animate-fade-in relative overflow-hidden">
+      <div className="mt-8 p-8 bg-gradient-to-br from-emerald-50 via-white to-red-50 rounded-3xl shadow-xl border border-emerald-200/50 animate-fade-in relative overflow-hidden">
         {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-200/30 to-blue-200/30 rounded-full blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-br from-blue-200/30 to-emerald-200/30 rounded-full blur-2xl"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-200/30 to-red-200/30 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-br from-red-200/30 to-emerald-200/30 rounded-full blur-2xl"></div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-lg">
@@ -72,7 +72,7 @@ const ServiceVehicleSelector = ({
     <div className="mt-8 p-8 bg-gradient-to-br from-white via-gray-50 to-red-50/30 rounded-3xl shadow-xl border border-border/50 animate-fade-in relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-red-100/40 to-orange-100/40 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-br from-blue-100/40 to-purple-100/40 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-br from-red-100/40 to-purple-100/40 rounded-full blur-3xl"></div>
       <div className="relative z-10">
         <div className="flex items-center gap-3 mb-8">
           <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg">
@@ -227,7 +227,7 @@ const ServiceVehicleSelector = ({
               </div>
               {/* Terms and Submit */}
               <div className="space-y-6">
-                <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200/50">
+                <div className="bg-red-50/50 rounded-2xl p-6 border border-red-200/50">
                   <div className="flex items-start gap-3">
                     <Checkbox id="terms" className="mt-1" />
                     <div className="grid gap-2 leading-relaxed">

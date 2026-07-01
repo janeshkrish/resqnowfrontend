@@ -15,7 +15,7 @@ const AdminSidebar = () => {
             <nav className="flex-1 p-4 space-y-2">
                 <Link
                     to="/admin/technicians"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive("/admin/technicians") ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive("/admin/technicians") ? "bg-red-600 text-white" : "text-slate-300 hover:bg-slate-800"
                         }`}
                 >
                     <Users size={20} />
@@ -23,7 +23,7 @@ const AdminSidebar = () => {
                 </Link>
                 <Link
                     to="/admin/add-technician"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive("/admin/add-technician") ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive("/admin/add-technician") ? "bg-red-600 text-white" : "text-slate-300 hover:bg-slate-800"
                         }`}
                 >
                     <UserPlus size={20} />

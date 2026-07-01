@@ -12,7 +12,7 @@ const Hero = () => {
 
       {/* Dynamic Glows */}
       <div className="absolute top-0 right-[10%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
-      <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
+      <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-red-500/10 rounded-full blur-[100px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-8 items-center">
@@ -31,7 +31,7 @@ const Hero = () => {
             <div className="space-y-6">
               <h1 className="text-5xl lg:text-[5rem] font-black text-foreground tracking-tighter leading-[1] drop-shadow-sm">
                 Fastest <br className="hidden lg:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-rose-500 animate-gradient-x">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-red-500 to-rose-500 animate-gradient-x">
                   Roadside Rescue.
                 </span>
               </h1>
@@ -72,7 +72,7 @@ const Hero = () => {
             {/* Social Proof Mini */}
             <div className="flex items-center gap-6 justify-center lg:justify-start pt-4 border-t border-slate-200 dark:border-slate-800/60 max-w-md mx-auto lg:mx-0">
               <div className="flex items-center gap-1.5">
-                <Clock className="w-5 h-5 text-blue-500" />
+                <Clock className="w-5 h-5 text-red-500" />
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">15 Min ETA</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -135,7 +135,7 @@ const Hero = () => {
               {/* Modern High-End Grid */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { icon: Anchor, name: "Towing", desc: "Flatbed & Wheel-lift", color: "from-blue-500 to-blue-600", bg: "bg-blue-50 dark:bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", link: "/request-service/towing" },
+                  { icon: Anchor, name: "Towing", desc: "Flatbed & Wheel-lift", color: "from-red-500 to-red-600", bg: "bg-red-50 dark:bg-red-500/10", text: "text-red-600 dark:text-red-400", link: "/request-service/towing" },
                   { icon: Wrench, name: "Flat Tire", desc: "Repair & Replace", color: "from-emerald-500 to-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", link: "/request-service/flat-tire" },
                   { icon: Battery, name: "Battery", desc: "Jumpstart & Swap", color: "from-amber-500 to-amber-600", bg: "bg-amber-50 dark:bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", link: "/request-service/battery" },
                   { icon: ArrowRight, name: "View All", desc: "Explore Catalog", color: "from-slate-700 to-slate-800", bg: "bg-slate-100 dark:bg-slate-800", text: "text-foreground", link: "/services" }

@@ -29,31 +29,31 @@ const Reveal = ({ children, className = "", delay = 0 }: { children: React.React
 
 const TechnicianLanding = () => {
   return (
-    <div className="min-h-screen bg-slate-50 selection:bg-blue-200 selection:text-slate-900 font-sans">
+    <div className="min-h-screen bg-slate-50 selection:bg-red-200 selection:text-slate-900 font-sans">
       {/* Hero Section */}
       <section className="relative pt-32 pb-24 overflow-hidden bg-white border-b border-slate-200/60">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 blur-[120px] rounded-full -translate-y-1/4 translate-x-1/4" />
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-red-500/5 blur-[120px] rounded-full -translate-y-1/4 translate-x-1/4" />
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[100px] rounded-full translate-y-1/4 -translate-x-1/4" />
         </div>
 
         <div className="container relative mx-auto max-w-7xl px-4 lg:px-8 z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <Reveal>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 mb-8">
-                <Wrench size={14} className="text-blue-600" />
-                <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-blue-700">ResQNow Partner Network</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-100 mb-8">
+                <Wrench size={14} className="text-red-600" />
+                <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-red-700">ResQNow Partner Network</span>
               </div>
               <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-slate-900 mb-6 leading-[1.05]">
                 Turn your skills into <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">predictable income.</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-indigo-600">predictable income.</span>
               </h1>
               <p className="text-xl lg:text-2xl text-slate-500 font-medium leading-relaxed mb-10 max-w-xl">
                 Join Tamil Nadu's fastest-growing digital roadside assistance grid. We provide the jobs, the tech, and guaranteed payouts. You focus on the fix.
               </p>
               
               <div className="flex flex-wrap items-center gap-4">
-                <Button size="xl" className="h-14 px-8 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300" asChild>
+                <Button size="xl" className="h-14 px-8 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300" asChild>
                   <Link to="/technician/register">
                     Apply Now <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -76,8 +76,8 @@ const TechnicianLanding = () => {
               >
                 <div className="flex justify-between items-center mb-8 pb-6 border-b border-slate-100">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                      <LineChart size={24} className="text-blue-600" />
+                    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                      <LineChart size={24} className="text-red-600" />
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900">Weekly Earnings</p>
@@ -115,7 +115,7 @@ const TechnicianLanding = () => {
       <section className="py-24 lg:py-32 relative">
         <div className="container mx-auto max-w-7xl px-4 lg:px-8">
           <Reveal className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-6">Why Join Us?</h2>
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-600 mb-6">Why Join Us?</h2>
             <h3 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1]">
               Built for mechanics who want to grow.
             </h3>
@@ -138,9 +138,9 @@ const TechnicianLanding = () => {
                 key={i}
                 variants={fadeUp}
                 whileHover={{ y: -5 }}
-                className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200/60 hover:border-blue-200 transition-colors"
+                className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200/60 hover:border-red-200 transition-colors"
               >
-                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-blue-600 border border-blue-100">
+                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mb-6 text-red-600 border border-red-100">
                   <benefit.icon size={24} />
                 </div>
                 <h4 className="text-xl font-bold text-slate-900 mb-3">{benefit.title}</h4>

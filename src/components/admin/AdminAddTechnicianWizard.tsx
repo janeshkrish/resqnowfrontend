@@ -577,13 +577,13 @@ const AdminAddTechnicianWizard = () => {
                                 <div key={idx} className="flex items-center gap-3 py-3 cursor-pointer" onClick={() => setCurrentStep(idx)}>
                                     <div className={cn(
                                         "w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-bold transition-colors z-10",
-                                        isActive ? "border-blue-600 bg-blue-600 text-white" :
+                                        isActive ? "border-red-600 bg-red-600 text-white" :
                                             isCompleted ? "border-green-500 bg-green-500 text-white" :
                                                 "border-slate-300 bg-card dark:bg-slate-900 text-muted-foreground/80"
                                     )}>
                                         {isCompleted ? <Check className="w-3 h-3" /> : (idx + 1)}
                                     </div>
-                                    <div className={cn("text-sm font-medium transition-colors", isActive ? "text-blue-700" : "text-muted-foreground")}>
+                                    <div className={cn("text-sm font-medium transition-colors", isActive ? "text-red-700" : "text-muted-foreground")}>
                                         {step.title}
                                     </div>
                                 </div>
@@ -652,8 +652,8 @@ const AdminAddTechnicianWizard = () => {
                                     <div className="grid grid-cols-3 gap-3">
                                         {ALL_SERVICES.map(s => (
                                             <FormField key={s.id} control={control} name="specialties" render={({ field }) => (
-                                                <FormItem className={cn("border rounded p-3 cursor-pointer flex flex-col items-center text-center gap-2 hover:bg-muted", field.value?.includes(s.id) && "border-blue-500 bg-blue-50")} onClick={() => { const val = field.value || []; field.onChange(val.includes(s.id) ? val.filter((x: string) => x !== s.id) : [...val, s.id]) }}>
-                                                    <s.icon className={cn("w-6 h-6", field.value?.includes(s.id) ? "text-blue-500" : "text-slate-400")} />
+                                                <FormItem className={cn("border rounded p-3 cursor-pointer flex flex-col items-center text-center gap-2 hover:bg-muted", field.value?.includes(s.id) && "border-red-500 bg-red-50")} onClick={() => { const val = field.value || []; field.onChange(val.includes(s.id) ? val.filter((x: string) => x !== s.id) : [...val, s.id]) }}>
+                                                    <s.icon className={cn("w-6 h-6", field.value?.includes(s.id) ? "text-red-500" : "text-slate-400")} />
                                                     <span className="text-xs font-medium">{s.label}</span>
                                                 </FormItem>
                                             )} />
@@ -664,8 +664,8 @@ const AdminAddTechnicianWizard = () => {
                                     <div className="grid grid-cols-4 gap-3">
                                         {VEHICLES.map(v => (
                                             <FormField key={v.id} control={control} name={`vehicle_types.${v.id}` as any} render={({ field }) => (
-                                                <FormItem className={cn("border rounded p-3 cursor-pointer flex flex-col items-center text-center gap-2", field.value && "border-blue-500 bg-blue-50")} onClick={() => field.onChange(!field.value)}>
-                                                    <v.icon className={cn("w-6 h-6", field.value ? "text-blue-500" : "text-slate-400")} />
+                                                <FormItem className={cn("border rounded p-3 cursor-pointer flex flex-col items-center text-center gap-2", field.value && "border-red-500 bg-red-50")} onClick={() => field.onChange(!field.value)}>
+                                                    <v.icon className={cn("w-6 h-6", field.value ? "text-red-500" : "text-slate-400")} />
                                                     <span className="text-xs font-medium">{v.label}</span>
                                                 </FormItem>
                                             )} />
@@ -781,9 +781,9 @@ const AdminAddTechnicianWizard = () => {
                             <div className="flex justify-end gap-3 pt-6 border-t mt-8">
                                 <Button variant="outline" type="button" onClick={() => setCurrentStep(p => Math.max(0, p - 1))} disabled={currentStep === 0}>Back</Button>
                                 {currentStep === STEPS.length - 1 ? (
-                                    <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700">{isSubmitting ? "Creating..." : "Create Technician"}</Button>
+                                    <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700">{isSubmitting ? "Creating..." : "Create Technician"}</Button>
                                 ) : (
-                                    <Button type="button" onClick={handleNext} className="bg-blue-600 hover:bg-blue-700">Continue</Button>
+                                    <Button type="button" onClick={handleNext} className="bg-red-600 hover:bg-red-700">Continue</Button>
                                 )}
                             </div>
                         </div>

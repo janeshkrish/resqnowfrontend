@@ -11,7 +11,7 @@ import { SERVICE_CATALOG } from "@/config/serviceCatalog";
 
 const serviceStyles: Record<string, { icon: any; color: string }> = {
   "towing": { icon: TowTruck, color: "bg-gradient-to-br from-red-500 to-red-600" },
-  "flat-tire": { icon: Gauge, color: "bg-gradient-to-br from-blue-500 to-blue-600" },
+  "flat-tire": { icon: Gauge, color: "bg-gradient-to-br from-red-500 to-red-600" },
   "battery": { icon: BatteryCharging, color: "bg-gradient-to-br from-purple-500 to-purple-600" },
   "mechanical": { icon: Settings, color: "bg-gradient-to-br from-orange-500 to-orange-600" },
   "fuel": { icon: Droplets, color: "bg-gradient-to-br from-green-500 to-green-600" },

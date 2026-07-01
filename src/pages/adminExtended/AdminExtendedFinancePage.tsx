@@ -309,7 +309,7 @@ export default function AdminExtendedFinancePage() {
           }
           if (payoutStatus === "processing") {
             return (
-              <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+              <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
                 Partially Allocated
               </span>
             );

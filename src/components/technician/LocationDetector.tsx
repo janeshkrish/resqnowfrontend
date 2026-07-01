@@ -245,7 +245,7 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
                             <span className="text-xs font-semibold text-muted-foreground block">Full Address</span>
                             <p className="line-clamp-2">{location.address}</p>
                         </div>
-                        <p className="text-xs text-blue-600 italic text-center mt-2">
+                        <p className="text-xs text-red-600 italic text-center mt-2">
                             Tip: Drag the marker to pinpoint your specific shop location.
                         </p>
                     </div>

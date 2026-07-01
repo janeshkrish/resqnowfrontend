@@ -506,7 +506,7 @@ const PaymentStep = ({ resumeFile, setResumeFile }: { resumeFile: File | null, s
 
       <Separator />
       <FormField control={control} name="agreed_to_terms" render={({ field }) => (
-        <FormItem className="flex flex-row items-center space-x-2 space-y-0 rounded bg-blue-50 p-4 border border-blue-200">
+        <FormItem className="flex flex-row items-center space-x-2 space-y-0 rounded bg-red-50 p-4 border border-red-200">
           <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
           <div className="space-y-1">
             <FormLabel>I accept the terms and conditions</FormLabel>

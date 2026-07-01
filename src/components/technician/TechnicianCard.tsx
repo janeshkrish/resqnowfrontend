@@ -44,7 +44,7 @@ const TechnicianCard = ({ technician, isSelected, onSelect }: TechnicianCardProp
           </AvatarFallback>
         </Avatar>
         {technician.verified && (
-          <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-0.5 rounded-full border-2 border-white">
+          <div className="absolute -bottom-1 -right-1 bg-red-500 text-white p-0.5 rounded-full border-2 border-white">
             <Shield className="h-3 w-3 fill-current" />
           </div>
         )}

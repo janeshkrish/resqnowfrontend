@@ -22,7 +22,7 @@ const vehicleOptions: VehicleOption[] = [
     id: "car",
     name: "Car / SUV",
     icon: Car,
-    gradient: "from-blue-500 to-blue-600",
+    gradient: "from-red-500 to-red-600",
     description: "Personal vehicles, sedans, hatchbacks"
   },
   {

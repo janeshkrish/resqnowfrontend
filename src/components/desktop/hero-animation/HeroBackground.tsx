@@ -42,7 +42,7 @@ const HeroBackground = () => {
       */}
       <div className="absolute inset-y-0 left-0 w-full lg:w-[55%] z-0">
         {/* Soft glowing ambient orbs */}
-        <div className="absolute top-[10%] -left-[10%] w-[600px] h-[600px] bg-blue-500/5 blur-[120px] rounded-full" />
+        <div className="absolute top-[10%] -left-[10%] w-[600px] h-[600px] bg-red-500/5 blur-[120px] rounded-full" />
         <div className="absolute top-[60%] left-[20%] w-[500px] h-[500px] bg-red-500/5 blur-[100px] rounded-full" />
         
         {/* Subtle topographic grid for texture */}

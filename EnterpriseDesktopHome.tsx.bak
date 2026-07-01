@@ -34,7 +34,7 @@ const Reveal = ({ children, className = "", delay = 0 }: { children: ReactNode; 
 const PremiumDashboardMockup = () => {
   return (
     <div className="relative w-full max-w-[800px] mx-auto perspective-1000">
-      <div className="absolute inset-0 -m-20 bg-gradient-to-tr from-red-500/20 via-transparent to-emerald-500/20 rounded-full blur-3xl opacity-50" />
+      <div className="absolute inset-0 -m-20 bg-gradient-to-tr -red-/20 via-transparent to-emerald-500/20 rounded-full blur-3xl opacity-50" />
       
       <motion.div 
         className="relative rounded-2xl border border-slate-200/50 bg-white/70 p-6 shadow-[0_40px_100px_-20px_rgba(15,23,42,0.15)] backdrop-blur-3xl overflow-hidden"
@@ -42,7 +42,7 @@ const PremiumDashboardMockup = () => {
         animate={{ rotateX: 0, y: 0, opacity: 1, scale: 1 }}
         transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
       >
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent -red-/50 to-transparent" />
         
         {/* Header */}
         <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-200/50">
@@ -54,7 +54,7 @@ const PremiumDashboardMockup = () => {
             </div>
             <div className="h-4 w-px bg-slate-300 mx-2" />
             <div className="flex items-center gap-2">
-              <Zap size={14} className="text-red-600" />
+              <Zap size={14} className="-red-" />
               <p className="text-xs font-bold tracking-wide text-slate-800">DispatchEngine_v2.0</p>
             </div>
           </div>
@@ -113,10 +113,10 @@ const PremiumDashboardMockup = () => {
               animate={{ scale: 1 }}
               transition={{ delay: 1.5, type: "spring" }}
             >
-              <div className="absolute w-24 h-24 bg-red-500/20 rounded-full animate-ping" />
+              <div className="absolute w-24 h-24 -red-/20 rounded-full animate-ping" />
               <div className="w-12 h-12 bg-white rounded-xl shadow-lg border border-slate-200 flex items-center justify-center z-10 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-red-50 translate-y-full group-hover:translate-y-0 transition-transform" />
-                <Truck size={20} className="text-red-600 relative z-10" />
+                <div className="absolute inset-0 -red- translate-y-full group-hover:translate-y-0 transition-transform" />
+                <Truck size={20} className="-red- relative z-10" />
               </div>
               
               {/* Floating Tooltip */}
@@ -141,8 +141,8 @@ const PremiumDashboardMockup = () => {
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Latency Optimization</p>
                 <p className="text-sm font-bold text-slate-900">Routing around Tier-2 Detours</p>
               </div>
-              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                <Activity size={14} className="text-red-600" />
+              <div className="h-8 w-8 rounded-full -red- flex items-center justify-center">
+                <Activity size={14} className="-red-" />
               </div>
             </div>
           </div>
@@ -153,7 +153,7 @@ const PremiumDashboardMockup = () => {
               className="bg-gradient-to-r from-slate-900 to-red-950 rounded-xl p-5 shadow-lg relative overflow-hidden group"
               whileHover={{ y: -2 }}
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/20 rounded-full blur-2xl -translate-y-10 translate-x-10 group-hover:bg-red-500/30 transition-colors" />
+              <div className="absolute top-0 right-0 w-32 h-32 -red-/20 rounded-full blur-2xl -translate-y-10 translate-x-10 group-hover:-red-/30 transition-colors" />
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Avg ETA</p>
               <p className="text-4xl font-black text-white mb-1">22<span className="text-xl text-slate-500">m</span></p>
               <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
@@ -191,7 +191,7 @@ const EnterpriseHero = () => (
     {/* Clean Background with Subtle Ambient Glows */}
     <div className="absolute inset-0 pointer-events-none bg-[#fafafa]">
       <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent z-10" />
-      <div className="absolute top-[10%] -left-[10%] w-[600px] h-[600px] bg-red-500/5 blur-[120px] rounded-full" />
+      <div className="absolute top-[10%] -left-[10%] w-[600px] h-[600px] -red-/5 blur-[120px] rounded-full" />
       <div className="absolute top-[60%] left-[20%] w-[500px] h-[500px] bg-red-500/5 blur-[100px] rounded-full" />
     </div>
 
@@ -205,13 +205,13 @@ const EnterpriseHero = () => (
               transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-600 shadow-sm mb-8 hover:bg-slate-50 transition-colors cursor-pointer"
             >
-              <span className="flex h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+              <span className="flex h-2 w-2 rounded-full -red- animate-pulse" />
               Phase 1: Tier-2 Emergency Grid
             </motion.div>
             
             <h1 className="text-5xl lg:text-7xl font-bold leading-[1.05] tracking-tighter text-slate-900 mb-6">
               Intelligent Roadside Assistance for <br className="hidden lg:block"/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-indigo-600 to-red-600 bg-300% animate-gradient">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r -red- via-indigo-600 -red- bg-300% animate-gradient">
                 Modern Mobility.
               </span>
             </h1>
@@ -292,7 +292,7 @@ const TrustDeficitSection = () => {
                 <div className="absolute top-0 right-0 p-8 opacity-0 group-hover:opacity-5 transition-opacity duration-500 transform group-hover:scale-110">
                   <problem.icon size={100} />
                 </div>
-                <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-8 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors duration-300">
+                <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center mb-8 -red- group-hover:-red- group-hover:text-white transition-colors duration-300">
                   <problem.icon size={24} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-4">{problem.title}</h3>
@@ -316,7 +316,7 @@ const WorkflowSection = () => {
 
   return (
     <section id="technology" className="py-24 lg:py-32 bg-[#fafafa] border-y border-slate-200/60 relative overflow-hidden">
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-500/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[800px] h-[800px] -red-/5 blur-[120px] rounded-full pointer-events-none" />
       
       <div className="container mx-auto max-w-7xl px-4 lg:px-8 relative z-10">
         <Reveal className="text-center max-w-3xl mx-auto mb-24">
@@ -367,7 +367,7 @@ const WorkflowSection = () => {
                   whileHover={{ y: -8, scale: 1.05 }}
                   transition={{ type: "spring", stiffness: 300 }}
                 >
-                  <step.icon size={32} className="text-slate-700 transition-colors group-hover:text-red-600" />
+                  <step.icon size={32} className="text-slate-700 transition-colors group-hover:-red-" />
                   <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gradient-to-r from-slate-900 to-red-950 text-white font-bold text-sm flex items-center justify-center shadow-lg border-2 border-white">
                     {i + 1}
                   </div>
@@ -394,12 +394,12 @@ const CTASection = () => (
       >
         <div className="bg-slate-50 border border-slate-200/60 rounded-[3rem] p-12 lg:p-24 text-center relative overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
           
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-red-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] -red-/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
           
           <div className="relative z-10 flex flex-col items-center">
             <motion.div 
-              className="w-20 h-20 bg-white shadow-sm text-red-600 rounded-2xl flex items-center justify-center mb-8 border border-slate-100"
+              className="w-20 h-20 bg-white shadow-sm -red- rounded-2xl flex items-center justify-center mb-8 border border-slate-100"
               whileHover={{ rotate: 180, scale: 1.1 }}
               transition={{ duration: 0.5, type: "spring" }}
             >
@@ -434,7 +434,7 @@ const CTASection = () => (
 
 const EnterpriseDesktopHome = () => {
   return (
-    <div className="min-h-screen bg-white selection:bg-red-100 selection:text-red-900 font-sans">
+    <div className="min-h-screen bg-white selection:-red- selection:-red- font-sans">
       <EnterpriseHero />
       <TrustDeficitSection />
       <WorkflowSection />

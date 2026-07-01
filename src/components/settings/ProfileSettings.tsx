@@ -65,7 +65,7 @@ const ProfileSettings = () => {
         <div className="relative group cursor-pointer">
           <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
             <AvatarImage src={formData.avatar} />
-            <AvatarFallback className="text-4xl bg-blue-600 text-white">
+            <AvatarFallback className="text-4xl bg-red-600 text-white">
               {formData.name.charAt(0)?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -213,11 +213,11 @@ const ProfileSettings = () => {
         </div>
 
         {/* Security / Account Card */}
-        <div className="zomato-card bg-blue-50/30 border-blue-100/50">
+        <div className="zomato-card bg-red-50/30 border-red-100/50">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <h3 className="font-semibold text-foreground flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-blue-600" />
+                <ShieldCheck className="h-5 w-5 text-red-600" />
                 Account Security
               </h3>
               <p className="text-sm text-muted-foreground max-w-md">

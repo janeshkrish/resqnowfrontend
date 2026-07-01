@@ -585,12 +585,12 @@ const VehicleInfoStep = ({
                 </div>
 
                 <div className="flex items-center gap-2.5 border-l border-slate-100 pl-3 md:gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 md:h-12 md:w-12">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600 md:h-12 md:w-12">
                     <ShieldCheck className="h-[18px] w-[18px] md:h-5 md:w-5" />
                   </div>
                   <div>
                     <p className="text-[0.72rem] text-slate-500 md:text-[0.9rem]">Verified technicians</p>
-                    <p className="text-[0.98rem] font-black text-blue-600 md:text-[1.1rem]">100% Safe</p>
+                    <p className="text-[0.98rem] font-black text-red-600 md:text-[1.1rem]">100% Safe</p>
                   </div>
                 </div>
               </div>

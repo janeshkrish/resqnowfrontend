@@ -253,7 +253,7 @@ export default function RequestDetailsModal({
                 <div className="space-y-3">
                   {details.timeline.map((event) => (
                     <div key={`${event.id}-${event.createdAt}`} className="flex gap-3">
-                      <div className="mt-1 h-3 w-3 shrink-0 rounded-full bg-blue-600" />
+                      <div className="mt-1 h-3 w-3 shrink-0 rounded-full bg-red-600" />
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-800">{event.title}</p>
                         <p className="text-xs text-slate-500">{dateTime(event.createdAt)}{event.actorId ? ` | ${event.actorId}` : ""}</p>

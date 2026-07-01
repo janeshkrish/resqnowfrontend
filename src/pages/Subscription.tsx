@@ -27,9 +27,9 @@ const getPlanTone = (plan: SubscriptionPlanConfig) => {
   const key = (plan.color || "").toLowerCase();
   if (key === "blue" || plan.id === "basic") {
     return {
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      button: "bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200",
+      iconBg: "bg-red-50",
+      iconColor: "text-red-600",
+      button: "bg-red-600 hover:bg-red-700 hover:shadow-red-200",
       border: "#2563EB",
     };
   }
@@ -160,7 +160,7 @@ const Subscription = () => {
   return (
     <div className="container py-16 animate-fade-in">
       <div className="text-center mb-12 space-y-4">
-        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-red-600">
+        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-700 to-red-600">
           ResQNow Customer Plans
         </h1>
         <p className="text-xl text-muted-foreground">Roadside help, made predictable and stress-free</p>
@@ -194,7 +194,7 @@ const Subscription = () => {
               className={`relative rounded-xl bg-card text-card-foreground border-2 cursor-pointer flex flex-col h-full overflow-hidden ${isSelected ? "z-10" : "z-0"}`}
             >
               {plan.recommended && (
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-medium shadow-md z-20">
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium shadow-md z-20">
                   Most Popular
                 </div>
               )}

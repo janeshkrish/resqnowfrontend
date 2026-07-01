@@ -134,7 +134,7 @@ export function PaymentSummaryDialog({
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : couponMessage?.tone === "error"
     ? "border-rose-200 bg-rose-50 text-rose-700"
-    : "border-blue-200 bg-blue-50 text-blue-700";
+    : "border-red-200 bg-red-50 text-red-700";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isProcessing && !open && onClose()}>

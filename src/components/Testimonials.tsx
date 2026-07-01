@@ -62,7 +62,7 @@ export default function Testimonials() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 {failedImages[review.image] ? (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-red-400 to-blue-500 text-base font-semibold text-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-red-400 to-red-500 text-base font-semibold text-white">
                     {review.name[0]}
                   </div>
                 ) : (
@@ -82,7 +82,7 @@ export default function Testimonials() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="font-semibold text-gray-800">{review.name}</h4>
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">
                       ✔ Verified
                     </span>
                   </div>

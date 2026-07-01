@@ -9,7 +9,7 @@ const vehicleTypes = [
     id: "car",
     name: "Cars",
     icon: Car,
-    color: "bg-gradient-to-r from-blue-500 to-blue-600",
+    color: "bg-gradient-to-r from-red-500 to-red-600",
     description: "Service for all types of cars including SUVs, hatchbacks, sedans, and MPVs.",
     subtypes: ["SUV", "Hatchback", "Sedan", "MPV", "Other Cars"]
   },
@@ -40,12 +40,12 @@ const VehicleTypes = () => {
     <section>
       <div className="container px-4">
         <div className="text-center mb-16 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-500/10 rounded-full mb-6 border border-blue-100 dark:border-blue-500/20">
-             <Car className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-             <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Supported Vehicles</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-500/10 rounded-full mb-6 border border-red-100 dark:border-red-500/20">
+             <Car className="w-4 h-4 text-red-600 dark:text-red-400" />
+             <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-widest">Supported Vehicles</span>
           </div>
           <h2 className="text-3xl md:text-5xl font-black text-foreground mb-4 tracking-tight leading-tight">
-            We Service <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600">Every Vehicle</span>
+            We Service <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-red-600">Every Vehicle</span>
           </h2>
           <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium">
             From two-wheelers to heavy commercial trucks, our partners are equipped to handle it all.

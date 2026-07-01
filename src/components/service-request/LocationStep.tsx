@@ -375,7 +375,7 @@ const LocationStep = ({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors shadow-none text-xs font-bold px-3"
+                className="h-8 gap-1.5 rounded-full border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors shadow-none text-xs font-bold px-3"
                 onClick={onGetCurrentLocation}
                 disabled={isGettingLocation}
               >
@@ -386,10 +386,10 @@ const LocationStep = ({
 
             {/* GPS Reference (if available) */}
             {currentLocation && (
-              <div className="px-4 py-3 bg-blue-50/50 border-b border-blue-100/50">
+              <div className="px-4 py-3 bg-red-50/50 border-b border-red-100/50">
                 <div className="flex gap-2 items-start">
-                  <div className="mt-0.5 text-blue-600">🎯</div>
-                  <p className="text-[11px] font-semibold text-blue-900 leading-tight pr-2">
+                  <div className="mt-0.5 text-red-600">🎯</div>
+                  <p className="text-[11px] font-semibold text-red-900 leading-tight pr-2">
                     {currentLocation}
                   </p>
                 </div>

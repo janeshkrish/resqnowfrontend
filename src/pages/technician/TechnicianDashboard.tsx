@@ -1902,7 +1902,7 @@ const TechnicianDashboard = () => {
             </Link>
 
             <Link to="/technician/history" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
-              <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-3 group-hover:scale-110 transition-transform">
+              <div className="h-10 w-10 bg-red-50 rounded-full flex items-center justify-center text-red-600 mb-3 group-hover:scale-110 transition-transform">
                 <Briefcase className="w-5 h-5" />
               </div>
               <div>
@@ -1973,7 +1973,7 @@ const TechnicianDashboard = () => {
               {/* Floating Status Badge */}
               <div className="absolute top-4 left-4 z-[400]">
                 <div className="bg-card dark:bg-slate-900/95 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg border border-border flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                  <div className="h-2 w-2 rounded-full bg-red-600 animate-ping" />
                   <span className="text-xs font-black tracking-widest text-foreground uppercase">
                     {formatTechnicianStatus(activeJob.status)}
                   </span>
@@ -2023,7 +2023,7 @@ const TechnicianDashboard = () => {
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-muted rounded-2xl p-3 border border-border flex items-center gap-3">
                   <div className="w-10 h-10 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
-                    <Navigation className="w-4 h-4 text-blue-600" />
+                    <Navigation className="w-4 h-4 text-red-600" />
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Dist</p>
@@ -2098,7 +2098,7 @@ const TechnicianDashboard = () => {
                 )}
 
                 {activeJobIsTowing && activeJobTowingAction && (
-                  <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange(activeJobTowingAction.status)}>
+                  <Button className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange(activeJobTowingAction.status)}>
                     {activeJobTowingAction.label}
                   </Button>
                 )}
@@ -2111,7 +2111,7 @@ const TechnicianDashboard = () => {
                 )}
 
                 {!activeJobIsTowing && (activeJobStatus === 'accepted' || activeJobStatus === 'assigned') && (
-                  <Button className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
+                  <Button className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
                     START JOURNEY
                   </Button>
                 )}

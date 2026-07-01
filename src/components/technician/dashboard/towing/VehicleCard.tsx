@@ -27,7 +27,7 @@ export default function VehicleCard({
       <CardContent className="space-y-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-700">
               <Truck className="h-5 w-5" />
             </div>
             <div>

@@ -55,7 +55,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] selection:bg-blue-100 selection:text-blue-900 font-sans pb-24 relative overflow-hidden">
+    <div className="min-h-screen bg-[#fafafa] selection:bg-red-100 selection:text-red-900 font-sans pb-24 relative overflow-hidden">
       
       {/* Sleek Minimalist Header */}
       <div className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 flex flex-col items-center justify-center text-center px-4 overflow-hidden">
@@ -70,11 +70,11 @@ const Contact = () => {
           className="relative z-10"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-[11px] font-bold uppercase tracking-[0.15em] text-slate-600 shadow-sm mb-6">
-            <Sparkles size={12} className="text-blue-600" />
+            <Sparkles size={12} className="text-red-600" />
             24/7 Support Desk
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight mb-6">
-            Let's keep you <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">moving.</span>
+            Let's keep you <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-indigo-600">moving.</span>
           </h1>
           <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed">
             Whether you have questions about our dispatch network, need technical support, or want to partner with us, our team is ready.
@@ -96,28 +96,28 @@ const Contact = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 group">
-                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Full Name</Label>
-                  <Input id="name" name="name" placeholder="John Doe" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner text-base" />
+                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-red-600 transition-colors">Full Name</Label>
+                  <Input id="name" name="name" placeholder="John Doe" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-red-500 transition-all shadow-inner text-base" />
                 </div>
                 <div className="space-y-2 group">
-                  <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Email Address</Label>
-                  <Input id="email" name="email" type="email" placeholder="john@example.com" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner text-base" />
+                  <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-red-600 transition-colors">Email Address</Label>
+                  <Input id="email" name="email" type="email" placeholder="john@example.com" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-red-500 transition-all shadow-inner text-base" />
                 </div>
               </div>
 
               <div className="space-y-2 group">
-                <Label htmlFor="subject" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Subject</Label>
-                <Input id="subject" name="subject" placeholder="How can we help?" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner text-base" />
+                <Label htmlFor="subject" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-red-600 transition-colors">Subject</Label>
+                <Input id="subject" name="subject" placeholder="How can we help?" required className="h-14 px-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-red-500 transition-all shadow-inner text-base" />
               </div>
 
               <div className="space-y-2 group">
-                <Label htmlFor="message" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-blue-600 transition-colors">Message</Label>
-                <Textarea id="message" name="message" rows={5} placeholder="Tell us more about your inquiry..." required className="p-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-all shadow-inner resize-none text-base" />
+                <Label htmlFor="message" className="text-xs font-bold uppercase tracking-wider text-slate-500 group-focus-within:text-red-600 transition-colors">Message</Label>
+                <Textarea id="message" name="message" rows={5} placeholder="Tell us more about your inquiry..." required className="p-4 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 focus-visible:border-red-500 transition-all shadow-inner resize-none text-base" />
               </div>
 
               <div className="pt-4 flex items-center justify-between">
                 <div className="text-[13px] font-medium text-slate-400">Response within <span className="font-bold text-slate-600">2 hours</span>.</div>
-                <Button type="submit" disabled={loading} size="xl" className="h-14 px-8 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                <Button type="submit" disabled={loading} size="xl" className="h-14 px-8 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 hover:shadow-lg hover:-translate-y-0.5 transition-all">
                   {loading ? "Sending..." : (
                     <>
                       Send Message <Send className="ml-2 h-4 w-4" />
@@ -133,16 +133,16 @@ const Contact = () => {
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-2 bg-gradient-to-b from-blue-50 to-white rounded-[2rem] p-8 lg:p-12 text-slate-900 relative overflow-hidden shadow-lg border border-blue-100/50"
+            className="lg:col-span-2 bg-gradient-to-b from-red-50 to-white rounded-[2rem] p-8 lg:p-12 text-slate-900 relative overflow-hidden shadow-lg border border-red-100/50"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[60px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
             
             <h3 className="text-2xl font-bold mb-8 relative z-10 text-slate-900">Direct Contact</h3>
             
             <ul className="space-y-10 relative z-10">
               <li className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 text-blue-600">
+                <div className="flex items-center gap-3 text-red-600">
                   <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
                     <MapPin size={18} />
                   </div>
@@ -156,26 +156,26 @@ const Contact = () => {
               </li>
               
               <li className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 text-blue-600">
+                <div className="flex items-center gap-3 text-red-600">
                   <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
                     <Phone size={18} />
                   </div>
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Phone</span>
                 </div>
                 <div className="text-slate-600 font-medium pl-13 ml-[52px]">
-                  <a href="tel:+919566510080" className="text-lg font-bold text-slate-900 hover:text-blue-600 transition-colors block">+91 9566510080</a>
+                  <a href="tel:+919566510080" className="text-lg font-bold text-slate-900 hover:text-red-600 transition-colors block">+91 9566510080</a>
                 </div>
               </li>
               
               <li className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 text-blue-600">
+                <div className="flex items-center gap-3 text-red-600">
                   <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
                     <Mail size={18} />
                   </div>
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Email</span>
                 </div>
                 <div className="text-slate-600 font-medium pl-13 ml-[52px]">
-                  <a href="mailto:resqnow01@gmail.com" className="font-bold text-slate-900 hover:text-blue-600 transition-colors block">resqnow01@gmail.com</a>
+                  <a href="mailto:resqnow01@gmail.com" className="font-bold text-slate-900 hover:text-red-600 transition-colors block">resqnow01@gmail.com</a>
                 </div>
               </li>
               

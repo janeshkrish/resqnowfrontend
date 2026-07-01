@@ -77,7 +77,7 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
           <Badge className={
             normalizedStatus === 'in-progress' ? 'bg-purple-500 animate-pulse' :
               normalizedStatus === 'en-route' ? 'bg-amber-500' :
-                normalizedStatus === 'arrived' ? 'bg-blue-500' :
+                normalizedStatus === 'arrived' ? 'bg-red-500' :
                   normalizedStatus === 'payment_pending' ? 'bg-orange-500' :
                     normalizedStatus === 'paid' ? 'bg-green-600' :
                       'bg-primary'

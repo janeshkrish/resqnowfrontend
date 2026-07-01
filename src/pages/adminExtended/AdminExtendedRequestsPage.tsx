@@ -11,8 +11,8 @@ const PAGE_LIMIT = 10;
 
 const statusBadgeClass: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
-  assigned: "bg-blue-50 text-blue-700 border-blue-200",
-  accepted: "bg-blue-50 text-blue-700 border-blue-200",
+  assigned: "bg-red-50 text-red-700 border-red-200",
+  accepted: "bg-red-50 text-red-700 border-red-200",
   en_route_pickup: "bg-sky-50 text-sky-700 border-sky-200",
   arrived_pickup: "bg-teal-50 text-teal-700 border-teal-200",
   vehicle_loaded: "bg-indigo-50 text-indigo-700 border-indigo-200",
@@ -162,7 +162,7 @@ export default function AdminExtendedRequestsPage() {
         key: "details",
         header: "",
         render: (row: AdminRequestRow) => (
-          <button type="button" onClick={() => setDetailsRequestId(row.requestId)} className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+          <button type="button" onClick={() => setDetailsRequestId(row.requestId)} className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100">
             <Route className="h-3.5 w-3.5" /> Details
           </button>
         ),

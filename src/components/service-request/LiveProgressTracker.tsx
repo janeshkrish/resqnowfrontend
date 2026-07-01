@@ -26,7 +26,7 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
   const progressPercentage = ((currentStep - 1) / (totalSteps - 1)) * 100;
 
   return (
-    <div className="bg-gradient-to-r from-red-50 via-white to-blue-50 rounded-2xl p-6 mb-8 border border-red-200/50 shadow-lg">
+    <div className="bg-gradient-to-r from-red-50 via-white to-red-50 rounded-2xl p-6 mb-8 border border-red-200/50 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-red-500 rounded-full">
@@ -46,7 +46,7 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
       {/* Progress Bar */}
       <div className="relative h-3 bg-border rounded-full mb-6 overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-red-500 via-yellow-500 via-blue-500 to-green-500 transition-all duration-700 ease-out rounded-full"
+          className="h-full bg-gradient-to-r from-red-500 via-yellow-500 via-red-500 to-green-500 transition-all duration-700 ease-out rounded-full"
           style={{ width: `${progressPercentage}%` }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer rounded-full" />
@@ -118,10 +118,10 @@ const LiveProgressTracker = ({ currentStep, totalSteps }: LiveProgressTrackerPro
 
       {/* Next Step Information */}
       {currentStep < totalSteps && (
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+        <div className="mt-6 p-4 bg-red-50 rounded-xl border border-red-200">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-800">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <span className="text-sm font-medium text-red-800">
               Next: {steps[currentStep]?.name} - Complete this step to continue
             </span>
           </div>

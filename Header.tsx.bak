@@ -159,7 +159,7 @@ const Header = () => {
                   href={item.to}
                   className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
                     isActive(item.activePath)
-                      ? "text-red-700 bg-red-50/80"
+                      ? "-red- -red-/80"
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
@@ -172,7 +172,7 @@ const Header = () => {
                   to={partnerRoute}
                   className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
                     isActive("/technician")
-                      ? "text-red-700 bg-red-50/80"
+                      ? "-red- -red-/80"
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
@@ -183,7 +183,7 @@ const Header = () => {
                   to="/contact"
                   className={`font-bold py-4 px-4 text-base rounded-xl transition-colors ${
                     isActive("/contact")
-                      ? "text-red-700 bg-red-50/80"
+                      ? "-red- -red-/80"
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}

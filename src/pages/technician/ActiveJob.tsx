@@ -496,7 +496,7 @@ const ActiveJob = () => {
 
             <div className="absolute left-4 top-4 z-[400]">
               <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/95 px-4 py-2 shadow-lg backdrop-blur-sm">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-600 animate-pulse" />
+                <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-pulse" />
                 <span className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">
                   {formatTechnicianStatus(status)}
                 </span>
@@ -558,7 +558,7 @@ const ActiveJob = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-border bg-muted p-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-blue-600 shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-red-600 shadow-sm">
                     <Wallet className="h-4 w-4" />
                   </div>
                   <div>
@@ -670,7 +670,7 @@ const ActiveJob = () => {
             <div className="space-y-3">
               {isTowingActiveJob && towingAction && (
                 <Button
-                  className="h-14 w-full rounded-2xl bg-blue-600 text-lg font-black tracking-wide text-white shadow-xl shadow-blue-600/20 hover:bg-blue-700"
+                  className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
                   onClick={() => updateStatus(towingAction.status)}
                   disabled={isLoading}
                 >
@@ -688,7 +688,7 @@ const ActiveJob = () => {
 
               {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
                 <Button
-                  className="h-14 w-full rounded-2xl bg-blue-600 text-lg font-black tracking-wide text-white shadow-xl shadow-blue-600/20 hover:bg-blue-700"
+                  className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
                   onClick={() => updateStatus('en-route')}
                   disabled={isLoading}
                 >

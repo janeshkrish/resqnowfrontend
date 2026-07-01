@@ -58,7 +58,7 @@ const About = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FAFCFF] selection:bg-blue-100 selection:text-blue-900 font-sans pb-32">
+    <div className="min-h-screen bg-[#FAFCFF] selection:bg-red-100 selection:text-red-900 font-sans pb-32">
       {/* Heavy Corporate Hero Section */}
       <div className="relative pt-32 pb-24 lg:pt-48 lg:pb-32 overflow-hidden border-b border-slate-200/50">
         <motion.div style={{ y }} className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -74,7 +74,7 @@ const About = () => {
             transition={{ duration: 0.7, ease: "easeOut" }}
             className="inline-flex items-center gap-3 rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-xl px-5 py-2.5 text-xs font-black uppercase tracking-[0.25em] text-slate-800 shadow-sm mb-10"
           >
-            <Building2 className="h-4 w-4 text-blue-600" />
+            <Building2 className="h-4 w-4 text-red-600" />
             Corporate Overview
           </motion.div>
 
@@ -85,7 +85,7 @@ const About = () => {
             className="text-5xl lg:text-[5rem] font-black text-slate-900 tracking-tight leading-[1.05] mb-8"
           >
             Pioneering India's <br className="hidden lg:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-600">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-700 via-indigo-600 to-red-600">
               Mobility Infrastructure
             </span>
           </motion.h1>
@@ -106,7 +106,7 @@ const About = () => {
         {/* Enterprise MSME Certification */}
         <Reveal>
           <div className="relative bg-white/60 backdrop-blur-3xl rounded-[3rem] p-10 lg:p-14 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mx-auto mb-32 group overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/30 to-blue-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/30 to-red-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
             <div className="relative z-10 w-40 h-40 lg:w-48 lg:h-48 shrink-0 bg-white rounded-3xl flex items-center justify-center border border-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.06)] p-6 group-hover:scale-105 transition-transform duration-700">
               <img src={msmeLogo} alt="MSME Udyam Registered" className="w-full h-full object-contain filter contrast-125" />
             </div>
@@ -127,10 +127,10 @@ const About = () => {
         <div className="grid lg:grid-cols-2 gap-10 mb-32">
           <Reveal delay={0.1}>
             <div className="relative bg-white/80 backdrop-blur-xl h-full rounded-[3rem] p-12 lg:p-16 shadow-[0_20px_50px_-20px_rgba(15,23,42,0.08)] border border-slate-100 overflow-hidden group hover:bg-white transition-all duration-700">
-              <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 group-hover:bg-blue-600/10 transition-colors duration-700" />
+              <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-red-600/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 group-hover:bg-red-600/10 transition-colors duration-700" />
               
               <div className="relative z-10">
-                <div className="w-20 h-20 bg-blue-600 text-white rounded-[1.5rem] flex items-center justify-center mb-10 shadow-[0_10px_30px_rgba(37,99,235,0.3)] group-hover:scale-110 transition-transform duration-500">
+                <div className="w-20 h-20 bg-red-600 text-white rounded-[1.5rem] flex items-center justify-center mb-10 shadow-[0_10px_30px_rgba(37,99,235,0.3)] group-hover:scale-110 transition-transform duration-500">
                   <Target size={40} strokeWidth={1.5} />
                 </div>
                 <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tight">Enterprise Mission</h2>
@@ -142,7 +142,7 @@ const About = () => {
           </Reveal>
 
           <Reveal delay={0.2}>
-            <div className="relative bg-slate-900 h-full rounded-[3rem] p-12 lg:p-16 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-800 overflow-hidden group">
+            <div className="relative bg-gradient-to-r from-slate-900 to-red-950 h-full rounded-[3rem] p-12 lg:p-16 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-800 overflow-hidden group">
               <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 group-hover:bg-indigo-500/30 transition-colors duration-700" />
               
               <div className="relative z-10 text-white">
@@ -165,8 +165,8 @@ const About = () => {
             
             <div className="relative z-10 max-w-5xl mx-auto">
               <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-[2px] bg-blue-600" />
-                <h2 className="text-sm font-black uppercase tracking-[0.3em] text-blue-600">The Catalyst</h2>
+                <div className="w-12 h-[2px] bg-red-600" />
+                <h2 className="text-sm font-black uppercase tracking-[0.3em] text-red-600">The Catalyst</h2>
               </div>
               
               <h3 className="text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] mb-12">
@@ -232,7 +232,7 @@ const About = () => {
                   <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:scale-150 transition-transform duration-700">
                     <stat.icon size={160} />
                   </div>
-                  <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-900 flex items-center justify-center mb-8 border border-slate-100 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors duration-500">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-900 flex items-center justify-center mb-8 border border-slate-100 shadow-sm group-hover:bg-red-600 group-hover:text-white transition-colors duration-500">
                     <stat.icon size={26} strokeWidth={2} />
                   </div>
                   <p className="text-5xl font-black text-slate-900 mb-3 tracking-tighter">

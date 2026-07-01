@@ -198,7 +198,7 @@ function JobCardActions({
       <button
         type="button"
         onClick={() => remindMutation.mutate({ requestId: job.requestId })}
-        className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+        className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
       >
         <BellRing className="h-3.5 w-3.5" />
         Send Reminder

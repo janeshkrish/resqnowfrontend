@@ -46,7 +46,7 @@ const HeroSection = () => {
   return (
     <section ref={ref} className="relative pt-40 pb-32 overflow-hidden bg-[#fafafa] text-slate-900 min-h-[90vh] flex items-center border-b border-slate-200/60">
       <motion.div style={{ y, opacity }} className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-600/5 rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4" />
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-red-600/5 rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-600/5 rounded-full blur-[100px] translate-y-1/4 -translate-x-1/4" />
       </motion.div>
 
@@ -55,12 +55,12 @@ const HeroSection = () => {
           <div className="col-span-12 lg:col-span-7">
             <Reveal>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 mb-8 shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-xs font-bold tracking-[0.2em] uppercase text-slate-600">Mission Control</span>
               </div>
               <h1 className="text-5xl lg:text-[5.5rem] font-black leading-[1.05] tracking-tighter mb-8 text-slate-900">
                 Built for people who <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-indigo-600">
                   can't afford to stop.
                 </span>
               </h1>
@@ -69,7 +69,7 @@ const HeroSection = () => {
                 We replace chaos with transparent, algorithmic dispatch.
               </p>
               <div className="flex flex-wrap items-center gap-4">
-                <Button size="xl" className="h-14 px-8 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300" asChild>
+                <Button size="xl" className="h-14 px-8 rounded-xl bg-gradient-to-r from-slate-900 to-red-950 text-white font-bold hover:from-slate-800 hover:to-red-900 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300" asChild>
                   <Link to="/map">
                     Open Live Radar <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -117,9 +117,9 @@ const HeroSection = () => {
                       </defs>
                     </svg>
                     
-                    <div className="absolute top-[35%] right-[15%] w-3 h-3 bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.6)]" />
+                    <div className="absolute top-[35%] right-[15%] w-3 h-3 bg-red-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.6)]" />
                     <motion.div 
-                      className="absolute bottom-[15%] left-[15%] w-8 h-8 bg-slate-900 rounded-full border-[3px] border-white flex items-center justify-center shadow-lg"
+                      className="absolute bottom-[15%] left-[15%] w-8 h-8 bg-gradient-to-r from-slate-900 to-red-950 rounded-full border-[3px] border-white flex items-center justify-center shadow-lg"
                       animate={{ y: [0, -5, 0] }}
                       transition={{ duration: 2, repeat: Infinity }}
                     >
@@ -152,8 +152,8 @@ const ProblemSection = () => (
       <Reveal>
         <div className="grid grid-cols-12 gap-12 lg:gap-20 mb-24">
           <div className="col-span-12 lg:col-span-5">
-            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-6 flex items-center gap-3">
-              <span className="w-8 h-px bg-blue-600"></span>
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-600 mb-6 flex items-center gap-3">
+              <span className="w-8 h-px bg-red-600"></span>
               The Status Quo
             </h2>
             <h3 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1]">
@@ -182,11 +182,11 @@ const ProblemSection = () => (
           { icon: AlertTriangle, title: "Zero Visibility", desc: "No tracking, no accountability, high anxiety during emergencies." }
         ].map((item, i) => (
           <motion.div key={i} variants={fadeUp} className="group cursor-pointer">
-            <div className="h-full bg-white border border-slate-200/60 rounded-[2rem] p-10 transition-all duration-500 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] hover:-translate-y-2 relative overflow-hidden group-hover:border-blue-100">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50/50 shadow-sm flex items-center justify-center mb-8 group-hover:bg-blue-600 transition-colors duration-500 border border-slate-100">
-                <item.icon className="h-8 w-8 text-blue-600 group-hover:text-white transition-colors duration-500" />
+            <div className="h-full bg-white border border-slate-200/60 rounded-[2rem] p-10 transition-all duration-500 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] hover:-translate-y-2 relative overflow-hidden group-hover:border-red-100">
+              <div className="w-16 h-16 rounded-2xl bg-red-50/50 shadow-sm flex items-center justify-center mb-8 group-hover:bg-red-600 transition-colors duration-500 border border-slate-100">
+                <item.icon className="h-8 w-8 text-red-600 group-hover:text-white transition-colors duration-500" />
               </div>
-              <h4 className="text-2xl font-bold mb-4 text-slate-900 group-hover:text-blue-900 transition-colors">{item.title}</h4>
+              <h4 className="text-2xl font-bold mb-4 text-slate-900 group-hover:text-red-900 transition-colors">{item.title}</h4>
               <p className="text-slate-500 font-medium leading-relaxed">{item.desc}</p>
             </div>
           </motion.div>
@@ -203,12 +203,12 @@ const LiveTrackingSection = () => (
         <div className="col-span-12 lg:col-span-6 order-2 lg:order-1">
           <Reveal>
             <div className="bg-white rounded-[2rem] border border-slate-200/50 p-10 lg:p-12 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-50 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-red-50 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" />
               
               <div className="relative z-10 flex flex-col gap-12">
                 <div className="flex items-start gap-6 group">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-                    <Activity className="h-6 w-6 text-blue-600" />
+                  <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                    <Activity className="h-6 w-6 text-red-600" />
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-slate-900 mb-2">Algorithmic Matching</h4>
@@ -252,7 +252,7 @@ const LiveTrackingSection = () => (
             <ul className="space-y-5">
               {["Sub-45 minute guaranteed ETA", "Zero app installation barrier", "Direct secure channel to technician"].map((text, i) => (
                 <li key={i} className="flex items-center gap-4 text-slate-900 font-bold text-lg">
-                  <div className="w-2 h-2 rounded-full bg-blue-600" />
+                  <div className="w-2 h-2 rounded-full bg-red-600" />
                   {text}
                 </li>
               ))}
@@ -274,7 +274,7 @@ const TargetAudienceSection = () => {
 
   const getColorClasses = (color: string) => {
     switch(color) {
-      case 'blue': return 'text-blue-600 bg-blue-50 border-blue-100 group-hover:bg-blue-600';
+      case 'blue': return 'text-red-600 bg-red-50 border-red-100 group-hover:bg-red-600';
       case 'indigo': return 'text-indigo-600 bg-indigo-50 border-indigo-100 group-hover:bg-indigo-600';
       case 'emerald': return 'text-emerald-600 bg-emerald-50 border-emerald-100 group-hover:bg-emerald-600';
       case 'orange': return 'text-orange-600 bg-orange-50 border-orange-100 group-hover:bg-orange-600';
@@ -284,11 +284,11 @@ const TargetAudienceSection = () => {
 
   return (
     <section className="py-32 bg-[#fafafa] relative overflow-hidden border-t border-slate-200/50">
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-red-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
       
       <div className="container mx-auto max-w-7xl px-8 relative z-10">
         <Reveal className="text-center max-w-3xl mx-auto mb-20">
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-6">Strategic Partners</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-600 mb-6">Strategic Partners</h2>
           <h3 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1] mb-6">
             Who builds with ResQNow?
           </h3>
@@ -322,7 +322,7 @@ const TargetAudienceSection = () => {
                 <h4 className="text-xl font-bold text-slate-900 mb-3">{partner.title}</h4>
                 <p className="text-sm font-medium text-slate-500 leading-relaxed mb-6 flex-grow">{partner.desc}</p>
                 
-                <div className="mt-auto flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-600 transition-colors">
+                <div className="mt-auto flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-red-600 transition-colors">
                   <span>Learn More</span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -340,7 +340,7 @@ const ServicesSection = () => (
     <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
     <div className="container mx-auto max-w-7xl px-8 relative z-10">
       <Reveal className="mb-20 text-center">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-6">Capabilities</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-600 mb-6">Capabilities</h2>
         <h3 className="text-4xl lg:text-6xl font-black tracking-tight leading-tight">
           Comprehensive recovery.
         </h3>
@@ -363,18 +363,18 @@ const ServicesSection = () => (
 const FinalCTASection = () => (
   <section className="py-40 bg-white text-center relative overflow-hidden">
     <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-    <div className="absolute -bottom-[400px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-blue-50 rounded-full blur-[100px] pointer-events-none" />
+    <div className="absolute -bottom-[400px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-red-50 rounded-full blur-[100px] pointer-events-none" />
 
     <div className="container mx-auto max-w-4xl px-8 relative z-10">
       <Reveal>
         <h2 className="text-5xl lg:text-7xl font-black tracking-tight text-slate-900 mb-8 leading-[1.05]">
           Roadside assistance, <br /> 
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">reimagined.</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-indigo-600">reimagined.</span>
         </h2>
         <p className="text-xl lg:text-2xl text-slate-500 font-medium mb-12 max-w-2xl mx-auto">
           Fast. Transparent. Built for modern mobility.
         </p>
-        <Button size="xl" className="h-16 px-12 rounded-full bg-slate-900 text-white font-bold text-lg hover:bg-slate-800 hover:shadow-xl hover:-translate-y-1 transition-all" asChild>
+        <Button size="xl" className="h-16 px-12 rounded-full bg-gradient-to-r from-slate-900 to-red-950 text-white font-bold text-lg hover:from-slate-800 hover:to-red-900 hover:shadow-xl hover:-translate-y-1 transition-all" asChild>
           <Link to="/">Explore the Platform</Link>
         </Button>
       </Reveal>
@@ -384,7 +384,7 @@ const FinalCTASection = () => (
 
 const WhyResQNow = () => {
   return (
-    <div className="min-h-screen bg-white selection:bg-blue-200 selection:text-slate-900 font-sans">
+    <div className="min-h-screen bg-white selection:bg-red-200 selection:text-slate-900 font-sans">
       <HeroSection />
       <ProblemSection />
       <LiveTrackingSection />

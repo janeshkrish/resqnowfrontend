@@ -37,7 +37,7 @@ const UserMenu = () => {
     if (!user || user.subscription === "none") return null;
     
     const colors = {
-      basic: "bg-blue-100 text-blue-800",
+      basic: "bg-red-100 text-red-800",
       premium: "bg-red-100 text-red-800",
       enterprise: "bg-purple-100 text-purple-800",
     };

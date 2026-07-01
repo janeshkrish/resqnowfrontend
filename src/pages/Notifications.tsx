@@ -55,10 +55,10 @@ const Notifications = () => {
                         {MOCK_NOTIFICATIONS.map((notif) => (
                             <div
                                 key={notif.id}
-                                className={`p-4 flex gap-4 transition-colors active:bg-muted ${notif.unread ? "bg-blue-50/30" : ""}`}
+                                className={`p-4 flex gap-4 transition-colors active:bg-muted ${notif.unread ? "bg-red-50/30" : ""}`}
                             >
                                 <div className="shrink-0 pt-0.5">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${notif.type === 'promo' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${notif.type === 'promo' ? 'bg-orange-100 text-orange-600' : 'bg-red-100 text-red-600'}`}>
                                         {notif.type === 'promo' ? <Bell className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
                                     </div>
                                 </div>
@@ -79,7 +79,7 @@ const Notifications = () => {
 
                                 {notif.unread && (
                                     <div className="shrink-0 flex items-center justify-center w-3 pt-2">
-                                        <Circle className="w-2.5 h-2.5 fill-blue-600 text-blue-600" />
+                                        <Circle className="w-2.5 h-2.5 fill-red-600 text-red-600" />
                                     </div>
                                 )}
                             </div>

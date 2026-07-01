@@ -13,7 +13,7 @@ const vehicleCategories = [
     id: "car",
     name: "Cars",
     icon: Car,
-    color: "bg-gradient-to-br from-blue-500 to-blue-600",
+    color: "bg-gradient-to-br from-red-500 to-red-600",
     description: "Sedan, Hatchback, SUV, MPV",
     subtypes: ["SUV", "Hatchback", "Sedan", "MPV", "Other Cars"]
   },

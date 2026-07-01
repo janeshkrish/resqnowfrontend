@@ -227,7 +227,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                         {Math.round(payNowDiscountPercent * 100)}% Discount
                       </Badge>
                     ) : (
-                      <Badge variant="secondary" className="border border-blue-200 bg-blue-100 text-blue-700">
+                      <Badge variant="secondary" className="border border-red-200 bg-red-100 text-red-700">
                         Online Payment
                       </Badge>
                     )}
@@ -259,7 +259,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
       <Card className="rounded-2xl border-border/80 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-bold">
-            <Wallet className="h-5 w-5 text-blue-500" />
+            <Wallet className="h-5 w-5 text-red-500" />
             Payment method
           </CardTitle>
         </CardHeader>
@@ -298,7 +298,7 @@ const PaymentStep = ({ servicePrice, onPaymentConfirm }: PaymentStepProps) => {
                           method.id === "upi"
                             ? "bg-amber-100 text-amber-700"
                             : method.id === "card"
-                            ? "bg-blue-100 text-blue-700"
+                            ? "bg-red-100 text-red-700"
                             : method.id === "netbanking"
                             ? "bg-emerald-100 text-emerald-700"
                             : "bg-zinc-100 text-zinc-700"

@@ -22,7 +22,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-muted/50 group-[.toast]:text-muted-foreground font-bold rounded-xl px-4 py-2 hover:bg-border transition-colors",
           success: "group-[.toaster]:border-emerald-200 group-[.toaster]:bg-emerald-50/95 group-[.toaster]:text-emerald-950 [&_[data-icon]]:text-emerald-600",
           error: "group-[.toaster]:border-red-200 group-[.toaster]:bg-red-50/95 group-[.toaster]:text-red-950 [&_[data-icon]]:text-red-600",
-          info: "group-[.toaster]:border-blue-200 group-[.toaster]:bg-blue-50/95 group-[.toaster]:text-blue-950 [&_[data-icon]]:text-blue-600",
+          info: "group-[.toaster]:border-red-200 group-[.toaster]:bg-red-50/95 group-[.toaster]:text-red-950 [&_[data-icon]]:text-red-600",
           warning: "group-[.toaster]:border-amber-200 group-[.toaster]:bg-amber-50/95 group-[.toaster]:text-amber-950 [&_[data-icon]]:text-amber-600",
         },
       }}

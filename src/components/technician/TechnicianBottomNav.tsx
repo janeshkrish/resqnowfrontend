@@ -131,13 +131,13 @@ const TechnicianBottomNav = () => {
               onClick={item.onClick}
               className={cn(
                 "flex min-w-[72px] flex-col items-center gap-1 rounded-2xl px-2 py-2 transition-colors",
-                isActive ? "text-blue-700" : "text-slate-400 hover:text-slate-700"
+                isActive ? "text-red-700" : "text-slate-400 hover:text-slate-700"
               )}
             >
               <span
                 className={cn(
                   "flex h-11 w-11 items-center justify-center rounded-full transition-colors",
-                  isActive ? "bg-blue-50" : "bg-transparent"
+                  isActive ? "bg-red-50" : "bg-transparent"
                 )}
               >
                 <item.icon className={cn("h-5 w-5", isActive ? "fill-current" : "")} strokeWidth={isActive ? 2.5 : 2} />

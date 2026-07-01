@@ -99,7 +99,7 @@ const MyRequests = () => {
       case 'accepted':
       case 'technician_assigned':
       case 'assigned':
-        return <Badge className="bg-blue-500 gap-1"><Wrench className="h-3 w-3" /> Assigned</Badge>;
+        return <Badge className="bg-red-500 gap-1"><Wrench className="h-3 w-3" /> Assigned</Badge>;
       case 'on_the_way':
       case 'on-the-way':
       case 'en_route':

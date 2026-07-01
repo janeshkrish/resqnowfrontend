@@ -91,7 +91,7 @@ const stepDetails = [
     icon: (active: boolean, completed: boolean) => (
       <div className={`rounded-full border-4 flex items-center justify-center transition-all duration-300
         ${completed ? "bg-gradient-to-br from-green-400 via-green-500 to-green-600 border-green-200 shadow-xl animate-glow"
-          : active ? "bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 border-blue-200 shadow-lg animate-glow"
+          : active ? "bg-gradient-to-br from-red-400 via-red-500 to-red-600 border-red-200 shadow-lg animate-glow"
             : "bg-border border-border"}
       `}>
         <MapPin className={`h-6 w-6 ${completed || active ? "text-white" : "text-muted-foreground/60"}`} />

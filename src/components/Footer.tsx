@@ -59,7 +59,7 @@ const Footer = () => {
               </span>
               <span>
                 <span className="block text-2xl font-black tracking-tight">ResQNow</span>
-                <span className="mt-1 block text-[0.68rem] font-black uppercase tracking-[0.24em] text-blue-200">
+                <span className="mt-1 block text-[0.68rem] font-black uppercase tracking-[0.24em] text-red-200">
                   Mobility Infrastructure
                 </span>
               </span>
@@ -71,22 +71,22 @@ const Footer = () => {
 
             <div className="mt-7 grid gap-3 text-sm text-slate-300">
               <div className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
                 <span>KGiSL Campus, Coimbatore, Tamil Nadu, India</span>
               </div>
               <div className="flex items-start gap-3">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
+                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
                 <span className="flex flex-col gap-1">
                   <a href="tel:+919566510080" className="transition hover:text-white">+91 9566510080</a>
                   <a href="tel:+919994806667" className="transition hover:text-white">+91 9994806667</a>
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <Mail className="h-4 w-4 shrink-0 text-blue-300" />
+                <Mail className="h-4 w-4 shrink-0 text-red-300" />
                 <a href="mailto:resqnow01@gmail.com" className="transition hover:text-white">resqnow01@gmail.com</a>
               </div>
               <div className="flex items-center gap-3">
-                <Clock className="h-4 w-4 shrink-0 text-blue-300" />
+                <Clock className="h-4 w-4 shrink-0 text-red-300" />
                 <span>Available 24/7</span>
               </div>
             </div>

@@ -357,7 +357,7 @@ const SettingsPage = () => {
                 {user?.name || user?.email?.split('@')[0] || 'User'}
               </h2>
               <p className="text-sm font-semibold text-muted-foreground/80 truncate mb-2">{user?.email}</p>
-              <button onClick={() => handleTabChange('profile')} className="text-blue-600 font-bold text-[10px] uppercase tracking-widest bg-blue-50 hover:bg-blue-100 px-4 py-1.5 rounded-full transition-colors active:scale-95">
+              <button onClick={() => handleTabChange('profile')} className="text-red-600 font-bold text-[10px] uppercase tracking-widest bg-red-50 hover:bg-red-100 px-4 py-1.5 rounded-full transition-colors active:scale-95">
                 Edit Profile
               </button>
             </div>
@@ -394,7 +394,7 @@ const SettingsPage = () => {
                 className="w-full text-left p-4 flex items-center justify-between hover:bg-muted active:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                  <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
                     <Briefcase className="w-5 h-5" />
                   </div>
                   <div>

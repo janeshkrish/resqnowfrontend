@@ -24,7 +24,7 @@ const ServicesPage = () => {
     : services.filter(service => true); // Assume logic handles it or it's just dummy in this demo
 
   return (
-    <div className="min-h-screen bg-[#FAFCFF] selection:bg-blue-100 selection:text-blue-900 font-sans pb-32">
+    <div className="min-h-screen bg-[#FAFCFF] selection:bg-red-100 selection:text-red-900 font-sans pb-32">
       {/* MNC Grade Enterprise Hero */}
       <div className="relative pt-28 pb-20 lg:pt-40 lg:pb-32 overflow-hidden border-b border-slate-100">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -41,7 +41,7 @@ const ServicesPage = () => {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="inline-flex items-center gap-2 rounded-full border border-slate-200/60 bg-white/60 backdrop-blur-xl px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-800 shadow-[0_8px_20px_-6px_rgba(0,0,0,0.05)] mb-8"
           >
-            <Sparkles className="h-3 w-3 text-blue-600" />
+            <Sparkles className="h-3 w-3 text-red-600" />
             Enterprise Services
           </motion.div>
 
@@ -52,7 +52,7 @@ const ServicesPage = () => {
             className="text-5xl lg:text-7xl font-black text-slate-900 tracking-tight leading-[1.1] mb-8"
           >
             Intelligent Infrastructure <br className="hidden lg:block"/>
-            for <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Mobility Recovery</span>
+            for <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-indigo-600">Mobility Recovery</span>
           </motion.h1>
           
           <motion.p 
@@ -101,16 +101,16 @@ const ServicesPage = () => {
                 onMouseLeave={() => setHoveredService(null)}
               >
                 <div 
-                  className="relative bg-white border border-slate-200 rounded-[2rem] p-8 h-full flex flex-col cursor-pointer transition-all duration-500 overflow-hidden hover:-translate-y-2 hover:shadow-[0_40px_80px_-20px_rgba(37,99,235,0.15)] hover:border-blue-200"
+                  className="relative bg-white border border-slate-200 rounded-[2rem] p-8 h-full flex flex-col cursor-pointer transition-all duration-500 overflow-hidden hover:-translate-y-2 hover:shadow-[0_40px_80px_-20px_rgba(37,99,235,0.15)] hover:border-red-200"
                   onClick={() => handleServiceClick(service.id)}
                 >
                   <div className="relative z-10 flex flex-col h-full">
                     {/* Premium Vector Icon Container */}
-                    <div className="w-16 h-16 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors duration-500">
-                      <service.icon size={32} strokeWidth={1.5} className="text-blue-600 transition-colors duration-500 group-hover:text-white" />
+                    <div className="w-16 h-16 rounded-2xl bg-red-50/50 border border-red-100 flex items-center justify-center mb-6 group-hover:bg-red-600 transition-colors duration-500">
+                      <service.icon size={32} strokeWidth={1.5} className="text-red-600 transition-colors duration-500 group-hover:text-white" />
                     </div>
 
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-4 group-hover:text-blue-700 transition-colors duration-300">
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-4 group-hover:text-red-700 transition-colors duration-300">
                       {service.name}
                     </h3>
                     
@@ -118,7 +118,7 @@ const ServicesPage = () => {
                       {service.description}
                     </p>
 
-                    <div className="flex items-center text-sm font-bold text-blue-600 mt-auto opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500">
+                    <div className="flex items-center text-sm font-bold text-red-600 mt-auto opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500">
                       <span>Initialize Request</span>
                       <ArrowRight size={16} className="ml-2" />
                     </div>

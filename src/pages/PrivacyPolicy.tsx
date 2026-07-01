@@ -99,8 +99,8 @@ const PrivacyPolicy = () => {
                         </p>
                         <div className="bg-muted p-4 rounded-lg">
                             <p className="font-medium">ResQNow Support</p>
-                            <p>Email: <a href="mailto:resqnow01@gmail.com" className="text-blue-600 hover:underline">resqnow01@gmail.com</a></p>
-                            <p>Phone: <a href="tel:+919566510080" className="text-blue-600 hover:underline">+91 9566510080</a></p>
+                            <p>Email: <a href="mailto:resqnow01@gmail.com" className="text-red-600 hover:underline">resqnow01@gmail.com</a></p>
+                            <p>Phone: <a href="tel:+919566510080" className="text-red-600 hover:underline">+91 9566510080</a></p>
                         </div>
                     </section>
                 </CardContent>

@@ -251,7 +251,7 @@ export default function AdminExtendedTechniciansPage() {
             <span
               className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-medium ${
                 row.visibility
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  ? "border-red-200 bg-red-50 text-red-700"
                   : "border-rose-200 bg-rose-50 text-rose-700"
               }`}
             >

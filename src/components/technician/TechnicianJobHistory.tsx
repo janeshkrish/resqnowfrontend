@@ -31,7 +31,7 @@ const TechnicianJobHistory: React.FC<TechnicianJobHistoryProps> = ({ jobs, compa
             case 'rejected':
                 return <Badge className="bg-muted/50 text-foreground border-border text-[10px] px-2 py-0.5"><Clock className="w-3 h-3 mr-1" /> Rejected</Badge>;
             case 'in-progress':
-                return <Badge className="bg-blue-100 text-blue-800 border-blue-200 animate-pulse text-[10px] px-2 py-0.5"><AlertCircle className="w-3 h-3 mr-1" /> In Progress</Badge>;
+                return <Badge className="bg-red-100 text-red-800 border-red-200 animate-pulse text-[10px] px-2 py-0.5"><AlertCircle className="w-3 h-3 mr-1" /> In Progress</Badge>;
             default:
                 return <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-[10px] px-2 py-0.5">{status}</Badge>;
         }

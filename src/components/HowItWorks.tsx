@@ -16,8 +16,8 @@ const steps = [
     title: "Share Location",
     description: "Allow us to access your current location or enter it manually",
     icon: MapPin,
-    color: "bg-blue-500",
-    hoverColor: "hover:bg-blue-600",
+    color: "bg-red-500",
+    hoverColor: "hover:bg-red-600",
   },
   {
     id: 3,
@@ -56,7 +56,7 @@ const HowItWorks = () => {
           {/* Subtle Progress Track (Desktop) */}
           <div className="absolute left-[50%] md:left-0 md:right-0 top-0 bottom-0 w-0.5 md:w-auto md:h-0.5 md:top-24 bg-slate-200 dark:bg-slate-800 hidden md:block">
             <div 
-               className="w-full h-full bg-gradient-to-r md:bg-gradient-to-b from-primary to-blue-600 transition-all duration-700 ease-out" 
+               className="w-full h-full bg-gradient-to-r md:bg-gradient-to-b from-primary to-red-600 transition-all duration-700 ease-out" 
                style={{ width: activeStep ? `${(activeStep / steps.length) * 100}%` : '0%' }}
             ></div>
           </div>

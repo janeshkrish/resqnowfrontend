@@ -124,7 +124,7 @@ export default function TechnicianAssignmentModal({
                   </span>
                 ))}
                 {candidate.fleet.slice(0, 3).map((fleet) => (
-                  <span key={`${fleet.vehicleType}-${fleet.vehicleNumber}`} className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
+                  <span key={`${fleet.vehicleType}-${fleet.vehicleNumber}`} className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700">
                     <Truck className="mr-1 h-3 w-3" /> {fleet.vehicleType}
                   </span>
                 ))}

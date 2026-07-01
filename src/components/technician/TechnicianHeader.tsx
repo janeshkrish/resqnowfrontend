@@ -48,14 +48,14 @@ const TechnicianHeader = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-card dark:bg-slate-900/80 backdrop-blur-md border-b border-border shadow-sm">
+    <header className="sticky top-0 z-50 w-full bg-card dark:bg-gradient-to-r from-slate-900 to-red-950/80 backdrop-blur-md border-b border-border shadow-sm">
       <div className="container flex h-16 items-center justify-between px-4">
 
         {/* Logo / Brand */}
         <div className="flex items-center">
           <Link to="/technician/dashboard" className="flex items-center">
-            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-900 drop-shadow-sm">
-              ResQNow <span className="text-blue-600 ml-1 hidden sm:inline">Technician</span>
+            <span className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-red-700 to-red-900 drop-shadow-sm">
+              ResQNow <span className="text-red-600 ml-1 hidden sm:inline">Technician</span>
             </span>
           </Link>
 
@@ -66,8 +66,8 @@ const TechnicianHeader = () => {
                 key={link.path}
                 to={link.path}
                 className={`font-bold transition-colors text-sm ${isActive(link.path)
-                  ? "text-blue-700"
-                  : "text-muted-foreground/80 hover:text-blue-600"
+                  ? "text-red-700"
+                  : "text-muted-foreground/80 hover:text-red-600"
                   }`}
               >
                 {link.label}
@@ -88,7 +88,7 @@ const TechnicianHeader = () => {
                       {profileImageUrl ? (
                         <AvatarImage src={profileImageUrl} alt={`${technician?.name || "Technician"} profile`} className="object-cover" />
                       ) : null}
-                      <AvatarFallback className="bg-blue-50 text-blue-700 font-bold">
+                      <AvatarFallback className="bg-red-50 text-red-700 font-bold">
                         {technician ? getInitials(technician.name) : <User className="h-5 w-5" />}
                       </AvatarFallback>
                     </Avatar>
@@ -131,7 +131,7 @@ const TechnicianHeader = () => {
               <Button variant="ghost" className="font-bold text-muted-foreground hover:text-foreground focus:bg-transparent" asChild>
                 <Link to="/technician/login">Log in</Link>
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full px-6 shadow-md shadow-blue-600/20" asChild>
+              <Button className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-full px-6 shadow-md shadow-red-600/20" asChild>
                 <Link to="/technician/register">Sign up</Link>
               </Button>
             </div>

@@ -1136,7 +1136,7 @@ const TechnicianSignupWizard = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-900/20 rounded-[1.5rem] shadow-sm border border-indigo-100/50 dark:border-indigo-900/50 p-5">
+                                <div className="bg-gradient-to-br from-indigo-50 to-red-50 dark:from-indigo-950/30 dark:to-red-900/20 rounded-[1.5rem] shadow-sm border border-indigo-100/50 dark:border-indigo-900/50 p-5">
                                     <div className="grid grid-cols-2 gap-5">
                                         <FormField control={control} name="experience" render={({ field }) => (
                                             <FormItem><FormLabel className="text-[11px] uppercase text-foreground/80 font-bold tracking-wider flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> Experience (Yrs)</FormLabel><FormControl><Input {...field} type="number" className="h-12 rounded-xl font-black text-lg bg-white/60 dark:bg-black/20 border-white/40 dark:border-white/10" /></FormControl><FormMessage /></FormItem>

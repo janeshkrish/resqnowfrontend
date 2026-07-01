@@ -302,7 +302,7 @@ const TechnicianProfile = () => {
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0">
-                                        <p className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-blue-700">
+                                        <p className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-red-700">
                                             ResQNow Profile
                                         </p>
                                         <h3 className="mt-3 text-lg font-black leading-tight text-foreground break-words">
@@ -432,7 +432,7 @@ const TechnicianProfile = () => {
                                 </div>
                                 <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
                                     <span className="text-sm font-bold text-muted-foreground">Total Earnings</span>
-                                    <span className="font-black text-blue-700">Rs {(liveStats.totalEarnings || profileData?.total_earnings || 0).toFixed(2)}</span>
+                                    <span className="font-black text-red-700">Rs {(liveStats.totalEarnings || profileData?.total_earnings || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -442,7 +442,7 @@ const TechnicianProfile = () => {
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {(profileData?.specialties || []).map((spec: string) => (
-                                    <span key={spec} className="bg-blue-50 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-full border border-blue-100">
+                                    <span key={spec} className="bg-red-50 text-red-700 font-bold text-xs px-3 py-1.5 rounded-full border border-red-100">
                                         {spec}
                                     </span>
                                 ))}
@@ -547,7 +547,7 @@ const TechnicianProfile = () => {
                 <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in duration-300">
                     <div className="bg-card dark:bg-slate-900 px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-border">
                         <div className="mb-5">
-                            <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-blue-700">
+                            <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-red-700">
                                 ResQNow Technician
                             </span>
                         </div>
@@ -634,7 +634,7 @@ const TechnicianProfile = () => {
         <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
             <div className="space-y-6">
                 <div className="space-y-0.5">
-                    <p className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-blue-700">
+                    <p className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-red-700">
                         ResQNow Technician Portal
                     </p>
                     <h2 className="pt-3 text-2xl font-bold tracking-tight text-foreground">My Profile & Settings</h2>

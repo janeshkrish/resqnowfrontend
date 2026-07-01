@@ -116,7 +116,7 @@ const UsageStats = () => {
             <CardTitle className="text-sm font-medium">Pending/Active</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.pending}</div>
+            <div className="text-2xl font-bold text-red-600">{stats.pending}</div>
             <p className="text-xs text-muted-foreground">Currently in progress</p>
           </CardContent>
         </Card>

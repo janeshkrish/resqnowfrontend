@@ -206,7 +206,7 @@ const DashboardHeader = ({
                     <SheetClose asChild>
                       <Button
                         onClick={onViewProfile}
-                        className="w-full rounded-[1.25rem] bg-slate-900 text-white hover:bg-slate-800"
+                        className="w-full rounded-[1.25rem] bg-gradient-to-r from-slate-900 to-red-950 text-white hover:from-slate-800 hover:to-red-900"
                       >
                         Open Profile Panel
                       </Button>

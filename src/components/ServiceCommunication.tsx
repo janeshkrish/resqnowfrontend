@@ -228,15 +228,15 @@ const ServiceCommunication = ({ serviceType, vehicleInfo, location, onClose }: S
         </Card>
 
         {/* Info Card */}
-        <Card className="mt-6 bg-blue-50 border-blue-200">
+        <Card className="mt-6 bg-red-50 border-red-200">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="bg-blue-100 p-2 rounded-full">
-                <MessageCircle className="h-5 w-5 text-blue-600" />
+              <div className="bg-red-100 p-2 rounded-full">
+                <MessageCircle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-blue-900 mb-1">How it works</h3>
-                <p className="text-sm text-blue-700">
+                <h3 className="font-semibold text-red-900 mb-1">How it works</h3>
+                <p className="text-sm text-red-700">
                   Your request will be sent directly to the selected service provider.
 
                   They will contact you within their response time to discuss details and confirm the service.

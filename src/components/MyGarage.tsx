@@ -212,10 +212,10 @@ const MyGarage = () => {
                                     onClick={() => handleTypeSelect("car")}
                                     className="group relative h-64 overflow-hidden rounded-2xl border-2 border-border hover:border-primary transition-all shadow-sm hover:shadow-xl"
                                 >
-                                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-indigo-100 opacity-50 group-hover:opacity-100 transition-opacity" />
                                     <div className="relative z-10 flex flex-col items-center justify-center h-full p-6">
                                         <div className="bg-card dark:bg-slate-900 p-6 rounded-full shadow-lg mb-6 group-hover:scale-110 transition-transform duration-300">
-                                            <Car className="h-12 w-12 text-blue-600" />
+                                            <Car className="h-12 w-12 text-red-600" />
                                         </div>
                                         <h4 className="text-2xl font-bold text-foreground">4-Wheeler</h4>
                                         <p className="text-muted-foreground/80 mt-2">Cars, SUVs, & Trucks</p>
@@ -387,7 +387,7 @@ const MyGarage = () => {
 
                                             <div className="absolute bottom-4 left-4 z-10">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${isCar ? 'bg-blue-500/20 text-blue-100 border border-blue-500/30' : 'bg-orange-500/20 text-orange-100 border border-orange-500/30'}`}>
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${isCar ? 'bg-red-500/20 text-red-100 border border-red-500/30' : 'bg-orange-500/20 text-orange-100 border border-orange-500/30'}`}>
                                                         {v.type}
                                                     </span>
                                                 </div>

@@ -77,7 +77,7 @@ const AdminDashboard = () => {
           <CardContent className="p-6 flex flex-col">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-muted-foreground">Users</p>
-              <Users className="h-5 w-5 text-blue-600 opacity-70" />
+              <Users className="h-5 w-5 text-red-600 opacity-70" />
             </div>
             <h3 className="text-3xl font-bold mt-2">{stats.totalUsers}</h3>
             <p className="text-sm text-muted-foreground mt-2">Registered Users</p>
@@ -216,7 +216,7 @@ const AdminDashboard = () => {
               className="block p-4 border rounded-md hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center">
-                <BarChart className="h-5 w-5 text-blue-500 mr-3" />
+                <BarChart className="h-5 w-5 text-red-500 mr-3" />
                 <span>Analytics Dashboard</span>
               </div>
               <p className="text-sm text-muted-foreground mt-2">

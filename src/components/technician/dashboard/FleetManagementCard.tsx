@@ -41,11 +41,11 @@ const FleetManagementCard = ({
           </div>
           <div className="space-y-2">
             <h3 className="text-2xl font-black tracking-tight">Add Vehicle</h3>
-            <p className="text-sm text-blue-100">Onboard new towing units and keep dispatch-ready.</p>
+            <p className="text-sm text-red-100">Onboard new towing units and keep dispatch-ready.</p>
           </div>
           <Button
             onClick={onAddVehicle}
-            className="w-fit rounded-full bg-white px-5 text-sm font-bold text-blue-700 hover:bg-blue-50"
+            className="w-fit rounded-full bg-white px-5 text-sm font-bold text-red-700 hover:bg-red-50"
           >
             Start Now
           </Button>

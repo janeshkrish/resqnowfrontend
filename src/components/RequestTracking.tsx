@@ -54,7 +54,6 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { routePolylineFromMetadata } from "@/lib/geo";
-import { canonicalizeServiceKey } from "@/config/technicianNormalization";
 import {
   resolveServiceRequestPaymentDetails,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
@@ -720,8 +719,7 @@ const RequestTracking = () => {
   const status = normalizeRequestStatus(request?.status || "pending");
   const paymentStatus = normalizeRequestPaymentStatus(request?.payment_status);
   const paymentCompleted = paymentStatus === "paid" || status === "paid";
-  const requestServiceType = request?.service_type || (request as { serviceType?: string } | null)?.serviceType;
-  const isTowingRequest = canonicalizeServiceKey(requestServiceType) === "towing";
+  const isTowingRequest = Boolean(request?.isTowing);
   const statusMeta = STATUS_COPY[status] || {
     title: "Request status updated",
     subtitle: "Your request is being processed."

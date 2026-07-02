@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Car,
@@ -27,6 +27,11 @@ import {
   normalizeTechnicianStatus,
 } from '@/utils/technicianStatus';
 import { useTechnicianActiveJob } from '@/hooks/useTechnicianActiveJob';
+import { getTowingAction } from '@/lib/towingActionState';
+import {
+  getTechnicianActiveJobPath,
+  selectMatchingActiveJobNavigationState,
+} from '@/lib/technicianActiveJobRoute';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 
@@ -69,26 +74,17 @@ const formatMoney = (value: number | null, maximumFractionDigits = 0) => {
 const isPaidPaymentStatus = (value: unknown) =>
   ['paid', 'completed'].includes(String(value || '').trim().toLowerCase());
 
-const getTowingAction = (status: string, paymentStatus: unknown) => {
-  if (status === 'assigned' || status === 'accepted') return { status: 'en_route_pickup', label: 'START PICKUP', icon: Navigation };
-  if (status === 'en_route_pickup') return { status: 'arrived_pickup', label: 'REACHED PICKUP', icon: MapPin };
-  if (status === 'arrived_pickup') return { status: 'vehicle_loaded', label: 'VEHICLE LOADED', icon: Car };
-  if (status === 'vehicle_loaded') return { status: 'enroute_drop', label: 'START TOW', icon: Navigation };
-  if (status === 'enroute_drop') return { status: 'arrived_drop', label: 'REACHED DROP LOCATION', icon: MapPin };
-  if (status === 'arrived_drop') return { status: 'service_completed', label: 'COMPLETE SERVICE', icon: CheckCircle };
-  if (status === 'service_completed') return { status: 'payment_pending', label: 'COLLECT PAYMENT', icon: CreditCard };
-  if (status === 'payment_pending' && isPaidPaymentStatus(paymentStatus)) return { status: 'closed', label: 'CLOSE JOB', icon: CheckCircle };
-  return null;
-};
-
 const ActiveJob = () => {
-  const { state } = useLocation();
+  const location = useLocation();
+  const { state } = location;
+  const { requestId: routeRequestId } = useParams();
   const navigate = useNavigate();
   const { socket } = useSocket();
   const { token, technician } = useTechnicianAuth();
 
   const { activeJob, dues, setDues, refreshActiveJob, refreshDues } = useTechnicianActiveJob(technician?.id, 15000);
-  const [status, setStatus] = useState(normalizeTechnicianStatus(state?.job?.status || 'accepted'));
+  const stateJob = selectMatchingActiveJobNavigationState(state?.job, routeRequestId);
+  const [status, setStatus] = useState(normalizeTechnicianStatus(stateJob?.status || 'accepted'));
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -96,8 +92,8 @@ const ActiveJob = () => {
   const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
   const [hasResolvedActiveJob, setHasResolvedActiveJob] = useState(false);
   const celebratedCompletionJobIdRef = useRef<string | null>(null);
-  const jobSnapshotRef = useRef<any | null>(state?.job || null);
-  const job = activeJob ?? (!hasResolvedActiveJob ? state?.job || null : null);
+  const jobSnapshotRef = useRef<any | null>(stateJob);
+  const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
 
   const isCancelledStatus = (value: unknown) => {
     const raw = String(value || '').trim().toLowerCase();
@@ -137,12 +133,15 @@ const ActiveJob = () => {
     let cancelled = false;
 
     const syncActiveJob = async () => {
-      try {
-        await refreshActiveJob();
-      } finally {
-        if (!cancelled) {
-          setHasResolvedActiveJob(true);
-        }
+      const refreshedJob = await refreshActiveJob();
+      if (!cancelled && refreshedJob !== undefined) {
+        setHasResolvedActiveJob(true);
+        navigate(
+          refreshedJob?.id
+            ? getTechnicianActiveJobPath(refreshedJob.id)
+            : location.pathname,
+          { replace: true, state: null }
+        );
       }
     };
 
@@ -151,7 +150,16 @@ const ActiveJob = () => {
     return () => {
       cancelled = true;
     };
-  }, [refreshActiveJob]);
+  }, [location.pathname, navigate, refreshActiveJob]);
+
+  useEffect(() => {
+    if (!activeJob) return;
+    setHasResolvedActiveJob(true);
+    const activeJobPath = getTechnicianActiveJobPath(activeJob.id);
+    if (location.state || location.pathname !== activeJobPath) {
+      navigate(activeJobPath, { replace: true, state: null });
+    }
+  }, [activeJob, location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (!job) return;
@@ -176,22 +184,22 @@ const ActiveJob = () => {
   }, [cancelledJob, hasResolvedActiveJob, job, job?.status, navigate]);
 
   useEffect(() => {
-    const completionJobId = String(job?.requestId || job?.id || state?.job?.requestId || state?.job?.id || '').trim();
+    const completionJobId = String(job?.requestId || job?.id || stateJob?.requestId || stateJob?.id || '').trim();
     if (!completionJobId) return;
 
     const resolvedStatus = normalizeTechnicianStatus(job?.status ?? status);
     if (!isTechnicianCompletionStatus(resolvedStatus)) return;
 
-    const earned = Number(job?.amount ?? state?.job?.amount ?? 0);
+    const earned = Number(job?.amount ?? stateJob?.amount ?? 0);
     openCompletionModal(completionJobId, earned);
   }, [
     job?.amount,
     job?.id,
     job?.requestId,
     job?.status,
-    state?.job?.amount,
-    state?.job?.id,
-    state?.job?.requestId,
+    stateJob?.amount,
+    stateJob?.id,
+    stateJob?.requestId,
     status,
   ]);
 
@@ -465,13 +473,23 @@ const ActiveJob = () => {
   const hasDropLocation = Number.isFinite(dropLat) && Number.isFinite(dropLng);
   const routeDistanceKm = toOptionalNumber(job.routeDistanceKm ?? job.route_distance_km);
   const estimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
-  const jobAddress = toOptionalString(job.address ?? job.location?.address ?? state?.job?.address) || 'Location not available';
-  const isTowingActiveJob =
-    String(displayService || '').toLowerCase().includes('towing') ||
-    Boolean(dropAddress) ||
-    Number.isFinite(routeDistanceKm);
+  const jobAddress = toOptionalString(job.address ?? job.location?.address ?? stateJob?.address) || 'Location not available';
+  const isTowingActiveJob = Boolean(job.isTowing);
   const towingAction = isTowingActiveJob ? getTowingAction(status, job.payment_status ?? job.paymentStatus) : null;
   const TowingActionIcon = towingAction?.icon;
+  const isWaitingForTowingPayment =
+    isTowingActiveJob &&
+    status === 'payment_pending' &&
+    !isPaidPaymentStatus(job.payment_status ?? job.paymentStatus);
+  const hasNormalStatusAction =
+    !isTowingActiveJob &&
+    ['accepted', 'assigned', 'en-route', 'arrived', 'payment_pending'].includes(status);
+  const isTerminalStatus = ['completed', 'paid', 'closed', 'cancelled', 'rejected'].includes(status);
+  const showActionFallback =
+    !isTerminalStatus &&
+    !towingAction &&
+    !isWaitingForTowingPayment &&
+    !hasNormalStatusAction;
   const estimatedDistanceKm =
     currentLocation && Number.isFinite(customerLat) && Number.isFinite(customerLng)
       ? Math.sqrt(
@@ -723,6 +741,25 @@ const ActiveJob = () => {
                 <div className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4">
                   <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
                   <span className="font-bold text-orange-700">Waiting for customer payment...</span>
+                </div>
+              )}
+
+              {showActionFallback && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900" role="alert">
+                  <p className="text-sm font-bold">Something looks off with this job.</p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    The current status cannot be advanced safely. Contact support so we can unblock it.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3 h-11 w-full rounded-xl border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                    asChild
+                  >
+                    <a href="tel:+919566510080">
+                      <PhoneCall className="mr-2 h-4 w-4" />
+                      Call Support
+                    </a>
+                  </Button>
                 </div>
               )}
 

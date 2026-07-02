@@ -9,9 +9,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch, readJsonSafely } from '@/lib/api';
 import { useTechnicianJob } from '@/contexts/TechnicianJobContext';
 import { normalizeTechnicianStatus } from '@/utils/technicianStatus';
+import { getTechnicianActiveJobPath } from '@/lib/technicianActiveJobRoute';
 
 interface JobRequest {
   id: string;
+  isTowing?: boolean;
   service_type: string;
   amount: number;
   pickupAddress?: string;
@@ -76,6 +78,7 @@ const JobNotificationModal = () => {
 
       const normalized: JobRequest = {
         id: normalizedId,
+        isTowing: Boolean(data.isTowing),
         service_type: String(data.serviceType || data.service_type || 'Service'),
         amount: Number(data.technicianEstimatedEarning || data.estimatedEarnings || data.amount || 0),
         pickupAddress: String((data.location as any)?.address || data.address || ''),
@@ -151,7 +154,7 @@ const JobNotificationModal = () => {
         setJobRequest(null);
         setIsUnavailable(false);
         setAcceptedJobId(acceptedJobId);
-        navigate('/technician/active-job', {
+        navigate(getTechnicianActiveJobPath(acceptedJobId), {
           replace: true,
           state: {
             jobId: acceptedJobId,

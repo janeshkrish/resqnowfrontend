@@ -280,6 +280,7 @@ const App = () => {
                               <Route path="verification" element={<TechnicianProtectedRoute><TechnicianVerification /></TechnicianProtectedRoute>} />
                               <Route path="dashboard" element={<TechnicianProtectedRoute><TechnicianDashboard /></TechnicianProtectedRoute>} />
                               <Route path="active-job" element={<TechnicianProtectedRoute><ActiveJob /></TechnicianProtectedRoute>} />
+                              <Route path="active-job/:requestId" element={<TechnicianProtectedRoute><ActiveJob /></TechnicianProtectedRoute>} />
                               <Route path="history" element={<TechnicianProtectedRoute><TechnicianHistoryPage /></TechnicianProtectedRoute>} />
                               <Route path="earnings" element={<TechnicianProtectedRoute><TechnicianEarningsPage /></TechnicianProtectedRoute>} />
                               <Route path="reviews" element={<TechnicianProtectedRoute><TechnicianReviewsPage /></TechnicianProtectedRoute>} />

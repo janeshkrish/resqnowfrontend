@@ -7,6 +7,7 @@ import { resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayme
 
 interface RequestData {
   id: string;
+  isTowing: boolean;
   user_id: string; // Added for feedback submission
   status: string;
   service_type: string;
@@ -86,6 +87,7 @@ const normalizeRequestData = (data: any): RequestData => {
 
   return {
     ...data,
+    isTowing: Boolean(data?.isTowing),
     paymentMode: paymentDetails.paymentMode,
     payment_mode: paymentDetails.paymentMode,
     baseAmount: paymentDetails.baseAmount,

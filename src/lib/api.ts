@@ -383,10 +383,11 @@ const withTechnician = (request: AnyRecord) => {
   if (!request) return request;
   const paymentDetails = resolveServiceRequestPaymentDetails(request);
   const technician = getTechnicians().find((item) => String(item.id) === String(request.technician_id));
-  if (!technician) return { ...request, ...paymentDetails };
+  if (!technician) return { ...request, ...paymentDetails, isTowing: Boolean(request.isTowing) };
   return {
     ...request,
     ...paymentDetails,
+    isTowing: Boolean(request.isTowing),
     technician: {
       id: technician.id,
       name: technician.name,
@@ -1527,6 +1528,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     const baseAmount = Number(pricingBreakdown?.base_amount || body.amount || 500);
     const request = {
       id,
+      isTowing,
       service_type: body.service_type || "other",
       vehicle_type: body.vehicle_type || "car",
       vehicle_model: body.vehicle_model || "Vehicle",

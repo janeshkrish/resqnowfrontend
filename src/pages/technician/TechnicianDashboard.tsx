@@ -29,6 +29,8 @@ import {
 } from "@/utils/technicianDashboard";
 import { isTowingTechnician as isTowingTechnicianRole } from "@/utils/technicianRole";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
+import { getTowingAction } from "@/lib/towingActionState";
+import { getTechnicianActiveJobPath } from "@/lib/technicianActiveJobRoute";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import FleetManagementModule from "@/components/technician/dashboard/towing/FleetManagementModule";
@@ -91,25 +93,7 @@ const TechnicianDashboard = () => {
     ["paid", "completed"].includes(String(value || "").trim().toLowerCase());
 
   const isTowingJob = (job: any) =>
-    String(job?.service_type || job?.serviceType || "").toLowerCase().includes("towing") ||
-    Boolean(job?.dropAddress || job?.drop_address || job?.dropLocation?.address) ||
-    job?.routeDistanceKm != null ||
-    job?.route_distance_km != null;
-
-  const getTowingAction = (job: any) => {
-    const status = normalizeTechnicianStatus(job?.status);
-    if (status === "assigned" || status === "accepted") return { status: "en_route_pickup", label: "START PICKUP" };
-    if (status === "en_route_pickup") return { status: "arrived_pickup", label: "REACHED PICKUP" };
-    if (status === "arrived_pickup") return { status: "vehicle_loaded", label: "VEHICLE LOADED" };
-    if (status === "vehicle_loaded") return { status: "enroute_drop", label: "START TOW" };
-    if (status === "enroute_drop") return { status: "arrived_drop", label: "REACHED DROP LOCATION" };
-    if (status === "arrived_drop") return { status: "service_completed", label: "COMPLETE SERVICE" };
-    if (status === "service_completed") return { status: "payment_pending", label: "COLLECT PAYMENT" };
-    if (status === "payment_pending" && isPaidPaymentStatus(job?.payment_status ?? job?.paymentStatus)) {
-      return { status: "closed", label: "CLOSE JOB" };
-    }
-    return null;
-  };
+    Boolean(job?.isTowing);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -194,6 +178,7 @@ const TechnicianDashboard = () => {
     return {
       ...raw,
       id: String(raw.id ?? raw.requestId ?? incomingJob?.id ?? activeJob?.id ?? ""),
+      isTowing: Boolean(raw.isTowing),
       status: normalizeTechnicianStatus(raw.status ?? raw.current_status ?? raw.job_status),
       service_type: raw.service_type ?? raw.serviceType ?? incomingJob?.serviceType ?? activeJob?.service_type,
       vehicle_type: raw.vehicle_type ?? raw.vehicleType ?? incomingJob?.vehicleType ?? activeJob?.vehicle_type,
@@ -528,6 +513,7 @@ const TechnicianDashboard = () => {
       const dropLocation = offerData?.dropLocation || {};
       const jobRequest: JobRequest = {
         id: requestId,
+        isTowing: Boolean(offerData?.isTowing),
         customerName: String(offerData?.customerName || "Customer"),
         serviceType: String(offerData?.serviceType || offerData?.service_type || "Service"),
         vehicleType: String(offerData?.vehicleType || offerData?.vehicle_type || "car"),
@@ -999,6 +985,7 @@ const TechnicianDashboard = () => {
 
       const fallbackJob: JobRequest = {
         id: normalizedJobId,
+        isTowing: Boolean(offerRequest?.isTowing),
         customerName: String(offerRequest?.customerName || "Customer"),
         serviceType: String(offerRequest?.serviceType || offerRequest?.service_type || "Service"),
         vehicleType: String(offerRequest?.vehicleType || offerRequest?.vehicle_type || "car"),
@@ -1108,7 +1095,7 @@ const TechnicianDashboard = () => {
         setIncomingJob(null);
         setIncomingJobUnavailable(false);
         setShowJobModal(false);
-        navigate("/technician/active-job", {
+        navigate(getTechnicianActiveJobPath(normalizedJobId), {
           replace: true,
           state: {
             jobId: normalizedJobId,
@@ -1180,6 +1167,7 @@ const TechnicianDashboard = () => {
         if (!sourceIncomingJob) return prev;
         return {
           id: sourceIncomingJob.id,
+          isTowing: Boolean(sourceIncomingJob.isTowing),
           status: 'accepted',
           service_type: sourceIncomingJob.serviceType,
           vehicle_type: sourceIncomingJob.vehicleType,
@@ -1194,7 +1182,7 @@ const TechnicianDashboard = () => {
       const refreshedActiveJob = await refreshActiveJob();
       if (!isMountedRef.current) return;
       startLocationTracking();
-      navigate("/technician/active-job", {
+      navigate(getTechnicianActiveJobPath(normalizedJobId), {
         state: {
           jobId: normalizedJobId,
           job:
@@ -1624,7 +1612,9 @@ const TechnicianDashboard = () => {
   const activeJobIsTowing = isTowingJob(activeJob);
   const activeJobRouteDistance = activeJob?.routeDistanceKm ?? activeJob?.route_distance_km ?? null;
   const activeJobEstimatedDuration = activeJob?.estimatedDuration ?? activeJob?.estimated_duration ?? null;
-  const activeJobTowingAction = activeJobIsTowing ? getTowingAction(activeJob) : null;
+  const activeJobTowingAction = activeJobIsTowing
+    ? getTowingAction(activeJobStatus, activeJob?.payment_status ?? activeJob?.paymentStatus)
+    : null;
   const activeJobDropAddress = activeJob?.dropAddress ?? activeJob?.drop_address ?? activeJob?.dropLocation?.address ?? null;
   const visibleCancelledJob =
     activeJob && isCancelledStatus(activeJob?.status)

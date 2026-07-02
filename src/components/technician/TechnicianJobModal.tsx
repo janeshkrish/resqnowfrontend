@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 export interface JobRequest {
     id: string; // Job ID / Service Request ID
+    isTowing?: boolean;
     customerName: string;
     serviceType: string;
     vehicleType: string;

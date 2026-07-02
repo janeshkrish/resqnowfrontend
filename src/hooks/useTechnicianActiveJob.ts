@@ -70,10 +70,7 @@ const normalizeJob = (job: any) => {
   const estimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
   const serviceDescription = toOptionalString(job.service?.description ?? job.description);
   const paymentDetails = resolveServiceRequestPaymentDetails(job);
-  const isTowingJob =
-    String(serviceType || job.service_type || "").toLowerCase().includes("towing") ||
-    destinationAddress != null ||
-    routeDistanceKm != null;
+  const isTowingJob = Boolean(job.isTowing);
   const technicianEstimatedEarning = toOptionalNumber(
     job.technicianEstimatedEarning ??
       job.technician_estimated_earning ??
@@ -92,6 +89,7 @@ const normalizeJob = (job: any) => {
     ...job,
     id: requestId ?? "",
     requestId: requestId ?? "",
+    isTowing: isTowingJob,
     status,
     jobStatus: status,
     customerName,

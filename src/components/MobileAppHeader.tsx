@@ -41,8 +41,15 @@ const MobileAppHeader = () => {
             </button>
           )}
 
-          <Link to="/" className="flex items-center">
-            <span className="text-lg font-bold text-primary">ResQNow</span>
+          <Link to="/" className="flex items-center -ml-1">
+            <img 
+              src="/resqnow-logo.png" 
+              alt="ResQNow Logo" 
+              className="h-[46px] w-auto object-contain origin-left scale-[1.35]"
+              onError={(e) => {
+                e.currentTarget.src = 'https://placehold.co/120x32/transparent/3b82f6?text=ResQNow';
+              }}
+            />
           </Link>
         </div>
 

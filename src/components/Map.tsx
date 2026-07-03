@@ -266,42 +266,31 @@ const buildRouteCurve = (from: [number, number], to: [number, number]): [number,
 
 const createUserIcon = () =>
   L.divIcon({
-    className: "radar-user-marker-wrapper",
+    className: "radar-user-marker-wrapper bg-transparent border-0",
     html: `
-      <div class="radar-user-marker">
-        <span class="radar-user-marker__ring radar-user-marker__ring--outer"></span>
-        <span class="radar-user-marker__ring radar-user-marker__ring--middle"></span>
-        <span class="radar-user-marker__ring radar-user-marker__ring--inner"></span>
-        <span class="radar-user-marker__dot"></span>
-      </div>
+      <div style="width: 20px; height: 20px; background: #4285f4; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.3);"></div>
     `,
-    iconSize: [78, 78],
-    iconAnchor: [39, 39],
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
 
 const createTechnicianIcon = (tech: Technician, selected: boolean) => {
-  const initials = getVendorInitials(tech.name);
-  const eta = calculateEtaMinutes(tech.distance);
+  const pinColor = selected ? "#ea4335" : "#1a73e8"; 
+  const pinScale = selected ? 1.15 : 0.95;
+  const pinZ = selected ? 1000 : 100;
 
   return L.divIcon({
-    className: "radar-tech-marker-wrapper",
+    className: "radar-tech-marker-wrapper bg-transparent border-0",
     html: `
-      <div class="radar-tech-marker${selected ? " radar-tech-marker--selected" : ""}">
-        <div class="radar-tech-marker__bubble">
-          <span class="radar-tech-marker__avatar">${initials}</span>
-          <div class="radar-tech-marker__copy">
-            <span>${eta} min</span>
-            <small>${formatDistanceCompact(tech.distance)}</small>
-          </div>
-        </div>
-        <div class="radar-tech-marker__pin">
-          <span class="radar-tech-marker__pulse"></span>
-          <span class="radar-tech-marker__core">${initials.slice(0, 1)}</span>
-        </div>
+      <div style="transform: scale(${pinScale}); transform-origin: bottom center; transition: transform 0.2s cubic-bezier(0.2,0,0,1); z-index: ${pinZ}; position: relative; filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.25));">
+        <svg width="28" height="40" viewBox="0 0 24 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M12 0C5.37258 0 0 5.37258 0 12C0 21 12 36 12 36C12 36 24 21 24 12C24 5.37258 18.6274 0 12 0ZM12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12C17 14.7614 14.7614 17 12 17Z" fill="${pinColor}"/>
+          <circle cx="12" cy="12" r="5" fill="white"/>
+        </svg>
       </div>
     `,
-    iconSize: [124, 90],
-    iconAnchor: [26, 74],
+    iconSize: [28, 40],
+    iconAnchor: [14, 40],
   });
 };
 
@@ -383,7 +372,7 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
 
   const isPreview = mode === "preview";
   const isDraggableSheet = !isPreview && isMobile;
-  const collapsedPeekHeight = isDraggableSheet ? 118 : 0;
+  const collapsedPeekHeight = isDraggableSheet ? (selectedTechId ? 210 : 130) : 0;
   const collapsedSheetOffset = isDraggableSheet ? Math.max(0, panelHeight - collapsedPeekHeight) : 0;
   const mapCenter: [number, number] = coordinates ? [coordinates.lat, coordinates.lng] : DEFAULT_CENTER;
 
@@ -691,12 +680,12 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
               type="button"
               onClick={() => setActiveFilter(chip.id)}
               className={cn(
-                "shrink-0 rounded-full border font-bold transition",
-                variant === "overlay" ? "px-3 py-2 text-[10px] shadow-sm" : "px-3.5 py-2 text-[11px]",
+                "shrink-0 rounded-full border transition font-medium",
+                variant === "overlay" ? "px-4 py-2 text-[13px] shadow-[0_1px_3px_rgba(0,0,0,0.12)] border-transparent" : "px-3.5 py-2 text-[11px]",
                 isActive
-                  ? "border-rose-200 bg-rose-50 text-rose-500 shadow-[0_12px_24px_-20px_rgba(244,63,94,0.75)]"
+                  ? variant === "overlay" ? "bg-[#e8f0fe] text-[#1967d2]" : "border-rose-200 bg-rose-50 text-rose-500 shadow-[0_12px_24px_-20px_rgba(244,63,94,0.75)]"
                   : variant === "overlay"
-                    ? "border-white/80 bg-white/96 text-slate-600 hover:border-slate-200 hover:bg-white"
+                    ? "bg-white text-slate-700 hover:bg-slate-50"
                     : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
               )}
             >
@@ -803,64 +792,63 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-[430] flex items-start justify-between md:inset-x-6 md:top-6">
-        <motion.div
-          initial={reduceMotion ? undefined : { opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24 }}
-          className="pointer-events-auto max-w-[200px] rounded-[1.25rem] bg-white/96 px-3.5 py-2.5 shadow-[0_18px_35px_-22px_rgba(15,23,42,0.4)]"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 shadow-inner shadow-rose-100/60">
-              <span className="relative flex h-4 w-4 items-center justify-center">
-                <span className="absolute h-4 w-4 rounded-full border-2 border-rose-500/45" />
-                <span className="absolute h-2 w-2 rounded-full bg-rose-500" />
-              </span>
-            </span>
-            <div>
-              <p className="text-[14px] font-extrabold tracking-tight text-slate-900">Live Radar</p>
-              <p className="text-[11px] font-semibold text-emerald-600">
-                {loadingTechnicians ? "Scanning nearby teams" : `${nearbyCount} Tech${nearbyCount === 1 ? "" : "s"} Nearby`}
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-[430] flex flex-col gap-3 md:inset-x-6 md:top-6">
+        <div className="flex items-start justify-between">
+          <motion.div
+            initial={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24 }}
+            className="pointer-events-auto flex flex-1 max-w-[340px] items-center gap-3 rounded-full bg-white px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.15)] md:max-w-md"
+          >
+            <div className="flex shrink-0 items-center justify-center text-slate-600">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-medium text-slate-700">
+                {loadingTechnicians ? "Searching..." : "Search here"}
               </p>
             </div>
-          </div>
-        </motion.div>
+            <div className="flex shrink-0 items-center justify-center">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                <span className="text-[10px] font-bold">ME</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
 
-        <motion.div
-          initial={reduceMotion ? undefined : { opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.22, delay: 0.03 }}
-          className="pointer-events-auto"
-        >
-          <Button
-            type="button"
-            onClick={requestLocation}
-            disabled={loadingLocation || loadingTechnicians}
-            className="h-11 w-11 rounded-[1rem] bg-white/96 p-0 text-slate-700 shadow-[0_18px_35px_-22px_rgba(15,23,42,0.4)] hover:bg-white"
+        {filterChips.length > 1 && (
+          <motion.div
+            initial={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, delay: 0.05 }}
+            className="pointer-events-auto w-full md:hidden"
           >
-            {loadingLocation ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <LocateFixed className="h-4.5 w-4.5" />}
-          </Button>
-        </motion.div>
+            {renderFilterChips("overlay")}
+          </motion.div>
+        )}
       </div>
 
+      <motion.div
+        initial={reduceMotion ? undefined : { opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.22, delay: 0.03 }}
+        className="pointer-events-auto absolute right-3 z-[430] md:right-6 md:top-6"
+        style={{ bottom: isDraggableSheet ? `calc(${panelHeight}px + 16px)` : 'auto' }}
+      >
+        <Button
+          type="button"
+          onClick={requestLocation}
+          disabled={loadingLocation || loadingTechnicians}
+          className="h-[46px] w-[46px] rounded-full bg-white p-0 text-slate-700 shadow-[0_3px_10px_rgba(0,0,0,0.2)] hover:bg-slate-50"
+        >
+          {loadingLocation ? <Loader2 className="h-5 w-5 animate-spin text-[#1a73e8]" /> : <LocateFixed className="h-5 w-5 text-slate-700" />}
+        </Button>
+      </motion.div>
+
       {locationError && (
-        <div className="absolute left-3 top-[5rem] z-[430] max-w-[230px] rounded-2xl bg-white/92 px-3 py-2 text-[11px] font-medium text-amber-700 shadow-[0_10px_24px_-16px_rgba(15,23,42,0.35)] md:left-6 md:top-[6.1rem]">
+        <div className="absolute left-3 top-[8rem] z-[430] max-w-[230px] rounded-xl bg-white px-3 py-2 text-[13px] font-medium text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.15)] md:left-6 md:top-[6.1rem]">
           {locationError}
         </div>
-      )}
-
-      {mapPriority && filterChips.length > 1 && (
-        <motion.div
-          initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-          className="pointer-events-none absolute inset-x-3 z-[430] md:hidden"
-          style={{ bottom: `calc(env(safe-area-inset-bottom) + ${collapsedPeekHeight + 14}px)` }}
-        >
-          <div className="rounded-[1.2rem] border border-white/70 bg-white/86 px-2 py-2 backdrop-blur-xl shadow-[0_18px_36px_-26px_rgba(15,23,42,0.3)]">
-            {renderFilterChips("overlay")}
-          </div>
-        </motion.div>
       )}
 
       <motion.section
@@ -876,89 +864,61 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
         dragConstraints={{ top: 0, bottom: collapsedSheetOffset }}
         onDragEnd={handleSheetDragEnd}
         style={isDraggableSheet ? { y: sheetDragY, willChange: "transform" } : undefined}
-        className={panelClasses}
+        className={cn(
+          "absolute z-[420] overflow-hidden bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.12)] border-t border-slate-100",
+          isPreview
+            ? "right-6 top-6 bottom-6 w-[392px] rounded-[2rem]"
+            : "inset-x-0 bottom-0 h-[75dvh] rounded-t-[1.5rem] md:inset-y-6 md:right-6 md:left-auto md:h-auto md:w-[396px] md:rounded-[2rem]",
+        )}
       >
         <div className="flex h-full flex-col">
           {!isPreview && (
-            <div className="shrink-0 border-b border-slate-100/80 px-4 pb-3 pt-2.5 md:hidden">
+            <div className="shrink-0 bg-white px-4 pb-1 pt-2 md:hidden">
               <div
                 role="presentation"
                 onPointerDown={handleSheetDragStart}
-                className="mx-auto flex w-full touch-none items-center justify-center py-2"
+                className="mx-auto flex w-full touch-none items-center justify-center py-2 pb-3 cursor-grab active:cursor-grabbing"
                 style={{ touchAction: "none" }}
               >
-                <span className="h-1.5 w-12 rounded-full bg-slate-300" />
+                <span className="h-1.5 w-10 rounded-full bg-slate-300" />
               </div>
 
-              {sheetExpanded ? (
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
-                    <p className="text-[11px] font-medium text-slate-500">
-                      {loadingTechnicians
-                        ? "Refreshing live radar..."
-                        : activeFilter === "all"
-                          ? `${nearbyCount} technicians available around you`
-                          : `${nearbyCount} technicians in this filter`}
-                    </p>
-                  </div>
-
-                  {activeFilter !== "all" ? (
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilter("all")}
-                      className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500 transition hover:bg-slate-50"
-                    >
-                      Clear
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setSheetExpanded(false)}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 transition hover:bg-slate-200"
-                      aria-label="Collapse technicians panel"
-                    >
-                      Live
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              ) : (
+              {!sheetExpanded && (
                 <button
                   type="button"
                   onClick={handleSheetPreviewClick}
-                  className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-3.5 py-3 text-left shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] transition hover:border-slate-300 hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]"
+                  className="w-full bg-white text-left transition"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
-                      <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
-                        {loadingTechnicians
-                          ? "Scanning nearby teams"
-                          : activeTech
-                            ? `${activeTech.name} - ${formatEtaWindow(activeTech.distance)}`
-                            : `${nearbyCount} technicians available around you`}
-                      </p>
-                    </div>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                      <ChevronUp className="h-4 w-4" />
-                    </span>
-                  </div>
-
-                  {activeTech && !loadingTechnicians && (
-                    <div className="mt-3 flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
-                        {getVendorInitials(activeTech.name)}
-                      </div>
+                  {activeTech && !loadingTechnicians ? (
+                    <div className="flex items-start gap-4 pb-2">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[0.82rem] font-bold text-slate-900">{activeTechServiceLabel}</p>
-                        <p className="truncate text-[11px] font-medium text-slate-500">
-                          {formatDistanceDetailed(activeTech.distance)} away
-                        </p>
+                        <p className="truncate text-[1.2rem] font-medium text-slate-900">{activeTech.name}</p>
+                        <div className="mt-1 flex items-center gap-1 text-[13px]">
+                           <span className="font-semibold text-slate-700">{formatRating(activeTech.rating)}</span>
+                           <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                           <span className="text-slate-500">({activeTech.rating > 0 ? "10+" : "0"}) · {formatDistanceDetailed(activeTech.distance)}</span>
+                        </div>
+                        <p className="mt-0.5 truncate text-[13px] text-slate-500">{activeTechServiceLabel}</p>
                       </div>
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">
-                        Live
-                      </span>
+                      
+                      <div className="shrink-0 pt-1">
+                         <div className="flex flex-col items-center gap-1.5">
+                           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_2px_6px_rgba(26,115,232,0.4)]">
+                              <Navigation className="h-5 w-5" />
+                           </div>
+                           <span className="text-[11px] font-medium text-[#1a73e8]">{formatEtaWindow(activeTech.distance).split(' ')[0]} min</span>
+                         </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 pb-3">
+                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                         <Navigation className="h-5 w-5" />
+                       </div>
+                       <div>
+                         <p className="text-[1.1rem] font-medium text-slate-900">Explore nearby</p>
+                         <p className="text-[13px] text-slate-500">{loadingTechnicians ? "Scanning..." : `${nearbyCount} technicians available`}</p>
+                       </div>
                     </div>
                   )}
                 </button>
@@ -969,7 +929,7 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
           <div
             className={cn(
               "flex-1 px-4 pb-5 custom-scrollbar sm:px-5",
-              sheetExpanded || !isDraggableSheet ? "overflow-y-auto pt-3" : "overflow-hidden pt-0",
+              sheetExpanded || !isDraggableSheet ? "overflow-y-auto pt-2" : "overflow-hidden pt-0",
               !isPreview && "pb-[calc(env(safe-area-inset-bottom)+5.15rem)] md:pb-5",
             )}
           >
@@ -1028,91 +988,63 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
               {!loadingTechnicians && activeTech && (
                 <motion.div
                   layout={!reduceMotion}
-                  className="rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.24)]"
+                  className="bg-white pb-4"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
-                      {getVendorInitials(activeTech.name)}
+                  <div className="pt-2 pb-4 border-b border-slate-100">
+                    <p className="text-[1.4rem] font-medium text-slate-900">{activeTech.name}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[14px]">
+                      <span className="font-semibold text-slate-700">{formatRating(activeTech.rating)}</span>
+                      <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                      <span className="text-slate-500">({activeTech.rating > 0 ? "10+" : "0"})</span>
+                      <span className="mx-1 text-slate-400">·</span>
+                      <span className="text-slate-700">{activeTechServiceLabel}</span>
+                    </div>
+                    <p className="mt-1.5 text-[14px] text-slate-500">
+                      {getServiceHighlights(activeTech)}
+                    </p>
+                    {activeTech.aiRecommended && (
+                       <p className="mt-2 text-[12px] font-medium text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Best Match • Verified
+                       </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-around py-4 border-b border-slate-100">
+                    <div className="flex flex-col items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => handleBookService(activeTech)}
+                        className="h-12 w-12 rounded-full bg-[#1a73e8] text-white shadow-[0_2px_6px_rgba(26,115,232,0.4)] hover:bg-blue-700 p-0"
+                      >
+                        <Navigation className="h-5 w-5" />
+                      </Button>
+                      <span className="text-[13px] font-medium text-[#1a73e8]">Directions</span>
+                    </div>
+                    
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 text-[#1a73e8]">
+                        <Clock3 className="h-5 w-5" />
+                      </div>
+                      <span className="text-[13px] font-medium text-[#1a73e8]">{formatEtaWindow(activeTech.distance).split(' ')[0]} min</span>
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-[0.95rem] font-black tracking-tight text-slate-900">
-                            {activeTech.name}
-                          </p>
-                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                            {activeTechServiceLabel}
-                          </p>
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[12px] font-black text-amber-500">
-                          <Star className="h-3.5 w-3.5 fill-current" />
-                          <span>{formatRating(activeTech.rating)}</span>
-                        </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 text-[#1a73e8]">
+                        <ShieldCheck className="h-5 w-5" />
                       </div>
-
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {activeTech.aiRecommended && (
-                          <Badge className="rounded-full bg-rose-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-rose-500 hover:bg-rose-50">
-                            Best Match
-                          </Badge>
-                        )}
-                        <Badge className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide text-emerald-600 hover:bg-emerald-50">
-                          Verified Team
-                        </Badge>
-                      </div>
+                      <span className="text-[13px] font-medium text-[#1a73e8]">Trusted</span>
                     </div>
                   </div>
 
-                  <p className="mt-3 text-[11px] font-medium leading-relaxed text-slate-500">
-                    {getServiceHighlights(activeTech)}
-                  </p>
-
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <div className="rounded-2xl bg-slate-50 px-2.5 py-2.5">
-                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                        <Navigation className="h-3.5 w-3.5" />
-                        Distance
-                      </div>
-                      <p className="mt-1 text-sm font-black text-slate-900">{formatDistanceDetailed(activeTech.distance)}</p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 px-2.5 py-2.5">
-                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                        <Clock3 className="h-3.5 w-3.5" />
-                        ETA
-                      </div>
-                      <p className="mt-1 text-sm font-black text-slate-900">{formatEtaWindow(activeTech.distance)}</p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 px-2.5 py-2.5">
-                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Verified
-                      </div>
-                      <p className="mt-1 text-sm font-black text-emerald-600">Trusted</p>
-                    </div>
+                  <div className="pt-4">
+                    <Button
+                      type="button"
+                      onClick={() => handleBookService(activeTech)}
+                      className="h-12 w-full rounded-full bg-[#1a73e8] text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(26,115,232,0.4)] hover:opacity-95"
+                    >
+                      Request Service Now
+                    </Button>
                   </div>
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[1rem] border border-emerald-100 bg-emerald-50 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-[12px] font-bold text-emerald-700">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Background Verified
-                    </div>
-                    <span className="text-[10px] font-semibold text-emerald-600">Trusted &amp; Verified</span>
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={() => handleBookService(activeTech)}
-                    className="mt-4 h-11 w-full rounded-[1.1rem] bg-[linear-gradient(135deg,#ff3b4d,#ff263f)] text-sm font-black text-white shadow-[0_24px_32px_-24px_rgba(239,68,68,0.85)] hover:opacity-95"
-                  >
-                    <span className="flex w-full items-center justify-center gap-2">
-                      Request Now
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
-                        <ArrowRight className="h-4 w-4" />
-                      </span>
-                    </span>
-                  </Button>
                 </motion.div>
               )}
 
@@ -1161,9 +1093,8 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
                   )}
                 </div>
 
-                <div className="space-y-3">
+                <div className="flex flex-col">
                   {visibleSecondaryTechnicians.map((tech, index) => {
-                    const isBestRow = tech.id === bestMatch?.id;
                     const isSelected = tech.id === activeTech?.id;
 
                     return (
@@ -1175,54 +1106,30 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.22, delay: index * 0.04 }}
                         className={cn(
-                          "w-full rounded-[1.3rem] border bg-white p-3 text-left shadow-[0_14px_32px_-30px_rgba(15,23,42,0.4)] transition",
-                          isSelected
-                            ? "border-rose-200 ring-2 ring-rose-100"
-                            : "border-slate-100 hover:border-slate-200 hover:shadow-[0_18px_32px_-28px_rgba(15,23,42,0.4)]",
+                          "w-full bg-white py-3 text-left transition border-b border-slate-100 last:border-0",
+                          isSelected ? "bg-slate-50" : "hover:bg-slate-50",
                         )}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[18px] font-medium text-slate-500">
                             {getVendorInitials(tech.name)}
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="truncate text-sm font-black tracking-tight text-slate-900">
-                                {tech.name}
-                              </p>
-                              {isBestRow && (
-                                <Badge className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-rose-500 hover:bg-rose-50">
-                                  Best Match
-                                </Badge>
-                              )}
+                            <p className="truncate text-[15px] font-medium text-slate-900">
+                              {tech.name}
+                            </p>
+                            
+                            <div className="mt-0.5 flex items-center gap-1 text-[13px]">
+                              <span className="font-semibold text-slate-700">{formatRating(tech.rating)}</span>
+                              <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                              <span className="text-slate-500">({tech.rating > 0 ? "10+" : "0"})</span>
                             </div>
-                            <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                              {getTechnicianServiceLabel(tech)}
+                            
+                            <p className="mt-0.5 truncate text-[13px] text-slate-500">
+                              {getTechnicianServiceLabel(tech)} · {formatDistanceCompact(tech.distance)}
                             </p>
                           </div>
-
-                          <div className="shrink-0 text-right">
-                            <div className="flex items-center justify-end gap-1 text-[12px] font-bold text-amber-500">
-                              <Star className="h-3.5 w-3.5 fill-current" />
-                              <span>{formatRating(tech.rating)}</span>
-                            </div>
-                            <p className="mt-1 text-[11px] font-semibold text-slate-500">{formatDistanceCompact(tech.distance)}</p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between">
-                          <p className="text-[11px] font-bold text-slate-600">{formatEtaWindow(tech.distance)}</p>
-                          <span
-                            className={cn(
-                              "rounded-full border px-4 py-2 text-[11px] font-extrabold transition",
-                              isSelected
-                                ? "border-rose-200 bg-rose-50 text-rose-500"
-                                : "border-rose-100 text-rose-500 hover:bg-rose-50",
-                            )}
-                          >
-                            {isSelected ? "Selected" : "Select"}
-                          </span>
                         </div>
                       </motion.button>
                     );

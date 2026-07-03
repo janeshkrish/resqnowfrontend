@@ -719,6 +719,7 @@ const RequestTracking = () => {
   const status = normalizeRequestStatus(request?.status || "pending");
   const paymentStatus = normalizeRequestPaymentStatus(request?.payment_status);
   const paymentCompleted = paymentStatus === "paid" || status === "paid";
+  const requestServiceType = request?.service_type ?? request?.serviceType ?? "";
   const isTowingRequest = Boolean(request?.isTowing);
   const statusMeta = STATUS_COPY[status] || {
     title: "Request status updated",

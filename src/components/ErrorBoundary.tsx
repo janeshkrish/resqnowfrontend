@@ -25,7 +25,13 @@ class ErrorBoundary extends Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("Uncaught error:", error, errorInfo);
+        console.error("Uncaught error:", {
+            error,
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            componentStack: errorInfo.componentStack,
+        });
         this.setState({ errorInfo });
     }
 
@@ -35,9 +41,18 @@ class ErrorBoundary extends Component<Props, State> {
 
     public render() {
         if (this.state.hasError) {
+            const debugDetails = [
+                this.state.error?.stack,
+                this.state.errorInfo?.componentStack
+                    ? `React component stack:\n${this.state.errorInfo.componentStack}`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join("\n\n");
+
             return (
                 <div className="min-h-screen flex items-center justify-center bg-muted p-4">
-                    <div className="bg-card dark:bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
+                    <div className="bg-card dark:bg-slate-900 p-8 rounded-2xl shadow-xl max-w-2xl w-full text-center border border-red-100">
                         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                             <AlertTriangle className="h-8 w-8 text-red-600" />
                         </div>
@@ -53,6 +68,17 @@ class ErrorBoundary extends Component<Props, State> {
                         <div className="bg-muted/50 p-4 rounded-lg text-left text-xs font-mono text-muted-foreground overflow-auto max-h-40 mb-6">
                             {this.state.error && this.state.error.toString()}
                         </div>
+
+                        {import.meta.env.DEV && debugDetails && (
+                            <details className="mb-6 rounded-lg border border-border bg-muted/30 text-left">
+                                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground">
+                                    Debug stack trace
+                                </summary>
+                                <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words border-t border-border p-4 text-xs text-muted-foreground">
+                                    {debugDetails}
+                                </pre>
+                            </details>
+                        )}
 
                         <div className="flex gap-3 justify-center">
                             <Button onClick={() => window.history.back()} variant="outline">

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("towing classification contract", () => {
   it("keeps every rendered job/request classification on the server flag", async () => {
-    const [activeJobSource, dashboardSource, activeJobHookSource, trackingSource] =
+    const [activeJobSource, dashboardSource, activeJobHookSource, trackingSource, realtimeHookSource] =
       await Promise.all([
         readFile("src/pages/technician/ActiveJob.tsx", "utf8"),
         readFile(
@@ -12,6 +12,7 @@ describe("towing classification contract", () => {
         ),
         readFile("src/hooks/useTechnicianActiveJob.ts", "utf8"),
         readFile("src/components/RequestTracking.tsx", "utf8"),
+        readFile("src/hooks/useRealtimeServiceRequest.ts", "utf8"),
       ]);
 
     expect(activeJobSource).toContain(
@@ -22,6 +23,12 @@ describe("towing classification contract", () => {
     );
     expect(activeJobHookSource).toContain(
       "const isTowingJob = Boolean(job.isTowing);"
+    );
+    expect(realtimeHookSource).toContain(
+      "serviceType?: string;"
+    );
+    expect(trackingSource).toContain(
+      'const requestServiceType = request?.service_type ?? request?.serviceType ?? "";'
     );
     expect(trackingSource).toContain(
       "const isTowingRequest = Boolean(request?.isTowing);"

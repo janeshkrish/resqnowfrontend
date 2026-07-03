@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, useState } from "react";
 import Services from "@/components/Services";
 import VehicleTypes from "@/components/VehicleTypes";
 import Testimonials from "@/components/Testimonials";
@@ -6,9 +6,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import { MapPin, Search, ArrowRight, Bell, Briefcase, Download, Smartphone } from "lucide-react";
 import { apiUrl } from "@/lib/api";
+import { lazyWithReload } from "@/lib/lazyWithReload";
 import msmeLogo from "../../assets/msme-logo.png";
 
-const EnterpriseDesktopHome = lazy(() => import("@/components/desktop/EnterpriseDesktopHome"));
+const EnterpriseDesktopHome = lazyWithReload(() => import("@/components/desktop/EnterpriseDesktopHome"));
 
 const MsmeAccreditationCard = () => (
   <section className="my-6 flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md">

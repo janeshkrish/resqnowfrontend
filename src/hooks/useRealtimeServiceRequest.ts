@@ -11,6 +11,7 @@ interface RequestData {
   user_id: string; // Added for feedback submission
   status: string;
   service_type: string;
+  serviceType?: string;
   vehicle_type?: string;
   vehicle_model?: string;
   address?: string;

@@ -1,16 +1,16 @@
-import { lazy } from "react";
 import { Navigate, type RouteObject } from "react-router-dom";
+import { lazyWithReload } from "@/lib/lazyWithReload";
 
-const AdminExtendedLayout = lazy(() => import("./AdminExtendedLayout"));
-const AdminExtendedDashboardPage = lazy(() => import("./AdminExtendedDashboardPage"));
-const AdminExtendedRequestsPage = lazy(() => import("./AdminExtendedRequestsPage"));
-const AdminExtendedCommandCenterPage = lazy(() => import("./AdminExtendedCommandCenterPage"));
-const AdminExtendedTechniciansPage = lazy(() => import("./AdminExtendedTechniciansPage"));
-const AdminExtendedTechnicianActivityPage = lazy(() => import("./AdminExtendedTechnicianActivityPage"));
-const AdminExtendedFinancePage = lazy(() => import("./AdminExtendedFinancePage"));
-const AdminExtendedAnalyticsPage = lazy(() => import("./AdminExtendedAnalyticsPage"));
-const AdminExtendedComplaintsPage = lazy(() => import("./AdminExtendedComplaintsPage"));
-const AdminExtendedNotificationsPage = lazy(() => import("./AdminExtendedNotificationsPage"));
+const AdminExtendedLayout = lazyWithReload(() => import("./AdminExtendedLayout"));
+const AdminExtendedDashboardPage = lazyWithReload(() => import("./AdminExtendedDashboardPage"));
+const AdminExtendedRequestsPage = lazyWithReload(() => import("./AdminExtendedRequestsPage"));
+const AdminExtendedCommandCenterPage = lazyWithReload(() => import("./AdminExtendedCommandCenterPage"));
+const AdminExtendedTechniciansPage = lazyWithReload(() => import("./AdminExtendedTechniciansPage"));
+const AdminExtendedTechnicianActivityPage = lazyWithReload(() => import("./AdminExtendedTechnicianActivityPage"));
+const AdminExtendedFinancePage = lazyWithReload(() => import("./AdminExtendedFinancePage"));
+const AdminExtendedAnalyticsPage = lazyWithReload(() => import("./AdminExtendedAnalyticsPage"));
+const AdminExtendedComplaintsPage = lazyWithReload(() => import("./AdminExtendedComplaintsPage"));
+const AdminExtendedNotificationsPage = lazyWithReload(() => import("./AdminExtendedNotificationsPage"));
 
 export const adminExtendedLazyRoutes: RouteObject[] = [
   {

@@ -78,7 +78,10 @@ const MobileBottomNav = () => {
     return (
         <div
             className={cn(
-                "fixed bottom-0 left-0 right-0 z-50 bg-card dark:bg-slate-900 border-t border-border shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:hidden pb-safe",
+                "fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe",
+                "bg-white/75 dark:bg-slate-950/75 backdrop-blur-2xl saturate-[1.8]",
+                "border-t border-white/50 dark:border-white/10",
+                "shadow-[0_-8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.1)]",
                 "transition-transform transition-opacity duration-300 ease-out",
                 visibilityClasses
             )}
@@ -93,7 +96,7 @@ const MobileBottomNav = () => {
                             to={item.path}
                             className={cn(
                                 "flex flex-col items-center justify-center gap-1 transition-all duration-300",
-                                active ? "text-primary" : "text-muted-foreground/60 hover:text-muted-foreground"
+                                active ? "text-primary" : "text-muted-foreground/70 hover:text-muted-foreground"
                             )}
                         >
                             <div

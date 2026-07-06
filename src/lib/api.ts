@@ -1710,7 +1710,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (/^\/api\/payments\/diagnostics\/request\/.+$/.test(path) && method === "GET") return json({ request: { id: path.split("/").pop(), status: "paid", payment_status: "completed" }, payments: [{ id: "pay_demo", amount: 699 }], invoices: [{ id: "inv_demo", total: 699 }], checks: { request_paid_consistent: true, payment_method_consistent: true } });
 
   if (path === "/api/upload" && method === "POST") return json({ url: "/placeholder.svg" });
-  if (path === "/api/public/stats" && method === "GET") return json({ users: getUsers().length, technicians: getTechnicians().filter((item) => item.verification_status === "verified").length, completedServices: getRequests().filter((item) => ["completed", "paid"].includes(String(item.status).toLowerCase())).length });
+  if (path === "/api/public/stats" && method === "GET") return json({ error: "Live telemetry requires a configured backend API." }, 503);
   if (path === "/api/public/android-app/status" && method === "GET") {
     return json({
       available: false,
@@ -1790,6 +1790,9 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   return json({ success: true });
 };
 
+const LIVE_BACKEND_ONLY_PATHS = new Set(["/api/public/stats"]);
+const LIVE_BACKEND_ONLY_API_BASE_URL = API_BASE_URL || DEFAULT_API_BASE_URL;
+
 let fetchPatched = false;
 const installMockFetch = () => {
   if (!FRONTEND_ONLY_MODE || !isBrowser || fetchPatched) return;
@@ -1797,6 +1800,9 @@ const installMockFetch = () => {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url, runtimeOrigin());
     if (!url.pathname.startsWith("/api/")) return nativeFetch(input, init);
+    if (LIVE_BACKEND_ONLY_PATHS.has(url.pathname)) {
+      return nativeFetch(`${LIVE_BACKEND_ONLY_API_BASE_URL}${url.pathname}${url.search}`, init);
+    }
     const method = (init?.method || (input instanceof Request ? input.method : "GET") || "GET").toUpperCase();
     const body = await parseBody(input, init);
     return mockApi(url, method, body);

@@ -1,12 +1,13 @@
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Services from "@/components/Services";
 import VehicleTypes from "@/components/VehicleTypes";
 import Testimonials from "@/components/Testimonials";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
-import { MapPin, Search, ArrowRight, Bell, Briefcase, Download, Smartphone } from "lucide-react";
-import { apiUrl } from "@/lib/api";
+import { MapPin, ArrowRight, Bell, Briefcase, Download, Smartphone, User, Users, Car, Clock } from "lucide-react";
+import { apiFetch, apiUrl } from "@/lib/api";
 import { lazyWithReload } from "@/lib/lazyWithReload";
+import AnimatedCounter from "@/components/AnimatedCounter";
 import msmeLogo from "../../assets/msme-logo.png";
 
 const EnterpriseDesktopHome = lazyWithReload(() => import("@/components/desktop/EnterpriseDesktopHome"));
@@ -26,6 +27,257 @@ const MsmeAccreditationCard = () => (
     </div>
   </section>
 );
+
+type TelemetryStats = {
+  users: number;
+  technicians: number;
+  incidents: number;
+  completedServices: number;
+  generatedAt: string;
+};
+
+type TelemetryConnectionStatus = "connecting" | "online" | "delayed";
+
+const TELEMETRY_REFRESH_INTERVAL_MS = 15_000;
+const TELEMETRY_CACHE_KEY = "resqnow_live_telemetry_stats";
+
+const parseTelemetryCount = (value: unknown): number => {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count < 0) {
+    throw new Error("Telemetry API returned an invalid count.");
+  }
+  return Math.trunc(count);
+};
+
+const formatTelemetryTime = (value?: string): string => {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+};
+
+const buildTelemetryStats = (data: Partial<TelemetryStats>): TelemetryStats => {
+  const completedServices = parseTelemetryCount(data.completedServices ?? data.incidents);
+
+  return {
+    users: parseTelemetryCount(data.users),
+    technicians: parseTelemetryCount(data.technicians),
+    incidents: parseTelemetryCount(data.incidents ?? completedServices),
+    completedServices,
+    generatedAt: typeof data.generatedAt === "string"
+      ? data.generatedAt
+      : new Date().toISOString(),
+  };
+};
+
+const readCachedTelemetryStats = (): TelemetryStats | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(TELEMETRY_CACHE_KEY);
+    if (!raw) return null;
+    return buildTelemetryStats(JSON.parse(raw) as Partial<TelemetryStats>);
+  } catch {
+    return null;
+  }
+};
+
+const cacheTelemetryStats = (stats: TelemetryStats) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(TELEMETRY_CACHE_KEY, JSON.stringify(stats));
+  } catch {
+    // A cache miss should never block live telemetry rendering.
+  }
+};
+
+const LiveTelemetryGrid = () => {
+  const [telemetry, setTelemetry] = useState(() => {
+    const cachedStats = readCachedTelemetryStats();
+    return {
+      stats: cachedStats,
+      connectionStatus: cachedStats ? "delayed" : "connecting",
+    } satisfies {
+      stats: TelemetryStats | null;
+      connectionStatus: TelemetryConnectionStatus;
+    };
+  });
+
+  useEffect(() => {
+    let disposed = false;
+    let activeController: AbortController | null = null;
+
+    const fetchStats = async () => {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
+      try {
+        const res = await apiFetch("/api/public/stats", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Telemetry request failed with status ${res.status}.`);
+        }
+
+        const data = await res.json() as Partial<TelemetryStats>;
+        const nextStats = buildTelemetryStats(data);
+        cacheTelemetryStats(nextStats);
+
+        if (disposed) return;
+        setTelemetry({
+          stats: nextStats,
+          connectionStatus: "online",
+        });
+      } catch (err) {
+        if (controller.signal.aborted || disposed) return;
+        setTelemetry((current) => ({
+          ...current,
+          connectionStatus: "delayed",
+        }));
+        console.error("Failed to refresh live telemetry", err);
+      }
+    };
+
+    fetchStats();
+
+    const interval = window.setInterval(fetchStats, TELEMETRY_REFRESH_INTERVAL_MS);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchStats();
+      }
+    };
+
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", fetchStats);
+    window.addEventListener("focus", fetchStats);
+
+    return () => {
+      disposed = true;
+      activeController?.abort();
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", fetchStats);
+      window.removeEventListener("focus", fetchStats);
+    };
+  }, []);
+
+  const { stats, connectionStatus } = telemetry;
+  const statusText = connectionStatus === "online"
+    ? "Systems Online"
+    : connectionStatus === "delayed"
+      ? stats
+        ? "Sync Delayed"
+        : "Backend Offline"
+      : "Connecting";
+  const statusClasses = connectionStatus === "online"
+    ? "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+    : connectionStatus === "delayed"
+      ? "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
+      : "bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20";
+  const statusDotClasses = connectionStatus === "online"
+    ? "bg-emerald-500"
+    : connectionStatus === "delayed"
+      ? "bg-amber-500"
+      : "bg-slate-400";
+
+  const renderCount = (value?: number) => (
+    value == null
+      ? <span className="animate-pulse text-slate-300 dark:text-slate-600">—</span>
+      : <AnimatedCounter end={value} duration={800} />
+  );
+
+  return (
+    <div className="bg-transparent mt-8 mb-2">
+      {/* Header Row */}
+      <div className="flex justify-between items-start mb-4 px-1 gap-2">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white tracking-tight leading-none mb-1.5">
+            Network Telemetry
+          </h2>
+          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 max-w-[200px] leading-snug">
+            Live metrics across the ResQNow grid.
+          </p>
+        </div>
+        
+        {/* Status Pill */}
+        <div
+          className={`flex items-center gap-1.5 border px-2.5 py-1 rounded-full shadow-sm shrink-0 ${statusClasses}`}
+          title={stats?.generatedAt ? `Last updated ${new Date(stats.generatedAt).toLocaleString()}` : statusText}
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            {connectionStatus === "online" && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            )}
+            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${statusDotClasses}`}></span>
+          </span>
+          <span className="text-[9px] font-bold tracking-wide">{statusText}</span>
+        </div>
+      </div>
+
+      {/* Unified Stats Panel */}
+      <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)] border border-slate-100 dark:border-slate-800 relative overflow-hidden isolate mb-4">
+        {/* Subtle background glow */}
+        <div className="absolute top-0 right-0 w-[150px] h-[150px] bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        
+        <div className="grid grid-cols-4 divide-x divide-slate-100 dark:divide-slate-800 relative z-10">
+          
+          {/* Item 1 */}
+          <div className="flex flex-col items-center justify-center px-1 group">
+            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-2.5 group-hover:bg-slate-100 transition-colors border border-slate-100 dark:border-white/5">
+              <User className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+            </div>
+            <h3 className="text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white mb-1 leading-none">
+              {renderCount(stats?.users)}
+            </h3>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center leading-tight">Users</p>
+          </div>
+
+          {/* Item 2 */}
+          <div className="flex flex-col items-center justify-center px-1 group">
+            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-2.5 group-hover:bg-slate-100 transition-colors border border-slate-100 dark:border-white/5">
+              <Users className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+            </div>
+            <h3 className="text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white mb-1 leading-none">
+              {renderCount(stats?.technicians)}
+            </h3>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center leading-tight">Partners</p>
+          </div>
+
+          {/* Item 3 */}
+          <div className="flex flex-col items-center justify-center px-1 group">
+            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-2.5 group-hover:bg-slate-100 transition-colors border border-slate-100 dark:border-white/5">
+              <Car className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+            </div>
+            <h3 className="text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white mb-1 leading-none">
+              {renderCount(stats?.incidents)}
+            </h3>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center leading-tight">Incidents</p>
+          </div>
+
+          {/* Item 4 */}
+          <div className="flex flex-col items-center justify-center px-1 group">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mb-2.5 group-hover:bg-emerald-100 transition-colors border border-emerald-100 dark:border-emerald-500/20">
+              <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h3 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-white mb-1 leading-none tabular-nums">
+              {formatTelemetryTime(stats?.generatedAt)}
+            </h3>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center leading-tight">Updated</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const MobileDashboard = () => {
   const [isDownloadingApp, setIsDownloadingApp] = useState(false);
@@ -131,35 +383,8 @@ const MobileDashboard = () => {
           </div>
         </div>
 
-        {/* Mini Map Widget */}
-        <div className="bg-card dark:bg-slate-900 rounded-[2rem] border border-border/60 shadow-sm p-5 relative overflow-hidden flex flex-col items-start isolate">
-          <div className="absolute inset-0 bg-[url('https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/13/4096/2727.png')] bg-cover bg-center opacity-40 z-0"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/90 to-white/10 z-10"></div>
-
-          <div className="w-full flex justify-between items-center mb-10 z-20">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100/50 shadow-sm">
-                <MapPin className="h-5 w-5 text-emerald-600" />
-              </div>
-              <h3 className="font-black text-lg text-foreground tracking-tight">Active Techs</h3>
-            </div>
-            <div className="flex items-center gap-1.5 bg-card dark:bg-slate-900 shadow-sm border border-border px-2.5 py-1 rounded-full">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">LIVE</span>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground font-semibold z-20 mb-4 max-w-[220px]">
-            12 verified mechanics and tow trucks online around you.
-          </p>
-
-          <Link to="/map" className="w-full bg-slate-900 text-white rounded-2xl py-3.5 text-sm font-bold text-center z-20 shadow-[0_8px_16px_rgba(15,23,42,0.25)] flex items-center justify-center gap-2 active:scale-95 transition-transform">
-            <Search className="w-4 h-4" /> Open Live Radar
-          </Link>
-        </div>
+        {/* Network Telemetry */}
+        <LiveTelemetryGrid />
 
         {/* Vehicle Types Grid */}
         <div>

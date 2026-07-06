@@ -13,7 +13,7 @@ const MobileBottomNav = () => {
     const [navEnabled, setNavEnabled] = useState(true);
     const [autoHideEnabled, setAutoHideEnabled] = useState(true);
 
-    const { visibilityClasses, revealNav } = useAutoHideBottomNav({
+    const { isVisible, revealNav } = useAutoHideBottomNav({
         enabled: navEnabled && autoHideEnabled,
     });
 
@@ -78,47 +78,51 @@ const MobileBottomNav = () => {
     return (
         <div
             className={cn(
-                "fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe",
-                "bg-white/75 dark:bg-slate-950/75 backdrop-blur-2xl saturate-[1.8]",
-                "border-t border-white/50 dark:border-white/10",
-                "shadow-[0_-8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.1)]",
-                "transition-transform transition-opacity duration-300 ease-out",
-                visibilityClasses
+                "fixed left-1/2 -translate-x-1/2 z-50 lg:hidden",
+                "bg-white/60 dark:bg-[#121212]/70 backdrop-blur-[40px] backdrop-saturate-[200%]",
+                "border border-white/50 dark:border-white/10",
+                "shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+                "rounded-[2.5rem] p-1.5",
+                "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex items-center justify-between",
+                isVisible ? "bottom-6 w-[92%] max-w-[400px] scale-100 opacity-100" : "bottom-4 w-[75%] max-w-[300px] scale-95 opacity-70"
             )}
             onPointerDown={revealNav}
         >
-            <div className="grid grid-cols-5 h-16">
-                {navItems.map((item) => {
-                    const active = isActive(item.path);
-                    return (
-                        <Link
-                            key={item.name}
-                            to={item.path}
-                            className={cn(
-                                "flex flex-col items-center justify-center gap-1 transition-all duration-300",
-                                active ? "text-primary" : "text-muted-foreground/70 hover:text-muted-foreground"
+            {navItems.map((item) => {
+                const active = isActive(item.path);
+                const hasNotification = item.name === "Activity";
+                
+                return (
+                    <Link
+                        key={item.name}
+                        to={item.path}
+                        className={cn(
+                            "relative flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                            active 
+                                ? "w-16 h-12 bg-white/60 dark:bg-white/15 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.2)]"
+                                : "w-12 h-12 bg-transparent rounded-full hover:bg-black/5 dark:hover:bg-white/5 active:scale-90"
+                        )}
+                    >
+                        <div className="relative flex items-center justify-center w-full h-full">
+                            <item.icon 
+                                className={cn(
+                                    "transition-all duration-500",
+                                    active 
+                                        ? "text-slate-900 dark:text-white h-[26px] w-[26px]" 
+                                        : "text-slate-500 dark:text-[#a0a0a0] h-[24px] w-[24px]"
+                                )} 
+                                strokeWidth={active ? 2.5 : 2}
+                            />
+                            {hasNotification && (
+                                <div className={cn(
+                                    "absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 transition-all duration-300",
+                                    active ? "opacity-0 scale-0" : "opacity-100 scale-100"
+                                )} />
                             )}
-                        >
-                            <div
-                                className={cn(
-                                    "p-1.5 rounded-full transition-all",
-                                    active ? "bg-primary/10 translate-y-[-2px]" : ""
-                                )}
-                            >
-                                <item.icon className={cn("h-5 w-5", active && "fill-current")} />
-                            </div>
-                            <span
-                                className={cn(
-                                    "text-[10px] font-medium leading-none",
-                                    active ? "font-bold" : ""
-                                )}
-                            >
-                                {item.name}
-                            </span>
-                        </Link>
-                    );
-                })}
-            </div>
+                        </div>
+                    </Link>
+                );
+            })}
         </div>
     );
 };

@@ -9,16 +9,16 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SERVICE_CATALOG } from "@/config/serviceCatalog";
 
-const serviceStyles: Record<string, { icon: any; color: string }> = {
-  "towing": { icon: TowTruck, color: "bg-gradient-to-br from-red-500 to-red-600" },
-  "flat-tire": { icon: Gauge, color: "bg-gradient-to-br from-red-500 to-red-600" },
-  "battery": { icon: BatteryCharging, color: "bg-gradient-to-br from-purple-500 to-purple-600" },
-  "mechanical": { icon: Settings, color: "bg-gradient-to-br from-orange-500 to-orange-600" },
-  "fuel": { icon: Droplets, color: "bg-gradient-to-br from-green-500 to-green-600" },
-  "lockout": { icon: Unlock, color: "bg-gradient-to-br from-yellow-500 to-yellow-600" },
-  "winching": { icon: ShieldCheck, color: "bg-gradient-to-br from-indigo-500 to-indigo-600" },
-  "ev-charging": { icon: Zap, color: "bg-gradient-to-br from-emerald-500 to-emerald-600" },
-  "other": { icon: Wrench, color: "bg-gradient-to-br from-gray-500 to-gray-600" }
+const serviceStyles: Record<string, { icon: any; color: string; image?: string }> = {
+  "towing": { icon: TowTruck, color: "bg-gradient-to-br from-red-500 to-red-600", image: "/images/services/towing.png" },
+  "flat-tire": { icon: Gauge, color: "bg-gradient-to-br from-red-500 to-red-600", image: "/images/services/flat-tire.png" },
+  "battery": { icon: BatteryCharging, color: "bg-gradient-to-br from-purple-500 to-purple-600", image: "/images/services/battery.png" },
+  "mechanical": { icon: Settings, color: "bg-gradient-to-br from-orange-500 to-orange-600", image: "/images/services/mechanical.png" },
+  "fuel": { icon: Droplets, color: "bg-gradient-to-br from-green-500 to-green-600", image: "/images/services/fuel.png" },
+  "lockout": { icon: Unlock, color: "bg-gradient-to-br from-yellow-500 to-yellow-600", image: "/images/services/lockout.png" },
+  "winching": { icon: ShieldCheck, color: "bg-gradient-to-br from-indigo-500 to-indigo-600", image: "/images/services/winching.png" },
+  "ev-charging": { icon: Zap, color: "bg-gradient-to-br from-emerald-500 to-emerald-600", image: "/images/services/ev-charging.png" },
+  "other": { icon: Wrench, color: "bg-gradient-to-br from-gray-500 to-gray-600", image: "/images/services/mechanical.png" }
 };
 
 const services = SERVICE_CATALOG
@@ -26,7 +26,8 @@ const services = SERVICE_CATALOG
   .map((s) => ({
     ...s,
     icon: serviceStyles[s.id]?.icon || Wrench,
-    color: serviceStyles[s.id]?.color || "bg-gradient-to-br from-gray-500 to-gray-600"
+    color: serviceStyles[s.id]?.color || "bg-gradient-to-br from-gray-500 to-gray-600",
+    image: serviceStyles[s.id]?.image
   }));
 
 const Services = ({ compact = false }: { compact?: boolean }) => {
@@ -94,10 +95,14 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
                   {/* Icon Container with Glassmorphism highlights */}
                   <div className={cn(
                     "w-[3.5rem] h-[3.5rem] rounded-[1.1rem] flex items-center justify-center shadow-md border border-white/20 relative overflow-hidden isolate",
-                    service.color
+                    !service.image && service.color
                   )}>
-                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent"></div>
-                    <service.icon className="h-6 w-6 text-white drop-shadow-sm relative z-10" />
+                    {!service.image && <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent"></div>}
+                    {service.image ? (
+                      <img src={service.image} alt={service.name} className="w-full h-full object-cover relative z-10" />
+                    ) : (
+                      <service.icon className="h-6 w-6 text-white drop-shadow-sm relative z-10" />
+                    )}
                   </div>
 
                   {/* Title */}
@@ -125,8 +130,15 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
 
                   <div className="text-left relative z-10 flex flex-col h-full">
                     {/* Ultra-Modern Solid Color Circle Icon */}
-                    <div className={`w-14 h-14 rounded-[1.25rem] bg-gradient-to-br ${service.color} flex items-center justify-center mb-8 shadow-md group-hover/card:scale-110 group-hover/card:rotate-[-5deg] transition-all duration-500 group-hover/card:shadow-[0_8px_20px_rgba(0,0,0,0.15)]`}>
-                      <service.icon className="h-6 w-6 text-white drop-shadow-sm" />
+                    <div className={cn(
+                      "w-16 h-16 rounded-[1.25rem] flex items-center justify-center mb-6 shadow-sm overflow-hidden group-hover/card:scale-110 group-hover/card:rotate-[-5deg] transition-all duration-500 group-hover/card:shadow-[0_8px_20px_rgba(0,0,0,0.15)]",
+                      !service.image && `bg-gradient-to-br ${service.color}`
+                    )}>
+                      {service.image ? (
+                        <img src={service.image} alt={service.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <service.icon className="h-6 w-6 text-white drop-shadow-sm" />
+                      )}
                     </div>
 
                     <div>

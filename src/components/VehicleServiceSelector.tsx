@@ -53,13 +53,7 @@ const VehicleServiceSelector = () => {
 
   const handleVehicleSelect = (vehicleId: string) => {
     setSelectedVehicle(vehicleId);
-
-    // Auto-advance on mobile for better UX
-    if (isMobile) {
-      setTimeout(() => {
-        handleContinue(vehicleId);
-      }, 300);
-    }
+    // Removed auto-advance to allow users to see the premium selection state and explicitly confirm, matching global app UX.
   };
 
   const handleContinue = (overrideId?: string) => {
@@ -72,10 +66,8 @@ const VehicleServiceSelector = () => {
 
       const targetUrl = `/request-service/${serviceId}/${idToUse}${techParam}`;
 
-      // Prefer token check over a simple localStorage flag for robustness
       const token = getUserToken();
       if (!token) {
-        // Store the intended destination
         sessionStorage.setItem('returnUrl', targetUrl);
         navigate('/login');
       } else {
@@ -86,75 +78,100 @@ const VehicleServiceSelector = () => {
 
   if (isMobile) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-slate-100 relative overflow-hidden">
-        {/* Map Header Area */}
-        <div className="flex-1 relative bg-[#f8f9fa] overflow-hidden min-h-[40dvh]">
-          {/* Subtle grid to simulate a map surface */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#cbd5e130_1px,transparent_1px),linear-gradient(to_bottom,#cbd5e130_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+      <div className="min-h-[100dvh] flex flex-col bg-[#F3F4F6] relative overflow-hidden font-sans">
+        {/* Premium Top Area - Minimalist Radar Concept */}
+        <div className="flex-1 relative bg-[#F3F4F6] overflow-hidden min-h-[45dvh]">
+          {/* Subtle Dot Pattern */}
+          <div className="absolute inset-0 bg-[radial-gradient(#d1d5db_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-60"></div>
           
-          {/* Decorative radar/map circles */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[24rem] h-[24rem] border border-slate-200/60 rounded-full"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[14rem] h-[14rem] border border-slate-200/80 rounded-full bg-white/30 backdrop-blur-[2px]"></div>
-          
-          {/* Mock Location Pin */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 mt-[-10px]">
-            <div className="w-16 h-16 bg-primary/20 rounded-full animate-ping absolute -inset-4"></div>
-            <div className="w-8 h-8 bg-primary rounded-full border-[3px] border-white shadow-lg flex items-center justify-center relative">
-              <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#F3F4F6]"></div>
+
+          {/* High-end Radar/Pin */}
+          <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-[280px] h-[280px] bg-blue-500/5 rounded-full animate-ping [animation-duration:4s]"></div>
+              <div className="absolute w-[200px] h-[200px] border border-blue-500/15 rounded-full"></div>
+              <div className="absolute w-[120px] h-[120px] border border-blue-500/20 rounded-full"></div>
+              {/* Premium Pin */}
+              <div className="relative z-10 w-12 h-12 bg-slate-900 rounded-full shadow-2xl flex items-center justify-center">
+                 <div className="w-3.5 h-3.5 bg-white rounded-full"></div>
+              </div>
             </div>
-            <div className="w-0.5 h-6 bg-gradient-to-b from-primary/80 to-transparent mx-auto"></div>
+            <div className="mt-8 bg-white/90 backdrop-blur-xl px-5 py-2.5 rounded-full shadow-sm border border-white">
+              <span className="text-[11px] font-bold text-slate-800 tracking-[0.15em] flex items-center gap-2.5">
+                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                 FINDING TECHNICIANS
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Sheet selection UI */}
-        <div className="bg-white rounded-t-[1.75rem] shadow-[0_-12px_40px_rgba(0,0,0,0.06)] px-6 pt-4 pb-safe relative z-20 -mt-8">
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+        {/* Ultra-Premium Bottom Sheet */}
+        <div className="bg-white rounded-t-[2rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.08)] px-5 pt-3 pb-8 relative z-20 -mt-12 flex flex-col">
+          {/* Minimal Drag Handle */}
+          <div className="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
           
-          <div className="mb-6">
-            <h1 className="font-extrabold text-[1.65rem] text-slate-900 tracking-[-0.03em] leading-tight mb-1">Choose Vehicle</h1>
-            <p className="text-[13px] text-slate-500 font-medium">For <span className="font-bold text-slate-700">{service.name}</span> assistance.</p>
+          <div className="mb-5 px-1">
+            <h1 className="font-bold text-[1.65rem] text-slate-900 tracking-tight mb-1">Choose a vehicle</h1>
+            <p className="text-[14px] text-slate-500 font-medium">For {service.name.toLowerCase()} assistance</p>
           </div>
 
-          <div className="flex flex-col pb-4">
-            {vehicleCategories.map((category) => (
-              <div
-                key={category.id}
-                className={cn(
-                  "relative flex items-center py-4 border-b border-slate-100 last:border-0 cursor-pointer transition-all duration-300",
-                  selectedVehicle === category.id ? "opacity-100" : "opacity-50 hover:opacity-100"
-                )}
-                onClick={() => handleVehicleSelect(category.id)}
-              >
-                {/* Ultra minimal icon without generic background boxes */}
-                <div className="flex-shrink-0 w-12 flex justify-start mr-2">
-                  <category.icon 
-                    className={cn(
-                      "w-8 h-8 transition-transform duration-300", 
-                      selectedVehicle === category.id ? "text-primary scale-110" : "text-slate-800"
-                    )} 
-                    strokeWidth={1.5} 
-                  />
-                </div>
+          <div className="flex flex-col gap-1.5 pb-6">
+            {vehicleCategories.map((category) => {
+              const isSelected = selectedVehicle === category.id;
+              
+              // Mock ETA for premium feel
+              const eta = category.id === 'car' ? '12 min' : category.id === 'bike' ? '8 min' : category.id === 'commercial' ? '20 min' : '15 min';
 
-                <div className="flex-1 pr-6">
-                  <h3 className={cn(
-                    "font-bold text-[16px] leading-tight mb-0.5 tracking-tight transition-colors duration-300",
-                    selectedVehicle === category.id ? "text-primary" : "text-slate-900"
-                  )}>
-                    {category.name}
-                  </h3>
-                  <p className="text-[13px] text-slate-500 font-medium line-clamp-1">
-                    {category.description}
-                  </p>
-                </div>
-
-                <div className="absolute right-0">
-                  {selectedVehicle === category.id && (
-                    <Check className="w-5 h-5 text-primary animate-in zoom-in spin-in-12 duration-300" strokeWidth={3} />
+              return (
+                <div
+                  key={category.id}
+                  className={cn(
+                    "group relative flex items-center p-3.5 rounded-[1.25rem] cursor-pointer transition-all duration-200",
+                    isSelected ? "bg-slate-50 border-[1.5px] border-slate-900 shadow-[0_2px_12px_rgba(0,0,0,0.03)]" : "border-[1.5px] border-transparent hover:bg-slate-50/50"
                   )}
+                  onClick={() => handleVehicleSelect(category.id)}
+                >
+                  {/* Icon Container */}
+                  <div className={cn(
+                    "flex-shrink-0 w-14 h-14 flex items-center justify-center rounded-2xl mr-4 transition-colors",
+                    isSelected ? "bg-slate-900 text-white" : "bg-[#F3F4F6] text-slate-600 group-hover:bg-slate-200"
+                  )}>
+                    <category.icon 
+                      className="w-7 h-7" 
+                      strokeWidth={1.5} 
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <h3 className={cn(
+                        "font-bold text-[16px] truncate tracking-tight",
+                        isSelected ? "text-slate-900" : "text-slate-800"
+                      )}>
+                        {category.name}
+                      </h3>
+                      {/* Premium ETA Badge */}
+                      <span className="text-[13px] font-semibold text-slate-600">{eta}</span>
+                    </div>
+                    <p className="text-[13px] text-slate-500 truncate leading-relaxed">
+                      {category.description}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+          
+          {/* Floating Action Button for selection */}
+          <div className="mt-1 px-1">
+             <Button
+                onClick={() => handleContinue()}
+                disabled={!selectedVehicle}
+                className="w-full h-14 rounded-[1.25rem] bg-slate-900 text-white font-bold text-[16px] hover:bg-slate-800 transition-all disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 shadow-md"
+             >
+                Confirm {selectedVehicle ? vehicleCategories.find(v => v.id === selectedVehicle)?.name : ''}
+             </Button>
           </div>
         </div>
       </div>

@@ -86,65 +86,76 @@ const VehicleServiceSelector = () => {
 
   return (
     <div className={cn(
-      "min-h-screen bg-muted",
-      isMobile ? "pt-6 pb-safe" : "bg-gradient-to-b from-background to-accent/10 py-4 md:py-8 pb-20 md:pb-8"
+      "min-h-[100dvh] relative overflow-hidden",
+      isMobile ? "pt-8 pb-safe bg-slate-50 dark:bg-slate-950" : "bg-gradient-to-b from-background to-accent/10 py-4 md:py-8 pb-20 md:pb-8"
     )}>
-      <div className={cn("container max-w-4xl", isMobile ? "px-0" : "px-3 md:px-4")}>
+      {/* Premium Decorative Background for Mobile */}
+      {isMobile && (
+        <div className="absolute top-0 inset-x-0 h-64 overflow-hidden pointer-events-none">
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-[60px]"></div>
+          <div className="absolute top-10 -left-24 w-64 h-64 bg-orange-500/10 rounded-full blur-[60px]"></div>
+        </div>
+      )}
+      
+      <div className={cn("container relative z-10 max-w-4xl", isMobile ? "px-4" : "px-3 md:px-4")}>
         <div className={cn(
-          isMobile ? "text-left mb-6 px-5" : "text-center mb-6 md:mb-8"
+          isMobile ? "text-left mb-8" : "text-center mb-6 md:mb-8"
         )}>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 rounded-full mb-4 shadow-sm border border-slate-100 dark:border-slate-800">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{service.name}</span>
+          </div>
           <h1 className={cn(
-            "font-black tracking-tight text-foreground mb-1",
-            isMobile ? "text-2xl" : "text-2xl md:text-4xl mb-3 md:mb-4"
+            "font-extrabold tracking-[-0.02em] text-slate-900 dark:text-white leading-tight",
+            isMobile ? "text-[2rem]" : "text-2xl md:text-4xl mb-3 md:mb-4"
           )}>
-            {isMobile ? "Choose Vehicle" : "Select Your Vehicle Type"}
+            {isMobile ? "Choose Vehicle." : "Select Your Vehicle Type"}
           </h1>
           <p className={cn(
-            "text-muted-foreground/80 font-medium",
-            isMobile ? "text-sm" : "text-lg md:text-xl md:mb-2"
+            "text-slate-500 dark:text-slate-400 mt-2 font-medium leading-relaxed max-w-[280px]",
+            isMobile ? "text-[13px]" : "text-lg md:text-xl md:mb-2"
           )}>
-            For <span className="text-primary font-bold">{service.name}</span>
+            Select the type of vehicle that needs {service.name.toLowerCase()} assistance.
           </p>
-          {!isMobile && (
-            <p className="text-muted-foreground text-sm md:text-base mt-2">
-              {service.description}
-            </p>
-          )}
         </div>
 
         <div className={cn(
           isMobile
-            ? "flex flex-col bg-card dark:bg-slate-900 border-y border-border/60 shadow-sm"
+            ? "flex flex-col gap-3"
             : "grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8"
         )}>
           {vehicleCategories.map((category, idx) => (
             isMobile ? (
-              // Premium MNC List Row for Mobile
+              // Premium Gold Standard Detached Card for Mobile
               <div
                 key={category.id}
                 className={cn(
-                  "relative flex items-center p-5 cursor-pointer active:bg-muted transition-colors duration-200",
-                  idx !== vehicleCategories.length - 1 && "border-b border-border/60"
+                  "relative flex items-center p-5 cursor-pointer transition-all duration-300 rounded-[1.25rem] bg-white dark:bg-slate-900 border",
+                  selectedVehicle === category.id 
+                    ? "border-primary shadow-[0_8px_24px_rgba(242,66,66,0.12)] ring-1 ring-primary scale-[1.02]"
+                    : "border-slate-100 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:scale-[1.01] active:scale-[0.98]"
                 )}
                 onClick={() => handleVehicleSelect(category.id)}
               >
                 <div className="flex items-center gap-4 flex-1">
-                  {/* Icon with soft tinted background */}
+                  {/* Modern App Icon with vibrant gradient */}
                   <div className={cn(
-                    "flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-transform",
-                    selectedVehicle === category.id ? category.color : "bg-muted/50 text-muted-foreground/80"
+                    "flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-sm",
+                    selectedVehicle === category.id 
+                      ? "bg-primary shadow-[0_4px_12px_rgba(242,66,66,0.3)] scale-110" 
+                      : `bg-gradient-to-br ${category.color}`
                   )}>
-                    <category.icon className={cn("h-6 w-6", selectedVehicle === category.id ? "text-white" : "text-muted-foreground")} />
+                    <category.icon className="h-6 w-6 text-white drop-shadow-sm" />
                   </div>
 
                   <div className="flex-1 pr-6">
                     <h3 className={cn(
-                      "font-bold text-[15px] leading-tight mb-1 transition-colors",
-                      selectedVehicle === category.id ? "text-foreground" : "text-muted-foreground"
+                      "font-extrabold text-[15px] leading-tight mb-1 transition-colors tracking-tight",
+                      selectedVehicle === category.id ? "text-primary" : "text-slate-800 dark:text-slate-100"
                     )}>
                       {category.name}
                     </h3>
-                    <p className="text-[12px] text-muted-foreground/80 font-medium leading-snug line-clamp-1">
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 font-medium leading-snug line-clamp-2 pr-2">
                       {category.description}
                     </p>
                   </div>
@@ -153,11 +164,13 @@ const VehicleServiceSelector = () => {
                 {/* Selection indicator / Chevron */}
                 <div className="absolute right-5">
                   {selectedVehicle === category.id ? (
-                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center animate-in zoom-in spin-in-12 duration-300">
-                      <Check className="h-4 w-4 text-white" />
+                    <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center shadow-md animate-in zoom-in spin-in-12 duration-300">
+                      <Check className="h-4 w-4 text-white" strokeWidth={3} />
                     </div>
                   ) : (
-                    <ArrowRight className="h-5 w-5 text-slate-300" />
+                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border border-slate-100 dark:border-slate-700">
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </div>
                   )}
                 </div>
               </div>

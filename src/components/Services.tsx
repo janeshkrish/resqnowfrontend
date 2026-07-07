@@ -76,7 +76,7 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
         {/* App-Style Services Grid for Mobile, Modern Grid for Desktop */}
         <div className={cn(
           isMobile
-            ? "grid grid-cols-4 gap-2" // Mobile: 4 columns
+            ? "grid grid-cols-4 gap-y-6 gap-x-2" // Mobile: 4 columns, elegant spacing
             : "grid grid-cols-2 md:grid-cols-4 gap-4 mb-12"
         )}>
           {services.slice(0, 8).map((service, index) => (
@@ -90,23 +90,22 @@ const Services = ({ compact = false }: { compact?: boolean }) => {
               style={{ animationDelay: `${index * 0.05}s` }}
             >
               {isMobile ? (
-                // Compact Mobile Item (Icon + Text)
-                <div className="flex flex-col items-center text-center gap-2 p-1 relative z-10">
-                  {/* Icon Container with Glassmorphism highlights */}
+                // Modern App Icon Style Item
+                <div className="flex flex-col items-center text-center gap-2 p-0 relative z-10">
+                  {/* Premium Icon Container */}
                   <div className={cn(
-                    "w-[3.5rem] h-[3.5rem] rounded-[1.1rem] flex items-center justify-center shadow-md border border-white/20 relative overflow-hidden isolate",
-                    !service.image && service.color
+                    "w-[4.2rem] h-[4.2rem] rounded-[1.15rem] flex items-center justify-center relative shadow-[0_8px_16px_rgba(0,0,0,0.05)] border border-slate-100/50 dark:border-slate-800 overflow-hidden bg-white",
+                    !service.image && `bg-gradient-to-br ${service.color}`
                   )}>
-                    {!service.image && <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent"></div>}
                     {service.image ? (
-                      <img src={service.image} alt={service.name} className="w-full h-full object-cover relative z-10" />
+                      <img src={service.image} alt={service.name} className="w-full h-full object-cover scale-[1.15] hover:scale-[1.2] transition-transform duration-500" />
                     ) : (
-                      <service.icon className="h-6 w-6 text-white drop-shadow-sm relative z-10" />
+                      <service.icon className="h-7 w-7 text-white drop-shadow-sm relative z-10" />
                     )}
                   </div>
 
                   {/* Title */}
-                  <span className="text-[11px] font-bold text-foreground leading-tight tracking-tight">
+                  <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 leading-[1.1] tracking-[-0.01em] px-1 h-8 flex items-start justify-center">
                     {service.name}
                   </span>
                 </div>

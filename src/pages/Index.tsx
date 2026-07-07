@@ -373,11 +373,18 @@ const MobileDashboard = () => {
 
         {/* Quick Services Grid Container */}
         <div className="bg-card dark:bg-slate-900 rounded-[2rem] p-5 shadow-sm border border-border/60">
-          <div className="flex justify-between items-center mb-0">
-            <h3 className="font-black text-[1.35rem] text-foreground tracking-tight">Top Services</h3>
-            <Link to="/services" className="text-[11px] font-bold text-primary flex items-center bg-rose-50 px-3 py-1.5 rounded-full hover:bg-rose-100 transition-colors">See all</Link>
+          <div className="flex justify-between items-end mb-4">
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">Available 24/7</span>
+              </div>
+              <h3 className="font-black text-[1.35rem] tracking-tight bg-gradient-to-r from-primary to-orange-500 bg-clip-text text-transparent">Request Service</h3>
+            </div>
+            <Link to="/services" className="text-[11px] font-bold text-primary flex items-center bg-rose-50 dark:bg-rose-500/10 px-3 py-1.5 rounded-full hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors active:scale-95 mb-0.5">
+              See all
+            </Link>
           </div>
-          {/* We will update Services.tsx to render a tighter 2x4 grid inside this container */}
           <div className="-mx-5">
             <Services compact={true} />
           </div>

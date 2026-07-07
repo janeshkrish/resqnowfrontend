@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Car, Bike, Truck, Zap, ArrowRight, Check } from "lucide-react";
+import { Car, Bike, Truck, Zap, ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -53,7 +53,13 @@ const VehicleServiceSelector = () => {
 
   const handleVehicleSelect = (vehicleId: string) => {
     setSelectedVehicle(vehicleId);
-    // Removed auto-advance to allow users to see the premium selection state and explicitly confirm, matching global app UX.
+
+    // Auto-advance on mobile for better UX
+    if (isMobile) {
+      setTimeout(() => {
+        handleContinue(vehicleId);
+      }, 300);
+    }
   };
 
   const handleContinue = (overrideId?: string) => {
@@ -66,8 +72,10 @@ const VehicleServiceSelector = () => {
 
       const targetUrl = `/request-service/${serviceId}/${idToUse}${techParam}`;
 
+      // Prefer token check over a simple localStorage flag for robustness
       const token = getUserToken();
       if (!token) {
+        // Store the intended destination
         sessionStorage.setItem('returnUrl', targetUrl);
         navigate('/login');
       } else {
@@ -76,175 +84,184 @@ const VehicleServiceSelector = () => {
     }
   };
 
-  if (isMobile) {
-    return (
-      <div className="min-h-[100dvh] flex flex-col bg-[#F3F4F6] relative overflow-hidden font-sans">
-        {/* Premium Top Area - Minimalist Radar Concept */}
-        <div className="flex-1 relative bg-[#F3F4F6] overflow-hidden min-h-[45dvh]">
-          {/* Subtle Dot Pattern */}
-          <div className="absolute inset-0 bg-[radial-gradient(#d1d5db_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-60"></div>
-          
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#F3F4F6]"></div>
-
-          {/* High-end Radar/Pin */}
-          <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <div className="relative flex items-center justify-center">
-              <div className="absolute w-[280px] h-[280px] bg-blue-500/5 rounded-full animate-ping [animation-duration:4s]"></div>
-              <div className="absolute w-[200px] h-[200px] border border-blue-500/15 rounded-full"></div>
-              <div className="absolute w-[120px] h-[120px] border border-blue-500/20 rounded-full"></div>
-              {/* Premium Pin */}
-              <div className="relative z-10 w-12 h-12 bg-slate-900 rounded-full shadow-2xl flex items-center justify-center">
-                 <div className="w-3.5 h-3.5 bg-white rounded-full"></div>
-              </div>
-            </div>
-            <div className="mt-8 bg-white/90 backdrop-blur-xl px-5 py-2.5 rounded-full shadow-sm border border-white">
-              <span className="text-[11px] font-bold text-slate-800 tracking-[0.15em] flex items-center gap-2.5">
-                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                 FINDING TECHNICIANS
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Ultra-Premium Bottom Sheet */}
-        <div className="bg-white rounded-t-[2rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.08)] px-5 pt-3 pb-8 relative z-20 -mt-12 flex flex-col">
-          {/* Minimal Drag Handle */}
-          <div className="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
-          
-          <div className="mb-5 px-1">
-            <h1 className="font-bold text-[1.65rem] text-slate-900 tracking-tight mb-1">Choose a vehicle</h1>
-            <p className="text-[14px] text-slate-500 font-medium">For {service.name.toLowerCase()} assistance</p>
-          </div>
-
-          <div className="flex flex-col gap-1.5 pb-6">
-            {vehicleCategories.map((category) => {
-              const isSelected = selectedVehicle === category.id;
-              
-              // Mock ETA for premium feel
-              const eta = category.id === 'car' ? '12 min' : category.id === 'bike' ? '8 min' : category.id === 'commercial' ? '20 min' : '15 min';
-
-              return (
-                <div
-                  key={category.id}
-                  className={cn(
-                    "group relative flex items-center p-3.5 rounded-[1.25rem] cursor-pointer transition-all duration-200",
-                    isSelected ? "bg-slate-50 border-[1.5px] border-slate-900 shadow-[0_2px_12px_rgba(0,0,0,0.03)]" : "border-[1.5px] border-transparent hover:bg-slate-50/50"
-                  )}
-                  onClick={() => handleVehicleSelect(category.id)}
-                >
-                  {/* Icon Container */}
-                  <div className={cn(
-                    "flex-shrink-0 w-14 h-14 flex items-center justify-center rounded-2xl mr-4 transition-colors",
-                    isSelected ? "bg-slate-900 text-white" : "bg-[#F3F4F6] text-slate-600 group-hover:bg-slate-200"
-                  )}>
-                    <category.icon 
-                      className="w-7 h-7" 
-                      strokeWidth={1.5} 
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0 pr-2">
-                    <div className="flex justify-between items-center mb-0.5">
-                      <h3 className={cn(
-                        "font-bold text-[16px] truncate tracking-tight",
-                        isSelected ? "text-slate-900" : "text-slate-800"
-                      )}>
-                        {category.name}
-                      </h3>
-                      {/* Premium ETA Badge */}
-                      <span className="text-[13px] font-semibold text-slate-600">{eta}</span>
-                    </div>
-                    <p className="text-[13px] text-slate-500 truncate leading-relaxed">
-                      {category.description}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* Floating Action Button for selection */}
-          <div className="mt-1 px-1">
-             <Button
-                onClick={() => handleContinue()}
-                disabled={!selectedVehicle}
-                className="w-full h-14 rounded-[1.25rem] bg-slate-900 text-white font-bold text-[16px] hover:bg-slate-800 transition-all disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 shadow-md"
-             >
-                Confirm {selectedVehicle ? vehicleCategories.find(v => v.id === selectedVehicle)?.name : ''}
-             </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-accent/10 py-4 md:py-8 pb-20 md:pb-8">
-      <div className="container max-w-4xl px-3 md:px-4">
-        <div className="text-center mb-6 md:mb-8">
-          <h1 className="font-extrabold tracking-[-0.02em] text-slate-900 dark:text-white leading-tight text-2xl md:text-4xl mb-3 md:mb-4">
-            Select Your Vehicle Type
+    <div className={cn(
+      "min-h-[100dvh] relative overflow-hidden",
+      isMobile ? "pt-8 pb-safe bg-slate-50 dark:bg-slate-950" : "bg-gradient-to-b from-background to-accent/10 py-4 md:py-8 pb-20 md:pb-8"
+    )}>
+      {/* Premium Decorative Background for Mobile */}
+      {isMobile && (
+        <div className="absolute top-0 inset-x-0 h-64 overflow-hidden pointer-events-none">
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-[60px]"></div>
+          <div className="absolute top-10 -left-24 w-64 h-64 bg-orange-500/10 rounded-full blur-[60px]"></div>
+        </div>
+      )}
+      
+      <div className={cn("container relative z-10 max-w-4xl", isMobile ? "px-4" : "px-3 md:px-4")}>
+        <div className={cn(
+          isMobile ? "text-left mb-8" : "text-center mb-6 md:mb-8"
+        )}>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 rounded-full mb-4 shadow-sm border border-slate-100 dark:border-slate-800">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{service.name}</span>
+          </div>
+          <h1 className={cn(
+            "font-extrabold tracking-[-0.02em] text-slate-900 dark:text-white leading-tight",
+            isMobile ? "text-[2rem]" : "text-2xl md:text-4xl mb-3 md:mb-4"
+          )}>
+            {isMobile ? "Choose Vehicle." : "Select Your Vehicle Type"}
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium leading-relaxed text-lg md:text-xl md:mb-2">
+          <p className={cn(
+            "text-slate-500 dark:text-slate-400 mt-2 font-medium leading-relaxed max-w-[280px]",
+            isMobile ? "text-[13px]" : "text-lg md:text-xl md:mb-2"
+          )}>
             Select the type of vehicle that needs {service.name.toLowerCase()} assistance.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
-          {vehicleCategories.map((category) => (
-            <Card
-              key={category.id}
-              className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${selectedVehicle === category.id
-                ? 'ring-2 ring-primary bg-primary/5 scale-105'
-                : 'hover:bg-accent/50'
-                }`}
-              onClick={() => handleVehicleSelect(category.id)}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl ${category.color}`}>
-                    <category.icon className="h-8 w-8 text-white" />
+        <div className={cn(
+          isMobile
+            ? "flex flex-col gap-3"
+            : "grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8"
+        )}>
+          {vehicleCategories.map((category, idx) => (
+            isMobile ? (
+              // Premium Gold Standard Detached Card for Mobile
+              <div
+                key={category.id}
+                className={cn(
+                  "relative flex items-center p-5 cursor-pointer transition-all duration-300 rounded-[1.25rem] bg-white dark:bg-slate-900 border",
+                  selectedVehicle === category.id 
+                    ? "border-primary shadow-[0_8px_24px_rgba(242,66,66,0.12)] ring-1 ring-primary scale-[1.02]"
+                    : "border-slate-100 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:scale-[1.01] active:scale-[0.98]"
+                )}
+                onClick={() => handleVehicleSelect(category.id)}
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  {/* Ultra-Premium Glassmorphic Icon Container */}
+                  <div className={cn(
+                    "relative flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_10px_rgba(0,0,0,0.08)] border border-white/60 dark:border-slate-700/50 overflow-hidden isolate",
+                    selectedVehicle === category.id ? "scale-110" : ""
+                  )}>
+                    {/* Background Gradient */}
+                    <div className={cn(
+                      "absolute inset-0 bg-gradient-to-br opacity-90",
+                      selectedVehicle === category.id ? "from-primary to-orange-500" : category.color
+                    )}></div>
+                    {/* Glass Highlight */}
+                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/40 to-transparent"></div>
+                    <category.icon className="h-[1.6rem] w-[1.6rem] relative z-10 text-white drop-shadow-md" strokeWidth={2.5} />
                   </div>
-                  <div>
-                    <CardTitle className="text-xl">{category.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
+
+                  <div className="flex-1 pr-6">
+                    <h3 className={cn(
+                      "font-extrabold text-[15px] leading-tight mb-1 transition-colors tracking-tight",
+                      selectedVehicle === category.id ? "text-primary" : "text-slate-800 dark:text-slate-100"
+                    )}>
+                      {category.name}
+                    </h3>
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 font-medium leading-snug line-clamp-2 pr-2">
                       {category.description}
                     </p>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {category.subtypes.slice(0, 4).map((subtype) => (
-                    <span
-                      key={subtype}
-                      className="text-xs bg-accent/50 px-2 py-1 rounded-full"
-                    >
-                      {subtype}
-                    </span>
-                  ))}
-                  {category.subtypes.length > 4 && (
-                    <span className="text-xs bg-accent/50 px-2 py-1 rounded-full">
-                      +{category.subtypes.length - 4} more
-                    </span>
+
+                {/* Selection indicator / Chevron */}
+                <div className="absolute right-5">
+                  {selectedVehicle === category.id ? (
+                    <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center shadow-md animate-in zoom-in spin-in-12 duration-300">
+                      <Check className="h-4 w-4 text-white" strokeWidth={3} />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border border-slate-100 dark:border-slate-700">
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            ) : (
+              // Original desktop card
+              <Card
+                key={category.id}
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${selectedVehicle === category.id
+                  ? 'ring-2 ring-primary bg-primary/5 scale-105'
+                  : 'hover:bg-accent/50'
+                  }`}
+                onClick={() => handleVehicleSelect(category.id)}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${category.color}`}>
+                      <category.icon className="h-8 w-8 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">{category.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {category.description}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {category.subtypes.slice(0, 4).map((subtype) => (
+                      <span
+                        key={subtype}
+                        className="text-xs bg-accent/50 px-2 py-1 rounded-full"
+                      >
+                        {subtype}
+                      </span>
+                    ))}
+                    {category.subtypes.length > 4 && (
+                      <span className="text-xs bg-accent/50 px-2 py-1 rounded-full">
+                        +{category.subtypes.length - 4} more
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
           ))}
         </div>
 
-        <div className="flex justify-center mt-8">
-          <Button
-            onClick={() => handleContinue()}
-            disabled={!selectedVehicle}
-            size="lg"
-            className="px-8 py-6 text-lg"
-          >
-            Continue with {selectedVehicle ? vehicleCategories.find(v => v.id === selectedVehicle)?.name : 'Vehicle'}
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-        </div>
+        {/* Premium Rapido-style Safety/Trust Banner for Mobile */}
+        {isMobile && (
+          <div className="mt-2 px-1">
+            <div className="bg-white dark:bg-slate-900 rounded-[1.25rem] p-4 flex items-center gap-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-800 relative overflow-hidden isolate">
+              {/* Subtle background glow */}
+              <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-emerald-500/10 blur-[30px] rounded-full"></div>
+              
+              <div className="w-[3.25rem] h-[3.25rem] rounded-[1rem] bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center flex-shrink-0 shadow-[0_4px_12px_rgba(16,185,129,0.25)] relative isolate overflow-hidden">
+                <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent"></div>
+                <ShieldCheck className="h-6 w-6 text-white drop-shadow-sm relative z-10" strokeWidth={2.5} />
+              </div>
+              <div className="flex-1 relative z-10">
+                <h4 className="font-extrabold text-[14px] text-slate-900 dark:text-white tracking-tight leading-tight mb-0.5">
+                  ResQNow Promise
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-[1.3] font-medium pr-2">
+                  Verified experts, highly secure payments, and 24/7 dedicated support.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Desktop Continue Button (Hidden on Mobile) */}
+        {!isMobile && (
+          <div className="flex justify-center mt-8">
+            <Button
+              onClick={() => handleContinue()}
+              disabled={!selectedVehicle}
+              size="lg"
+              className="px-8 py-6 text-lg"
+            >
+              Continue with {selectedVehicle ? vehicleCategories.find(v => v.id === selectedVehicle)?.name : 'Vehicle'}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

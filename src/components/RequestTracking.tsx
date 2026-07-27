@@ -28,6 +28,9 @@ import {
   ReceiptText,
   AlertCircle,
   Wrench,
+  FileText,
+  UserCheck,
+  Truck,
 } from "lucide-react";
 
 import ClientJobCompletion from "./ClientJobCompletion";
@@ -1103,35 +1106,35 @@ const RequestTracking = () => {
       caption: formatCompactTime(request?.created_at) || "Created",
       complete: stageIndex >= 0,
       active: stageIndex === 0,
-      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+      icon: <FileText className="h-4 w-4" />,
     },
     {
       label: "Assigned",
       caption: technician ? "Matched" : "Pending",
       complete: stageIndex >= 1,
       active: stageIndex === 1,
-      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+      icon: <UserCheck className="h-4 w-4" />,
     },
     {
       label: "On the way",
       caption: eta || "Waiting",
       complete: stageIndex >= 2,
       active: stageIndex === 2,
-      icon: <RadioTower className="h-3.5 w-3.5" />,
+      icon: <Truck className="h-4 w-4" />,
     },
     {
       label: "Service",
       caption: formatCompactTime(request?.started_at) || "Pending",
       complete: stageIndex >= 3,
       active: stageIndex === 3,
-      icon: <Wrench className="h-3.5 w-3.5" />,
+      icon: <Wrench className="h-4 w-4" />,
     },
     {
       label: "Completed",
       caption: paymentCompleted ? "Paid" : formatCompactTime(request?.completed_at) || "Pending",
       complete: stageIndex >= 4,
       active: stageIndex === 4,
-      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+      icon: <CheckCircle2 className="h-4 w-4" />,
     },
   ];
 
@@ -1237,8 +1240,9 @@ const RequestTracking = () => {
           onDragEnd={handleDragEnd}
         >
           {/* Drag Handle */}
-          <div className="flex w-full cursor-grab items-center justify-center pt-3 pb-1" onClick={toggleSheet}>
-             <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+          <div className="flex w-full cursor-grab flex-col items-center justify-center pt-3 pb-2 relative" onClick={toggleSheet}>
+             <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none rounded-t-[28px]" />
+             <div className="h-1.5 w-12 rounded-full bg-slate-200 z-10" />
           </div>
 
           <div 
@@ -1253,31 +1257,26 @@ const RequestTracking = () => {
               }
             }}
           >
-            <div className="mb-4 mt-2 flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-                {isConnected ? "Live tracking" : "Reconnecting..."}
-              </span>
-            </div>
-            
-            <div className="block">
-              {/* Status header */}
-              <div className="mb-1 mt-1">
-                <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-600" />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">On-time assistance</span>
-                  {eta && status === "en-route" && (
-                    <span className="ml-1 text-[10px] font-semibold text-emerald-600">· ETA {eta}</span>
-                  )}
+            <div className="block mt-2">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-50" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                    {isConnected ? "Live tracking" : "Reconnecting..."}
+                  </span>
                 </div>
-                <h2 className="text-[20px] font-extrabold leading-tight tracking-tight text-slate-900">
-                  {statusMeta.title}
-                </h2>
-                <p className="mt-1 text-[12px] leading-relaxed text-slate-500">{statusMeta.subtitle}</p>
+                {eta && status === "en-route" && (
+                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">ETA {eta}</span>
+                )}
               </div>
+              <h2 className="text-2xl font-black leading-tight tracking-tight text-slate-900">
+                {statusMeta.title}
+              </h2>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-slate-500">{statusMeta.subtitle}</p>
+            </div>
 
               {routeSummaryVisible && (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
@@ -1303,11 +1302,11 @@ const RequestTracking = () => {
                 </div>
               )}
 
-              {/* ── Google Material Stepper ── */}
-              <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-3.5">
-                <div className="mb-3 flex items-center justify-between">
+              {/* ── Journey Stepper ── */}
+              <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                <div className="mb-4 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Journey progress</span>
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold text-primary">{stageProgress}%</span>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-extrabold text-primary">{stageProgress}%</span>
                 </div>
                 <div className="flex items-start">
                   {trackingSteps.map((step, index) => {
@@ -1316,36 +1315,30 @@ const RequestTracking = () => {
                       <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
                         <div className="flex flex-col items-center">
                           <div className={cn(
-                            "relative flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-500",
+                            "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500",
                             step.complete && !step.active
-                              ? "bg-emerald-500 text-white shadow-[0_0_0_3px_rgba(16,185,129,0.15)]"
+                              ? "bg-primary text-white shadow-[0_4px_12px_rgba(239,68,68,0.25)]"
                               : step.active
-                                ? "border-2 border-primary bg-white text-primary shadow-[0_0_0_4px_rgba(239,68,68,0.1)]"
-                                : "border border-slate-200 bg-white text-slate-400"
+                                ? "bg-primary text-white shadow-[0_0_0_4px_rgba(239,68,68,0.15)] ring-1 ring-primary/20"
+                                : "bg-white text-slate-300 border border-slate-200"
                           )}>
-                            {step.complete && !step.active ? (
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            ) : (
-                              <span>{index + 1}</span>
-                            )}
+                            {step.icon}
                           </div>
                           <p className={cn(
-                            "mt-1 text-center text-[8px] font-semibold leading-tight",
-                            step.complete || step.active ? "text-slate-700" : "text-slate-400"
+                            "mt-2 text-center text-[9px] font-bold leading-tight",
+                            step.complete || step.active ? "text-slate-800" : "text-slate-400"
                           )}>
                             {step.label}
                           </p>
                         </div>
                         {!isLast && (
-                          <div className="flex flex-1 items-center px-0.5" style={{ paddingTop: 12 }}>
-                            <div className={cn(
-                              "h-[2px] w-full rounded-full transition-all duration-700",
-                              index < stageIndex
-                                ? "bg-emerald-500"
-                                : index === stageIndex
-                                  ? "bg-gradient-to-r from-primary/60 to-slate-200"
-                                  : "bg-slate-200"
-                            )} />
+                          <div className="flex flex-1 items-center px-1" style={{ paddingTop: 14 }}>
+                            <div className="relative h-1 w-full rounded-full bg-slate-200 overflow-hidden">
+                              <div className={cn(
+                                "absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-700 ease-out",
+                                index < stageIndex ? "w-full" : index === stageIndex ? "w-1/2 opacity-50" : "w-0"
+                              )} />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1373,10 +1366,15 @@ const RequestTracking = () => {
                   ) : null}
                   <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                     <div className="flex items-center gap-3.5">
-                      <Avatar className="h-12 w-12 ring-2 ring-slate-100 shadow-sm">
-                        <AvatarImage src={technician.avatar_url} />
-                        <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
-                      </Avatar>
+                      <div className="relative">
+                        <Avatar className="h-12 w-12 ring-2 ring-slate-100 shadow-sm">
+                          <AvatarImage src={technician.avatar_url} />
+                          <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 rounded-full border-2 border-white bg-blue-500 p-0.5 text-white">
+                           <ShieldCheck className="h-2.5 w-2.5" />
+                        </div>
+                      </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate text-[15px] font-extrabold text-slate-900">{technician.name}</h3>
                         <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
@@ -1399,7 +1397,7 @@ const RequestTracking = () => {
                         </Button>
                         <Button
                           size="icon"
-                          className="h-10 w-10 rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-600"
+                          className="h-10 w-10 rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800"
                           asChild
                         >
                           <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
@@ -1477,13 +1475,10 @@ const RequestTracking = () => {
                 </div>
               )}
 
-              <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-3">
-                <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <p className="leading-relaxed">
-                    Request ID #{request.id} | Keep this screen open for real-time updates and payment confirmation.
-                  </p>
-                </div>
+              <div className="mt-5 pb-2">
+                <p className="text-center text-[10px] font-semibold text-slate-400">
+                  Request ID #{request.id}
+                </p>
               </div>
 
               {status !== "cancelled" && status !== "completed" && !paymentCompleted && (
@@ -1550,9 +1545,8 @@ const RequestTracking = () => {
                   </div>
                 </div>
               )}
-            </div>
           </div>
-          </motion.div>
+        </motion.div>
 
         <PaymentSummaryDialog
           isOpen={showPaymentSummary}

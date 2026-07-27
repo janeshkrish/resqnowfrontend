@@ -74,13 +74,13 @@ const AmountCard = ({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-red-600/90">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary/90">
               {title}
             </p>
             <h3
               className={cn(
-                "mt-2 text-2xl font-black tracking-tight sm:text-3xl",
-                hasAmount ? "text-red-600" : "text-slate-500"
+                "mt-1 text-2xl font-black tracking-tight sm:text-3xl",
+                hasAmount ? "text-primary" : "text-slate-500"
               )}
             >
               {resolvedAmount}
@@ -103,30 +103,30 @@ const AmountCard = ({
         </div>
 
         {hasBreakdown ? (
-          <div className="mt-4 rounded-xl border border-red-100/60 bg-white/80 p-3">
+          <div className="mt-4 rounded-xl border border-red-100/40 bg-white/60 p-3.5">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Technician</span>
-              <span className="font-semibold">
+              <span className="text-slate-500">Technician</span>
+              <span className="font-medium text-slate-500">
                 {formatAmount(Number(technicianAmount || 0), currency)}
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Platform Fee</span>
-              <span className="font-semibold">
+              <span className="text-slate-500">Platform Fee</span>
+              <span className="font-medium text-slate-500">
                 {formatAmount(Number(platformFee || 0), currency)}
               </span>
             </div>
             {(paymentMode === "upi" || Number(razorpayFee || 0) > 0) && (
               <div className="mt-2 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Razorpay Fee</span>
-                <span className="font-semibold">
+                <span className="text-slate-500">Razorpay Fee</span>
+                <span className="font-medium text-slate-500">
                   {formatAmount(Number(razorpayFee || 0), currency)}
                 </span>
               </div>
             )}
-            <div className="mt-3 flex items-center justify-between border-t border-red-100 pt-3 text-sm">
-              <span className="font-semibold text-foreground">Total</span>
-              <span className="text-base font-black text-red-600">
+            <div className="mt-4 flex items-center justify-between border-t border-red-100/60 pt-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary/80">Total</span>
+              <span className="text-xl font-black text-primary">
                 {formatAmount(Number(resolvedTotal || 0), currency)}
               </span>
             </div>

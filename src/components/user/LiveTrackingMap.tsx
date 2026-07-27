@@ -138,6 +138,12 @@ function MapViewport({
       map.invalidateSize();
     }, 170);
 
+    const mapContainer = map.getContainer();
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    resizeObserver.observe(mapContainer);
+
     const points = [techLoc, userLoc, dropLoc].filter(Boolean) as { lat: number; lng: number }[];
     if (points.length > 1) {
       map.fitBounds(L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number])), {
@@ -156,8 +162,9 @@ function MapViewport({
 
     return () => {
       window.clearTimeout(invalidateTimer);
+      resizeObserver.disconnect();
     };
-  }, [bottomPadding, dropLoc, map, recenterKey, reduceMotion, techLoc, topPadding, userLoc]);
+  }, [map, techLoc, userLoc, dropLoc, topPadding, bottomPadding, reduceMotion, recenterKey]);
 
   return null;
 }

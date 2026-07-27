@@ -4,6 +4,7 @@ import {
   animate,
   motion,
   useMotionValue,
+  useTransform,
   useReducedMotion,
 } from "framer-motion";
 import {
@@ -932,60 +933,65 @@ const RequestTracking = () => {
     Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
       ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
       : null;
-  const sheetPanelHeightVh = showPayment ? TRACKING_PAYMENT_PANEL_HEIGHT_VH : TRACKING_PANEL_HEIGHT_VH;
-  const sheetOffsets = useMemo(
-    () => getTrackingSheetOffsets(panelHeight, viewportHeight, showPayment),
-    [panelHeight, showPayment, viewportHeight],
-  );
+  const EXPANDED_Y = Math.max(120, viewportHeight * 0.15);
+  const HALF_Y = viewportHeight * 0.55;
+  const COLLAPSED_Y = Math.max(viewportHeight - 160, HALF_Y + 100);
+
+  const mapHeight = useTransform(sheetY, (y) => (y as number) + 28); // +28px so it smoothly overlaps under sheet's rounded corners
 
   useEffect(() => {
-    if (!isMobile || !panelRef.current) return;
+    setViewportHeight(window.innerHeight);
+    const handleResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-    const panelNode = panelRef.current;
-    const updatePanelHeight = () => {
-      setPanelHeight(Math.round(panelNode.getBoundingClientRect().height));
-    };
-
-    updatePanelHeight();
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updatePanelHeight()) : null;
-    resizeObserver?.observe(panelNode);
-    window.addEventListener("resize", updatePanelHeight);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updatePanelHeight);
-    };
-  }, [isMobile, sheetPanelHeightVh]);
-
+  const [hasAnimatedIn, setHasAnimatedIn] = useState(false);
+  
   useEffect(() => {
-    if (!isMobile || panelHeight === 0 || viewportHeight === 0) return;
-    const targetY = sheetOffsets[sheetMode];
+    if (isMobile && viewportHeight > 0 && !hasAnimatedIn) {
+      sheetY.set(viewportHeight); // Start off screen
+      animate(sheetY, HALF_Y, { type: "spring", stiffness: 300, damping: 30 }).then(() => {
+        setHasAnimatedIn(true);
+      });
+    }
+  }, [isMobile, viewportHeight, sheetY, HALF_Y, hasAnimatedIn]);
 
-    if (reduceMotion) {
-      sheetY.set(targetY);
-      return;
+  const handleDragEnd = (event: any, info: any) => {
+    const currentY = sheetY.get();
+    const velocity = info.velocity.y;
+
+    let targetY = currentY;
+
+    if (velocity < -500) {
+      // Swiping up
+      if (currentY > HALF_Y + 50) targetY = HALF_Y;
+      else targetY = EXPANDED_Y;
+    } else if (velocity > 500) {
+      // Swiping down
+      if (currentY < HALF_Y - 50) targetY = HALF_Y;
+      else targetY = COLLAPSED_Y;
+    } else {
+      // Snap to nearest
+      const distances = [
+        { y: EXPANDED_Y, dist: Math.abs(currentY - EXPANDED_Y) },
+        { y: HALF_Y, dist: Math.abs(currentY - HALF_Y) },
+        { y: COLLAPSED_Y, dist: Math.abs(currentY - COLLAPSED_Y) }
+      ];
+      targetY = distances.reduce((prev, curr) => prev.dist < curr.dist ? prev : curr).y;
     }
 
-    const controls = animate(sheetY, targetY, {
+    animate(sheetY, targetY, {
       type: "spring",
-      stiffness: 380,
-      damping: 36,
-      mass: 0.82,
+      stiffness: 400,
+      damping: 40,
     });
-
-    return () => {
-      controls.stop();
-    };
-  }, [isMobile, panelHeight, reduceMotion, sheetMode, sheetOffsets, sheetY, viewportHeight]);
-
-  const handleMapInteract = () => {
-    setSheetMode("map");
   };
 
   const toggleSheet = () => {
-    setSheetMode((current) => (current === "map" ? "sheet" : "map"));
+    const currentY = sheetY.get();
+    const targetY = Math.abs(currentY - EXPANDED_Y) < 50 ? COLLAPSED_Y : EXPANDED_Y;
+    animate(sheetY, targetY, { type: "spring", stiffness: 400, damping: 40 });
   };
 
   const serviceLocationLabel = request?.address?.trim() || "Location is being updated";
@@ -1171,10 +1177,10 @@ const RequestTracking = () => {
   if (isMobile) {
     return (
       <div
-        className="flex h-[100dvh] w-full flex-col overflow-hidden bg-slate-950"
+        className="relative h-[100dvh] w-full overflow-hidden bg-slate-950"
         style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
       >
-        <div className="relative flex-1 min-h-0">
+        <motion.div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: mapHeight }}>
           <LiveTrackingMap
             techLocation={technicianMapLocation}
             userLocation={requestMapLocation}
@@ -1220,11 +1226,34 @@ const RequestTracking = () => {
               </Badge>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="z-40 w-full shrink-0 overflow-y-auto rounded-t-[28px] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.12)] max-h-[85dvh]">
-          <div className="flex flex-col px-5 pt-5 pb-[max(env(safe-area-inset-bottom),1.25rem)]">
-            <div className="mb-4 flex items-center gap-2">
+        <motion.div
+          className="absolute inset-x-0 bottom-0 z-40 w-full rounded-t-[28px] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.12)]"
+          style={{ y: sheetY, top: 0, height: "100dvh" }}
+          drag="y"
+          dragConstraints={{ top: EXPANDED_Y, bottom: COLLAPSED_Y }}
+          dragElastic={0.05}
+          onDragEnd={handleDragEnd}
+        >
+          {/* Drag Handle */}
+          <div className="flex w-full cursor-grab items-center justify-center pt-3 pb-1" onClick={toggleSheet}>
+             <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+          </div>
+
+          <div 
+            className="flex h-full flex-col px-5 overflow-y-auto pb-[max(env(safe-area-inset-bottom),10rem)]"
+            onPointerDownCapture={(e) => {
+              const currentY = sheetY.get();
+              if (Math.abs(currentY - EXPANDED_Y) < 10) {
+                 const target = e.currentTarget;
+                 if (target.scrollTop > 0) {
+                   e.stopPropagation();
+                 }
+              }
+            }}
+          >
+            <div className="mb-4 mt-2 flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -1523,7 +1552,7 @@ const RequestTracking = () => {
               )}
             </div>
           </div>
-        </div>
+          </motion.div>
 
         <PaymentSummaryDialog
           isOpen={showPaymentSummary}

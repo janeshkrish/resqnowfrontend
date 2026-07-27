@@ -28,7 +28,7 @@ import {
   AlertCircle,
   Wrench,
 } from "lucide-react";
-import FindingTechnician from "./FindingTechnician";
+
 import ClientJobCompletion from "./ClientJobCompletion";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -1171,139 +1171,70 @@ const RequestTracking = () => {
   if (isMobile) {
     return (
       <div
-        className="relative h-[100dvh] w-full overflow-hidden bg-slate-950"
+        className="flex h-[100dvh] w-full flex-col overflow-hidden bg-slate-950"
         style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
       >
-        <div className="absolute inset-0 z-0">
-          {status === "pending" ? (
-            <FindingTechnician 
-              vehicleType={request?.vehicle_type} 
-              serviceType={request?.service_type} 
-            />
-          ) : (
-            <LiveTrackingMap
-              techLocation={technicianMapLocation}
-              userLocation={requestMapLocation}
-              dropLocation={trackingDropLocation}
-              routePolyline={trackingRoutePolyline}
-              eta={eta}
-              variant="fullscreen"
-              status={status}
-              distanceLabel={mapDistanceLabel}
-              mapMode={sheetMode}
-              onInteract={handleMapInteract}
-              showRoutePath={isTowingRequest}
-              className="h-full w-full"
-            />
-          )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/60 to-transparent" />
-        </div>
-
-        <div className="absolute inset-x-4 z-30 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-          <div className="flex items-center justify-between gap-3">
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => navigate("/")}
-              className="h-10 w-10 rounded-full bg-card/95 text-foreground shadow-lg backdrop-blur"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Badge
-              className={cn(
-                "border-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white",
-                isConnected ? "bg-emerald-500/90" : "bg-amber-500/90"
-              )}
-            >
-              {isConnected ? (
-                <span className="inline-flex items-center gap-1">
-                  <Wifi className="h-3 w-3" />
-                  Live
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  <WifiOff className="h-3 w-3" />
-                  Reconnecting
-                </span>
-              )}
-            </Badge>
+        <div className="relative flex-1 min-h-0">
+          <LiveTrackingMap
+            techLocation={technicianMapLocation}
+            userLocation={requestMapLocation}
+            dropLocation={trackingDropLocation}
+            routePolyline={trackingRoutePolyline}
+            eta={eta}
+            variant="fullscreen"
+            status={status}
+            distanceLabel={mapDistanceLabel}
+            mapMode={"map"}
+            showRoutePath={isTowingRequest}
+            className="h-full w-full"
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-36 z-20 bg-gradient-to-b from-black/60 to-transparent" />
+          
+          <div className="absolute inset-x-4 z-30 pt-[calc(env(safe-area-inset-top)+0.75rem)] top-0">
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => navigate("/")}
+                className="h-10 w-10 rounded-full bg-card/95 text-foreground shadow-lg backdrop-blur"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <Badge
+                className={cn(
+                  "border-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white",
+                  isConnected ? "bg-emerald-500/90" : "bg-amber-500/90"
+                )}
+              >
+                {isConnected ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Wifi className="h-3 w-3" />
+                    Live
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <WifiOff className="h-3 w-3" />
+                    Reconnecting
+                  </span>
+                )}
+              </Badge>
+            </div>
           </div>
         </div>
 
-        {status !== "pending" && (
-          <div className="absolute inset-x-0 bottom-0 z-40">
-          <motion.section
-            ref={panelRef}
-            initial={reduceMotion ? undefined : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="mx-0 mb-0 w-full overflow-hidden rounded-t-[28px] border-t border-slate-200/80 bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.12)] pb-[max(env(safe-area-inset-bottom),1rem)]"
-            style={{ height: `${sheetPanelHeightVh}dvh`, y: sheetY, willChange: "transform" }}
-          >
-            <div className="flex h-full flex-col">
-              {/* ── Collapsed compact card ── */}
-              {sheetMode === "map" && (
-                <button type="button" onClick={toggleSheet} className="w-full shrink-0 px-5 py-3 text-left">
-                  <div className="flex items-center gap-3">
-                    {technician ? (
-                      <>
-                        <Avatar className="h-11 w-11 shrink-0 ring-2 ring-white shadow-md">
-                          <AvatarImage src={technician.avatar_url} />
-                          <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] font-extrabold text-slate-900">{technician.name}</p>
-                          <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">
-                            {trackingSummary.eyebrow}{eta ? ` · ${eta}` : ""}
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[14px] font-extrabold text-slate-900">{statusMeta.title}</p>
-                        <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{statusMeta.subtitle}</p>
-                      </div>
-                    )}
-                    {technician?.phone && (
-                      <a href={`tel:${technician.phone}`} onClick={(e) => e.stopPropagation()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" aria-label="Call technician">
-                        <Phone className="h-4 w-4 fill-current" />
-                      </a>
-                    )}
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                      <ChevronUp className="h-4 w-4 text-slate-500" />
-                    </span>
-                  </div>
-                </button>
-              )}
-
-              {/* ── Expanded header with collapse toggle ── */}
-              {sheetMode === "sheet" && (
-                <button type="button" onClick={toggleSheet} className="w-full shrink-0 px-5 pb-1 pt-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                      </span>
-                      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-                        {isConnected ? "Live tracking" : "Reconnecting..."}
-                      </span>
-                    </div>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200">
-                      <ChevronDown className="h-4 w-4 text-slate-500" />
-                    </span>
-                  </div>
-                </button>
-              )}
-
-              {/* ── Scrollable expanded content ── */}
-              <div
-                className={cn(
-                  "min-h-0 flex-1 px-5 pb-5",
-                  sheetMode === "map" ? "hidden" : "overflow-y-auto"
-                )}
-              >
-              <div className={cn(sheetMode === "map" ? "hidden" : "block")}>
+        <div className="z-40 w-full shrink-0 overflow-y-auto rounded-t-[28px] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.12)] max-h-[85dvh]">
+          <div className="flex flex-col px-5 pt-5 pb-[max(env(safe-area-inset-bottom),1.25rem)]">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                {isConnected ? "Live tracking" : "Reconnecting..."}
+              </span>
+            </div>
+            
+            <div className="block">
               {/* Status header */}
               <div className="mb-1 mt-1">
                 <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1">
@@ -1590,12 +1521,9 @@ const RequestTracking = () => {
                   </div>
                 </div>
               )}
-              </div>
             </div>
-            </div>
-          </motion.section>
+          </div>
         </div>
-        )}
 
         <PaymentSummaryDialog
           isOpen={showPaymentSummary}

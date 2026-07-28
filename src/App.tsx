@@ -62,6 +62,7 @@ const Subscription = lazyWithReload(() => import("./pages/Subscription"));
 const MyRequests = lazyWithReload(() => import("./pages/MyRequests"));
 const Notifications = lazyWithReload(() => import("./pages/Notifications"));
 const Marketplace = lazyWithReload(() => import("./pages/Marketplace"));
+const MyGaragePage = lazyWithReload(() => import("./pages/MyGaragePage"));
 const ProductDetail = lazyWithReload(() => import("./pages/ProductDetail"));
 const ServiceCommunicationPage = lazyWithReload(() => import("./pages/ServiceCommunicationPage"));
 const MapPage = lazyWithReload(() => import("./pages/MapPage"));
@@ -266,6 +267,8 @@ const App = () => {
                               <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
                               <Route path="my-requests" element={<ProtectedRoute><MyRequests /></ProtectedRoute>} />
                               <Route path="notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                              <Route path="my-garage" element={<ProtectedRoute><MyGaragePage /></ProtectedRoute>} />
+                              <Route path="my-garage/add" element={<ProtectedRoute><MyGaragePage /></ProtectedRoute>} />
                               <Route path="marketplace" element={<Marketplace />} />
                               <Route path="marketplace/product/:id" element={<ProductDetail />} />
                               <Route path="service-communication/:serviceId" element={<ProtectedRoute><ServiceCommunicationPage /></ProtectedRoute>} />

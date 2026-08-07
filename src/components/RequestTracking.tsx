@@ -6,6 +6,7 @@ import {
   useMotionValue,
   useTransform,
   useReducedMotion,
+  useDragControls,
 } from "framer-motion";
 import {
   ArrowLeft,
@@ -31,6 +32,7 @@ import {
   FileText,
   UserCheck,
   Truck,
+  Banknote,
 } from "lucide-react";
 
 import ClientJobCompletion from "./ClientJobCompletion";
@@ -285,8 +287,10 @@ const RequestTracking = () => {
   const [sheetMode, setSheetMode] = useState<TrackingSheetMode>("map");
   const [panelHeight, setPanelHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [sheetSnapState, setSheetSnapState] = useState<"expanded" | "half" | "collapsed">("half");
   const panelRef = useRef<HTMLElement | null>(null);
   const sheetY = useMotionValue(0);
+  const dragControls = useDragControls();
   const reduceMotion = useReducedMotion();
 
   const isMobile = useIsMobile();
@@ -936,65 +940,107 @@ const RequestTracking = () => {
     Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
       ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
       : null;
-  const EXPANDED_Y = Math.max(120, viewportHeight * 0.15);
-  const HALF_Y = viewportHeight * 0.55;
-  const COLLAPSED_Y = Math.max(viewportHeight - 160, HALF_Y + 100);
+  const EXPANDED_Y = Math.max(56, Math.round(viewportHeight * 0.10));
+  const HALF_Y = Math.max(EXPANDED_Y + 120, Math.round(viewportHeight * 0.48));
+  const COLLAPSED_Y = Math.max(viewportHeight - 110, HALF_Y + 80);
 
-  const mapHeight = useTransform(sheetY, (y) => (y as number) + 28); // +28px so it smoothly overlaps under sheet's rounded corners
+  const mapHeight = useTransform(sheetY, (y) => Math.max(160, (y as number) + 32)); // Smooth overlap under sheet's rounded corners
 
   useEffect(() => {
-    setViewportHeight(window.innerHeight);
-    const handleResize = () => setViewportHeight(window.innerHeight);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const updateHeight = () => {
+      setViewportHeight(window.innerHeight);
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
   }, []);
 
   const [hasAnimatedIn, setHasAnimatedIn] = useState(false);
   
   useEffect(() => {
-    if (isMobile && viewportHeight > 0 && !hasAnimatedIn) {
+    if (!isMobile || viewportHeight <= 0) return;
+
+    if (showPayment) {
+      setSheetSnapState("expanded");
+      animate(sheetY, EXPANDED_Y, { type: "spring", stiffness: 350, damping: 32 });
+      return;
+    }
+
+    if (!hasAnimatedIn) {
       sheetY.set(viewportHeight); // Start off screen
-      animate(sheetY, HALF_Y, { type: "spring", stiffness: 300, damping: 30 }).then(() => {
+      animate(sheetY, HALF_Y, { type: "spring", stiffness: 350, damping: 32 }).then(() => {
         setHasAnimatedIn(true);
+        setSheetSnapState("half");
       });
     }
-  }, [isMobile, viewportHeight, sheetY, HALF_Y, hasAnimatedIn]);
+  }, [isMobile, viewportHeight, sheetY, EXPANDED_Y, HALF_Y, hasAnimatedIn, showPayment]);
 
-  const handleDragEnd = (event: any, info: any) => {
-    const currentY = sheetY.get();
-    const velocity = info.velocity.y;
+  const snapTo = (target: "expanded" | "half" | "collapsed") => {
+    let targetY = HALF_Y;
+    if (target === "expanded") targetY = EXPANDED_Y;
+    if (target === "collapsed") targetY = COLLAPSED_Y;
 
-    let targetY = currentY;
-
-    if (velocity < -500) {
-      // Swiping up
-      if (currentY > HALF_Y + 50) targetY = HALF_Y;
-      else targetY = EXPANDED_Y;
-    } else if (velocity > 500) {
-      // Swiping down
-      if (currentY < HALF_Y - 50) targetY = HALF_Y;
-      else targetY = COLLAPSED_Y;
-    } else {
-      // Snap to nearest
-      const distances = [
-        { y: EXPANDED_Y, dist: Math.abs(currentY - EXPANDED_Y) },
-        { y: HALF_Y, dist: Math.abs(currentY - HALF_Y) },
-        { y: COLLAPSED_Y, dist: Math.abs(currentY - COLLAPSED_Y) }
-      ];
-      targetY = distances.reduce((prev, curr) => prev.dist < curr.dist ? prev : curr).y;
-    }
-
+    setSheetSnapState(target);
     animate(sheetY, targetY, {
       type: "spring",
-      stiffness: 400,
-      damping: 40,
+      stiffness: 380,
+      damping: 34,
     });
   };
 
   const toggleSheet = () => {
     const currentY = sheetY.get();
-    const targetY = Math.abs(currentY - EXPANDED_Y) < 50 ? COLLAPSED_Y : EXPANDED_Y;
-    animate(sheetY, targetY, { type: "spring", stiffness: 400, damping: 40 });
+    if (Math.abs(currentY - EXPANDED_Y) < 40) {
+      snapTo("half");
+    } else if (Math.abs(currentY - HALF_Y) < 40) {
+      snapTo("expanded");
+    } else {
+      snapTo("half");
+    }
+  };
+
+  const handleDragEnd = (_: any, info: any) => {
+    const currentY = sheetY.get();
+    const velocity = info.velocity.y;
+
+    let nextSnap: "expanded" | "half" | "collapsed" = "half";
+    let targetY = HALF_Y;
+
+    if (velocity < -350) {
+      // Swiping up
+      if (currentY > HALF_Y + 30) {
+        nextSnap = "half";
+        targetY = HALF_Y;
+      } else {
+        nextSnap = "expanded";
+        targetY = EXPANDED_Y;
+      }
+    } else if (velocity > 350) {
+      // Swiping down
+      if (currentY < HALF_Y - 30) {
+        nextSnap = "half";
+        targetY = HALF_Y;
+      } else {
+        nextSnap = "collapsed";
+        targetY = COLLAPSED_Y;
+      }
+    } else {
+      const distances = [
+        { snap: "expanded" as const, y: EXPANDED_Y, dist: Math.abs(currentY - EXPANDED_Y) },
+        { snap: "half" as const, y: HALF_Y, dist: Math.abs(currentY - HALF_Y) },
+        { snap: "collapsed" as const, y: COLLAPSED_Y, dist: Math.abs(currentY - COLLAPSED_Y) },
+      ];
+      const closest = distances.reduce((prev, curr) => (prev.dist < curr.dist ? prev : curr));
+      nextSnap = closest.snap;
+      targetY = closest.y;
+    }
+
+    setSheetSnapState(nextSnap);
+    animate(sheetY, targetY, {
+      type: "spring",
+      stiffness: 380,
+      damping: 34,
+    });
   };
 
   const serviceLocationLabel = request?.address?.trim() || "Location is being updated";
@@ -1183,6 +1229,7 @@ const RequestTracking = () => {
         className="relative h-[100dvh] w-full overflow-hidden bg-slate-950"
         style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
       >
+        {/* Fullscreen Map Background */}
         <motion.div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: mapHeight }}>
           <LiveTrackingMap
             techLocation={technicianMapLocation}
@@ -1197,270 +1244,677 @@ const RequestTracking = () => {
             showRoutePath={isTowingRequest}
             className="h-full w-full"
           />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-36 z-20 bg-gradient-to-b from-black/60 to-transparent" />
-          
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 z-20 bg-gradient-to-b from-black/60 to-transparent" />
+
+          {/* Top Bar Controls */}
           <div className="absolute inset-x-4 z-30 pt-[calc(env(safe-area-inset-top)+0.75rem)] top-0">
             <div className="flex items-center justify-between gap-3">
               <Button
                 variant="secondary"
                 size="icon"
                 onClick={() => navigate("/")}
-                className="h-10 w-10 rounded-full bg-card/95 text-foreground shadow-lg backdrop-blur"
+                className="h-10 w-10 rounded-full bg-card/95 text-foreground shadow-lg backdrop-blur hover:bg-card"
+                aria-label="Back to home"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <Badge
-                className={cn(
-                  "border-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white",
-                  isConnected ? "bg-emerald-500/90" : "bg-amber-500/90"
-                )}
-              >
-                {isConnected ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Wifi className="h-3 w-3" />
-                    Live
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1">
-                    <WifiOff className="h-3 w-3" />
-                    Reconnecting
-                  </span>
-                )}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge
+                  className={cn(
+                    "border-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-md",
+                    isConnected ? "bg-emerald-500/90" : "bg-amber-500/90"
+                  )}
+                >
+                  {isConnected ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Wifi className="h-3 w-3" />
+                      Live
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5">
+                      <WifiOff className="h-3 w-3" />
+                      Reconnecting
+                    </span>
+                  )}
+                </Badge>
+              </div>
             </div>
           </div>
         </motion.div>
 
+        {/* Draggable Bottom Sheet */}
         <motion.div
-          className="absolute inset-x-0 bottom-0 z-40 w-full rounded-t-[28px] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.12)]"
+          className="absolute inset-x-0 bottom-0 z-40 w-full rounded-t-[28px] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border-t border-slate-100"
           style={{ y: sheetY, top: 0, height: "100dvh" }}
           drag="y"
+          dragControls={dragControls}
+          dragListener={false}
           dragConstraints={{ top: EXPANDED_Y, bottom: COLLAPSED_Y }}
-          dragElastic={0.05}
+          dragElastic={0.08}
           onDragEnd={handleDragEnd}
         >
-          {/* Drag Handle */}
-          <div className="flex w-full cursor-grab flex-col items-center justify-center pt-3 pb-2 relative" onClick={toggleSheet}>
-             <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none rounded-t-[28px]" />
-             <div className="h-1.5 w-12 rounded-full bg-slate-200 z-10" />
-          </div>
-
-          <div 
-            className="flex h-full flex-col px-5 overflow-y-auto pb-[max(env(safe-area-inset-bottom),10rem)]"
-            onPointerDownCapture={(e) => {
-              const currentY = sheetY.get();
-              if (Math.abs(currentY - EXPANDED_Y) < 10) {
-                 const target = e.currentTarget;
-                 if (target.scrollTop > 0) {
-                   e.stopPropagation();
-                 }
-              }
-            }}
+          {/* Drag Handle & Header Area (Drag gesture is attached ONLY here) */}
+          <div
+            className="w-full select-none cursor-grab active:cursor-grabbing touch-none bg-white px-5 pt-3 pb-3 border-b border-slate-100/90 transition-colors"
+            onPointerDown={(e) => dragControls.start(e)}
+            onClick={toggleSheet}
           >
-            <div className="block mt-2">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-50" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
-                    {isConnected ? "Live tracking" : "Reconnecting..."}
-                  </span>
-                </div>
+            {/* Drag Handle Indicator */}
+            <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300 transition-colors" />
+
+            {/* Header info row */}
+            <div className="mt-2.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-50" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+                <span className="truncate text-xs font-extrabold uppercase tracking-[0.14em] text-primary">
+                  {isConnected ? "Live Tracking" : "Reconnecting"}
+                </span>
                 {eta && status === "en-route" && (
-                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">ETA {eta}</span>
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-700">
+                    ETA {eta}
+                  </span>
                 )}
               </div>
-              <h2 className="text-2xl font-black leading-tight tracking-tight text-slate-900">
-                {statusMeta.title}
-              </h2>
-              <p className="mt-1 text-sm font-medium leading-relaxed text-slate-500">{statusMeta.subtitle}</p>
+
+              {/* Tap to expand / collapse toggle */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSheet();
+                }}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
+                aria-label="Toggle sheet height"
+              >
+                {sheetSnapState === "expanded" ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </button>
             </div>
 
-              {routeSummaryVisible && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                    <MapPin className="h-3.5 w-3.5 text-primary" />
-                    Towing route
+            {/* Status Title and quick amount peek */}
+            <div className="mt-1 flex items-baseline justify-between gap-2">
+              <h2 className="truncate text-lg font-black tracking-tight text-slate-900">
+                {statusMeta.title}
+              </h2>
+              {showPayment && !paymentCompleted && (
+                <span className="shrink-0 text-sm font-black text-orange-600">
+                  {currency} {amountDueLabel}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Scrollable Content Container (Pure native touch scrolling) */}
+          <div
+            className="flex-1 overflow-y-auto overscroll-y-contain px-4 sm:px-5 py-4 space-y-4 touch-pan-y"
+            style={{
+              WebkitOverflowScrolling: "touch",
+              paddingBottom: showPayment && !paymentCompleted ? "calc(env(safe-area-inset-bottom, 16px) + 6.5rem)" : "calc(env(safe-area-inset-bottom, 16px) + 3rem)"
+            }}
+          >
+            {/* Status subtitle description */}
+            <p className="text-xs font-medium leading-relaxed text-slate-500">
+              {statusMeta.subtitle}
+            </p>
+
+            {/* Towing Route Details */}
+            {routeSummaryVisible && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 shadow-sm">
+                <div className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Towing route details
+                </div>
+                <div className="space-y-2 text-xs font-semibold text-slate-700">
+                  <div className="flex items-start gap-2">
+                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 shrink-0">Pickup</span>
+                    <span className="line-clamp-2 text-slate-800">{request.address || "Pickup selected"}</span>
                   </div>
-                  <div className="space-y-2 text-xs font-semibold text-slate-700">
-                    <div className="flex gap-2">
-                      <span className="text-emerald-600">Pickup</span>
-                      <span className="line-clamp-2">{request.address || "Pickup selected"}</span>
+                  <div className="flex items-start gap-2">
+                    <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800 shrink-0">Drop</span>
+                    <span className="line-clamp-2 text-slate-800">{request.dropLocation?.address || request.drop_address || "Drop selected"}</span>
+                  </div>
+                  {Number.isFinite(routeDistanceKm) && (
+                    <div className="mt-1 rounded-xl bg-white border border-slate-200/60 px-3 py-2 text-slate-900 font-bold text-[11px]">
+                      {routeDistanceKm.toFixed(1)} km total towing route
                     </div>
-                    <div className="flex gap-2">
-                      <span className="text-rose-600">Drop</span>
-                      <span className="line-clamp-2">{request.dropLocation?.address || request.drop_address || "Drop selected"}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Journey Progress Stepper */}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Journey progress</span>
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-extrabold text-primary">{stageProgress}%</span>
+              </div>
+              <div className="flex items-start">
+                {trackingSteps.map((step, index) => {
+                  const isLast = index === trackingSteps.length - 1;
+                  return (
+                    <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500",
+                          step.complete && !step.active
+                            ? "bg-primary text-white shadow-[0_4px_12px_rgba(239,68,68,0.25)]"
+                            : step.active
+                              ? "bg-primary text-white shadow-[0_0_0_4px_rgba(239,68,68,0.15)] ring-1 ring-primary/20"
+                              : "bg-white text-slate-300 border border-slate-200"
+                        )}>
+                          {step.icon}
+                        </div>
+                        <p className={cn(
+                          "mt-2 text-center text-[9px] font-bold leading-tight",
+                          step.complete || step.active ? "text-slate-800" : "text-slate-400"
+                        )}>
+                          {step.label}
+                        </p>
+                      </div>
+                      {!isLast && (
+                        <div className="flex flex-1 items-center px-1" style={{ paddingTop: 14 }}>
+                          <div className="relative h-1 w-full rounded-full bg-slate-200 overflow-hidden">
+                            <div className={cn(
+                              "absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-700 ease-out",
+                              index < stageIndex ? "w-full" : index === stageIndex ? "w-1/2 opacity-50" : "w-0"
+                            )} />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {Number.isFinite(routeDistanceKm) && (
-                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-900">
-                        {routeDistanceKm.toFixed(1)} km towing distance
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Amount Breakdown Card */}
+            {shouldShowAmount && (
+              <AmountCard
+                amount={finalAmount}
+                technicianAmount={amountCardDetails.baseAmount}
+                platformFee={amountCardDetails.platformFee}
+                razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
+                total={amountCardDetails.finalAmount}
+                paymentMode={amountCardDetails.paymentMode}
+                currency={currency}
+                title="Final Amount"
+                helperText="Live payment breakdown from your current service request."
+                badgeText={null}
+              />
+            )}
+
+            {/* Main Payment Section with Action Buttons */}
+            {showPayment && !paymentCompleted && (
+              <div className="space-y-2.5">
+                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 text-white shadow-xl">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">
+                          Amount due
+                        </p>
+                        <h3 className="mt-1 text-3xl font-black">
+                          {currency} {amountDueLabel}
+                        </h3>
+                      </div>
+                      <Badge className="border border-white/20 bg-white/15 text-white hover:bg-white/15 text-[10px] font-bold uppercase">
+                        Pending
+                      </Badge>
+                    </div>
+                    <Button
+                      onClick={handleOnlinePaymentClick}
+                      className="mt-4 h-12 w-full rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-100 shadow-md"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Pay securely online
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCashPaymentClick}
+                  className="h-11 w-full rounded-xl border-slate-200 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-slate-50"
+                >
+                  <Banknote className="mr-2 h-4 w-4 text-slate-500" />
+                  Pay with cash instead
+                </Button>
+              </div>
+            )}
+
+            {/* Technician Profile Card */}
+            {technician ? (
+              <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center gap-3.5">
+                  <div className="relative">
+                    <Avatar className="h-12 w-12 ring-2 ring-slate-100 shadow-sm">
+                      <AvatarImage src={technician.avatar_url} />
+                      <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -bottom-1 -right-1 rounded-full border-2 border-white bg-blue-500 p-0.5 text-white">
+                      <ShieldCheck className="h-2.5 w-2.5" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-[15px] font-extrabold text-slate-900">{technician.name}</h3>
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-bold text-slate-800">{technicianRatingLabel}</span>
+                      <span className="text-slate-300">|</span>
+                      <span>{Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-10 w-10 rounded-full border-slate-200 text-slate-600 hover:bg-slate-50"
+                      asChild
+                    >
+                      <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
+                        <MessageSquare className="h-4 w-4" />
+                      </a>
+                    </Button>
+                    <Button
+                      size="icon"
+                      className="h-10 w-10 rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800"
+                      asChild
+                    >
+                      <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
+                        <Phone className="h-4 w-4 fill-current" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : status === "pending" ? (
+              <div className="rounded-2xl border border-border bg-muted/50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                  Matching with nearby partners...
+                </div>
+              </div>
+            ) : null}
+
+            {/* Active Service Timer */}
+            {!showPayment && (status === "en-route" || status === "in-progress" || status === "en_route_pickup" || status === "vehicle_loaded" || status === "enroute_drop") && (
+              <div className="rounded-2xl border border-border p-3.5 bg-card">
+                <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock3 className="h-3.5 w-3.5 text-primary" />
+                    Active service timer
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs font-bold text-foreground">
+                    {elapsedSeconds > 0 ? formatElapsedTime() : "00:00"}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full bg-emerald-500 transition-all duration-1000",
+                      status === "en-route" ? "w-1/3" : "w-2/3 animate-pulse"
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Request ID & Home Navigation */}
+            <div className="pt-2">
+              <p className="text-center text-[11px] font-semibold text-slate-400">
+                Request ID #{request.id}
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/")}
+                className="mt-3 h-10 w-full rounded-xl text-xs font-semibold"
+              >
+                Back to home
+              </Button>
+            </div>
+
+            {/* Cancel Request Dialog */}
+            {status !== "cancelled" && status !== "completed" && !paymentCompleted && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-10 w-full rounded-xl text-[11px] font-semibold uppercase tracking-[0.12em] text-red-500 hover:bg-red-50 hover:text-red-600"
+                  >
+                    Cancel request
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="w-[calc(100%-1.5rem)] max-w-md rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Cancel this request?</DialogTitle>
+                    <DialogDescription>This action cannot be undone.</DialogDescription>
+                  </DialogHeader>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      const reason = formData.get("reason") as string;
+                      try {
+                        const res = await apiFetch(`/api/service-requests/${requestId}/cancel`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ reason })
+                        });
+                        if (res.ok) {
+                          refresh();
+                          toast.success("Request cancelled");
+                        } else {
+                          toast.error("Unable to cancel request");
+                        }
+                      } catch {
+                        toast.error("Error cancelling request");
+                      }
+                    }}
+                  >
+                    <div className="space-y-4 py-2">
+                      <div>
+                        <Label htmlFor="reason">Reason</Label>
+                        <Textarea
+                          id="reason"
+                          name="reason"
+                          required
+                          className="mt-2 min-h-[90px]"
+                          placeholder="Tell us why you want to cancel."
+                        />
+                      </div>
+                      <Button type="submit" variant="destructive" className="w-full">
+                        Confirm cancellation
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {status === "cancelled" && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  This request was cancelled. You can place a fresh request from the home screen.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Bottom Quick-Pay Bar when payment is pending */}
+          {showPayment && !paymentCompleted && (
+            <div className="border-t border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] backdrop-blur-md pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Total Due</span>
+                  <div className="text-xl font-black text-slate-900 leading-tight">
+                    {currency} {amountDueLabel}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCashPaymentClick}
+                    className="h-10 rounded-xl border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  >
+                    <Banknote className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
+                    Cash
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleOnlinePaymentClick}
+                    className="h-10 rounded-xl bg-orange-600 px-4 text-xs font-extrabold text-white shadow-md shadow-orange-500/25 hover:bg-orange-500"
+                  >
+                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                    Pay Online
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        <PaymentSummaryDialog
+          isOpen={showPaymentSummary}
+          onClose={() => setShowPaymentSummary(false)}
+          onConfirm={handleConfirmPayment}
+          baseAmount={requestAmount}
+          isProcessing={isProcessingPayment}
+          paymentMethod={selectedPaymentMethod}
+          platformFeePercent={SERVICE_REQUEST_PLATFORM_FEE_PERCENT}
+          paymentFeePercent={0}
+          currency={currency}
+          breakdown={summaryBreakdown}
+          showCouponSection={true}
+          couponCodeInput={couponCodeInput}
+          onCouponCodeInputChange={(value) => {
+            setCouponCodeInput(value);
+            if (couponMessage) setCouponMessage(null);
+          }}
+          onApplyCoupon={handleApplyCoupon}
+          onRemoveCoupon={handleRemoveCoupon}
+          isApplyingCoupon={isFetchingQuote}
+          couponAppliedCode={appliedCouponCode}
+          couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
+          couponMessage={couponMessage}
+        />
+
+        {paymentCompleted && (status === "completed" || status === "paid" || status === "payment_pending") && (
+          <ClientJobCompletion
+            technicianName={technician?.name || "Technician"}
+            onSubmitReview={() => {
+              toast.success("Thank you for your feedback");
+              navigate("/");
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="container mx-auto max-w-5xl px-4 py-6 sm:py-8"
+      style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
+    >
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_1fr] items-start">
+        {/* Left Column: Map, Towing Route & Stepper */}
+        <div className="space-y-5">
+          <Card className="overflow-hidden rounded-2xl border-border/80 shadow-md">
+            <CardContent className="p-0">
+              <LiveTrackingMap
+                techLocation={technicianMapLocation}
+                userLocation={requestMapLocation}
+                dropLocation={trackingDropLocation}
+                routePolyline={trackingRoutePolyline}
+                eta={eta}
+                status={status}
+                distanceLabel={mapDistanceLabel}
+                showRoutePath={isTowingRequest}
+                className="h-[380px] sm:h-[440px] w-full mb-0"
+              />
+            </CardContent>
+          </Card>
+
+          {routeSummaryVisible && (
+            <Card className="rounded-2xl border-border/80 bg-card p-4 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                <MapPin className="h-4 w-4 text-primary" />
+                Towing route details
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex gap-2">
+                  <span className="font-semibold text-emerald-600">Pickup:</span>
+                  <span className="text-foreground">{request.address || "Selected location"}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-semibold text-rose-600">Drop:</span>
+                  <span className="text-foreground">{request.dropLocation?.address || request.drop_address || "Selected location"}</span>
+                </div>
+                {Number.isFinite(routeDistanceKm) && (
+                  <div className="mt-2 rounded-xl bg-muted/50 px-3 py-2 text-xs font-bold text-foreground">
+                    {routeDistanceKm.toFixed(1)} km estimated towing distance
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Desktop Stepper */}
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Journey progress</span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">{stageProgress}%</span>
+            </div>
+            <div className="flex items-start">
+              {trackingSteps.map((step, index) => {
+                const isLast = index === trackingSteps.length - 1;
+                return (
+                  <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
+                    <div className="flex flex-col items-center">
+                      <div className={cn(
+                        "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500",
+                        step.complete && !step.active
+                          ? "bg-primary text-white shadow-[0_4px_12px_rgba(239,68,68,0.25)]"
+                          : step.active
+                            ? "bg-primary text-white shadow-[0_0_0_4px_rgba(239,68,68,0.15)] ring-1 ring-primary/20"
+                            : "bg-background text-muted-foreground border border-border"
+                      )}>
+                        {step.icon}
+                      </div>
+                      <p className={cn(
+                        "mt-2 text-center text-[10px] font-bold leading-tight",
+                        step.complete || step.active ? "text-foreground" : "text-muted-foreground"
+                      )}>
+                        {step.label}
+                      </p>
+                    </div>
+                    {!isLast && (
+                      <div className="flex flex-1 items-center px-1" style={{ paddingTop: 14 }}>
+                        <div className="relative h-1 w-full rounded-full bg-muted overflow-hidden">
+                          <div className={cn(
+                            "absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-700 ease-out",
+                            index < stageIndex ? "w-full" : index === stageIndex ? "w-1/2 opacity-50" : "w-0"
+                          )} />
+                        </div>
                       </div>
                     )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Status, Payment, Technician & Actions */}
+        <div className="space-y-4">
+          <Card className="rounded-2xl border-border/80 shadow-md">
+            <CardContent className="space-y-5 p-5 sm:p-6">
+              <div className="flex items-center justify-between">
+                <Badge className={isConnected ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}>
+                  {isConnected ? "LIVE" : "RECONNECTING"}
+                </Badge>
+                <p className="text-xs text-muted-foreground">Request #{request.id}</p>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-black text-foreground">{statusMeta.title}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{statusMeta.subtitle}</p>
+              </div>
+
+              {/* Technician Info */}
+              {technician && (
+                <div className="rounded-2xl border border-border bg-muted/20 p-4">
+                  <div className="flex items-center gap-3.5">
+                    <Avatar className="h-12 w-12 ring-2 ring-border shadow-sm">
+                      <AvatarImage src={technician.avatar_url} />
+                      <AvatarFallback className="bg-muted text-sm font-bold text-foreground">{(technician.name || "T")[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-extrabold text-foreground">{technician.name}</h3>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        <span className="font-bold text-foreground">{technicianRatingLabel}</span>
+                        <span>|</span>
+                        <span>{Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="icon" variant="outline" className="h-9 w-9 rounded-full" asChild>
+                        <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
+                          <MessageSquare className="h-4 w-4" />
+                        </a>
+                      </Button>
+                      <Button size="icon" className="h-9 w-9 rounded-full bg-slate-900 text-white hover:bg-slate-800" asChild>
+                        <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
+                          <Phone className="h-4 w-4 fill-current" />
+                        </a>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* ── Journey Stepper ── */}
-              <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Journey progress</span>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-extrabold text-primary">{stageProgress}%</span>
-                </div>
-                <div className="flex items-start">
-                  {trackingSteps.map((step, index) => {
-                    const isLast = index === trackingSteps.length - 1;
-                    return (
-                      <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
-                        <div className="flex flex-col items-center">
-                          <div className={cn(
-                            "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500",
-                            step.complete && !step.active
-                              ? "bg-primary text-white shadow-[0_4px_12px_rgba(239,68,68,0.25)]"
-                              : step.active
-                                ? "bg-primary text-white shadow-[0_0_0_4px_rgba(239,68,68,0.15)] ring-1 ring-primary/20"
-                                : "bg-white text-slate-300 border border-slate-200"
-                          )}>
-                            {step.icon}
-                          </div>
-                          <p className={cn(
-                            "mt-2 text-center text-[9px] font-bold leading-tight",
-                            step.complete || step.active ? "text-slate-800" : "text-slate-400"
-                          )}>
-                            {step.label}
-                          </p>
-                        </div>
-                        {!isLast && (
-                          <div className="flex flex-1 items-center px-1" style={{ paddingTop: 14 }}>
-                            <div className="relative h-1 w-full rounded-full bg-slate-200 overflow-hidden">
-                              <div className={cn(
-                                "absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-700 ease-out",
-                                index < stageIndex ? "w-full" : index === stageIndex ? "w-1/2 opacity-50" : "w-0"
-                              )} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Amount Breakdown */}
+              {shouldShowAmount && (
+                <AmountCard
+                  amount={finalAmount}
+                  technicianAmount={amountCardDetails.baseAmount}
+                  platformFee={amountCardDetails.platformFee}
+                  razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
+                  total={amountCardDetails.finalAmount}
+                  paymentMode={amountCardDetails.paymentMode}
+                  currency={currency}
+                  title="Final Amount"
+                  helperText="Live payment breakdown from your current service request."
+                  badgeText={null}
+                />
+              )}
 
-              {technician ? (
-                <>
-                  {shouldShowAmount ? (
-                    <AmountCard
-                      amount={finalAmount}
-                      technicianAmount={amountCardDetails.baseAmount}
-                      platformFee={amountCardDetails.platformFee}
-                      razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
-                      total={amountCardDetails.finalAmount}
-                      paymentMode={amountCardDetails.paymentMode}
-                      currency={currency}
-                      title="Final Amount"
-                      helperText="Live payment breakdown from your current service request."
-                      badgeText={null}
-                      className="mt-4"
-                    />
-                  ) : null}
-                  <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                    <div className="flex items-center gap-3.5">
-                      <div className="relative">
-                        <Avatar className="h-12 w-12 ring-2 ring-slate-100 shadow-sm">
-                          <AvatarImage src={technician.avatar_url} />
-                          <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-1 -right-1 rounded-full border-2 border-white bg-blue-500 p-0.5 text-white">
-                           <ShieldCheck className="h-2.5 w-2.5" />
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-[15px] font-extrabold text-slate-900">{technician.name}</h3>
-                        <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-slate-800">{technicianRatingLabel}</span>
-                          <span className="text-slate-300">|</span>
-                          <span>{Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-10 w-10 rounded-full border-slate-200 text-slate-600 hover:bg-slate-50"
-                          asChild
-                        >
-                          <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
-                            <MessageSquare className="h-4 w-4" />
-                          </a>
-                        </Button>
-                        <Button
-                          size="icon"
-                          className="h-10 w-10 rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800"
-                          asChild
-                        >
-                          <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
-                            <Phone className="h-4 w-4 fill-current" />
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : status === "pending" ? (
-                <div className="mt-4 rounded-2xl border border-border bg-muted/50 p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-                    Matching with nearby partners...
-                  </div>
-                </div>
-              ) : null}
-
+              {/* Payment Box */}
               {showPayment && !paymentCompleted && (
-                <div className="mt-4 space-y-2">
-                  <div className="overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-primary text-white shadow-lg">
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/75">
-                            Amount due
-                          </p>
-                          <h3 className="mt-1 text-3xl font-black">
-                            {currency} {amountDueLabel}
-                          </h3>
-                        </div>
-                        <Badge className="border border-white/20 bg-white/15 text-white hover:bg-white/15">
-                          Pending
-                        </Badge>
-                      </div>
-                      <Button
-                        onClick={handleOnlinePaymentClick}
-                        className="mt-4 h-11 w-full rounded-xl bg-white text-slate-900 hover:bg-slate-100"
-                      >
-                        Pay securely online
-                      </Button>
-                    </div>
+                <div className="space-y-2">
+                  <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 p-5 text-white shadow-lg">
+                    <p className="text-xs uppercase tracking-[0.12em] text-white/70">Amount due</p>
+                    <p className="mt-1 text-3xl font-black">
+                      {currency} {amountDueLabel}
+                    </p>
+                    <Button
+                      onClick={handleOnlinePaymentClick}
+                      className="mt-4 w-full bg-white text-slate-900 font-bold hover:bg-slate-100 shadow-md"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Pay securely online
+                    </Button>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleCashPaymentClick}
-                    className="h-10 w-full rounded-xl border-border text-xs font-semibold uppercase tracking-[0.12em]"
+                    className="w-full text-xs font-semibold uppercase tracking-wider"
                   >
+                    <Banknote className="mr-2 h-4 w-4 text-muted-foreground" />
                     Pay with cash instead
                   </Button>
                 </div>
               )}
 
+              {/* Active Timer */}
               {!showPayment && (status === "en-route" || status === "in-progress" || status === "en_route_pickup" || status === "vehicle_loaded" || status === "enroute_drop") && (
-                <div className="mt-4 rounded-2xl border border-border p-3">
-                  <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      Active timer
+                <div className="rounded-2xl border border-border p-3.5 bg-muted/20">
+                  <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock3 className="h-3.5 w-3.5 text-primary" />
+                      Active service timer
                     </span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-foreground">
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs font-bold text-foreground">
                       {elapsedSeconds > 0 ? formatElapsedTime() : "00:00"}
                     </span>
                   </div>
@@ -1475,23 +1929,22 @@ const RequestTracking = () => {
                 </div>
               )}
 
-              <div className="mt-5 pb-2">
-                <p className="text-center text-[10px] font-semibold text-slate-400">
-                  Request ID #{request.id}
-                </p>
-              </div>
+              <Button onClick={() => navigate("/")} variant="outline" className="w-full">
+                Back to home
+              </Button>
 
+              {/* Cancel Request Dialog */}
               {status !== "cancelled" && status !== "completed" && !paymentCompleted && (
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="mt-3 h-10 w-full rounded-xl text-[11px] font-semibold uppercase tracking-[0.12em] text-red-500 hover:bg-red-50 hover:text-red-600"
+                      className="w-full text-xs font-semibold uppercase tracking-wider text-red-500 hover:bg-red-50 hover:text-red-600"
                     >
                       Cancel request
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="w-[calc(100%-1.5rem)] max-w-md rounded-2xl">
+                  <DialogContent className="max-w-md rounded-2xl">
                     <DialogHeader>
                       <DialogTitle>Cancel this request?</DialogTitle>
                       <DialogDescription>This action cannot be undone.</DialogDescription>
@@ -1536,133 +1989,9 @@ const RequestTracking = () => {
                   </DialogContent>
                 </Dialog>
               )}
-
-              {status === "cancelled" && (
-                <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    This request was cancelled. You can place a fresh request from the home screen.
-                  </div>
-                </div>
-              )}
-          </div>
-        </motion.div>
-
-        <PaymentSummaryDialog
-          isOpen={showPaymentSummary}
-          onClose={() => setShowPaymentSummary(false)}
-          onConfirm={handleConfirmPayment}
-          baseAmount={requestAmount}
-          isProcessing={isProcessingPayment}
-          paymentMethod={selectedPaymentMethod}
-          platformFeePercent={SERVICE_REQUEST_PLATFORM_FEE_PERCENT}
-          paymentFeePercent={0}
-          currency={currency}
-          breakdown={summaryBreakdown}
-          showCouponSection={true}
-          couponCodeInput={couponCodeInput}
-          onCouponCodeInputChange={(value) => {
-            setCouponCodeInput(value);
-            if (couponMessage) setCouponMessage(null);
-          }}
-          onApplyCoupon={handleApplyCoupon}
-          onRemoveCoupon={handleRemoveCoupon}
-          isApplyingCoupon={isFetchingQuote}
-          couponAppliedCode={appliedCouponCode}
-          couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
-          couponMessage={couponMessage}
-        />
-
-        {paymentCompleted && (status === "completed" || status === "paid" || status === "payment_pending") && (
-          <ClientJobCompletion
-            technicianName={technician?.name || "Technician"}
-            onSubmitReview={() => {
-              toast.success("Thank you for your feedback");
-              navigate("/");
-            }}
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="container max-w-5xl py-8"
-      style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
-    >
-      <div className="grid gap-5 md:grid-cols-[1.4fr_1fr]">
-        <Card className="overflow-hidden rounded-2xl border-border/80">
-          <CardContent className="p-0">
-            <LiveTrackingMap
-              techLocation={technicianMapLocation}
-              userLocation={requestMapLocation}
-              dropLocation={trackingDropLocation}
-              routePolyline={trackingRoutePolyline}
-              eta={eta}
-              status={status}
-              distanceLabel={mapDistanceLabel}
-              showRoutePath={isTowingRequest}
-              className="mb-0"
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-border/80">
-          <CardContent className="space-y-4 p-5">
-            <div className="flex items-center justify-between">
-              <Badge className={isConnected ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}>
-                {isConnected ? "LIVE" : "RECONNECTING"}
-              </Badge>
-              <p className="text-xs text-muted-foreground">Request #{request.id}</p>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold">{statusMeta.title}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{statusMeta.subtitle}</p>
-            </div>
-            {routeSummaryVisible && (
-              <div className="rounded-2xl border border-border bg-muted/30 p-3 text-sm">
-                <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                  <MapPin className="h-4 w-4 text-orange-500" />
-                  Towing route
-                </div>
-                <p className="font-semibold text-foreground">Pickup: {request.address || "Selected"}</p>
-                <p className="mt-1 font-semibold text-foreground">Drop: {request.dropLocation?.address || request.drop_address || "Selected"}</p>
-                {Number.isFinite(routeDistanceKm) && (
-                  <p className="mt-2 text-xs font-bold text-slate-600">{routeDistanceKm.toFixed(1)} km route</p>
-                )}
-              </div>
-            )}
-            {shouldShowAmount ? (
-              <AmountCard
-                amount={finalAmount}
-                technicianAmount={amountCardDetails.baseAmount}
-                platformFee={amountCardDetails.platformFee}
-                razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
-                total={amountCardDetails.finalAmount}
-                paymentMode={amountCardDetails.paymentMode}
-                currency={currency}
-                title="Final Amount"
-                helperText="Live payment breakdown from your current service request."
-                badgeText={null}
-              />
-            ) : null}
-            {showPayment && !paymentCompleted && (
-              <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 p-4 text-white">
-                <p className="text-xs uppercase tracking-[0.12em] text-white/70">Amount due</p>
-                <p className="mt-1 text-3xl font-black">
-                  {currency} {amountDueLabel}
-                </p>
-                <Button onClick={handleOnlinePaymentClick} className="mt-3 w-full bg-white text-slate-900 hover:bg-slate-100">
-                  Pay now
-                </Button>
-              </div>
-            )}
-            <Button onClick={() => navigate("/")} variant="outline" className="w-full">
-              Back to home
-            </Button>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <PaymentSummaryDialog
@@ -1689,6 +2018,16 @@ const RequestTracking = () => {
         couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
         couponMessage={couponMessage}
       />
+
+      {paymentCompleted && (status === "completed" || status === "paid" || status === "payment_pending") && (
+        <ClientJobCompletion
+          technicianName={technician?.name || "Technician"}
+          onSubmitReview={() => {
+            toast.success("Thank you for your feedback");
+            navigate("/");
+          }}
+        />
+      )}
     </div>
   );
 };

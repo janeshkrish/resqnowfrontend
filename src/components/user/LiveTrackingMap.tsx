@@ -1,12 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { LocateFixed, RadioTower } from "lucide-react";
-import { Card, CardContent } from "../ui/card";
-import { cn } from "@/lib/utils";
+
 import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
+import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import type {
+  MapCameraSpec,
+  MapCircleSpec,
+  MapMarkerSpec,
+  MapPoint,
+  MapPolylineSpec,
+} from "@/lib/mapProvider/types";
+import { cn } from "@/lib/utils";
+
+import { Card, CardContent } from "../ui/card";
 
 type TrackingMapMode = "map" | "balanced" | "sheet";
 
@@ -25,13 +32,10 @@ interface LiveTrackingMapProps {
   showRoutePath?: boolean;
 }
 
-const FALLBACK_CENTER: [number, number] = [20.5937, 78.9629];
+const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
 
 const normalizeStatusLabel = (status: string | undefined) => {
-  const raw = String(status || "")
-    .trim()
-    .toLowerCase();
-
+  const raw = String(status || "").trim().toLowerCase();
   if (raw === "en-route" || raw === "on_the_way" || raw === "on-the-way") return "On the way";
   if (raw === "arrived") return "Arrived";
   if (raw === "in-progress" || raw === "in_progress") return "Service started";
@@ -40,7 +44,6 @@ const normalizeStatusLabel = (status: string | undefined) => {
   if (raw === "assigned") return "Assigned";
   if (raw === "pending") return "Finding technician";
   if (!raw) return "Live tracking";
-
   return raw
     .replace(/[_-]+/g, " ")
     .split(/\s+/)
@@ -50,145 +53,100 @@ const normalizeStatusLabel = (status: string | undefined) => {
 };
 
 const normalizeEtaLabel = (eta: string | undefined) =>
-  String(eta || "")
-    .replace(/\bmins?\b/i, "min")
-    .trim();
+  String(eta || "").replace(/\bmins?\b/i, "min").trim();
 
-const buildRouteCurve = (from: [number, number], to: [number, number]): [number, number][] => {
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+      })[character] || character,
+  );
+
+const buildRouteCurve = (
+  from: [number, number],
+  to: [number, number],
+): [number, number][] => {
   const [fromLat, fromLng] = from;
   const [toLat, toLng] = to;
   const latDelta = toLat - fromLat;
   const lngDelta = toLng - fromLng;
-
-  const firstCurve: [number, number] = [
-    fromLat + latDelta * 0.24 + lngDelta * 0.07,
-    fromLng + lngDelta * 0.24 - latDelta * 0.07,
+  return [
+    from,
+    [fromLat + latDelta * 0.24 + lngDelta * 0.07, fromLng + lngDelta * 0.24 - latDelta * 0.07],
+    [(fromLat + toLat) / 2 + lngDelta * 0.12, (fromLng + toLng) / 2 - latDelta * 0.12],
+    [fromLat + latDelta * 0.76 + lngDelta * 0.03, fromLng + lngDelta * 0.76 - latDelta * 0.03],
+    to,
   ];
-  const middleCurve: [number, number] = [
-    (fromLat + toLat) / 2 + lngDelta * 0.12,
-    (fromLng + toLng) / 2 - latDelta * 0.12,
-  ];
-  const secondCurve: [number, number] = [
-    fromLat + latDelta * 0.76 + lngDelta * 0.03,
-    fromLng + lngDelta * 0.76 - latDelta * 0.03,
-  ];
-
-  return [from, firstCurve, middleCurve, secondCurve, to];
 };
 
-const createDestinationIcon = () =>
-  L.divIcon({
-    className: "tracking-destination-marker-wrapper",
-    html: `
-      <div class="tracking-destination-marker">
-        <span class="tracking-destination-marker__ripple tracking-destination-marker__ripple--outer"></span>
-        <span class="tracking-destination-marker__ripple tracking-destination-marker__ripple--inner"></span>
-        <span class="tracking-destination-marker__pin">
-          <span class="tracking-destination-marker__pin-core"></span>
-        </span>
+const destinationMarkerHtml = `
+  <div class="mappls-marker-shell tracking-destination-marker">
+    <span class="tracking-destination-marker__ripple tracking-destination-marker__ripple--outer"></span>
+    <span class="tracking-destination-marker__ripple tracking-destination-marker__ripple--inner"></span>
+    <span class="tracking-destination-marker__pin">
+      <span class="tracking-destination-marker__pin-core"></span>
+    </span>
+  </div>
+`;
+
+const createTechnicianMarkerHtml = (etaLabel: string) => `
+  <div class="mappls-marker-shell tracking-tech-marker">
+    <div class="tracking-tech-marker__bubble">
+      <span class="tracking-tech-marker__badge"></span>
+      <div class="tracking-tech-marker__copy">
+        <span>${escapeHtml(etaLabel || "Live")}</span>
+        <small>Technician</small>
       </div>
-    `,
-    iconSize: [86, 92],
-    iconAnchor: [43, 74],
-  });
+    </div>
+    <span class="tracking-tech-marker__pulse"></span>
+    <span class="tracking-tech-marker__pin"></span>
+  </div>
+`;
 
-const createTechnicianIcon = (etaLabel: string) =>
-  L.divIcon({
-    className: "tracking-tech-marker-wrapper",
-    html: `
-      <div class="tracking-tech-marker">
-        <div class="tracking-tech-marker__bubble">
-          <span class="tracking-tech-marker__badge"></span>
-          <div class="tracking-tech-marker__copy">
-            <span>${etaLabel || "Live"}</span>
-            <small>Technician</small>
-          </div>
-        </div>
-        <span class="tracking-tech-marker__pulse"></span>
-        <span class="tracking-tech-marker__pin"></span>
-      </div>
-    `,
-    iconSize: [108, 96],
-    iconAnchor: [54, 78],
-  });
-
-const destinationIcon = createDestinationIcon();
-
-function MapViewport({
-  techLoc,
-  userLoc,
-  dropLoc,
-  topPadding,
-  bottomPadding,
-  reduceMotion,
-  recenterKey,
-}: {
-  techLoc: { lat: number; lng: number } | null;
-  userLoc: { lat: number; lng: number } | null;
-  dropLoc: { lat: number; lng: number } | null;
-  topPadding: number;
-  bottomPadding: number;
-  reduceMotion: boolean;
-  recenterKey: number;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    const invalidateTimer = window.setTimeout(() => {
-      map.invalidateSize();
-    }, 170);
-
-    const mapContainer = map.getContainer();
-    const resizeObserver = new ResizeObserver(() => {
-      map.invalidateSize();
-    });
-    resizeObserver.observe(mapContainer);
-
-    const points = [techLoc, userLoc, dropLoc].filter(Boolean) as { lat: number; lng: number }[];
-    if (points.length > 1) {
-      map.fitBounds(L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number])), {
-        paddingTopLeft: [24, topPadding],
-        paddingBottomRight: [24, bottomPadding],
-        maxZoom: 15,
-        animate: !reduceMotion,
-      });
-    } else if (techLoc) {
-      map.setView([techLoc.lat, techLoc.lng], 14.3, { animate: !reduceMotion });
-    } else if (userLoc) {
-      map.setView([userLoc.lat, userLoc.lng], 14, { animate: !reduceMotion });
-    } else {
-      map.setView(FALLBACK_CENTER, 5, { animate: !reduceMotion });
-    }
-
-    return () => {
-      window.clearTimeout(invalidateTimer);
-      resizeObserver.disconnect();
-    };
-  }, [map, techLoc, userLoc, dropLoc, topPadding, bottomPadding, reduceMotion, recenterKey]);
-
-  return null;
+function coordinateRevision(points: MapPoint[]) {
+  return points.reduce(
+    (revision, point) =>
+      revision + Math.round(point.lat * 10_000) * 31 + Math.round(point.lng * 10_000),
+    points.length,
+  );
 }
 
-function MapInteractionBridge({
-  enabled,
-  onInteract,
-}: {
-  enabled: boolean;
-  onInteract: () => void;
-}) {
-  useMapEvents(
-    enabled
-      ? {
-          click: onInteract,
-          dragstart: onInteract,
-          mousedown: onInteract,
-          touchstart: onInteract,
-          zoomstart: onInteract,
-        }
-      : {},
-  );
+function useInterpolatedPoint(target: MapPoint | null, reduceMotion: boolean) {
+  const [displayed, setDisplayed] = useState<MapPoint | null>(target);
+  const displayedRef = useRef<MapPoint | null>(target);
 
-  return null;
+  useEffect(() => {
+    if (!target || !displayedRef.current || reduceMotion) {
+      displayedRef.current = target;
+      setDisplayed(target);
+      return;
+    }
+
+    const from = displayedRef.current;
+    const startedAt = performance.now();
+    let frameId = 0;
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / 900);
+      const eased = 1 - (1 - progress) ** 3;
+      const next = {
+        lat: from.lat + (target.lat - from.lat) * eased,
+        lng: from.lng + (target.lng - from.lng) * eased,
+      };
+      displayedRef.current = next;
+      setDisplayed(next);
+      if (progress < 1) frameId = window.requestAnimationFrame(animate);
+    };
+    frameId = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [reduceMotion, target]);
+
+  return displayed;
 }
 
 const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
@@ -205,43 +163,43 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   routePolyline,
   showRoutePath = true,
 }) => {
-  const reduceMotion = useReducedMotion();
-  const [routePath, setRoutePath] = useState<[number, number][]>([]);
+  const reduceMotion = Boolean(useReducedMotion());
+  const displayedTechLocation = useInterpolatedPoint(techLocation, reduceMotion);
+  const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
   const [recenterKey, setRecenterKey] = useState(0);
+  const [autoFrame, setAutoFrame] = useState(true);
+  const lockedCameraRevisionRef = useRef<number | null>(null);
 
   const techPosition = useMemo<[number, number] | null>(
-    () => (techLocation ? [techLocation.lat, techLocation.lng] : null),
-    [techLocation],
+    () => displayedTechLocation
+      ? [displayedTechLocation.lat, displayedTechLocation.lng]
+      : null,
+    [displayedTechLocation],
   );
   const userPosition = useMemo<[number, number] | null>(
-    () => (userLocation ? [userLocation.lat, userLocation.lng] : null),
+    () => userLocation ? [userLocation.lat, userLocation.lng] : null,
     [userLocation],
   );
   const dropPosition = useMemo<[number, number] | null>(
-    () => (dropLocation ? [dropLocation.lat, dropLocation.lng] : null),
+    () => dropLocation ? [dropLocation.lat, dropLocation.lng] : null,
     [dropLocation],
   );
 
-  const routeFallback = useMemo(
-    () => {
-      if (!showRoutePath) return [];
-      if (techPosition && userPosition && dropPosition) return [...buildRouteCurve(techPosition, userPosition), ...buildRouteCurve(userPosition, dropPosition).slice(1)];
-      if (techPosition && userPosition) return buildRouteCurve(techPosition, userPosition);
-      if (userPosition && dropPosition) return buildRouteCurve(userPosition, dropPosition);
-      return [];
-    },
-    [dropPosition, showRoutePath, techPosition, userPosition],
-  );
-
-  const techIcon = useMemo(() => createTechnicianIcon(normalizeEtaLabel(eta) || "Live"), [eta]);
+  const routeFallback = useMemo(() => {
+    if (!showRoutePath) return [];
+    if (techPosition && userPosition && dropPosition) {
+      return [
+        ...buildRouteCurve(techPosition, userPosition),
+        ...buildRouteCurve(userPosition, dropPosition).slice(1),
+      ];
+    }
+    if (techPosition && userPosition) return buildRouteCurve(techPosition, userPosition);
+    if (userPosition && dropPosition) return buildRouteCurve(userPosition, dropPosition);
+    return [];
+  }, [dropPosition, showRoutePath, techPosition, userPosition]);
 
   useEffect(() => {
     if (!showRoutePath) {
-      setRoutePath([]);
-      return;
-    }
-
-    if ((!techLocation && !userLocation) || (!userLocation && !dropLocation)) {
       setRoutePath([]);
       return;
     }
@@ -252,40 +210,146 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       return;
     }
 
-    const waypointObjects = [techLocation, userLocation, dropLocation].filter(Boolean) as { lat: number; lng: number }[];
-    const waypointPositions = waypointObjects.map((point) => [point.lat, point.lng] as [number, number]);
-    const fallbackPath =
-      waypointPositions.length >= 2
-        ? waypointPositions.slice(1).reduce<[number, number][]>(
-            (path, current, index) => {
-              const previous = waypointPositions[index];
-              const segment = buildRouteCurve(previous, current);
-              return path.length ? [...path, ...segment.slice(1)] : segment;
-            },
-            [],
-          )
-        : [];
+    const waypoints = [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[];
+    if (waypoints.length < 2) {
+      setRoutePath([]);
+      return;
+    }
+
+    const waypointPositions = waypoints.map(
+      (point) => [point.lat, point.lng] as [number, number],
+    );
+    const fallbackPath = waypointPositions.slice(1).reduce<Array<[number, number]>>(
+      (path, current, index) => {
+        const segment = buildRouteCurve(waypointPositions[index], current);
+        return path.length ? [...path, ...segment.slice(1)] : segment;
+      },
+      [],
+    );
     setRoutePath(fallbackPath);
 
-    const loadRoute = async () => {
-      try {
-        const route = await fetchRoute(waypointObjects, "full");
+    let stale = false;
+    void fetchRoute(waypoints, "full")
+      .then((route) => {
+        if (stale) return;
         const coordinates = routePolylineFromMetadata(route);
-
-        if (coordinates.length > 1) {
-          setRoutePath(coordinates);
-        }
-      } catch (error) {
-        setRoutePath(fallbackPath);
-      }
+        if (coordinates.length > 1) setRoutePath(coordinates);
+      })
+      .catch(() => {
+        if (!stale) setRoutePath(fallbackPath);
+      });
+    return () => {
+      stale = true;
     };
-
-    void loadRoute();
   }, [dropLocation, routePolyline, showRoutePath, techLocation, userLocation]);
 
-  const mapCenter: [number, number] = userPosition || techPosition || FALLBACK_CENTER;
-  const statusLabel = normalizeStatusLabel(status);
-  const supportingLabel = distanceLabel || normalizeEtaLabel(eta) || "Live location";
+  const etaLabel = normalizeEtaLabel(eta) || "Live";
+  const markers = useMemo<MapMarkerSpec[]>(() => {
+    const next: MapMarkerSpec[] = [];
+    if (userLocation) {
+      next.push({
+        id: "customer",
+        position: userLocation,
+        html: destinationMarkerHtml,
+        anchor: "center",
+        zIndex: 640,
+        width: 86,
+        height: 92,
+        offset: [0, -18],
+      });
+    }
+    if (dropLocation) {
+      next.push({
+        id: "destination",
+        position: dropLocation,
+        html: destinationMarkerHtml,
+        anchor: "center",
+        zIndex: 620,
+        width: 86,
+        height: 92,
+        offset: [0, -18],
+      });
+    }
+    if (displayedTechLocation) {
+      next.push({
+        id: "technician",
+        position: displayedTechLocation,
+        html: createTechnicianMarkerHtml(etaLabel),
+        anchor: "center",
+        zIndex: 720,
+        width: 108,
+        height: 96,
+        offset: [0, -18],
+      });
+    }
+    return next;
+  }, [displayedTechLocation, dropLocation, etaLabel, userLocation]);
+
+  const circles = useMemo<MapCircleSpec[]>(() => {
+    const next: MapCircleSpec[] = [];
+    if (userLocation) {
+      next.push(
+        {
+          id: "customer-radius-outer",
+          center: userLocation,
+          radiusMeters: 230,
+          fillColor: "#60a5fa",
+          fillOpacity: 0.08,
+        },
+        {
+          id: "customer-radius-inner",
+          center: userLocation,
+          radiusMeters: 120,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.12,
+        },
+      );
+    }
+    if (displayedTechLocation) {
+      next.push({
+        id: "technician-radius",
+        center: displayedTechLocation,
+        radiusMeters: 170,
+        fillColor: "#ef4444",
+        fillOpacity: 0.08,
+      });
+    }
+    return next;
+  }, [displayedTechLocation, userLocation]);
+
+  const visibleRoute = routePath.length > 1 ? routePath : routeFallback;
+  const polylines = useMemo<MapPolylineSpec[]>(() => {
+    if (!showRoutePath || visibleRoute.length < 2) return [];
+    const points = visibleRoute.map(([lat, lng]) => ({ lat, lng }));
+    return [
+      {
+        id: "route-casing",
+        points,
+        color: "#ffffff",
+        width: 7,
+        opacity: 0.86,
+      },
+      {
+        id: "route-primary",
+        points,
+        color: "#ef4444",
+        width: 4,
+        opacity: 0.92,
+      },
+    ];
+  }, [showRoutePath, visibleRoute]);
+
+  const cameraPoints = useMemo(
+    () => [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[],
+    [dropLocation, techLocation, userLocation],
+  );
+  const baseCameraRevision =
+    coordinateRevision(cameraPoints) +
+    recenterKey * 10_000_000 +
+    (mapMode === "sheet" ? 2 : mapMode === "balanced" ? 1 : 0);
+  const cameraRevision = autoFrame
+    ? baseCameraRevision
+    : (lockedCameraRevisionRef.current ?? baseCameraRevision);
   const topPadding = variant === "fullscreen" ? 180 : 48;
   const bottomPadding =
     variant === "fullscreen"
@@ -295,95 +359,47 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           ? 300
           : 136
       : 72;
+  const camera = useMemo<MapCameraSpec>(
+    () => ({
+      mode: "fit",
+      points: cameraPoints.length ? cameraPoints : [FALLBACK_CENTER],
+      padding: { top: topPadding, right: 24, bottom: bottomPadding, left: 24 },
+      maxZoom: cameraPoints.length > 1 ? 15 : cameraPoints.length === 1 ? 14 : 5,
+      revision: cameraRevision,
+    }),
+    [bottomPadding, cameraPoints, cameraRevision, topPadding],
+  );
 
-  const renderMap = () => (
-    <MapContainer
-      center={mapCenter}
-      zoom={14}
+  const handleInteract = () => {
+    lockedCameraRevisionRef.current = cameraRevision;
+    setAutoFrame(false);
+    onInteract?.();
+  };
+
+  const recenter = () => {
+    lockedCameraRevisionRef.current = null;
+    setAutoFrame(true);
+    setRecenterKey((current) => current + 1);
+  };
+
+  const map = (
+    <MapplsMapSurface
+      ariaLabel="Live service tracking map"
+      markers={markers}
+      polylines={polylines}
+      circles={circles}
+      camera={camera}
       className="tracking-live-map h-full w-full"
-      zoomControl={false}
-      attributionControl={false}
-      scrollWheelZoom
-      dragging
-      touchZoom
-    >
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-
-      <MapInteractionBridge enabled={variant === "fullscreen" && Boolean(onInteract)} onInteract={onInteract || (() => undefined)} />
-
-      <MapViewport
-        techLoc={techLocation}
-        userLoc={userLocation}
-        dropLoc={dropLocation || null}
-        topPadding={topPadding}
-        bottomPadding={bottomPadding}
-        reduceMotion={Boolean(reduceMotion)}
-        recenterKey={recenterKey}
-      />
-
-      {userPosition && (
-        <>
-          <Circle
-            center={userPosition}
-            radius={230}
-            pathOptions={{ color: "transparent", fillColor: "#60a5fa", fillOpacity: 0.08 }}
-          />
-          <Circle
-            center={userPosition}
-            radius={120}
-            pathOptions={{ color: "transparent", fillColor: "#3b82f6", fillOpacity: 0.12 }}
-          />
-          <Marker position={userPosition} icon={destinationIcon} zIndexOffset={640} />
-        </>
-      )}
-
-      {dropPosition && (
-        <Marker position={dropPosition} icon={destinationIcon} zIndexOffset={620} />
-      )}
-
-      {techPosition && (
-        <>
-          <Circle
-            center={techPosition}
-            radius={170}
-            pathOptions={{ color: "transparent", fillColor: "#ef4444", fillOpacity: 0.08 }}
-          />
-          <Marker position={techPosition} icon={techIcon} zIndexOffset={720} />
-        </>
-      )}
-
-      {showRoutePath && (routePath.length > 1 ? routePath : routeFallback).length > 1 && (
-        <>
-          <Polyline
-            positions={routePath.length > 1 ? routePath : routeFallback}
-            pathOptions={{
-              color: "rgba(255,255,255,0.86)",
-              weight: 7,
-              opacity: 0.7,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-          />
-          <Polyline
-            positions={routePath.length > 1 ? routePath : routeFallback}
-            pathOptions={{
-              color: "#ef4444",
-              weight: 4,
-              opacity: 0.92,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-          />
-        </>
-      )}
-    </MapContainer>
+      onInteract={variant === "fullscreen" && onInteract ? handleInteract : undefined}
+    />
   );
 
   if (variant === "fullscreen") {
+    const statusLabel = normalizeStatusLabel(status);
+    const supportingLabel = distanceLabel || normalizeEtaLabel(eta) || "Live location";
     return (
       <div className={cn("relative h-full w-full overflow-hidden", className)}>
-        {renderMap()}
-
+        {map}
         <div
           className="pointer-events-none absolute inset-0 z-[380]"
           style={{
@@ -391,8 +407,10 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
               "radial-gradient(circle at top center, rgba(255,255,255,0.82), transparent 26%), linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08) 38%, rgba(238,242,248,0.38) 100%)",
           }}
         />
-
-        <div className="pointer-events-none absolute inset-x-4 z-[410]" style={{ top: "calc(env(safe-area-inset-top) + 6.75rem)" }}>
+        <div
+          className="pointer-events-none absolute inset-x-4 z-[410]"
+          style={{ top: "calc(env(safe-area-inset-top) + 6.75rem)" }}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="pointer-events-auto rounded-[1.5rem] border border-white/80 bg-white/92 px-4 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl">
               <div className="flex items-center gap-2 text-[15px] font-bold text-emerald-600">
@@ -404,10 +422,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
                 {supportingLabel}
               </div>
             </div>
-
             <button
               type="button"
-              onClick={() => setRecenterKey((current) => current + 1)}
+              onClick={recenter}
               className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/75 bg-white/92 text-slate-700 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl transition hover:bg-white"
               aria-label="Recenter live tracking map"
             >
@@ -421,9 +438,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
 
   return (
     <Card className={cn("overflow-hidden border-0 shadow-lg ring-1 ring-slate-900/5", className)}>
-      <CardContent className="relative h-[320px] p-0">
-        {renderMap()}
-      </CardContent>
+      <CardContent className="relative h-[320px] p-0">{map}</CardContent>
     </Card>
   );
 };

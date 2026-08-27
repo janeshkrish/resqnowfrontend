@@ -7,6 +7,9 @@ dev-dist/
 .env.*
 !.env.example
 
+# Superdesign temporary draft exports
+.superdesign/tmp/
+
 # Netlify local state
 .netlify/
 

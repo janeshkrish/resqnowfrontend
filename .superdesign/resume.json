@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "technician-active-job-navigation": {
+      "targetKind": "new-ui",
+      "projectId": "07cd2dca-9dc5-4867-8e65-1070d87390c2",
+      "activeDraftId": "b5261408-14b3-42dc-aecd-bd2291b7ba10",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/pages/technician/ActiveJob.tsx",
+        "src/components/technician/ActiveJobMap.tsx",
+        "src/components/ui/button.tsx",
+        "src/components/ui/card.tsx",
+        ".superdesign/init/theme.md",
+        "src/index.css:1:139",
+        "src/index.css:371:542",
+        "src/index.css:903:909",
+        "tailwind.config.ts",
+        "src/lib/utils.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "ce48bc11588485b760c9da1f04436e39f39268bf88441f55eacbb40e88792dc3",
+        "src/pages/technician/ActiveJob.tsx": "80b6e1c8f5068c109005bc8b12fd454834b455b1c5e584a06516a3d296df9f1d",
+        "src/components/technician/ActiveJobMap.tsx": "5ad4eb275b32449bb72a06455eeac9464b01d5a6cb71064fde001552fedcde2d",
+        "src/components/ui/button.tsx": "be3bd713ad5a91df0570786ba4da7548497d5e2c184a2f496eecf93f6a6422d0",
+        "src/components/ui/card.tsx": "ac0c8abee8162037e0376650049c8a7acda9e2eef7eecd37e47354926153675d",
+        ".superdesign/init/theme.md": "6c619035e3a32d851ddf892951b64bb3204deea109a9920a35f028aa1498462c",
+        "src/index.css": "cd94cd18b4d955db3668c5b12da9297573b7e29383ccc46e98b5ffb125f4f8fa",
+        "tailwind.config.ts": "38905406e5d6b04c768791c92a80b50fb0cc6bfea88884579a1209417c072bfb",
+        "src/lib/utils.ts": "74a147991a119f1c4cdc25a4d9b22713632fa32eb136e55ab6939b006d71b9d6"
+      },
+      "drafts": {
+        "b5261408-14b3-42dc-aecd-bd2291b7ba10": {
+          "title": "Active In-Trip Navigation",
+          "visualDirection": "ResQNow mobile navigation with top maneuver banner and bottom trip card",
+          "currentVersion": 2
+        }
+      },
+      "updatedAt": "2026-08-27T06:19:21Z"
+    }
+  }
+}

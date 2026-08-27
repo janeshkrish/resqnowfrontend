@@ -34,6 +34,10 @@ import {
 } from '@/lib/technicianActiveJobRoute';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+import {
+  resolveActiveJobNavigationTarget,
+  startJourneyAndNavigate,
+} from '@/lib/activeJobNavigation';
 
 const EMPTY_VALUE_TOKENS = new Set(['not available', 'n/a', 'na', 'null', 'undefined', 'no phone number']);
 
@@ -87,6 +91,7 @@ const ActiveJob = () => {
   const [status, setStatus] = useState(normalizeTechnicianStatus(stateJob?.status || 'accepted'));
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isNavigationActive, setIsNavigationActive] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [lastEarned, setLastEarned] = useState(0);
   const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
@@ -94,6 +99,7 @@ const ActiveJob = () => {
   const celebratedCompletionJobIdRef = useRef<string | null>(null);
   const jobSnapshotRef = useRef<any | null>(stateJob);
   const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
+  const navigationTarget = resolveActiveJobNavigationTarget(job, status);
 
   const isCancelledStatus = (value: unknown) => {
     const raw = String(value || '').trim().toLowerCase();
@@ -182,6 +188,25 @@ const ActiveJob = () => {
       setStatus(normalizeTechnicianStatus(job.status));
     }
   }, [cancelledJob, hasResolvedActiveJob, job, job?.status, navigate]);
+
+  useEffect(() => {
+    if (
+      [
+        'arrived',
+        'arrived_pickup',
+        'arrived_drop',
+        'service_completed',
+        'payment_pending',
+        'completed',
+        'paid',
+        'closed',
+        'cancelled',
+        'rejected',
+      ].includes(status)
+    ) {
+      setIsNavigationActive(false);
+    }
+  }, [status]);
 
   useEffect(() => {
     const completionJobId = String(job?.requestId || job?.id || stateJob?.requestId || stateJob?.id || '').trim();
@@ -372,7 +397,7 @@ const ActiveJob = () => {
 
   // 4. Update Status Logic
   const updateStatus = async (newStatus: string) => {
-    if (!job) return;
+    if (!job) return false;
     const normalizedNextStatus = normalizeTechnicianStatus(newStatus);
     setIsLoading(true);
     const previousStatus = status;
@@ -403,14 +428,17 @@ const ActiveJob = () => {
           toast.success(`Status updated to: ${formatTechnicianStatus(resolvedStatus)}`);
         }
         refreshActiveJob();
+        return true;
       } else {
         setStatus(previousStatus);
         toast.error(data.error || 'Failed to update status');
+        return false;
       }
     } catch (error) {
       console.error('Update status error:', error);
       setStatus(previousStatus);
       toast.error('Failed to update status');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -418,26 +446,11 @@ const ActiveJob = () => {
 
   // 5. Navigation Logic
   const openNavigation = () => {
-    if (!job) return;
-    const normalizedStatus = normalizeTechnicianStatus(status);
-    const useDrop = ['vehicle_loaded', 'enroute_drop', 'arrived_drop', 'service_completed', 'payment_pending', 'closed'].includes(normalizedStatus);
-    const pickupLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
-    const pickupLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
-    const towDropLat = toOptionalNumber(job.destinationLatitude ?? job.dropLocation?.lat ?? job.drop_latitude);
-    const towDropLng = toOptionalNumber(job.destinationLongitude ?? job.dropLocation?.lng ?? job.drop_longitude);
-    const destLat = useDrop ? towDropLat ?? pickupLat : pickupLat;
-    const destLng = useDrop ? towDropLng ?? pickupLng : pickupLng;
-
-    if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) {
+    if (!navigationTarget) {
       toast.error('Customer location coordinates are missing.');
       return;
     }
-
-    const url = currentLocation
-      ? `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${currentLocation.lat}%2C${currentLocation.lng}%3B${destLat}%2C${destLng}`
-      : `https://www.openstreetmap.org/?mlat=${destLat}&mlon=${destLng}#map=16/${destLat}/${destLng}`;
-    window.open(url, '_blank');
-
+    setIsNavigationActive(true);
   };
 
   if (visibleCancelledJob) {
@@ -504,24 +517,27 @@ const ActiveJob = () => {
     <div className="min-h-screen bg-[#f3f4f6] pb-8">
       <div className="mx-auto max-w-md px-4 py-4">
         <div className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/60">
-          <div className="relative h-[240px] w-full bg-muted/40">
+          <div className={`relative w-full bg-muted/40 ${isNavigationActive ? 'h-[calc(100dvh-2rem)] min-h-[560px] max-h-[760px]' : 'h-[240px]'}`}>
             <ActiveJobMap
               technicianLocation={currentLocation || { lat: 28.6139, lng: 77.209 }}
               customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
               destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
               routePolyline={job.routePolyline || job.route_polyline || job.routeMetadata?.polyline || null}
+              navigationMode={isNavigationActive}
+              navigationDestination={navigationTarget || undefined}
+              onExitNavigation={() => setIsNavigationActive(false)}
             />
 
-            <div className="absolute left-4 top-4 z-[400]">
+            {!isNavigationActive && <div className="absolute left-4 top-4 z-[400]">
               <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/95 px-4 py-2 shadow-lg backdrop-blur-sm">
                 <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-pulse" />
                 <span className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">
                   {formatTechnicianStatus(status)}
                 </span>
               </div>
-            </div>
+            </div>}
 
-            <div className="absolute right-4 top-4 z-[400] flex flex-col gap-2">
+            {!isNavigationActive && <div className="absolute right-4 top-4 z-[400] flex flex-col gap-2">
               <div className="rounded-2xl bg-zinc-900/90 px-3 py-2 shadow-lg backdrop-blur-md">
                 <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-400">Payout</p>
                 <p className="mt-1 text-lg font-black text-white">{formatMoney(displayAmount, 0)}</p>
@@ -541,7 +557,7 @@ const ActiveJob = () => {
                 </p>
                 <p className="mt-1 text-sm font-black">{formatMoney(displayDue, 0)}</p>
               </button>
-            </div>
+            </div>}
           </div>
 
           <div className="space-y-5 p-5">
@@ -707,7 +723,7 @@ const ActiveJob = () => {
               {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
                 <Button
                   className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
-                  onClick={() => updateStatus('en-route')}
+                  onClick={() => void startJourneyAndNavigate(updateStatus, setIsNavigationActive)}
                   disabled={isLoading}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Navigation className="mr-2 h-5 w-5" />}

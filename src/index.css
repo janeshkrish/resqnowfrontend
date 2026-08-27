@@ -373,19 +373,55 @@
   font-family: "Plus Jakarta Sans", "Inter", sans-serif;
 }
 
-.tracking-live-map .leaflet-tile-pane {
+.mappls-marker-shell {
+  background: transparent;
+  border: 0;
+  filter: drop-shadow(0 12px 12px rgba(15, 23, 42, 0.2));
+  pointer-events: none;
+  transform-origin: center bottom;
+}
+
+.active-job-navigation-marker {
+  position: relative;
+  display: grid;
+  height: 54px;
+  width: 54px;
+  place-items: center;
+  transform: rotate(var(--marker-heading, 0deg));
+}
+
+.active-job-navigation-marker__pulse {
+  position: absolute;
+  inset: 1px;
+  border-radius: 9999px;
+  background: rgba(225, 29, 72, 0.2);
+  animation: trackingTechPulse 2.4s ease-out infinite;
+}
+
+.active-job-navigation-marker__arrow {
+  position: relative;
+  display: grid;
+  height: 38px;
+  width: 38px;
+  place-items: center;
+  border: 3px solid #ffffff;
+  border-radius: 9999px;
+  background: #e11d48;
+  box-shadow: 0 14px 28px -14px rgba(225, 29, 72, 0.88);
+}
+
+.tracking-live-map canvas {
   filter: saturate(0.8) brightness(1.04) contrast(0.94);
   transform: translateZ(0);
   backface-visibility: hidden;
 }
 
-.tracking-live-map .leaflet-div-icon {
+.tracking-live-map .mappls-marker-shell {
   background: transparent;
   border: 0;
 }
 
-.tracking-live-map .leaflet-marker-icon,
-.tracking-live-map .leaflet-marker-shadow {
+.tracking-live-map [class*="marker"] {
   outline: none;
 }
 
@@ -903,6 +939,7 @@
   .tracking-tech-marker,
   .tracking-tech-marker__pulse,
   .tracking-destination-marker__ripple,
+  .active-job-navigation-marker__pulse,
   .radar-tech-marker,
   .radar-tech-marker__pulse,
   .radar-user-marker__ring {

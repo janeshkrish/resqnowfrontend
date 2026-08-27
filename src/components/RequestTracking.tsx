@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { routePolylineFromMetadata } from "@/lib/geo";
+import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
 import {
   resolveServiceRequestPaymentDetails,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
@@ -284,7 +285,6 @@ const RequestTracking = () => {
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [couponMessage, setCouponMessage] = useState<CouponMessageState | null>(null);
   const [finalAmount, setFinalAmount] = useState<number | null>(null);
-  const [sheetMode, setSheetMode] = useState<TrackingSheetMode>("map");
   const [panelHeight, setPanelHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [sheetSnapState, setSheetSnapState] = useState<"expanded" | "half" | "collapsed">("half");
@@ -347,14 +347,6 @@ const RequestTracking = () => {
     setAppliedCouponCode(null);
     setCouponMessage(null);
   }, [request?.id]);
-
-  useEffect(() => {
-    if (!isMobile) return;
-    setSheetMode((current) => {
-      if (showPayment) return "sheet";
-      return current;
-    });
-  }, [isMobile, showPayment]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -1240,7 +1232,8 @@ const RequestTracking = () => {
             variant="fullscreen"
             status={status}
             distanceLabel={mapDistanceLabel}
-            mapMode={"map"}
+            mapMode={trackingMapModeFromSheetSnap(sheetSnapState)}
+            onInteract={() => snapTo("collapsed")}
             showRoutePath={isTowingRequest}
             className="h-full w-full"
           />

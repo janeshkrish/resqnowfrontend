@@ -12,7 +12,10 @@ type InitializableMapplsRuntime = MapplsRuntime & {
 type LoaderDependencies = {
   readKey: () => string | undefined;
   createSdk: () => Promise<{ sdk: InitializableMapplsRuntime }>;
+  timeoutMs?: number;
 };
+
+const DEFAULT_LOAD_TIMEOUT_MS = 15_000;
 
 const loadOptions = {
   map: true,
@@ -21,7 +24,11 @@ const loadOptions = {
   plugins: [""],
 } as const;
 
-export function createMapplsSdkLoader({ readKey, createSdk }: LoaderDependencies) {
+export function createMapplsSdkLoader({
+  readKey,
+  createSdk,
+  timeoutMs = DEFAULT_LOAD_TIMEOUT_MS,
+}: LoaderDependencies) {
   let initialization: Promise<MapplsRuntime> | null = null;
 
   return () => {
@@ -41,9 +48,21 @@ export function createMapplsSdkLoader({ readKey, createSdk }: LoaderDependencies
       .then(
         ({ sdk }) =>
           new Promise<MapplsRuntime>((resolve, reject) => {
+            const timeoutId = globalThis.setTimeout(() => {
+              reject(
+                new MapProviderError(
+                  "sdk_load_failed",
+                  "Mappls SDK loading timed out. Check the SDK key and allowed browser origins.",
+                ),
+              );
+            }, timeoutMs);
             try {
-              sdk.initialize(key, loadOptions, () => resolve(sdk));
+              sdk.initialize(key, loadOptions, () => {
+                globalThis.clearTimeout(timeoutId);
+                resolve(sdk);
+              });
             } catch (error) {
+              globalThis.clearTimeout(timeoutId);
               reject(
                 new MapProviderError(
                   "sdk_load_failed",

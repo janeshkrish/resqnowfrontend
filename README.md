@@ -112,6 +112,7 @@ All frontend environment variables must be prefixed with `VITE_` because they ar
 | `VITE_API_URL` | Yes for backend-connected builds | Backend API origin, for example `http://localhost:5000` or `https://resqnowbackend.onrender.com`. Do not append `/api`. |
 | `VITE_FRONTEND_ONLY` | Optional | Set to `true` only for demo mode without a backend. Do not enable for production backend-connected deployments. |
 | `VITE_GOOGLE_MAPS_API_KEY` | Required for Google map/geocoding UI | Public browser key restricted by domain and API. |
+| `VITE_MAPPLS_MAP_SDK_KEY` | Required for active-job and live-tracking maps | Client-safe Mappls Web SDK access token. Its Mappls IP/domain restrictions must include every browser and Capacitor origin that serves the app. |
 | `VITE_RAZORPAY_KEY_ID` | Required for payment UI | Razorpay public key ID. The secret key must stay only in the backend. |
 | `VITE_PAYMENTS_DISABLED` | Optional | Feature flag for disabling payment flows in local/demo environments. |
 | `VITE_FIREBASE_API_KEY` | Required for FCM | Firebase public client API key. Restrict it in Google Cloud/Firebase. |
@@ -123,6 +124,22 @@ All frontend environment variables must be prefixed with `VITE_` because they ar
 | `VITE_FIREBASE_VAPID_KEY` | Required for web push | Public web push VAPID key. |
 
 Never place backend secrets, database credentials, JWT secrets, Razorpay secrets, SMTP credentials, or Firebase Admin private keys in this repository.
+
+### Mappls SDK authorization
+
+`VITE_MAPPLS_MAP_SDK_KEY` is embedded by Vite at build time. After adding or changing it, restart the dev server and rebuild the web/Capacitor bundle.
+
+In the Mappls console, add each actual app origin to the key's IP/domain restrictions. For this repository, that normally includes:
+
+```text
+http://localhost:8080
+http://127.0.0.1:8080
+http://localhost:4173
+https://resqnowfrontend.vercel.app
+https://localhost
+```
+
+Add any custom production or preview domain that is used as well. Mappls returns `401 ASSET_ACCESS_DENIED` with `IP/Domain validation failed` when the page's origin is missing. The SDK loader converts a stalled remote script into a retryable error after 15 seconds; changing application code cannot bypass Mappls origin authorization.
 
 ## API Configuration
 
@@ -233,6 +250,7 @@ Required Netlify environment variables:
 ```text
 VITE_API_URL=https://your-backend.example.com
 VITE_GOOGLE_MAPS_API_KEY=your-public-google-maps-key
+VITE_MAPPLS_MAP_SDK_KEY=your-client-safe-mappls-sdk-token
 VITE_RAZORPAY_KEY_ID=your-razorpay-key-id
 VITE_FIREBASE_API_KEY=your-firebase-public-api-key
 VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com

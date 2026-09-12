@@ -1,86 +1,79 @@
-import type { MapplsMap, MapplsRuntime } from "./types";
+import type { mappls } from "mappls-web-maps";
+import type { MapplsRuntime } from "./types";
 import { MapProviderError } from "./types";
 
-type MapplsSdk = Omit<MapplsRuntime, "Map"> & {
-  map(
-    options: { id: string; key: string; properties: Record<string, unknown> },
-    onReady: (map: MapplsMap) => void,
-  ): void;
-};
-
+// Keep this contract tied to the installed package, not a hand-written SDK API.
+type MapplsSdk = Pick<mappls, "initialize" | "Map" | "Marker" | "Polyline" | "Circle" | "removeLayer">;
 type LoaderDependencies = {
   readKey: () => string | undefined;
   createSdk: () => Promise<{ sdk: MapplsSdk }>;
   timeoutMs?: number;
 };
 
-const DEFAULT_LOAD_TIMEOUT_MS = 15_000;
-
-function createRuntime(sdk: MapplsSdk, key: string, timeoutMs: number): MapplsRuntime {
-  return {
-    Map: ({ id, properties }) =>
-      new Promise<MapplsMap>((resolve, reject) => {
-        const timeoutId = globalThis.setTimeout(() => {
-          reject(
-            new MapProviderError(
-              "sdk_load_failed",
-              "Mappls map creation timed out. Check the SDK key and allowed browser origins.",
-            ),
-          );
-        }, timeoutMs);
-        try {
-          sdk.map({ id, key, properties }, (map) => {
-            globalThis.clearTimeout(timeoutId);
-            if (!map) {
-              reject(new MapProviderError("map_failed", "Mappls did not return a map instance."));
-              return;
-            }
-            resolve(map);
-          });
-        } catch (error) {
-          globalThis.clearTimeout(timeoutId);
-          reject(new MapProviderError("sdk_load_failed", "Mappls map creation failed.", error));
-        }
-      }),
-    Marker: (options) => sdk.Marker(options),
-    Polyline: (options) => sdk.Polyline(options),
-    Circle: (options) => sdk.Circle(options),
-    removeLayer: (input) => sdk.removeLayer(input),
-  };
-}
-
 export function createMapplsSdkLoader({
   readKey,
   createSdk,
-  timeoutMs = DEFAULT_LOAD_TIMEOUT_MS,
+  timeoutMs = 15_000,
 }: LoaderDependencies) {
   let initialization: Promise<MapplsRuntime> | null = null;
-
   return () => {
     if (initialization) return initialization;
-
     const key = readKey()?.trim();
     if (!key) {
-      return Promise.reject(
-        new MapProviderError(
-          "missing_key",
-          "VITE_MAPPLS_MAP_SDK_KEY is not configured.",
-        ),
-      );
+      return Promise.reject(new MapProviderError("missing_key", "VITE_MAPPLS_MAP_SDK_KEY is not configured."));
     }
 
-    initialization = createSdk()
-      .then(({ sdk }) => createRuntime(sdk, key, timeoutMs))
-      .catch((error: unknown) => {
-        initialization = null;
-        if (error instanceof MapProviderError) throw error;
-        throw new MapProviderError(
-          "sdk_load_failed",
-          "Mappls SDK could not be loaded.",
-          error,
-        );
-      });
-
+    initialization = createSdk().then(({ sdk }) => new Promise<MapplsRuntime>((resolve, reject) => {
+      const previousScripts = new Set(document.querySelectorAll("script"));
+      const isSdkScript = (element: EventTarget | null): element is HTMLScriptElement => {
+        if (!(element instanceof HTMLScriptElement)) return false;
+        try {
+          const url = new URL(element.src);
+          return url.hostname === "sdk.mappls.com" && url.pathname === "/map/sdk/web"
+            && url.searchParams.get("access_token") === key && !previousScripts.has(element);
+        } catch { return false; }
+      };
+      let settled = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        document.removeEventListener("error", onScriptError, true);
+      };
+      const fail = (message: string) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        document.querySelectorAll("script").forEach((script) => {
+          if (isSdkScript(script)) {
+            script.onload = null;
+            script.remove();
+          }
+        });
+        reject(new MapProviderError("sdk_load_failed", message));
+      };
+      const onScriptError = (event: Event) => {
+        if (isSdkScript(event.target)) {
+          fail("Mappls rejected or could not load the Web SDK. Check the key's domain/IP whitelist and Web SDK allocation.");
+        }
+      };
+      const timer = setTimeout(() => fail("Mappls SDK loading timed out. Check browser connectivity and Mappls authorization."), timeoutMs);
+      document.addEventListener("error", onScriptError, true);
+      try {
+        // 3.8.1 uses initialize() then uppercase Map(). No plugins are needed
+        // for rendering; requesting even [''] loads a second, unnecessary SDK.
+        sdk.initialize(key, { map: true, version: "3.0" }, () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(sdk);
+        });
+      } catch {
+        fail("Mappls SDK initialization failed.");
+      }
+    })).catch((error: unknown) => {
+      initialization = null;
+      if (error instanceof MapProviderError) throw error;
+      throw new MapProviderError("sdk_load_failed", "Mappls SDK could not be loaded.");
+    });
     return initialization;
   };
 }
@@ -89,8 +82,7 @@ const defaultLoader = createMapplsSdkLoader({
   readKey: () => import.meta.env.VITE_MAPPLS_MAP_SDK_KEY,
   createSdk: async () => {
     const { mappls } = await import("mappls-web-maps");
-    return { sdk: new mappls() as MapplsSdk };
+    return { sdk: new mappls() };
   },
 });
-
 export const initializeMapplsSdk = () => defaultLoader();

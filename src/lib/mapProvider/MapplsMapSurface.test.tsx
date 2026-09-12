@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MapplsMapSurface } from "./MapplsMapSurface";
 
@@ -22,6 +22,7 @@ const createFakeRuntime = () => {
     remove: vi.fn(),
   };
   const layer = () => ({
+    addListener: vi.fn((_event: string, _handler: () => void) => {}),
     remove: vi.fn(),
     setPosition: vi.fn(),
     setData: vi.fn(),
@@ -30,7 +31,7 @@ const createFakeRuntime = () => {
   return {
     fakeMap,
     runtime: {
-      Map: vi.fn(async () => fakeMap),
+      Map: vi.fn(() => fakeMap),
       Marker: vi.fn(layer),
       Polyline: vi.fn(layer),
       Circle: vi.fn(layer),
@@ -40,7 +41,13 @@ const createFakeRuntime = () => {
 };
 
 describe("Mappls map surface", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
   it("shows a retryable fallback when Mappls cannot initialize", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onUnavailable = vi.fn();
     const loadSdk = vi.fn().mockRejectedValue(new Error("invalid key"));
 
     render(
@@ -50,6 +57,7 @@ describe("Mappls map surface", () => {
         markers={[]}
         polylines={[]}
         circles={[]}
+        onUnavailable={onUnavailable}
       />,
     );
 
@@ -58,6 +66,8 @@ describe("Mappls map surface", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Retry map" }));
     await waitFor(() => expect(loadSdk).toHaveBeenCalledTimes(2));
+    expect(onUnavailable).toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith("[Mappls]", { code: "map_failed", origin: window.location.origin });
   });
 
   it("creates one map and forwards map interactions", async () => {
@@ -85,5 +95,33 @@ describe("Mappls map surface", () => {
     );
     await act(async () => { fakeMap.emit("dragstart"); });
     expect(onInteract).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not create a map after unmounting during SDK loading", async () => {
+    const { runtime } = createFakeRuntime();
+    let ready: (value: typeof runtime) => void;
+    const loadSdk = () => new Promise<typeof runtime>((resolve) => { ready = resolve; });
+    const view = render(<MapplsMapSurface ariaLabel="Map" markers={[]} circles={[]} polylines={[]} loadSdk={loadSdk} />);
+    view.unmount();
+    await act(async () => { ready(runtime); });
+    expect(runtime.Map).not.toHaveBeenCalled();
+  });
+
+  it("uses the latest technician click handler without recreating the marker", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const onClick = vi.fn(), nextClick = vi.fn();
+    const loadSdk = async () => runtime;
+    const marker = { id: "tech", position: {lat:11,lng:77}, html: "<span>Technician</span>", onClick };
+    const view = render(<MapplsMapSurface ariaLabel="Map" markers={[marker]} circles={[]} polylines={[]} loadSdk={loadSdk} />);
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+    const layer = runtime.Marker.mock.results[0].value;
+    const click = layer.addListener.mock.calls[0][1] as () => void;
+    click();
+    expect(onClick).toHaveBeenCalledOnce();
+    view.rerender(<MapplsMapSurface ariaLabel="Map" markers={[{...marker, onClick:nextClick}]} circles={[]} polylines={[]} loadSdk={loadSdk} />);
+    click();
+    expect(nextClick).toHaveBeenCalledOnce();
+    expect(runtime.Marker).toHaveBeenCalledOnce();
   });
 });

@@ -135,11 +135,17 @@ In the Mappls console, add each actual app origin to the key's IP/domain restric
 http://localhost:8080
 http://127.0.0.1:8080
 http://localhost:4173
+https://resqnow.org
+https://www.resqnow.org
 https://resqnowfrontend.vercel.app
 https://localhost
 ```
 
-Add any custom production or preview domain that is used as well. Mappls returns `401 ASSET_ACCESS_DENIED` with `IP/Domain validation failed` when the page's origin is missing. The SDK loader converts a stalled remote script into a retryable error after 15 seconds; changing application code cannot bypass Mappls origin authorization.
+Add any custom production or preview domain that is used as well. Mappls returns `401 ASSET_ACCESS_DENIED` with `IP/Domain validation failed` when its IP/domain policy rejects the request. Web SDK requests originate in visitors' browsers; an IP allowlist containing only a hosting IP such as `216.198.79.1` does not authorize all visitors. Configure the application's Web SDK domain whitelist and review/remove the incompatible server-IP restriction with Mappls if the console does not permit editing it.
+
+Both `/map` and job tracking use Mappls. The pinned `mappls-web-maps@3.8.1` package uses `initialize(token, { map: true, version: "3.0" }, callback)`, followed by uppercase `Map(...)`. Old lowercase `map({key}, callback)` examples are incompatible with this package. No plugin allocation is required for these map surfaces.
+
+From the frontend directory, run `node scripts/diagnose-mappls.cjs` to check the local key against the official SDK endpoints without printing it. A 401 requires a Mappls configuration fix; changing frontend code cannot bypass it. After fixing configuration, rebuild/redeploy Vercel with `VITE_MAPPLS_MAP_SDK_KEY` in the Production environment. Mappls authorization scripts use NetworkOnly caching so old authorization responses are not reused.
 
 ## API Configuration
 

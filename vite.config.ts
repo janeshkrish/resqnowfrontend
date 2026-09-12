@@ -95,6 +95,13 @@ export default defineConfig(({ mode }) => {
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
             {
+              // Authorization responses must not survive in the generic script cache.
+              urlPattern: ({ url }) =>
+                url.hostname === "sdk.mappls.com" || url.hostname === "apis.mappls.com",
+              handler: "NetworkOnly",
+              method: "GET",
+            },
+            {
               urlPattern: paymentNoCacheRuntimePattern,
               handler: "NetworkOnly",
               method: "GET",

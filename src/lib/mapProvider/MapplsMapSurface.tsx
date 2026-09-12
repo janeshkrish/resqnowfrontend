@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { initializeMapplsSdk } from "./mapplsSdk";
+import { MapProviderError } from "./types";
 import type {
   MapCameraSpec,
   MapCircleSpec,
@@ -30,6 +31,8 @@ type MapplsMapSurfaceProps = {
   camera?: MapCameraSpec;
   className?: string;
   onInteract?: () => void;
+  onUnavailable?: () => void;
+  fallbackDescription?: string;
   loadSdk?: () => Promise<MapplsRuntime>;
 };
 
@@ -61,6 +64,8 @@ export function MapplsMapSurface({
   camera,
   className,
   onInteract,
+  onUnavailable,
+  fallbackDescription = "Live job details will continue updating.",
   loadSdk = initializeMapplsSdk,
 }: MapplsMapSurfaceProps) {
   const reactId = useId();
@@ -73,12 +78,18 @@ export function MapplsMapSurface({
   const mapRef = useRef<MapplsMap | null>(null);
   const markerLayersRef = useRef(new Map<string, MapplsMarker>());
   const markerContentRef = useRef(new Map<string, string | HTMLElement>());
+  const markerClickRef = useRef(new Map<string, (() => void) | undefined>());
+  markerClickRef.current = new Map(markers.map((marker) => [marker.id, marker.onClick]));
   const polylineLayersRef = useRef(new Map<string, MapplsLayer>());
   const circleLayersRef = useRef(new Map<string, MapplsLayer>());
   const lastCameraRef = useRef<{ mode: MapCameraSpec["mode"]; revision: number } | null>(null);
   const [loadRevision, setLoadRevision] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (error) onUnavailable?.();
+  }, [error, onUnavailable]);
 
   const retry = useCallback(() => {
     setError(null);
@@ -91,6 +102,7 @@ export function MapplsMapSurface({
     let map: MapplsMap | null = null;
     let runtime: MapplsRuntime | null = null;
     let resizeObserver: ResizeObserver | null = null;
+    let readyTimer: ReturnType<typeof setTimeout> | undefined;
     const markerLayers = markerLayersRef.current;
     const markerContent = markerContentRef.current;
     const polylineLayers = polylineLayersRef.current;
@@ -103,7 +115,7 @@ export function MapplsMapSurface({
         runtime = loadedRuntime;
         runtimeRef.current = loadedRuntime;
         lastCameraRef.current = null;
-        return loadedRuntime.Map({
+        const createdMap = loadedRuntime.Map({
           id: mapId,
           properties: {
             center: [20.5937, 78.9629],
@@ -112,19 +124,23 @@ export function MapplsMapSurface({
             location: false,
           },
         });
-      })
-      .then((createdMap) => {
-        if (disposed) {
-          createdMap.remove();
-          return;
+        if (!createdMap || typeof createdMap.on !== "function") {
+          throw new MapProviderError("map_failed", "Mappls did not return a map. Verify the Web SDK key and authorization.");
         }
         map = createdMap;
         mapRef.current = createdMap;
 
         const handleLoad = () => {
+          clearTimeout(readyTimer);
           if (!disposed) setLoaded(true);
         };
+        readyTimer = setTimeout(() => {
+          if (!disposed) {
+            setError(new MapProviderError("map_failed", "Mappls map rendering timed out."));
+          }
+        }, 20_000);
         createdMap.on("load", handleLoad);
+        if (createdMap.loaded?.()) handleLoad();
 
         if (containerRef.current && typeof ResizeObserver !== "undefined") {
           resizeObserver = new ResizeObserver(() => createdMap.resize());
@@ -133,12 +149,18 @@ export function MapplsMapSurface({
       })
       .catch((cause: unknown) => {
         if (!disposed) {
+          // Do not log provider URLs or raw SDK errors: they may contain the key.
+          console.error("[Mappls]", {
+            code: cause instanceof MapProviderError ? cause.code : "map_failed",
+            origin: window.location.origin,
+          });
           setError(cause instanceof Error ? cause : new Error(String(cause)));
         }
       });
 
     return () => {
       disposed = true;
+      clearTimeout(readyTimer);
       resizeObserver?.disconnect();
       markerLayers.forEach((layer) => {
         if (runtime && map) removeOverlay(runtime, map, layer);
@@ -189,9 +211,7 @@ export function MapplsMapSurface({
         return;
       }
       if (existing) removeOverlay(runtime, map, existing);
-      markerLayersRef.current.set(
-        marker.id,
-        runtime.Marker({
+      const layer = runtime.Marker({
           map,
           position: marker.position,
           html: marker.html,
@@ -200,8 +220,9 @@ export function MapplsMapSurface({
           width: marker.width,
           height: marker.height,
           offset: marker.offset,
-        }),
-      );
+        });
+      layer.addListener?.("click", () => markerClickRef.current.get(marker.id)?.());
+      markerLayersRef.current.set(marker.id, layer);
       markerContentRef.current.set(marker.id, marker.html);
     });
   }, [loaded, markers]);
@@ -300,7 +321,7 @@ export function MapplsMapSurface({
       >
         <p className="font-bold text-slate-900">Map is temporarily unavailable</p>
         <p className="mt-1 text-sm text-slate-500">
-          Live job details will continue updating.
+          {fallbackDescription}
         </p>
         <Button className="mt-4" type="button" variant="outline" onClick={retry}>
           Retry map

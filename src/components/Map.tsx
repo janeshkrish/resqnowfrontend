@@ -8,9 +8,7 @@ import {
   type PanInfo,
 } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import { NearbyMapCanvas } from "@/components/NearbyMapCanvas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -72,67 +70,6 @@ const SERVICE_ORDER_BY_KEY = SERVICE_CATALOG.reduce<Record<string, number>>((acc
   }
   return accumulator;
 }, {});
-
-function MapViewport({
-  userPosition,
-  activeTechnicianPosition,
-  bottomPadding,
-  rightPadding,
-  reduceMotion,
-}: {
-  userPosition: [number, number] | null;
-  activeTechnicianPosition: [number, number] | null;
-  bottomPadding: number;
-  rightPadding: number;
-  reduceMotion: boolean;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    const invalidateTimer = window.setTimeout(() => {
-      map.invalidateSize();
-    }, 160);
-
-    if (userPosition && activeTechnicianPosition) {
-      map.fitBounds(L.latLngBounds([userPosition, activeTechnicianPosition]), {
-        paddingTopLeft: [24, 92],
-        paddingBottomRight: [rightPadding, bottomPadding],
-        maxZoom: 14,
-        animate: !reduceMotion,
-      });
-    } else if (userPosition) {
-      map.setView(userPosition, 13.5, { animate: !reduceMotion });
-    }
-
-    return () => {
-      window.clearTimeout(invalidateTimer);
-    };
-  }, [activeTechnicianPosition, bottomPadding, map, reduceMotion, rightPadding, userPosition]);
-
-  return null;
-}
-
-function MapInteractionBridge({
-  enabled,
-  onInteract,
-}: {
-  enabled: boolean;
-  onInteract: () => void;
-}) {
-  useMapEvents(
-    enabled
-      ? {
-          click: onInteract,
-          mousedown: onInteract,
-          touchstart: onInteract,
-          dragstart: onInteract,
-          zoomstart: onInteract,
-        }
-      : {},
-  );
-
-  return null;
-}
 
 const toNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
@@ -264,38 +201,6 @@ const buildRouteCurve = (from: [number, number], to: [number, number]): [number,
   return [from, firstCurve, middleCurve, secondCurve, to];
 };
 
-const createUserIcon = () =>
-  L.divIcon({
-    className: "radar-user-marker-wrapper bg-transparent border-0",
-    html: `
-      <div style="width: 20px; height: 20px; background: #4285f4; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.3);"></div>
-    `,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  });
-
-const createTechnicianIcon = (tech: Technician, selected: boolean) => {
-  const pinColor = selected ? "#ea4335" : "#1a73e8"; 
-  const pinScale = selected ? 1.15 : 0.95;
-  const pinZ = selected ? 1000 : 100;
-
-  return L.divIcon({
-    className: "radar-tech-marker-wrapper bg-transparent border-0",
-    html: `
-      <div style="transform: scale(${pinScale}); transform-origin: bottom center; transition: transform 0.2s cubic-bezier(0.2,0,0,1); z-index: ${pinZ}; position: relative; filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.25));">
-        <svg width="28" height="40" viewBox="0 0 24 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path fill-rule="evenodd" clip-rule="evenodd" d="M12 0C5.37258 0 0 5.37258 0 12C0 21 12 36 12 36C12 36 24 21 24 12C24 5.37258 18.6274 0 12 0ZM12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12C17 14.7614 14.7614 17 12 17Z" fill="${pinColor}"/>
-          <circle cx="12" cy="12" r="5" fill="white"/>
-        </svg>
-      </div>
-    `,
-    iconSize: [28, 40],
-    iconAnchor: [14, 40],
-  });
-};
-
-const userRadarIcon = createUserIcon();
-
 const buildFilterId = (serviceType: string) => `service:${serviceType.trim().toLowerCase()}`;
 
 const getTechnicianServiceKeys = (tech: Technician) =>
@@ -316,7 +221,7 @@ const normalizeTechnicians = (input: unknown, origin: [number, number]) => {
   if (!Array.isArray(input)) return [];
 
   return input
-    .map((item, index) => {
+    .map((item, index): Technician | null => {
       const raw = (item ?? {}) as Record<string, unknown>;
       const latitude = toNumber(raw.latitude ?? raw.lat, NaN);
       const longitude = toNumber(raw.longitude ?? raw.lng, NaN);
@@ -700,88 +605,18 @@ const RadarMap = ({ mode = "page" }: MapProps) => {
   return (
     <div className={containerClasses}>
       <div className="absolute inset-0">
-        <MapContainer
+        <NearbyMapCanvas
           center={mapCenter}
-          zoom={13}
-          className="radar-map h-full w-full"
-          zoomControl={false}
-          attributionControl={false}
-          scrollWheelZoom
-          dragging
-          touchZoom
-        >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-
-          <MapInteractionBridge enabled={isDraggableSheet} onInteract={handleMapInteract} />
-
-          <MapViewport
-            userPosition={userPosition}
-            activeTechnicianPosition={activeTechPosition}
-            bottomPadding={mapFitBottomPadding}
-            rightPadding={mapFitRightPadding}
-            reduceMotion={reduceMotion}
-          />
-
-          {userPosition && (
-            <>
-              <Circle
-                center={userPosition}
-                radius={240}
-                pathOptions={{ color: "transparent", fillColor: "#fb7185", fillOpacity: 0.08 }}
-              />
-              <Circle
-                center={userPosition}
-                radius={140}
-                pathOptions={{ color: "transparent", fillColor: "#fb7185", fillOpacity: 0.14 }}
-              />
-              <Marker position={userPosition} icon={userRadarIcon} zIndexOffset={600} />
-            </>
-          )}
-
-          {activeTechPosition && (
-            <Circle
-              center={activeTechPosition}
-              radius={180}
-              pathOptions={{ color: "transparent", fillColor: "#34d399", fillOpacity: 0.11 }}
-            />
-          )}
-
-          {routePath.length > 1 && (
-            <>
-              <Polyline
-                positions={routePath}
-                pathOptions={{
-                  color: "rgba(255,255,255,0.88)",
-                  weight: 8,
-                  opacity: 0.72,
-                  lineCap: "round",
-                  lineJoin: "round",
-                }}
-              />
-              <Polyline
-                positions={routePath}
-                pathOptions={{
-                  color: "#ff4d5a",
-                  weight: 4,
-                  opacity: 0.92,
-                  dashArray: "6 10",
-                  lineCap: "round",
-                  lineJoin: "round",
-                }}
-              />
-            </>
-          )}
-
-          {orderedTechnicians.map((tech) => (
-            <Marker
-              key={tech.id}
-              position={[tech.latitude, tech.longitude]}
-              icon={createTechnicianIcon(tech, activeTech?.id === tech.id)}
-              eventHandlers={{ click: () => handleTechSelect(tech, "map") }}
-              zIndexOffset={activeTech?.id === tech.id ? 400 : 150}
-            />
-          ))}
-        </MapContainer>
+          userPosition={userPosition}
+          activeTechPosition={activeTechPosition}
+          technicians={orderedTechnicians}
+          selectedTechId={activeTech?.id}
+          routePath={routePath}
+          bottomPadding={mapFitBottomPadding}
+          rightPadding={mapFitRightPadding}
+          onSelect={(tech) => handleTechSelect(tech, "map")}
+          onInteract={isDraggableSheet ? handleMapInteract : undefined}
+        />
 
         <div
           className="pointer-events-none absolute inset-0 z-[380]"

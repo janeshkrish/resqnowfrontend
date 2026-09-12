@@ -14,11 +14,13 @@ export interface MapplsLayer {
 }
 
 export interface MapplsMarker extends MapplsLayer {
+  addListener?: (event: string, handler: () => void) => void;
   setPosition?: (position: MapPoint | [number, number]) => void;
   setLngLat?: (position: [number, number]) => void;
 }
 
 export interface MapplsMap {
+  loaded?: () => boolean;
   on(event: string, handler: () => void): void;
   off(event: string, handler: () => void): void;
   fitBounds(bounds: unknown, options?: Record<string, unknown>): void;
@@ -28,7 +30,7 @@ export interface MapplsMap {
 }
 
 export interface MapplsRuntime {
-  Map(options: { id: string; properties: Record<string, unknown> }): Promise<MapplsMap>;
+  Map(options: { id: string; properties: Record<string, unknown> }): MapplsMap;
   Marker(options: Record<string, unknown>): MapplsMarker;
   Polyline(options: Record<string, unknown>): MapplsLayer;
   Circle(options: Record<string, unknown>): MapplsLayer;
@@ -36,6 +38,7 @@ export interface MapplsRuntime {
 }
 
 export type MapMarkerSpec = {
+  onClick?: () => void;
   id: string;
   position: MapPoint;
   html: string | HTMLElement;

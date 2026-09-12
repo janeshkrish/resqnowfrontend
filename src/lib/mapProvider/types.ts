@@ -28,7 +28,7 @@ export interface MapplsMap {
 }
 
 export interface MapplsRuntime {
-  Map(options: { id: string; properties: Record<string, unknown> }): MapplsMap;
+  Map(options: { id: string; properties: Record<string, unknown> }): Promise<MapplsMap>;
   Marker(options: Record<string, unknown>): MapplsMarker;
   Polyline(options: Record<string, unknown>): MapplsLayer;
   Circle(options: Record<string, unknown>): MapplsLayer;

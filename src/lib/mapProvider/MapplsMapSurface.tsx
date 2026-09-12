@@ -103,7 +103,7 @@ export function MapplsMapSurface({
         runtime = loadedRuntime;
         runtimeRef.current = loadedRuntime;
         lastCameraRef.current = null;
-        map = loadedRuntime.Map({
+        return loadedRuntime.Map({
           id: mapId,
           properties: {
             center: [20.5937, 78.9629],
@@ -112,15 +112,22 @@ export function MapplsMapSurface({
             location: false,
           },
         });
-        mapRef.current = map;
+      })
+      .then((createdMap) => {
+        if (disposed) {
+          createdMap.remove();
+          return;
+        }
+        map = createdMap;
+        mapRef.current = createdMap;
 
         const handleLoad = () => {
           if (!disposed) setLoaded(true);
         };
-        map.on("load", handleLoad);
+        createdMap.on("load", handleLoad);
 
         if (containerRef.current && typeof ResizeObserver !== "undefined") {
-          resizeObserver = new ResizeObserver(() => map?.resize());
+          resizeObserver = new ResizeObserver(() => createdMap.resize());
           resizeObserver.observe(containerRef.current);
         }
       })

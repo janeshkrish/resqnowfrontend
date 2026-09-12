@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MapplsMapSurface } from "./MapplsMapSurface";
@@ -30,7 +30,7 @@ const createFakeRuntime = () => {
   return {
     fakeMap,
     runtime: {
-      Map: vi.fn(() => fakeMap),
+      Map: vi.fn(async () => fakeMap),
       Marker: vi.fn(layer),
       Polyline: vi.fn(layer),
       Circle: vi.fn(layer),
@@ -57,7 +57,7 @@ describe("Mappls map surface", () => {
       "Map is temporarily unavailable",
     );
     fireEvent.click(screen.getByRole("button", { name: "Retry map" }));
-    expect(loadSdk).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(loadSdk).toHaveBeenCalledTimes(2));
   });
 
   it("creates one map and forwards map interactions", async () => {
@@ -76,14 +76,14 @@ describe("Mappls map surface", () => {
     );
 
     await waitFor(() => expect(runtime.Map).toHaveBeenCalledTimes(1));
-    fakeMap.emit("load");
+    await act(async () => { fakeMap.emit("load"); });
     await waitFor(() =>
       expect(fakeMap.on).toHaveBeenCalledWith(
         "dragstart",
         expect.any(Function),
       ),
     );
-    fakeMap.emit("dragstart");
+    await act(async () => { fakeMap.emit("dragstart"); });
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 });

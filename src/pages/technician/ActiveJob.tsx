@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
+  Bike,
   Car,
   CheckCircle,
   Clock3,
@@ -10,6 +11,7 @@ import {
   MapPin,
   Navigation,
   PhoneCall,
+  Truck,
   User,
   Wallet,
   XCircle,
@@ -17,7 +19,7 @@ import {
 import { useSocket } from '@/contexts/SocketContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { toast } from 'sonner';
-import ActiveJobMap from '@/components/technician/ActiveJobMap';
+import ActiveJobMap, { type ActiveJobRouteState } from '@/components/technician/ActiveJobMap';
 import TechnicianJobCompletion from '@/components/technician/TechnicianJobCompletion';
 import CancelledJobCard, { CancelledJobDetails } from '@/components/technician/CancelledJobCard';
 import { apiUrl } from '@/lib/api';
@@ -38,6 +40,17 @@ import {
   resolveActiveJobNavigationTarget,
   startJourneyAndNavigate,
 } from '@/lib/activeJobNavigation';
+import {
+  defaultNavigationVehicleMode,
+  isPlausibleLocationSample,
+  isUsableLocationFix,
+  isValidNavigationPoint,
+  navigationVehicleLabels,
+  resolveNavigationMotion,
+  smoothNavigationPoint,
+  type NavigationVehicleMode,
+  type TechnicianLocationFix,
+} from '@/lib/navigation/technicianNavigation';
 
 const EMPTY_VALUE_TOKENS = new Set(['not available', 'n/a', 'na', 'null', 'undefined', 'no phone number']);
 
@@ -90,16 +103,46 @@ const ActiveJob = () => {
   const stateJob = selectMatchingActiveJobNavigationState(state?.job, routeRequestId);
   const [status, setStatus] = useState(normalizeTechnicianStatus(stateJob?.status || 'accepted'));
   const [isLoading, setIsLoading] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<TechnicianLocationFix | null>(null);
+  const [locationNow, setLocationNow] = useState(() => Date.now());
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [isNavigationActive, setIsNavigationActive] = useState(false);
+  const [vehicleMode, setVehicleMode] = useState<NavigationVehicleMode>(() =>
+    defaultNavigationVehicleMode(technician?.vehicle_types),
+  );
+  const [routeState, setRouteState] = useState<ActiveJobRouteState>({
+    status: 'idle',
+    distanceKm: null,
+    durationMinutes: null,
+  });
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [lastEarned, setLastEarned] = useState(0);
   const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
   const [hasResolvedActiveJob, setHasResolvedActiveJob] = useState(false);
   const celebratedCompletionJobIdRef = useRef<string | null>(null);
   const jobSnapshotRef = useRef<any | null>(stateJob);
+  const previousLocationRef = useRef<TechnicianLocationFix | null>(null);
+  const vehicleSelectionTouchedRef = useRef(false);
+  const locationSocketRef = useRef(socket);
+  locationSocketRef.current = socket;
   const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
-  const navigationTarget = resolveActiveJobNavigationTarget(job, status);
+  const navigationTarget = useMemo(
+    () => resolveActiveJobNavigationTarget(job, status),
+    [job, status],
+  );
+  const activeRequestId = job?.requestId || job?.id;
+
+  useEffect(() => {
+    if (!vehicleSelectionTouchedRef.current) {
+      setVehicleMode(defaultNavigationVehicleMode(technician?.vehicle_types));
+    }
+  }, [technician?.vehicle_types]);
+
+  useEffect(() => {
+    if (!activeRequestId) return;
+    const timer = window.setInterval(() => setLocationNow(Date.now()), 5_000);
+    return () => window.clearInterval(timer);
+  }, [activeRequestId]);
 
   const isCancelledStatus = (value: unknown) => {
     const raw = String(value || '').trim().toLowerCase();
@@ -168,7 +211,7 @@ const ActiveJob = () => {
   }, [activeJob, location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    if (!job) return;
+    if (!activeRequestId) return;
     jobSnapshotRef.current = job;
     if (isCancelledStatus(job.status)) {
       const details = buildCancelledJobDetails(job);
@@ -296,15 +339,56 @@ const ActiveJob = () => {
 
   // 3. Geolocation Logic
   useEffect(() => {
-    if (!job) return;
+    if (!activeRequestId) return;
 
     let watchId: string | number | null = null;
     let cancelled = false;
     let permissionNotified = false;
 
-    const applyLocationUpdate = (latitude: number, longitude: number) => {
+    const applyLocationUpdate = (position: {
+      coords: {
+        latitude: number;
+        longitude: number;
+        accuracy?: number | null;
+        speed?: number | null;
+        heading?: number | null;
+      };
+      timestamp?: number;
+    }) => {
       if (cancelled) return;
-      setCurrentLocation({ lat: latitude, lng: longitude });
+      const latitude = Number(position.coords.latitude);
+      const longitude = Number(position.coords.longitude);
+      const timestamp = Number(position.timestamp) || Date.now();
+      if (!isValidNavigationPoint({ lat: latitude, lng: longitude })) {
+        setLocationError('Waiting for a valid GPS position.');
+        return;
+      }
+
+      const rawFix = {
+        lat: latitude,
+        lng: longitude,
+        accuracy: Number.isFinite(Number(position.coords.accuracy))
+          ? Number(position.coords.accuracy)
+          : null,
+        timestamp,
+        speedMetersPerSecond: position.coords.speed,
+        heading: position.coords.heading,
+      };
+      if (!isPlausibleLocationSample(previousLocationRef.current, rawFix)) {
+        setLocationError('Ignoring an unstable GPS jump while accuracy settles.');
+        return;
+      }
+      const motion = resolveNavigationMotion(previousLocationRef.current, rawFix);
+      const smoothedPoint = smoothNavigationPoint(previousLocationRef.current, rawFix);
+      const nextFix: TechnicianLocationFix = { ...rawFix, ...smoothedPoint, ...motion };
+      previousLocationRef.current = nextFix;
+      setCurrentLocation(nextFix);
+      setLocationNow(Date.now());
+      setLocationError(
+        isUsableLocationFix(nextFix)
+          ? null
+          : 'Improving GPS accuracy before navigation can start.',
+      );
 
       fetch(apiUrl('/api/technicians/me/location'), {
         method: 'PATCH',
@@ -315,12 +399,12 @@ const ActiveJob = () => {
         body: JSON.stringify({ latitude, longitude })
       }).catch(console.error);
 
-      if (socket && job) {
-        socket.emit('technician:location_update', {
+      if (locationSocketRef.current) {
+        locationSocketRef.current.emit('technician:location_update', {
           technicianId: technician?.id,
           lat: latitude,
           lng: longitude,
-          requestId: job.requestId || job.id
+          requestId: activeRequestId
         });
       }
     };
@@ -346,6 +430,7 @@ const ActiveJob = () => {
     const startNativeWatch = async () => {
       const granted = await ensureNativePermission();
       if (!granted) {
+        setLocationError('Location permission is required to start navigation.');
         if (!permissionNotified) {
           permissionNotified = true;
           toast.error('Location permission is required to track this job.');
@@ -358,22 +443,33 @@ const ActiveJob = () => {
         (position, error) => {
           if (error) {
             console.warn('Native geolocation error:', error);
+            setLocationError('Unable to read the current GPS position.');
             return;
           }
           if (!position) return;
-          applyLocationUpdate(position.coords.latitude, position.coords.longitude);
+          applyLocationUpdate(position);
         }
       );
     };
 
     const startWebWatch = () => {
-      if (!navigator.geolocation) return;
+      if (!navigator.geolocation) {
+        setLocationError('Geolocation is not available on this device.');
+        return;
+      }
       watchId = navigator.geolocation.watchPosition(
         (position) => {
-          applyLocationUpdate(position.coords.latitude, position.coords.longitude);
+          applyLocationUpdate(position);
         },
-        (err) => console.error('Geolocation error:', err),
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        (err) => {
+          console.error('Geolocation error:', err);
+          setLocationError(
+            err.code === err.PERMISSION_DENIED
+              ? 'Location permission is required to start navigation.'
+              : 'Unable to acquire an accurate GPS position.',
+          );
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     };
 
@@ -393,7 +489,7 @@ const ActiveJob = () => {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [job, socket, technician?.id, token]);
+  }, [activeRequestId, technician?.id, token]);
 
   // 4. Update Status Logic
   const updateStatus = async (newStatus: string) => {
@@ -445,9 +541,35 @@ const ActiveJob = () => {
   };
 
   // 5. Navigation Logic
-  const openNavigation = () => {
+  const hasUsableCurrentLocation = isUsableLocationFix(currentLocation, locationNow);
+  const navigationStartReady =
+    hasUsableCurrentLocation && routeState.status === 'ready' && Boolean(navigationTarget);
+  const handleRouteStateChange = useCallback((nextState: ActiveJobRouteState) => {
+    setRouteState((current) =>
+      current.status === nextState.status &&
+      current.distanceKm === nextState.distanceKm &&
+      current.durationMinutes === nextState.durationMinutes &&
+      current.message === nextState.message
+        ? current
+        : nextState,
+    );
+  }, []);
+
+  const openNavigation = async () => {
     if (!navigationTarget) {
       toast.error('Customer location coordinates are missing.');
+      return;
+    }
+    if (!hasUsableCurrentLocation) {
+      toast.error('An accurate, current GPS position is required to start navigation.');
+      return;
+    }
+    if (routeState.status !== 'ready') {
+      toast.error('Wait for the road route to finish calculating.');
+      return;
+    }
+    if (status === 'accepted' || status === 'assigned') {
+      await startJourneyAndNavigate(updateStatus, setIsNavigationActive);
       return;
     }
     setIsNavigationActive(true);
@@ -484,8 +606,8 @@ const ActiveJob = () => {
   const dropLng = toOptionalNumber(job.destinationLongitude ?? job.dropLocation?.lng ?? job.drop_longitude);
   const dropAddress = toOptionalString(job.destinationAddress ?? job.dropAddress ?? job.drop_address ?? job.dropLocation?.address);
   const hasDropLocation = Number.isFinite(dropLat) && Number.isFinite(dropLng);
-  const routeDistanceKm = toOptionalNumber(job.routeDistanceKm ?? job.route_distance_km);
-  const estimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
+  const bookedRouteDistanceKm = toOptionalNumber(job.routeDistanceKm ?? job.route_distance_km);
+  const bookedEstimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
   const jobAddress = toOptionalString(job.address ?? job.location?.address ?? stateJob?.address) || 'Location not available';
   const isTowingActiveJob = Boolean(job.isTowing);
   const towingAction = isTowingActiveJob ? getTowingAction(status, job.payment_status ?? job.paymentStatus) : null;
@@ -503,15 +625,44 @@ const ActiveJob = () => {
     !towingAction &&
     !isWaitingForTowingPayment &&
     !hasNormalStatusAction;
-  const estimatedDistanceKm =
-    currentLocation && Number.isFinite(customerLat) && Number.isFinite(customerLng)
-      ? Math.sqrt(
-          Math.pow(currentLocation.lat - Number(customerLat), 2) +
-            Math.pow(currentLocation.lng - Number(customerLng), 2)
-        ) * 111
-      : null;
-  const etaMinutes = estimatedDistanceKm !== null ? Math.max(3, Math.ceil((estimatedDistanceKm / 30) * 60)) : null;
+  const towingStartsNavigation = Boolean(
+    towingAction && ['en_route_pickup', 'enroute_drop'].includes(towingAction.status),
+  );
+  const handleTowingAction = async () => {
+    if (!towingAction) return;
+    if (towingStartsNavigation) {
+      if (!navigationStartReady) {
+        toast.error('Accurate GPS and a ready road route are required to start navigation.');
+        return;
+      }
+      const updated = await updateStatus(towingAction.status);
+      if (updated) setIsNavigationActive(true);
+      return;
+    }
+    await updateStatus(towingAction.status);
+  };
+  const routeDistanceKm = routeState.status === 'ready' ? routeState.distanceKm : null;
+  const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
   const actionGridClass = dialablePhone ? 'grid-cols-2' : 'grid-cols-1';
+
+  if (isNavigationActive) {
+    return (
+      <div className="fixed inset-0 z-[1000] bg-slate-100">
+        <ActiveJobMap
+          technicianLocation={hasUsableCurrentLocation && currentLocation ? currentLocation : undefined}
+          customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
+          destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
+          navigationMode
+          navigationDestination={navigationTarget || undefined}
+          heading={currentLocation?.heading}
+          speedKmh={currentLocation?.speedKmh}
+          vehicleMode={vehicleMode}
+          onRouteStateChange={handleRouteStateChange}
+          onExitNavigation={() => setIsNavigationActive(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] pb-8">
@@ -519,13 +670,14 @@ const ActiveJob = () => {
         <div className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/60">
           <div className={`relative w-full bg-muted/40 ${isNavigationActive ? 'h-[calc(100dvh-2rem)] min-h-[560px] max-h-[760px]' : 'h-[240px]'}`}>
             <ActiveJobMap
-              technicianLocation={currentLocation || { lat: 28.6139, lng: 77.209 }}
+              technicianLocation={hasUsableCurrentLocation && currentLocation ? currentLocation : undefined}
               customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
               destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
-              routePolyline={job.routePolyline || job.route_polyline || job.routeMetadata?.polyline || null}
-              navigationMode={isNavigationActive}
               navigationDestination={navigationTarget || undefined}
-              onExitNavigation={() => setIsNavigationActive(false)}
+              heading={currentLocation?.heading}
+              speedKmh={currentLocation?.speedKmh}
+              vehicleMode={vehicleMode}
+              onRouteStateChange={handleRouteStateChange}
             />
 
             {!isNavigationActive && <div className="absolute left-4 top-4 z-[400]">
@@ -562,6 +714,56 @@ const ActiveJob = () => {
 
           <div className="space-y-5 p-5">
             <div>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Navigation vehicle</p>
+                  <p className="mt-1 text-sm font-bold text-slate-700">
+                    {!hasUsableCurrentLocation
+                      ? 'Acquiring accurate location…'
+                      : routeState.status === 'ready'
+                      ? 'Road route ready'
+                      : routeState.message || 'Calculating road route…'}
+                  </p>
+                  {locationError && !hasUsableCurrentLocation && (
+                    <p className="mt-1 text-xs font-semibold text-amber-700">{locationError}</p>
+                  )}
+                </div>
+                {routeState.status === 'ready' && (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">READY</span>
+                )}
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Navigation vehicle">
+                {([
+                  ['two-wheeler', 'Bike', Bike],
+                  ['car', 'Car', Car],
+                  ['commercial-tow', 'Tow', Truck],
+                ] as const).map(([mode, label, Icon]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={vehicleMode === mode}
+                    className={`flex min-h-16 flex-col items-center justify-center rounded-2xl border px-2 py-2 text-xs font-extrabold transition ${
+                      vehicleMode === mode
+                        ? 'border-rose-600 bg-rose-50 text-rose-700 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-500'
+                    }`}
+                    onClick={() => {
+                      vehicleSelectionTouchedRef.current = true;
+                      setVehicleMode(mode);
+                    }}
+                  >
+                    <Icon className="mb-1 h-5 w-5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Routing as {navigationVehicleLabels[vehicleMode]}
+              </p>
+            </div>
+
+            <div>
               <h1 className="text-2xl font-black tracking-tight text-foreground">
                 {displayService || 'Active Job'}
               </h1>
@@ -579,8 +781,8 @@ const ActiveJob = () => {
                   {dropAddress && <p className="mt-1 text-sm font-bold text-foreground">{dropAddress}</p>}
                   <p className="mt-2 text-xs font-semibold text-slate-500">
                     {[
-                      Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : null,
-                      Number.isFinite(estimatedDuration) ? `${Math.round(estimatedDuration)} min` : null,
+                      Number.isFinite(bookedRouteDistanceKm) ? `${bookedRouteDistanceKm.toFixed(1)} km` : null,
+                      Number.isFinite(bookedEstimatedDuration) ? `${Math.round(bookedEstimatedDuration)} min` : null,
                       displayVehicle,
                       `Status: ${formatTechnicianStatus(status)}`,
                     ].filter(Boolean).join(' / ')}
@@ -638,7 +840,7 @@ const ActiveJob = () => {
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Distance</p>
                     <p className="text-sm font-black text-foreground">
-                      {Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : estimatedDistanceKm !== null ? `${estimatedDistanceKm.toFixed(1)} km` : '--'}
+                      {Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : '--'}
                     </p>
                   </div>
                 </div>
@@ -691,22 +893,25 @@ const ActiveJob = () => {
                 </Button>
               ) : null}
 
-              <Button
-                variant="outline"
-                className="h-12 rounded-xl border-border bg-card text-muted-foreground shadow-sm"
-                onClick={openNavigation}
-              >
-                <Navigation className="mr-2 h-4 w-4" />
-                <span className="font-bold">Navigate</span>
-              </Button>
+              {status !== 'accepted' && status !== 'assigned' && (
+                <Button
+                  variant="outline"
+                  className="h-12 rounded-xl border-border bg-card text-muted-foreground shadow-sm"
+                  onClick={() => void openNavigation()}
+                  disabled={!navigationStartReady}
+                >
+                  <Navigation className="mr-2 h-4 w-4" />
+                  <span className="font-bold">Open navigation</span>
+                </Button>
+              )}
             </div>
 
             <div className="space-y-3">
               {isTowingActiveJob && towingAction && (
                 <Button
                   className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
-                  onClick={() => updateStatus(towingAction.status)}
-                  disabled={isLoading}
+                  onClick={() => void handleTowingAction()}
+                  disabled={isLoading || (towingStartsNavigation && !navigationStartReady)}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : TowingActionIcon ? <TowingActionIcon className="mr-2 h-5 w-5" /> : null}
                   {towingAction.label}
@@ -723,11 +928,11 @@ const ActiveJob = () => {
               {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
                 <Button
                   className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
-                  onClick={() => void startJourneyAndNavigate(updateStatus, setIsNavigationActive)}
-                  disabled={isLoading}
+                  onClick={() => void openNavigation()}
+                  disabled={isLoading || !navigationStartReady}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Navigation className="mr-2 h-5 w-5" />}
-                  START JOURNEY
+                  START NAVIGATION
                 </Button>
               )}
 

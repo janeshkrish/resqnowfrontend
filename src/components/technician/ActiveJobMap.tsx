@@ -5,6 +5,7 @@ import {
   CornerUpRight,
   LocateFixed,
   Navigation,
+  RefreshCw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,15 +21,37 @@ import {
   getNavigationProgress,
   type ManeuverKind,
 } from "@/lib/navigation/routeNavigation";
+import {
+  isValidNavigationPoint,
+  navigationVehicleLabels,
+  type NavigationVehicleMode,
+} from "@/lib/navigation/technicianNavigation";
+
+export type ActiveJobRouteStatus =
+  | "idle"
+  | "locating"
+  | "loading"
+  | "ready"
+  | "rerouting"
+  | "error";
+
+export type ActiveJobRouteState = {
+  status: ActiveJobRouteStatus;
+  distanceKm: number | null;
+  durationMinutes: number | null;
+  message?: string;
+};
 
 interface ActiveJobMapProps {
   technicianLocation?: { lat: number; lng: number };
   customerLocation?: { lat: number; lng: number };
   destinationLocation?: { lat: number; lng: number };
-  routePolyline?: Array<[number, number]> | null;
   navigationMode?: boolean;
   navigationDestination?: { lat: number; lng: number };
   heading?: number | null;
+  speedKmh?: number | null;
+  vehicleMode?: NavigationVehicleMode;
+  onRouteStateChange?: (state: ActiveJobRouteState) => void;
   onExitNavigation?: () => void;
 }
 
@@ -91,104 +114,168 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   technicianLocation,
   customerLocation,
   destinationLocation,
-  routePolyline,
   navigationMode = false,
   navigationDestination,
   heading,
+  speedKmh,
+  vehicleMode = "car",
+  onRouteStateChange,
   onExitNavigation,
 }) => {
-  const suppliedRoute = useMemo(
-    () => routePolylineFromMetadata({ polyline: routePolyline }),
-    [routePolyline],
-  );
-  const [routePath, setRoutePath] = useState<Array<[number, number]>>(suppliedRoute);
-  const [routeDurationMinutes, setRouteDurationMinutes] = useState<number>();
+  const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
+  const [routeDurationMinutes, setRouteDurationMinutes] = useState<number | null>(null);
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
+  const [routeStatus, setRouteStatus] = useState<ActiveJobRouteStatus>("idle");
+  const [routeMessage, setRouteMessage] = useState<string>();
+  const [retryRevision, setRetryRevision] = useState(0);
   const [following, setFollowing] = useState(true);
   const [cameraRevision, setCameraRevision] = useState(0);
   const lastRouteOriginRef = useRef<MapPoint | null>(null);
   const lastRouteRequestAtRef = useRef(0);
+  const routeContextRef = useRef("");
+  const requestSequenceRef = useRef(0);
+  const mountedRef = useRef(true);
 
-  const routePoints = useMemo(() => {
-    if (navigationMode) {
-      return [technicianLocation, navigationDestination].filter(Boolean) as MapPoint[];
-    }
-    return [technicianLocation, customerLocation, destinationLocation].filter(
-      Boolean,
-    ) as MapPoint[];
-  }, [
-    customerLocation,
-    destinationLocation,
-    navigationDestination,
-    navigationMode,
-    technicianLocation,
-  ]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const validTechnicianLocation = isValidNavigationPoint(technicianLocation)
+    ? technicianLocation
+    : undefined;
+  const validNavigationDestination = isValidNavigationPoint(navigationDestination)
+    ? navigationDestination
+    : undefined;
 
   const progress = useMemo(() => {
-    if (!navigationMode || !technicianLocation) return null;
+    if (!navigationMode || !validTechnicianLocation || routePath.length < 3) return null;
     return getNavigationProgress({
-      current: technicianLocation,
-      destination: navigationDestination,
+      current: validTechnicianLocation,
+      destination: validNavigationDestination,
       route: routePath,
-      routeDurationMinutes,
+      routeDistanceKm: routeDistanceKm ?? undefined,
+      routeDurationMinutes: routeDurationMinutes ?? undefined,
     });
   }, [
-    navigationDestination,
     navigationMode,
     routeDurationMinutes,
+    routeDistanceKm,
     routePath,
-    technicianLocation,
+    validNavigationDestination,
+    validTechnicianLocation,
   ]);
 
   useEffect(() => {
-    if (suppliedRoute.length > 1) setRoutePath(suppliedRoute);
-  }, [suppliedRoute]);
+    onRouteStateChange?.({
+      status: routeStatus,
+      distanceKm: routeDistanceKm,
+      durationMinutes: routeDurationMinutes,
+      ...(routeMessage ? { message: routeMessage } : {}),
+    });
+  }, [onRouteStateChange, routeDistanceKm, routeDurationMinutes, routeMessage, routeStatus]);
 
   useEffect(() => {
-    if (routePoints.length < 2) {
+    if (!validTechnicianLocation) {
+      requestSequenceRef.current += 1;
       setRoutePath([]);
+      setRouteDistanceKm(null);
+      setRouteDurationMinutes(null);
+      setRouteMessage("Acquiring accurate location…");
+      setRouteStatus("locating");
+      return;
+    }
+    if (!validNavigationDestination) {
+      requestSequenceRef.current += 1;
+      setRoutePath([]);
+      setRouteDistanceKm(null);
+      setRouteDurationMinutes(null);
+      setRouteMessage("Destination coordinates are unavailable.");
+      setRouteStatus("error");
       return;
     }
 
-    const origin = routePoints[0];
+    const contextKey = `${validNavigationDestination.lat.toFixed(6)}:${validNavigationDestination.lng.toFixed(6)}:${vehicleMode}:${retryRevision}`;
+    const contextChanged = routeContextRef.current !== contextKey;
+    if (contextChanged) {
+      routeContextRef.current = contextKey;
+      lastRouteOriginRef.current = null;
+      lastRouteRequestAtRef.current = 0;
+      setRoutePath([]);
+      setRouteDistanceKm(null);
+      setRouteDurationMinutes(null);
+    }
+
     const previousOrigin = lastRouteOriginRef.current;
     const moved = previousOrigin
-      ? distanceMeters(previousOrigin, origin)
+      ? distanceMeters(previousOrigin, validTechnicianLocation)
       : Number.POSITIVE_INFINITY;
-    const now = Date.now();
+    const needsInitialRoute = contextChanged || routePath.length < 3;
     const needsNavigationRoute =
-      navigationMode && (progress?.offRoute || moved >= routeRequestDistanceMeters);
-    const needsOverviewRoute = !navigationMode && suppliedRoute.length < 2;
-    if (!needsNavigationRoute && !needsOverviewRoute) return;
+      navigationMode && (Boolean(progress?.offRoute) || moved >= routeRequestDistanceMeters);
+    if (!needsInitialRoute && !needsNavigationRoute) return;
+
+    const now = Date.now();
     if (
+      !contextChanged &&
       lastRouteRequestAtRef.current &&
       now - lastRouteRequestAtRef.current < minimumRouteRequestIntervalMs
     ) {
       return;
     }
 
-    let stale = false;
-    lastRouteOriginRef.current = origin;
+    const requestSequence = ++requestSequenceRef.current;
+    lastRouteOriginRef.current = validTechnicianLocation;
     lastRouteRequestAtRef.current = now;
-    void fetchRoute(routePoints, "full")
+    setRouteMessage(undefined);
+    setRouteStatus(!contextChanged && routePath.length >= 3 ? "rerouting" : "loading");
+
+    void fetchRoute(
+      [validTechnicianLocation, validNavigationDestination],
+      "full",
+      vehicleMode,
+    )
       .then((route) => {
-        if (stale) return;
+        if (!mountedRef.current || requestSequence !== requestSequenceRef.current) return;
         const coordinates = routePolylineFromMetadata(route);
-        if (coordinates.length > 1) setRoutePath(coordinates);
+        const distance = Number(route.distanceKm ?? route.distance_km);
         const duration = Number(
           route.durationMinutes ?? route.estimatedDuration ?? route.estimated_duration,
         );
-        if (Number.isFinite(duration) && duration > 0) {
-          setRouteDurationMinutes(duration);
+        if (
+          coordinates.length < 3 ||
+          !Number.isFinite(distance) ||
+          distance <= 0 ||
+          !Number.isFinite(duration) ||
+          duration <= 0
+        ) {
+          throw new Error("The route provider did not return usable road geometry.");
         }
+        setRoutePath(coordinates);
+        setRouteDistanceKm(distance);
+        setRouteDurationMinutes(duration);
+        setRouteStatus("ready");
       })
       .catch((error: unknown) => {
-        if (!stale) console.error("Route Fetch Error:", error);
+        if (!mountedRef.current || requestSequence !== requestSequenceRef.current) return;
+        console.error("Route Fetch Error:", error);
+        setRoutePath([]);
+        setRouteDistanceKm(null);
+        setRouteDurationMinutes(null);
+        setRouteMessage(error instanceof Error ? error.message : "Route calculation failed.");
+        setRouteStatus("error");
       });
-
-    return () => {
-      stale = true;
-    };
-  }, [navigationMode, progress?.offRoute, routePoints, suppliedRoute.length]);
+  }, [
+    navigationMode,
+    progress?.offRoute,
+    retryRevision,
+    routePath.length,
+    validNavigationDestination,
+    validTechnicianLocation,
+    vehicleMode,
+  ]);
 
   useEffect(() => {
     setFollowing(true);
@@ -196,25 +283,25 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   }, [navigationMode]);
 
   useEffect(() => {
-    if (navigationMode && following && technicianLocation) {
+    if (navigationMode && following && validTechnicianLocation) {
       setCameraRevision((revision) => revision + 1);
     }
-  }, [following, navigationMode, technicianLocation]);
+  }, [following, navigationMode, validTechnicianLocation]);
 
   const markerHeading = heading ?? progress?.maneuver.bearing ?? 0;
   const markers = useMemo<MapMarkerSpec[]>(() => {
     const next: MapMarkerSpec[] = [];
-    if (technicianLocation) {
+    if (validTechnicianLocation) {
       next.push({
         id: "technician",
-        position: technicianLocation,
+        position: validTechnicianLocation,
         html: technicianMarker(markerHeading),
         anchor: "center",
         zIndex: 30,
         heading: markerHeading,
       });
     }
-    if (customerLocation) {
+    if (isValidNavigationPoint(customerLocation)) {
       next.push({
         id: "pickup",
         position: customerLocation,
@@ -223,7 +310,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         zIndex: 20,
       });
     }
-    if (destinationLocation) {
+    if (isValidNavigationPoint(destinationLocation)) {
       next.push({
         id: "destination",
         position: destinationLocation,
@@ -231,10 +318,10 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         anchor: "bottom",
         zIndex: 20,
       });
-    } else if (navigationMode && navigationDestination) {
+    } else if (validNavigationDestination && !customerLocation) {
       next.push({
         id: "navigation-destination",
-        position: navigationDestination,
+        position: validNavigationDestination,
         html: pinMarker("Destination", "#0f172a"),
         anchor: "bottom",
         zIndex: 20,
@@ -245,14 +332,11 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     customerLocation,
     destinationLocation,
     markerHeading,
-    navigationDestination,
-    navigationMode,
-    technicianLocation,
+    validNavigationDestination,
+    validTechnicianLocation,
   ]);
 
-  const visibleRoute = navigationMode && progress
-    ? progress.remainingPolyline
-    : routePath;
+  const visibleRoute = navigationMode && progress ? progress.remainingPolyline : routePath;
   const polylines = useMemo<MapPolylineSpec[]>(() => {
     if (visibleRoute.length < 2) return [];
     const points = visibleRoute.map(([lat, lng]) => ({ lat, lng }));
@@ -274,18 +358,23 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     ];
   }, [navigationMode, visibleRoute]);
 
-  const camera = useMemo<MapCameraSpec>(() => {
-    if (navigationMode && technicianLocation) {
+  const camera = useMemo<MapCameraSpec | undefined>(() => {
+    if (navigationMode && validTechnicianLocation) {
       return {
         mode: "follow",
-        center: technicianLocation,
+        center: validTechnicianLocation,
         zoom: 17,
         bearing: markerHeading,
         pitch: 45,
         revision: cameraRevision,
       };
     }
-    const points = routePoints.length ? routePoints : [{ lat: 12.9716, lng: 77.5946 }];
+    const points = [
+      validTechnicianLocation,
+      isValidNavigationPoint(customerLocation) ? customerLocation : undefined,
+      isValidNavigationPoint(destinationLocation) ? destinationLocation : undefined,
+    ].filter(Boolean) as MapPoint[];
+    if (points.length === 0) return undefined;
     return {
       mode: "fit",
       points,
@@ -293,16 +382,26 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       maxZoom: 15,
       revision: coordinateRevision(points),
     };
-  }, [cameraRevision, markerHeading, navigationMode, routePoints, technicianLocation]);
+  }, [
+    cameraRevision,
+    customerLocation,
+    destinationLocation,
+    markerHeading,
+    navigationMode,
+    validTechnicianLocation,
+  ]);
 
   const recenter = () => {
     setFollowing(true);
     setCameraRevision((revision) => revision + 1);
   };
 
+  const retryRoute = () => setRetryRevision((revision) => revision + 1);
+  const showRouteInterruption = ["locating", "loading", "error"].includes(routeStatus);
+
   return (
     <div
-      className="relative z-0 h-full min-h-[240px] w-full overflow-hidden rounded-xl bg-slate-100"
+      className={`relative z-0 h-full min-h-[240px] w-full overflow-hidden bg-slate-100 ${navigationMode ? 'rounded-none' : 'rounded-xl'}`}
       {...(navigationMode
         ? { role: "region", "aria-label": "Turn-by-turn navigation" }
         : {})}
@@ -317,6 +416,40 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         onInteract={navigationMode ? () => setFollowing(false) : undefined}
       />
 
+      {showRouteInterruption && (
+        <div className="absolute inset-0 z-30 grid place-items-center bg-slate-950/35 p-5 backdrop-blur-[2px]">
+          <div role="status" aria-live="polite" className="max-w-xs rounded-2xl bg-white/95 p-5 text-center shadow-2xl">
+            {routeStatus === "error" ? (
+              <>
+                <p className="font-black text-slate-950">Road route unavailable</p>
+                <p className="mt-1 text-sm text-slate-500">{routeMessage}</p>
+                <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={retryRoute}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry route
+                </Button>
+                {navigationMode && (
+                  <Button type="button" variant="ghost" className="mt-2 rounded-xl" onClick={onExitNavigation}>
+                    Exit navigation
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mx-auto h-6 w-6 animate-spin text-rose-600" />
+                <p className="mt-3 font-black text-slate-950">
+                  {routeStatus === "locating" ? "Acquiring accurate location…" : "Calculating road route…"}
+                </p>
+                {navigationMode && (
+                  <Button type="button" variant="ghost" className="mt-3 rounded-xl" onClick={onExitNavigation}>
+                    Exit navigation
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {navigationMode && progress && (
         <>
           <div
@@ -328,31 +461,42 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-rose-600">
-                In {formatDistance(progress.distanceToManeuverMeters)}
+                ResQNow · In {formatDistance(progress.distanceToManeuverMeters)}
               </p>
               <p className="truncate text-lg font-black">{progress.instruction}</p>
-              {progress.offRoute && (
+              {routeStatus === "rerouting" && (
                 <p className="text-xs font-bold text-amber-600">Updating route…</p>
               )}
             </div>
           </div>
 
-          <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
+          <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
+            <div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 text-center">
               <div>
-                <p className="text-2xl font-black text-slate-950">
-                  {progress.remainingEtaMinutes} min
-                </p>
-                <p className="text-sm font-bold text-slate-500">
-                  {formatDistance(progress.remainingDistanceMeters)} remaining
-                </p>
+                <p className="text-lg font-black text-slate-950">{progress.remainingEtaMinutes} min</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">ETA</p>
               </div>
+              <div>
+                <p className="text-lg font-black text-slate-950">{formatDistance(progress.remainingDistanceMeters)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Remaining</p>
+              </div>
+              <div>
+                <p className="text-lg font-black text-slate-950">
+                  {Number.isFinite(speedKmh) ? `${Math.max(0, Math.round(Number(speedKmh)))} km/h` : "-- km/h"}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Speed</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-xs font-extrabold text-slate-600">
+                {navigationVehicleLabels[vehicleMode]}
+              </p>
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
                 aria-label="Recenter navigation map"
-                className="h-11 w-11 rounded-full"
+                className="h-10 w-10 rounded-full"
                 onClick={recenter}
               >
                 <LocateFixed className="h-5 w-5" />
@@ -360,7 +504,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
               <Button
                 type="button"
                 variant="destructive"
-                className="h-11 rounded-xl px-5 font-extrabold"
+                className="h-10 rounded-xl px-4 font-extrabold"
                 onClick={onExitNavigation}
               >
                 Exit navigation

@@ -14,7 +14,7 @@ export type LocationSearchResult = GeoPoint & {
   category?: string | null;
 };
 
-type RouteResponse = {
+export type RouteResponse = {
   distanceKm?: number;
   distance_km?: number;
   durationMinutes?: number;
@@ -22,6 +22,10 @@ type RouteResponse = {
   estimated_duration?: number;
   geometry?: { type?: string; coordinates?: [number, number][] };
   polyline?: Array<[number, number]>;
+  provider?: string;
+  source?: string;
+  vehicleMode?: string;
+  vehicle_mode?: string;
   error?: string;
 };
 
@@ -118,7 +122,11 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Location
   };
 }
 
-export async function fetchRoute(points: GeoPoint[], overview: "full" | "simplified" = "full"): Promise<RouteResponse> {
+export async function fetchRoute(
+  points: GeoPoint[],
+  overview: "full" | "simplified" = "full",
+  vehicleMode: "two-wheeler" | "car" | "commercial-tow" = "car",
+): Promise<RouteResponse> {
   const validPoints = points
     .map((point) => toFinitePoint(point.lat, point.lng))
     .filter((point): point is GeoPoint => Boolean(point));
@@ -127,7 +135,7 @@ export async function fetchRoute(points: GeoPoint[], overview: "full" | "simplif
   }
 
   const encodedPoints = validPoints.map((point) => `${point.lat},${point.lng}`).join(";");
-  const queryString = `points=${encodeURIComponent(encodedPoints)}&overview=${encodeURIComponent(overview)}`;
+  const queryString = `points=${encodeURIComponent(encodedPoints)}&overview=${encodeURIComponent(overview)}&vehicleMode=${encodeURIComponent(vehicleMode)}`;
   let response = await apiFetch(`/api/public/route?${queryString}`);
   if (response.status === 404) {
     response = await apiFetch(`/api/route?${queryString}`);

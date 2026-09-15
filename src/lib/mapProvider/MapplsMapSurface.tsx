@@ -302,12 +302,18 @@ export function MapplsMapSurface({
       }
       return;
     }
-    map.jumpTo({
+    const followCamera = {
       center: [camera.center.lng, camera.center.lat],
       zoom: camera.zoom,
       bearing: camera.bearing ?? 0,
       pitch: camera.pitch ?? 0,
-    });
+      duration: 550,
+    };
+    if (typeof map.easeTo === "function") {
+      map.easeTo(followCamera);
+    } else {
+      map.jumpTo(followCamera);
+    }
   }, [camera, camera?.mode, camera?.revision, loaded]);
 
   if (error) {

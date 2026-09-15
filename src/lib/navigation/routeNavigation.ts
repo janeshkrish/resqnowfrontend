@@ -14,6 +14,7 @@ export type NavigationInput = {
   current: GeoPoint;
   destination?: GeoPoint;
   route: Array<[number, number]>;
+  routeDistanceKm?: number;
   routeDurationMinutes?: number;
 };
 
@@ -163,32 +164,13 @@ export function getNavigationProgress({
   current,
   destination,
   route: rawRoute,
+  routeDistanceKm,
   routeDurationMinutes,
-}: NavigationInput): NavigationProgress {
+}: NavigationInput): NavigationProgress | null {
   const route = collapseRoute(rawRoute);
 
   if (route.length < 2) {
-    const endpoint = destination ?? current;
-    const remainingDistanceMeters = distanceMeters(current, endpoint);
-    return {
-      instruction: "Continue toward the destination",
-      maneuver: {
-        kind: remainingDistanceMeters < 20 ? "arrive" : "continue",
-        bearing: bearingDegrees(current, endpoint),
-      },
-      distanceToManeuverMeters: remainingDistanceMeters,
-      remainingDistanceMeters,
-      remainingEtaMinutes: etaMinutes(
-        remainingDistanceMeters,
-        remainingDistanceMeters,
-        routeDurationMinutes,
-      ),
-      remainingPolyline: [
-        [current.lat, current.lng],
-        [endpoint.lat, endpoint.lng],
-      ],
-      offRoute: false,
-    };
+    return null;
   }
 
   const nearest = nearestSegment(current, route);
@@ -196,8 +178,14 @@ export function getNavigationProgress({
     [nearest.point.lat, nearest.point.lng],
     ...route.slice(nearest.segmentIndex + 1),
   ];
-  const remainingDistanceMeters = routeLength(remainingPolyline);
-  const totalMeters = routeLength(route);
+  const geometryRemainingMeters = routeLength(remainingPolyline);
+  const geometryTotalMeters = routeLength(route);
+  const providerTotalMeters = Number.isFinite(routeDistanceKm) && Number(routeDistanceKm) > 0
+    ? Number(routeDistanceKm) * 1_000
+    : geometryTotalMeters;
+  const remainingDistanceMeters = geometryTotalMeters > 0
+    ? providerTotalMeters * (geometryRemainingMeters / geometryTotalMeters)
+    : geometryRemainingMeters;
 
   let maneuverKind: ManeuverKind = "arrive";
   let maneuverBearing = bearingDegrees(
@@ -246,7 +234,7 @@ export function getNavigationProgress({
     remainingDistanceMeters,
     remainingEtaMinutes: etaMinutes(
       remainingDistanceMeters,
-      totalMeters,
+      providerTotalMeters,
       routeDurationMinutes,
     ),
     remainingPolyline,

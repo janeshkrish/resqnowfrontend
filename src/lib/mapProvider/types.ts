@@ -24,6 +24,7 @@ export interface MapplsMap {
   on(event: string, handler: () => void): void;
   off(event: string, handler: () => void): void;
   fitBounds(bounds: unknown, options?: Record<string, unknown>): void;
+  easeTo?(options: Record<string, unknown>): void;
   jumpTo(options: Record<string, unknown>): void;
   resize(): void;
   remove(): void;

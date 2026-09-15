@@ -15,8 +15,8 @@ describe("route navigation", () => {
       route,
     });
 
-    expect(result.remainingPolyline[0][0]).toBeCloseTo(12.9721, 3);
-    expect(result.remainingDistanceMeters).toBeGreaterThan(150);
+    expect(result?.remainingPolyline[0][0]).toBeCloseTo(12.9721, 3);
+    expect(result?.remainingDistanceMeters).toBeGreaterThan(150);
   });
 
   it("describes the next meaningful right turn", () => {
@@ -25,19 +25,30 @@ describe("route navigation", () => {
       route,
     });
 
-    expect(result.maneuver.kind).toBe("turn-right");
-    expect(result.instruction).toMatch(/right/i);
-    expect(result.distanceToManeuverMeters).toBeGreaterThan(50);
+    expect(result?.maneuver.kind).toBe("turn-right");
+    expect(result?.instruction).toMatch(/right/i);
+    expect(result?.distanceToManeuverMeters).toBeGreaterThan(50);
   });
 
-  it("falls back to direct destination guidance when no route is available", () => {
+  it("does not fabricate direct destination guidance when no road route is available", () => {
     const result = getNavigationProgress({
       current: { lat: 12.97, lng: 77.59 },
       destination: { lat: 12.98, lng: 77.6 },
       route: [],
     });
 
-    expect(result.instruction).toBe("Continue toward the destination");
-    expect(result.remainingPolyline).toHaveLength(2);
+    expect(result).toBeNull();
+  });
+
+  it("uses provider route distance and duration for remaining metrics", () => {
+    const result = getNavigationProgress({
+      current: { lat: 12.9716, lng: 77.5946 },
+      route,
+      routeDistanceKm: 3,
+      routeDurationMinutes: 12,
+    });
+
+    expect(result?.remainingDistanceMeters).toBeCloseTo(3_000, -1);
+    expect(result?.remainingEtaMinutes).toBe(12);
   });
 });

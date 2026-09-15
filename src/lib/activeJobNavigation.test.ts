@@ -39,4 +39,19 @@ describe("active-job navigation helpers", () => {
     );
     expect(setNavigationActive).toHaveBeenCalledWith(true);
   });
+
+  it("rejects placeholder and out-of-range navigation targets", () => {
+    expect(
+      resolveActiveJobNavigationTarget(
+        { pickupLatitude: 0, pickupLongitude: 0 },
+        "accepted",
+      ),
+    ).toBeNull();
+    expect(
+      resolveActiveJobNavigationTarget(
+        { pickupLatitude: 120, pickupLongitude: 77 },
+        "accepted",
+      ),
+    ).toBeNull();
+  });
 });

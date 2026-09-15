@@ -1,4 +1,5 @@
 import type { GeoPoint } from "@/lib/geo";
+import { isValidNavigationPoint } from "@/lib/navigation/technicianNavigation";
 import { normalizeTechnicianStatus } from "@/utils/technicianStatus";
 
 const dropNavigationStatuses = new Set([
@@ -48,7 +49,8 @@ export function resolveActiveJobNavigationTarget(
   const useDrop = dropNavigationStatuses.has(normalizeTechnicianStatus(status));
   const lat = useDrop ? dropLat ?? pickupLat : pickupLat;
   const lng = useDrop ? dropLng ?? pickupLng : pickupLng;
-  return lat == null || lng == null ? null : { lat, lng };
+  const target = lat == null || lng == null ? null : { lat, lng };
+  return isValidNavigationPoint(target) ? target : null;
 }
 
 export async function startJourneyAndNavigate(

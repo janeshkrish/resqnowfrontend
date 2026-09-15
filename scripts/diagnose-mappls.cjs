@@ -18,9 +18,16 @@ async function diagnose() {
           error: response.status !== 200 ? body.replaceAll(key, '[REDACTED]').slice(0, 350) : undefined });
       } catch (error) { console.log({origin, auth, error: error.name}); }
     }
+    const pluginUrl = `https://sdk.mappls.com/map/sdk/plugins?access_token=${encodeURIComponent(key)}&v=3.0&libraries=search`;
+    try {
+      const response = await fetch(pluginUrl, { headers: { Referer: origin + '/', Origin: origin }, signal: AbortSignal.timeout(20000) });
+      const body = await response.text();
+      console.log({ origin, asset: 'search-plugin', status: response.status, contentType: response.headers.get('content-type'), bytes: body.length,
+        error: response.status !== 200 ? body.replaceAll(key, '[REDACTED]').slice(0, 350) : undefined });
+    } catch (error) { console.log({ origin, asset: 'search-plugin', error: error.name }); }
   }
   try {
-    const origin = 'https://www.resqnow.org';
+    const origin = 'https://resqnow.org';
     const page = await (await fetch(origin + '/map')).text();
     const entry = page.match(/src="([^"]*\/assets\/index-[^"]+\.js)"/)?.[1];
     if (!entry) throw new Error('entry_not_found');

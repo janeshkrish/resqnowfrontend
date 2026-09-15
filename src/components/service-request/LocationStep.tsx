@@ -3,27 +3,13 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { LocationSelection, ServiceRequestFormData } from "./types";
 import { MapPin, Loader2, Navigation } from "lucide-react";
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-import OpenStreetMapPlaceInput from "./OpenStreetMapPlaceInput";
-import GooglePlacesAutocomplete from "./GooglePlacesAutocomplete.jsx";
+import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
+import MapplsPlaceInput from "./MapplsPlaceInput";
 import TowingEstimateCard from "./TowingEstimateCard";
 import { fetchRoute, reverseGeocode, routePolylineFromMetadata } from "@/lib/geo";
 import { reverseGeocodeWithGoogle } from "@/lib/googlePlaces";
-
-// Fix Leaflet icons
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-const DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import type { MapCameraSpec, MapMarkerSpec, MapPolylineSpec, MapPoint } from "@/lib/mapProvider/types";
 
 interface LocationStepProps {
   formData: ServiceRequestFormData;
@@ -61,79 +47,17 @@ const normalizePlaceSelection = (place: LocationSelection): LocationSelection =>
   };
 };
 
-const LocationMarker = ({ position, label, onDragEnd }: { position: { lat: number, lng: number } | null, label: string, onDragEnd: (lat: number, lng: number) => void }) => {
-  const map = useMap();
-  const markerRef = useRef<L.Marker>(null);
+const PICKUP_MARKER_HTML = '<div style="width:32px;height:32px;border:3px solid white;border-radius:9999px;background:#059669;color:white;display:grid;place-items:center;font:800 11px/1 sans-serif;box-shadow:0 4px 12px rgba(15,23,42,.3)">P</div>';
+const DROP_MARKER_HTML = '<div style="width:32px;height:32px;border:3px solid white;border-radius:9999px;background:#e11d48;color:white;display:grid;place-items:center;font:800 11px/1 sans-serif;box-shadow:0 4px 12px rgba(15,23,42,.3)">D</div>';
 
-  useEffect(() => {
-    if (position) {
-      map.flyTo([position.lat, position.lng], 16);
-    }
-  }, [position?.lat, position?.lng, map]);
-
-  const eventHandlers = useMemo(
-    () => ({
-      dragend() {
-        const marker = markerRef.current;
-        if (marker) {
-          const latLng = marker.getLatLng();
-          onDragEnd(latLng.lat, latLng.lng);
-        }
-      },
-    }),
-    [onDragEnd],
-  );
-
-  if (!position) return null;
-
-  return (
-    <Marker
-      draggable={true}
-      eventHandlers={eventHandlers}
-      position={position}
-      ref={markerRef}
-    >
-      <Popup>{label}</Popup>
-    </Marker>
-  );
-};
-
-const RouteBounds = ({ pickup, drop, routePath }: { pickup: { lat: number, lng: number } | null, drop: { lat: number, lng: number } | null, routePath?: Array<[number, number]> }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (!pickup || !drop) return;
-    if (routePath && routePath.length > 1) {
-      map.fitBounds(routePath, { padding: [32, 32] });
-      return;
-    }
-    map.fitBounds(
-      [
-        [pickup.lat, pickup.lng],
-        [drop.lat, drop.lng],
-      ],
-      { padding: [32, 32] }
-    );
-  }, [drop, map, pickup, routePath]);
-  return null;
-};
-
-const MapPinClickHandler = ({
-  enabled,
-  target,
-  onSelect,
-}: {
-  enabled: boolean;
-  target: "pickup" | "drop";
-  onSelect: (lat: number, lng: number, type: "pickup" | "drop") => void;
-}) => {
-  useMapEvents({
-    click(event) {
-      if (!enabled) return;
-      onSelect(event.latlng.lat, event.latlng.lng, target);
-    },
-  });
-  return null;
-};
+const isUsableSearchCoordinate = (lat: number, lng: number) =>
+  Number.isFinite(lat)
+  && Number.isFinite(lng)
+  && lat >= -90
+  && lat <= 90
+  && lng >= -180
+  && lng <= 180
+  && !(lat === 0 && lng === 0);
 
 const LocationStep = ({
   formData,
@@ -158,11 +82,32 @@ const LocationStep = ({
         ? { lat: Number(formData.locationLat), lng: Number(formData.locationLng) }
         : { lat: 12.9716, lng: 77.5946 }
   );
-  const dropPosition = formData.dropLocationCoordinates
+  const searchLocationBias = useMemo<MapPoint | null>(() => {
+    const coordinates = formData.locationCoordinates;
+    if (coordinates && isUsableSearchCoordinate(coordinates.lat, coordinates.lng)) {
+      return { lat: coordinates.lat, lng: coordinates.lng };
+    }
+    if (
+      formData.locationLat !== undefined
+      && formData.locationLat !== null
+      && formData.locationLng !== undefined
+      && formData.locationLng !== null
+    ) {
+      const lat = Number(formData.locationLat);
+      const lng = Number(formData.locationLng);
+      if (isUsableSearchCoordinate(lat, lng)) return { lat, lng };
+    }
+    return null;
+  }, [formData.locationCoordinates, formData.locationLat, formData.locationLng]);
+  const dropPosition = useMemo(() => formData.dropLocationCoordinates
     ? { lat: formData.dropLocationCoordinates.lat, lng: formData.dropLocationCoordinates.lng }
     : formData.dropLat && formData.dropLng
       ? { lat: Number(formData.dropLat), lng: Number(formData.dropLng) }
-      : null;
+      : null, [
+        formData.dropLat,
+        formData.dropLng,
+        formData.dropLocationCoordinates,
+      ]);
   const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
   const [activePin, setActivePin] = useState<"pickup" | "drop">(
     requiresDropLocation ? "drop" : "pickup"
@@ -214,7 +159,7 @@ const LocationStep = ({
     onDropLocationSelect?.(normalizedPlace.lat, normalizedPlace.lng, normalizedPlace.address, normalizedPlace.placeId);
   };
 
-  const handleMarkerDragEnd = async (lat: number, lng: number, type: "pickup" | "drop" = "pickup") => {
+  const handleMarkerDragEnd = useCallback(async (lat: number, lng: number, type: "pickup" | "drop" = "pickup") => {
     // 1. Update coordinates
     if (type === "pickup") {
       setActivePin("pickup");
@@ -243,7 +188,7 @@ const LocationStep = ({
     } catch (error) {
       console.error("Reverse geocoding failed", error);
     }
-  };
+  }, [onDropLocationSelect, onInputChange, onLocationSelect, requiresDropLocation]);
 
   useEffect(() => {
     if (!requiresDropLocation || !markerPosition || !dropPosition) {
@@ -279,7 +224,85 @@ const LocationStep = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [dropPosition?.lat, dropPosition?.lng, markerPosition?.lat, markerPosition?.lng, requiresDropLocation, towingEstimate]);
+  }, [dropPosition, markerPosition, requiresDropLocation, towingEstimate]);
+
+  const routePoints = useMemo<MapPoint[]>(
+    () => routePath.map(([lat, lng]) => ({ lat, lng })),
+    [routePath],
+  );
+
+  const markers = useMemo<MapMarkerSpec[]>(() => {
+    const nextMarkers: MapMarkerSpec[] = [];
+    if (markerPosition) {
+      nextMarkers.push({
+        id: "pickup",
+        position: markerPosition,
+        html: PICKUP_MARKER_HTML,
+        anchor: "center",
+        draggable: true,
+        onDragEnd: ({ lat, lng }) => void handleMarkerDragEnd(lat, lng, "pickup"),
+      });
+    }
+    if (requiresDropLocation && dropPosition) {
+      nextMarkers.push({
+        id: "drop",
+        position: dropPosition,
+        html: DROP_MARKER_HTML,
+        anchor: "center",
+        draggable: true,
+        onDragEnd: ({ lat, lng }) => void handleMarkerDragEnd(lat, lng, "drop"),
+      });
+    }
+    return nextMarkers;
+  }, [
+    dropPosition,
+    handleMarkerDragEnd,
+    markerPosition,
+    requiresDropLocation,
+  ]);
+
+  const polylines = useMemo<MapPolylineSpec[]>(
+    () => requiresDropLocation && routePoints.length > 1
+      ? [{
+          id: "towing-route",
+          points: routePoints,
+          color: "#0f172a",
+          width: 4,
+          opacity: 0.8,
+        }]
+      : [],
+    [requiresDropLocation, routePoints],
+  );
+
+  const cameraPoints = useMemo<MapPoint[]>(() => {
+    if (requiresDropLocation && routePoints.length > 1) return routePoints;
+    return [markerPosition, requiresDropLocation ? dropPosition : null].filter(
+      (point): point is MapPoint => Boolean(point),
+    );
+  }, [dropPosition, markerPosition, requiresDropLocation, routePoints]);
+
+  const cameraKey = cameraPoints
+    .map(({ lat, lng }) => `${lat.toFixed(6)},${lng.toFixed(6)}`)
+    .join("|");
+  const cameraRevisionRef = useRef({ key: "", revision: 0 });
+  if (cameraRevisionRef.current.key !== cameraKey) {
+    cameraRevisionRef.current = {
+      key: cameraKey,
+      revision: cameraRevisionRef.current.revision + 1,
+    };
+  }
+  const cameraRevision = cameraRevisionRef.current.revision;
+  const camera = useMemo<MapCameraSpec>(() => ({
+    mode: "fit",
+    points: cameraPoints,
+    padding: { top: 48, right: 48, bottom: 48, left: 48 },
+    maxZoom: 16,
+    revision: cameraRevision,
+  }), [cameraPoints, cameraRevision]);
+
+  const handleMapClick = useCallback(({ lat, lng }: MapPoint) => {
+    void handleMarkerDragEnd(lat, lng, requiresDropLocation ? activePin : "pickup");
+  }, [activePin, handleMarkerDragEnd, requiresDropLocation]);
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
@@ -296,38 +319,16 @@ const LocationStep = ({
         {/* Modern Map Container */}
         <div className="flex-[1.2] bg-card dark:bg-slate-900 rounded-[1.5rem] overflow-hidden border border-border shadow-sm relative shadow-sm">
           <div className="h-[250px] md:h-[400px] w-full relative z-0">
-            <MapContainer
-              center={markerPosition || [12.9716, 77.5946]}
-              zoom={15}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <LocationMarker position={markerPosition} label="Pickup" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "pickup")} />
-              <MapPinClickHandler
-                enabled={requiresDropLocation || activePin === "pickup"}
-                target={requiresDropLocation ? activePin : "pickup"}
-                onSelect={handleMarkerDragEnd}
-              />
-              {requiresDropLocation && (
-                <>
-                  <LocationMarker position={dropPosition} label="Drop" onDragEnd={(lat, lng) => handleMarkerDragEnd(lat, lng, "drop")} />
-                  {markerPosition && dropPosition && (
-                    <>
-                      {routePath.length > 1 && (
-                        <Polyline
-                          positions={routePath}
-                          pathOptions={{ color: "#0f172a", weight: 4, opacity: 0.8 }}
-                        />
-                      )}
-                      <RouteBounds pickup={markerPosition} drop={dropPosition} routePath={routePath} />
-                    </>
-                  )}
-                </>
-              )}
-            </MapContainer>
+            <MapplsMapSurface
+              ariaLabel="Service request location map"
+              className="h-full min-h-0 w-full"
+              markers={markers}
+              polylines={polylines}
+              circles={[]}
+              camera={camera}
+              onMapClick={handleMapClick}
+              fallbackDescription="You can still use Auto Detect or search for your address."
+            />
 
             {/* Premium Floating Badge */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] text-[10px] font-bold tracking-widest uppercase text-white z-[400] pointer-events-none flex items-center gap-2 border border-white/20">
@@ -399,25 +400,15 @@ const LocationStep = ({
             <div className="space-y-3 p-4 border-b border-border">
               <div className="space-y-2">
                 <Label htmlFor="location" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Pickup Location</Label>
-                {requiresDropLocation ? (
-                  <GooglePlacesAutocomplete
-                    id="location"
-                    name="location"
-                    value={normalizeAddressValue(formData.location)}
-                    placeholder="Search pickup address..."
-                    onTextChange={emitTextChange}
-                    onPlaceSelect={handlePickupPlaceSelect}
-                  />
-                ) : (
-                  <OpenStreetMapPlaceInput
-                    id="location"
-                    name="location"
-                    value={normalizeAddressValue(formData.location)}
-                    placeholder="Search pickup address..."
-                    onTextChange={emitTextChange}
-                    onPlaceSelect={handlePickupPlaceSelect}
-                  />
-                )}
+                <MapplsPlaceInput
+                  id="location"
+                  name="location"
+                  value={normalizeAddressValue(formData.location)}
+                  placeholder="Search pickup address..."
+                  locationBias={searchLocationBias}
+                  onTextChange={emitTextChange}
+                  onPlaceSelect={handlePickupPlaceSelect}
+                />
               </div>
               {requiresDropLocation && (
                 <div className="space-y-2">
@@ -434,12 +425,13 @@ const LocationStep = ({
                       Map pin
                     </Button>
                   </div>
-                  <GooglePlacesAutocomplete
+                  <MapplsPlaceInput
                     id="dropLocation"
                     name="dropLocation"
                     value={normalizeAddressValue(formData.dropLocation)}
                     placeholder="Search garage, home, or service center..."
                     iconTone="drop"
+                    locationBias={searchLocationBias}
                     onTextChange={emitTextChange}
                     onPlaceSelect={handleDropPlaceSelect}
                   />

@@ -31,6 +31,7 @@ type MapplsMapSurfaceProps = {
   camera?: MapCameraSpec;
   className?: string;
   onInteract?: () => void;
+  onMapClick?: (position: MapMarkerSpec["position"]) => void;
   onUnavailable?: () => void;
   fallbackDescription?: string;
   loadSdk?: () => Promise<MapplsRuntime>;
@@ -56,6 +57,26 @@ function removeOverlay(
   }
 }
 
+function readMapPoint(value: unknown): MapMarkerSpec["position"] | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const target = record.target && typeof record.target === "object"
+    ? record.target as Record<string, unknown>
+    : undefined;
+  const candidate = (
+    record.lngLat
+    || record.latLng
+    || record._lngLat
+    || target?._lngLat
+    || target?.lngLat
+    || record.position
+    || record
+  ) as Record<string, unknown>;
+  const lat = Number(candidate?.lat ?? candidate?.latitude);
+  const lng = Number(candidate?.lng ?? candidate?.lon ?? candidate?.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
 export function MapplsMapSurface({
   ariaLabel,
   markers,
@@ -64,6 +85,7 @@ export function MapplsMapSurface({
   camera,
   className,
   onInteract,
+  onMapClick,
   onUnavailable,
   fallbackDescription = "Live job details will continue updating.",
   loadSdk = initializeMapplsSdk,
@@ -80,6 +102,8 @@ export function MapplsMapSurface({
   const markerContentRef = useRef(new Map<string, string | HTMLElement>());
   const markerClickRef = useRef(new Map<string, (() => void) | undefined>());
   markerClickRef.current = new Map(markers.map((marker) => [marker.id, marker.onClick]));
+  const markerDragEndRef = useRef(new Map<string, ((position: MapMarkerSpec["position"]) => void) | undefined>());
+  markerDragEndRef.current = new Map(markers.map((marker) => [marker.id, marker.onDragEnd]));
   const polylineLayersRef = useRef(new Map<string, MapplsLayer>());
   const circleLayersRef = useRef(new Map<string, MapplsLayer>());
   const lastCameraRef = useRef<{ mode: MapCameraSpec["mode"]; revision: number } | null>(null);
@@ -192,6 +216,17 @@ export function MapplsMapSurface({
   }, [loaded, onInteract]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || !onMapClick) return;
+    const handleClick = (event?: unknown) => {
+      const position = readMapPoint(event);
+      if (position) onMapClick(position);
+    };
+    map.on("click", handleClick);
+    return () => map.off("click", handleClick);
+  }, [loaded, onMapClick]);
+
+  useEffect(() => {
     const runtime = runtimeRef.current;
     const map = mapRef.current;
     if (!runtime || !map || !loaded) return;
@@ -220,8 +255,13 @@ export function MapplsMapSurface({
           width: marker.width,
           height: marker.height,
           offset: marker.offset,
+          draggable: marker.draggable ?? false,
         });
       layer.addListener?.("click", () => markerClickRef.current.get(marker.id)?.());
+      layer.addListener?.("dragend", (event?: unknown) => {
+        const position = readMapPoint(layer.getPosition?.()) || readMapPoint(event);
+        if (position) markerDragEndRef.current.get(marker.id)?.(position);
+      });
       markerLayersRef.current.set(marker.id, layer);
       markerContentRef.current.set(marker.id, marker.html);
     });

@@ -14,15 +14,16 @@ export interface MapplsLayer {
 }
 
 export interface MapplsMarker extends MapplsLayer {
-  addListener?: (event: string, handler: () => void) => void;
+  addListener?: (event: string, handler: (event?: unknown) => void) => void;
+  getPosition?: () => unknown;
   setPosition?: (position: MapPoint | [number, number]) => void;
   setLngLat?: (position: [number, number]) => void;
 }
 
 export interface MapplsMap {
   loaded?: () => boolean;
-  on(event: string, handler: () => void): void;
-  off(event: string, handler: () => void): void;
+  on(event: string, handler: (event?: unknown) => void): void;
+  off(event: string, handler: (event?: unknown) => void): void;
   fitBounds(bounds: unknown, options?: Record<string, unknown>): void;
   easeTo?(options: Record<string, unknown>): void;
   jumpTo(options: Record<string, unknown>): void;
@@ -40,9 +41,11 @@ export interface MapplsRuntime {
 
 export type MapMarkerSpec = {
   onClick?: () => void;
+  onDragEnd?: (position: MapPoint) => void;
   id: string;
   position: MapPoint;
   html: string | HTMLElement;
+  draggable?: boolean;
   anchor?: "center" | "bottom";
   zIndex?: number;
   heading?: number | null;

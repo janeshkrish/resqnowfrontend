@@ -112,7 +112,7 @@ All frontend environment variables must be prefixed with `VITE_` because they ar
 | `VITE_API_URL` | Yes for backend-connected builds | Backend API origin, for example `http://localhost:5000` or `https://resqnowbackend.onrender.com`. Do not append `/api`. |
 | `VITE_FRONTEND_ONLY` | Optional | Set to `true` only for demo mode without a backend. Do not enable for production backend-connected deployments. |
 | `VITE_GOOGLE_MAPS_API_KEY` | Required for Google map/geocoding UI | Public browser key restricted by domain and API. |
-| `VITE_MAPPLS_MAP_SDK_KEY` | Required for active-job and live-tracking maps | Client-safe Mappls Web SDK access token. Its Mappls IP/domain restrictions must include every browser and Capacitor origin that serves the app. |
+| `VITE_MAPPLS_MAP_SDK_KEY` | Required for service-request, active-job, and live-tracking maps and service-request place search | Client-safe Mappls Web SDK access token with Web Maps and Search plugin access. Its Mappls IP/domain restrictions must include every browser and Capacitor origin that serves the app. |
 | `VITE_RAZORPAY_KEY_ID` | Required for payment UI | Razorpay public key ID. The secret key must stay only in the backend. |
 | `VITE_PAYMENTS_DISABLED` | Optional | Feature flag for disabling payment flows in local/demo environments. |
 | `VITE_FIREBASE_API_KEY` | Required for FCM | Firebase public client API key. Restrict it in Google Cloud/Firebase. |
@@ -143,7 +143,7 @@ https://localhost
 
 Add any custom production or preview domain that is used as well. Mappls returns `401 ASSET_ACCESS_DENIED` with `IP/Domain validation failed` when its IP/domain policy rejects the request. Web SDK requests originate in visitors' browsers; an IP allowlist containing only a hosting IP such as `216.198.79.1` does not authorize all visitors. Configure the application's Web SDK domain whitelist and review/remove the incompatible server-IP restriction with Mappls if the console does not permit editing it.
 
-Both `/map` and job tracking use Mappls. The pinned `mappls-web-maps@3.8.1` package uses `initialize(token, { map: true, version: "3.0" }, callback)`, followed by uppercase `Map(...)`. Old lowercase `map({key}, callback)` examples are incompatible with this package. No plugin allocation is required for these map surfaces.
+The service-request location step, `/map`, and job tracking use Mappls. The pinned `mappls-web-maps@3.8.1` package uses `initialize(token, { map: true, version: "3.0" }, callback)`, followed by uppercase `Map(...)`. Old lowercase `map({key}, callback)` examples are incompatible with this package. Service-request autocomplete separately initializes the official `search` plugin, so the same key must also have Search plugin access.
 
 From the frontend directory, run `node scripts/diagnose-mappls.cjs` to check the local key against the official SDK endpoints without printing it. A 401 requires a Mappls configuration fix; changing frontend code cannot bypass it. After fixing configuration, rebuild/redeploy Vercel with `VITE_MAPPLS_MAP_SDK_KEY` in the Production environment. Mappls authorization scripts use NetworkOnly caching so old authorization responses are not reused.
 

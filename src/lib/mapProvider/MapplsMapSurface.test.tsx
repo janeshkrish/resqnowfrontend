@@ -4,18 +4,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MapplsMapSurface } from "./MapplsMapSurface";
 
 const createFakeRuntime = () => {
-  const handlers = new Map<string, Set<() => void>>();
+  const handlers = new Map<string, Set<(event?: unknown) => void>>();
   const fakeMap = {
-    on: vi.fn((event: string, handler: () => void) => {
-      const listeners = handlers.get(event) || new Set<() => void>();
+    on: vi.fn((event: string, handler: (event?: unknown) => void) => {
+      const listeners = handlers.get(event) || new Set<(event?: unknown) => void>();
       listeners.add(handler);
       handlers.set(event, listeners);
     }),
-    off: vi.fn((event: string, handler: () => void) =>
+    off: vi.fn((event: string, handler: (event?: unknown) => void) =>
       handlers.get(event)?.delete(handler),
     ),
-    emit: (event: string) =>
-      handlers.get(event)?.forEach((handler) => handler()),
+    emit: (event: string, payload?: unknown) =>
+      handlers.get(event)?.forEach((handler) => handler(payload)),
     fitBounds: vi.fn(),
     jumpTo: vi.fn(),
     resize: vi.fn(),
@@ -123,5 +123,49 @@ describe("Mappls map surface", () => {
     click();
     expect(nextClick).toHaveBeenCalledOnce();
     expect(runtime.Marker).toHaveBeenCalledOnce();
+  });
+
+  it("returns coordinates when the map is clicked or a draggable marker is released", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const onMapClick = vi.fn();
+    const onDragEnd = vi.fn();
+
+    render(
+      <MapplsMapSurface
+        ariaLabel="Service location map"
+        loadSdk={async () => runtime}
+        markers={[{
+          id: "pickup",
+          position: { lat: 11.0168, lng: 76.9558 },
+          html: "<span>Pickup</span>",
+          draggable: true,
+          onDragEnd,
+        }]}
+        polylines={[]}
+        circles={[]}
+        onMapClick={onMapClick}
+      />,
+    );
+
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+    await waitFor(() => expect(runtime.Marker).toHaveBeenCalledOnce());
+
+    expect(runtime.Marker).toHaveBeenCalledWith(expect.objectContaining({ draggable: true }));
+    await act(async () => {
+      fakeMap.emit("click", { lngLat: { lat: 11.021, lng: 76.967 } });
+    });
+    expect(onMapClick).toHaveBeenCalledWith({ lat: 11.021, lng: 76.967 });
+
+    const markerLayer = runtime.Marker.mock.results[0].value;
+    const dragCall = markerLayer.addListener.mock.calls.find(([event]) => event === "dragend");
+    expect(dragCall).toBeDefined();
+    markerLayer.getPosition = vi.fn(() => ({ lat: 11.025, lng: 76.97 }));
+    dragCall?.[1]();
+    expect(onDragEnd).toHaveBeenCalledWith({ lat: 11.025, lng: 76.97 });
+
+    markerLayer.getPosition = undefined;
+    dragCall?.[1]({ target: { _lngLat: { lat: 11.026, lng: 76.971 } } });
+    expect(onDragEnd).toHaveBeenCalledWith({ lat: 11.026, lng: 76.971 });
   });
 });

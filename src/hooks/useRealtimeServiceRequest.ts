@@ -67,6 +67,11 @@ interface TechnicianData {
   location_lat?: number;
   location_lng?: number;
   completedJobs?: number;
+  routeDistanceKm?: number;
+  routeEtaMinutes?: number;
+  routeEtaText?: string;
+  routeEtaSource?: string;
+  routeRequestId?: string;
 }
 
 interface RealtimeOptions {
@@ -142,7 +147,18 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             ? (/^https?:\/\//i.test(rawAvatarUrl) ? rawAvatarUrl : apiUrl(rawAvatarUrl))
             : undefined;
 
-          setTechnician(techData);
+          setTechnician(prev => {
+            if (!prev || String(prev.id) !== techId) return techData;
+            const preserveRouteMetrics = prev.routeRequestId === String(requestId);
+            return {
+              ...techData,
+              routeDistanceKm: preserveRouteMetrics ? prev.routeDistanceKm : undefined,
+              routeEtaMinutes: preserveRouteMetrics ? prev.routeEtaMinutes : undefined,
+              routeEtaText: preserveRouteMetrics ? prev.routeEtaText : undefined,
+              routeEtaSource: preserveRouteMetrics ? prev.routeEtaSource : undefined,
+              routeRequestId: preserveRouteMetrics ? prev.routeRequestId : undefined,
+            };
+          });
 
           if (techId && lastTechnicianIdRef.current !== techId) {
             options?.onTechnicianAssigned?.();
@@ -229,6 +245,22 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
         const lat = Number(data?.lat);
         const lng = Number(data?.lng);
+        const parseRouteMetric = (value: unknown) => {
+          if (value == null || (typeof value === "string" && value.trim() === "")) return undefined;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+        };
+        const routeDistanceKm = parseRouteMetric(data?.distanceKm);
+        const routeEtaMinutes = parseRouteMetric(data?.durationMinutes);
+        const routeEtaText = typeof data?.etaText === "string" && data.etaText.trim()
+          ? data.etaText.trim()
+          : undefined;
+        const routeEtaSource = typeof data?.etaSource === "string" && data.etaSource.trim()
+          ? data.etaSource.trim()
+          : undefined;
+        const routeRequestId = routeDistanceKm !== undefined && routeEtaMinutes !== undefined
+          ? String(requestId)
+          : undefined;
         // We set the location on the technician object in state
         setTechnician(prev => {
           if (!prev) return null;
@@ -236,6 +268,11 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             ...prev,
             location_lat: Number.isFinite(lat) ? lat : prev.location_lat,
             location_lng: Number.isFinite(lng) ? lng : prev.location_lng,
+            routeDistanceKm,
+            routeEtaMinutes,
+            routeEtaText,
+            routeEtaSource,
+            routeRequestId,
             // Map legacy 'location' string if needed
             location: `${data?.lat}, ${data?.lng}`
           };

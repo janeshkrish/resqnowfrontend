@@ -739,7 +739,18 @@ const RequestTracking = () => {
     [request?.location_lat, request?.location_lng]
   );
   const liveTrackingMetrics = useMemo(() => {
-    if (!technicianMapLocation || !requestMapLocation) {
+    const serverDistanceKm = technician?.routeDistanceKm;
+    const serverEtaMinutes = technician?.routeEtaMinutes;
+    const hasServerRouteMetrics =
+      technician?.routeRequestId === String(requestId) &&
+      typeof serverDistanceKm === "number" &&
+      Number.isFinite(serverDistanceKm) &&
+      serverDistanceKm >= 0 &&
+      typeof serverEtaMinutes === "number" &&
+      Number.isFinite(serverEtaMinutes) &&
+      serverEtaMinutes >= 0;
+
+    if (!hasServerRouteMetrics && (!technicianMapLocation || !requestMapLocation)) {
       return {
         eta:
           status === "arrived"
@@ -762,23 +773,31 @@ const RequestTracking = () => {
       };
     }
 
-    const technicianLat = technicianMapLocation.lat;
-    const technicianLng = technicianMapLocation.lng;
-    const requestLat = requestMapLocation.lat;
-    const requestLng = requestMapLocation.lng;
-    const toRad = (value: number) => (value * Math.PI) / 180;
-    const earthRadiusKm = 6371;
-    const deltaLat = toRad(requestLat - technicianLat);
-    const deltaLng = toRad(requestLng - technicianLng);
-    const a =
-      Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-      Math.cos(toRad(technicianLat)) *
-        Math.cos(toRad(requestLat)) *
-        Math.sin(deltaLng / 2) *
-        Math.sin(deltaLng / 2);
-    const distanceKm = Number((2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1));
-    const minutes = Math.max(1, Math.ceil((distanceKm / 30) * 60));
-    const etaLabel = `${minutes} min`;
+    let distanceKm: number;
+    let etaLabel: string;
+
+    if (hasServerRouteMetrics) {
+      distanceKm = serverDistanceKm;
+      etaLabel = technician?.routeEtaText?.trim() || `${serverEtaMinutes} min`;
+    } else {
+      const technicianLat = technicianMapLocation!.lat;
+      const technicianLng = technicianMapLocation!.lng;
+      const requestLat = requestMapLocation!.lat;
+      const requestLng = requestMapLocation!.lng;
+      const toRad = (value: number) => (value * Math.PI) / 180;
+      const earthRadiusKm = 6371;
+      const deltaLat = toRad(requestLat - technicianLat);
+      const deltaLng = toRad(requestLng - technicianLng);
+      const a =
+        Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+        Math.cos(toRad(technicianLat)) *
+          Math.cos(toRad(requestLat)) *
+          Math.sin(deltaLng / 2) *
+          Math.sin(deltaLng / 2);
+      distanceKm = Number((2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1));
+      const minutes = Math.max(1, Math.ceil((distanceKm / 30) * 60));
+      etaLabel = `${minutes} min`;
+    }
 
     if (status === "arrived") {
       return {
@@ -797,7 +816,12 @@ const RequestTracking = () => {
     };
   }, [
     requestMapLocation,
+    requestId,
     status,
+    technician?.routeDistanceKm,
+    technician?.routeEtaMinutes,
+    technician?.routeEtaText,
+    technician?.routeRequestId,
     technicianMapLocation,
   ]);
   const eta = liveTrackingMetrics.eta;

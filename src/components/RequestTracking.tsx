@@ -55,6 +55,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import LiveTrackingMap from "@/components/user/LiveTrackingMap";
 import AmountCard from "@/components/user/AmountCard";
+import MobileTrackingSummaryDock from "@/components/user/MobileTrackingSummaryDock";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -984,9 +985,13 @@ const RequestTracking = () => {
     Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
       ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
       : null;
+  const MOBILE_MAP_DOCK_HEIGHT = showPayment && !paymentCompleted ? 318 : 266;
   const EXPANDED_Y = Math.max(56, Math.round(viewportHeight * 0.10));
-  const HALF_Y = Math.max(EXPANDED_Y + 120, Math.round(viewportHeight * 0.48));
-  const COLLAPSED_Y = Math.max(viewportHeight - 110, HALF_Y + 80);
+  const HALF_Y = Math.max(EXPANDED_Y + 150, Math.round(viewportHeight * 0.46));
+  const COLLAPSED_Y = Math.max(
+    HALF_Y + 92,
+    Math.max(EXPANDED_Y + 242, viewportHeight - MOBILE_MAP_DOCK_HEIGHT),
+  );
 
   const mapHeight = useTransform(sheetY, (y) => Math.max(160, (y as number) + 32)); // Smooth overlap under sheet's rounded corners
 
@@ -1004,12 +1009,6 @@ const RequestTracking = () => {
   useEffect(() => {
     if (!isMobile || viewportHeight <= 0) return;
 
-    if (showPayment) {
-      setSheetSnapState("expanded");
-      animate(sheetY, EXPANDED_Y, { type: "spring", stiffness: 350, damping: 32 });
-      return;
-    }
-
     if (!hasAnimatedIn) {
       sheetY.set(viewportHeight); // Start off screen
       animate(sheetY, HALF_Y, { type: "spring", stiffness: 350, damping: 32 }).then(() => {
@@ -1017,7 +1016,7 @@ const RequestTracking = () => {
         setSheetSnapState("half");
       });
     }
-  }, [isMobile, viewportHeight, sheetY, EXPANDED_Y, HALF_Y, hasAnimatedIn, showPayment]);
+  }, [isMobile, viewportHeight, sheetY, EXPANDED_Y, HALF_Y, hasAnimatedIn]);
 
   const snapTo = (target: "expanded" | "half" | "collapsed") => {
     let targetY = HALF_Y;
@@ -1227,6 +1226,28 @@ const RequestTracking = () => {
       icon: <CheckCircle2 className="h-4 w-4" />,
     },
   ];
+  const compactTrackingSummary = {
+    eyebrow: trackingSummary.eyebrow,
+    value: trackingSummary.value,
+    detail: trackingSummary.detail,
+    journeyLabel:
+      isTowingRequest && isTowingDropLeg
+        ? "Towing to drop location"
+        : trackingSteps[stageIndex]?.label || "Journey progress",
+  };
+  const compactTechnician = technician
+    ? {
+        name: technician.name || "Technician",
+        avatarUrl: technician.avatar_url,
+        phone: technician.phone,
+        ratingLabel: technicianRatingLabel,
+        completedJobs: Number.isFinite(technicianJobs) ? technicianJobs : 0,
+      }
+    : null;
+  const isMapFocus = sheetSnapState === "collapsed";
+  const isDetailsFocus = sheetSnapState === "expanded";
+  const showExpandedPaymentBar =
+    showPayment && !paymentCompleted && sheetSnapState !== "collapsed";
 
   const summaryBreakdown = summaryPaymentDetails.hasPricing
     ? {
@@ -1288,6 +1309,7 @@ const RequestTracking = () => {
             mapMode={trackingMapModeFromSheetSnap(sheetSnapState)}
             onInteract={() => snapTo("collapsed")}
             showRoutePath={shouldShowLiveRoute}
+            showStatusOverlay={false}
             className="h-full w-full"
           />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-32 z-20 bg-gradient-to-b from-black/60 to-transparent" />
@@ -1339,71 +1361,49 @@ const RequestTracking = () => {
           dragElastic={0.08}
           onDragEnd={handleDragEnd}
         >
-          {/* Drag Handle & Header Area (Drag gesture is attached ONLY here) */}
+          {/* Drag is attached to the handle; the button keeps the same interaction available without a gesture. */}
           <div
-            className="w-full select-none cursor-grab active:cursor-grabbing touch-none bg-white px-5 pt-3 pb-3 border-b border-slate-100/90 transition-colors"
-            onPointerDown={(e) => dragControls.start(e)}
-            onClick={toggleSheet}
+            className="flex h-9 w-full items-center justify-center bg-white pt-2 touch-none"
+            onPointerDown={(event) => dragControls.start(event)}
           >
-            {/* Drag Handle Indicator */}
-            <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300 transition-colors" />
-
-            {/* Header info row */}
-            <div className="mt-2.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-50" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-                </span>
-                <span className="truncate text-xs font-extrabold uppercase tracking-[0.14em] text-primary">
-                  {isConnected ? "Live Tracking" : "Reconnecting"}
-                </span>
-                {eta && status === "en-route" && (
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-700">
-                    ETA {eta}
-                  </span>
-                )}
-              </div>
-
-              {/* Tap to expand / collapse toggle */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleSheet();
-                }}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
-                aria-label="Toggle sheet height"
-              >
-                {sheetSnapState === "expanded" ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronUp className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-
-            {/* Status Title and quick amount peek */}
-            <div className="mt-1 flex items-baseline justify-between gap-2">
-              <h2 className="truncate text-lg font-black tracking-tight text-slate-900">
-                {statusMeta.title}
-              </h2>
-              {showPayment && !paymentCompleted && (
-                <span className="shrink-0 text-sm font-black text-orange-600">
-                  {currency} {amountDueLabel}
-                </span>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => snapTo(isDetailsFocus ? "half" : "expanded")}
+              aria-label={isDetailsFocus ? "Show balanced tracking view" : "Expand service panel"}
+              className="flex h-8 w-20 items-center justify-center rounded-full"
+            >
+              <span className="h-1.5 w-12 rounded-full bg-slate-300 transition-colors" />
+            </button>
           </div>
 
+          <MobileTrackingSummaryDock
+            summary={compactTrackingSummary}
+            technician={compactTechnician}
+            isConnected={isConnected}
+            isMapFocus={isMapFocus}
+            onShowMap={() => snapTo("collapsed")}
+            onShowDetails={() => snapTo("expanded")}
+            paymentAction={
+              showPayment && !paymentCompleted && isMapFocus
+                ? {
+                    amountLabel: `${currency} ${amountDueLabel}`,
+                    onPayOnline: handleOnlinePaymentClick,
+                  }
+                : null
+            }
+          />
+
           {/* Scrollable Content Container (Pure native touch scrolling) */}
-          <div
-            className="flex-1 overflow-y-auto overscroll-y-contain px-4 sm:px-5 py-4 space-y-4 touch-pan-y"
-            style={{
-              WebkitOverflowScrolling: "touch",
-              paddingBottom: showPayment && !paymentCompleted ? "calc(env(safe-area-inset-bottom, 16px) + 6.5rem)" : "calc(env(safe-area-inset-bottom, 16px) + 3rem)"
-            }}
-          >
+          {isDetailsFocus && (
+            <div
+              className="flex-1 overflow-y-auto overscroll-y-contain px-4 sm:px-5 py-4 space-y-4 touch-pan-y"
+              style={{
+                WebkitOverflowScrolling: "touch",
+                paddingBottom: showExpandedPaymentBar
+                  ? "calc(env(safe-area-inset-bottom, 16px) + 6.5rem)"
+                  : "calc(env(safe-area-inset-bottom, 16px) + 3rem)",
+              }}
+            >
             {/* Status subtitle description */}
             <p className="text-xs font-medium leading-relaxed text-slate-500">
               {statusMeta.subtitle}
@@ -1690,10 +1690,11 @@ const RequestTracking = () => {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Sticky Bottom Quick-Pay Bar when payment is pending */}
-          {showPayment && !paymentCompleted && (
+          {showExpandedPaymentBar && (
             <div className="border-t border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] backdrop-blur-md pb-[max(env(safe-area-inset-bottom),0.75rem)]">
               <div className="flex items-center justify-between gap-3">
                 <div>

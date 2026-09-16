@@ -2,6 +2,7 @@ import { act } from "react";
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -20,6 +21,8 @@ const trackingHarness = vi.hoisted(() => ({
   mapProps: null as Record<string, unknown> | null,
 }));
 
+const viewportHarness = vi.hoisted(() => ({ isMobile: false }));
+
 vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
   useRealtimeServiceRequest: () => ({
     request: trackingHarness.request,
@@ -31,7 +34,7 @@ vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: () => false,
+  useIsMobile: () => viewportHarness.isMobile,
 }));
 
 vi.mock("@/hooks/usePricingConfig", () => ({
@@ -68,6 +71,7 @@ describe("RequestTracking live metrics", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    viewportHarness.isMobile = false;
     trackingHarness.mapProps = null;
     trackingHarness.request = {
       id: "request-1",
@@ -103,6 +107,23 @@ describe("RequestTracking live metrics", () => {
     document.body.appendChild(container);
     root = createRoot(container);
   });
+
+  const renderTracking = async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter
+          initialEntries={["/requests/request-1"]}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <Routes>
+            <Route path="/requests/:requestId" element={<RequestTracking />} />
+          </Routes>
+        </MemoryRouter>
+      );
+    });
+
+    await waitFor(() => expect(trackingHarness.mapProps).not.toBeNull());
+  };
 
   afterEach(() => {
     act(() => root.unmount());
@@ -238,5 +259,50 @@ describe("RequestTracking live metrics", () => {
       showRoutePath: true,
       routeDestination: { lat: 0.02, lng: 0.03 },
     });
+  });
+
+  it("starts mobile tracking in balanced focus and lets the customer select map and details focus", async () => {
+    viewportHarness.isMobile = true;
+    await renderTracking();
+
+    expect(screen.getByTestId("mobile-tracking-summary")).toHaveTextContent("17 min");
+    expect(trackingHarness.mapProps).toMatchObject({
+      mapMode: "balanced",
+      showStatusOverlay: false,
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Show more map" }));
+    });
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "map" });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "View service details" }));
+    });
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "sheet" });
+    expect(screen.getByText("Journey progress")).toBeInTheDocument();
+  });
+
+  it("keeps payment reachable in map focus without forcing the details sheet", async () => {
+    viewportHarness.isMobile = true;
+    trackingHarness.request = {
+      ...trackingHarness.request,
+      status: "payment_pending",
+      payment_status: "pending",
+    };
+    await renderTracking();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Show more map" }));
+    });
+    expect(screen.getByRole("button", { name: /Pay INR .* online/ })).toBeInTheDocument();
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "map" });
+  });
+
+  it("keeps the desktop tracking hierarchy when the mobile viewport flag is false", async () => {
+    await renderTracking();
+
+    expect(screen.queryByTestId("mobile-tracking-summary")).not.toBeInTheDocument();
+    expect(trackingHarness.mapProps).toMatchObject({ showRoutePath: true });
   });
 });

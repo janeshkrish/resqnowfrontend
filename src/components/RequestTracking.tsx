@@ -985,7 +985,7 @@ const RequestTracking = () => {
     Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
       ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
       : null;
-  const MOBILE_MAP_DOCK_HEIGHT = showPayment && !paymentCompleted ? 318 : 266;
+  const MOBILE_MAP_DOCK_HEIGHT = showPayment && !paymentCompleted ? 392 : 336;
   const EXPANDED_Y = Math.max(56, Math.round(viewportHeight * 0.10));
   const HALF_Y = Math.max(EXPANDED_Y + 150, Math.round(viewportHeight * 0.46));
   const COLLAPSED_Y = Math.max(
@@ -1363,14 +1363,14 @@ const RequestTracking = () => {
         >
           {/* Drag is attached to the handle; the button keeps the same interaction available without a gesture. */}
           <div
-            className="flex h-9 w-full items-center justify-center bg-white pt-2 touch-none"
+            className="flex h-11 w-full items-center justify-center bg-white touch-none"
             onPointerDown={(event) => dragControls.start(event)}
           >
             <button
               type="button"
               onClick={() => snapTo(isDetailsFocus ? "half" : "expanded")}
               aria-label={isDetailsFocus ? "Show balanced tracking view" : "Expand service panel"}
-              className="flex h-8 w-20 items-center justify-center rounded-full"
+              className="flex h-11 w-20 items-center justify-center rounded-full"
             >
               <span className="h-1.5 w-12 rounded-full bg-slate-300 transition-colors" />
             </button>

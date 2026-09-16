@@ -270,6 +270,7 @@ describe("RequestTracking live metrics", () => {
       mapMode: "balanced",
       showStatusOverlay: false,
     });
+    expect(screen.getByRole("button", { name: "Expand service panel" })).toHaveClass("h-11");
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Show more map" }));

@@ -417,7 +417,7 @@ Do not alter `liveTrackingMetrics`, server route freshness checks, `liveTracking
 Replace the hard-coded 110px collapsed visibility with named geometry that accommodates the summary dock and remains ordered at short viewport heights:
 
 ```tsx
-const MOBILE_MAP_DOCK_HEIGHT = showPayment && !paymentCompleted ? 206 : 158;
+const MOBILE_MAP_DOCK_HEIGHT = showPayment && !paymentCompleted ? 392 : 336;
 const EXPANDED_Y = Math.max(56, Math.round(viewportHeight * 0.10));
 const HALF_Y = Math.max(EXPANDED_Y + 150, Math.round(viewportHeight * 0.46));
 const COLLAPSED_Y = Math.max(

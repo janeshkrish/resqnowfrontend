@@ -134,4 +134,20 @@ describe("LiveTrackingMap", () => {
     );
     expect(fetchRouteMock).toHaveBeenCalledTimes(2);
   });
+
+  it("can hide the duplicate status card without removing map recenter", () => {
+    render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        eta="8 min"
+        status="en-route"
+        variant="fullscreen"
+        showStatusOverlay={false}
+      />,
+    );
+
+    expect(screen.queryByText("On the way")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Recenter live tracking map" })).toBeInTheDocument();
+  });
 });

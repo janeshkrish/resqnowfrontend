@@ -31,6 +31,7 @@ interface LiveTrackingMapProps {
   routePolyline?: Array<[number, number]> | null;
   routeDestination?: { lat: number; lng: number } | null;
   showRoutePath?: boolean;
+  showStatusOverlay?: boolean;
 }
 
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
@@ -182,6 +183,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   routePolyline,
   routeDestination,
   showRoutePath = true,
+  showStatusOverlay = true,
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
   const displayedTechLocation = useInterpolatedPoint(techLocation, reduceMotion);
@@ -460,16 +462,20 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           style={{ top: "calc(env(safe-area-inset-top) + 6.75rem)" }}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="pointer-events-auto rounded-[1.5rem] border border-white/80 bg-white/92 px-4 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl">
-              <div className="flex items-center gap-2 text-[15px] font-bold text-emerald-600">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                {statusLabel}
+            {showStatusOverlay ? (
+              <div className="pointer-events-auto rounded-[1.5rem] border border-white/80 bg-white/92 px-4 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+                <div className="flex items-center gap-2 text-[15px] font-bold text-emerald-600">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  {statusLabel}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
+                  <RadioTower className="h-3.5 w-3.5 text-emerald-500" />
+                  {supportingLabel}
+                </div>
               </div>
-              <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
-                <RadioTower className="h-3.5 w-3.5 text-emerald-500" />
-                {supportingLabel}
-              </div>
-            </div>
+            ) : (
+              <span />
+            )}
             <button
               type="button"
               onClick={recenter}

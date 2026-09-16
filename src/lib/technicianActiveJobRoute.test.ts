@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getTechnicianActiveJobNavigation,
   getTechnicianActiveJobPath,
   selectMatchingActiveJobNavigationState,
 } from "./technicianActiveJobRoute";
@@ -20,5 +21,14 @@ describe("technician active-job routing", () => {
     expect(getTechnicianActiveJobPath("request 42")).toBe(
       "/technician/active-job/request%2042"
     );
+  });
+
+  it("keeps an arrived job inside the embedded Active Job route", () => {
+    const arrivedJob = { id: "request-42", status: "arrived" };
+
+    expect(getTechnicianActiveJobNavigation(arrivedJob)).toEqual({
+      path: "/technician/active-job/request-42",
+      state: { jobId: "request-42", job: arrivedJob },
+    });
   });
 });

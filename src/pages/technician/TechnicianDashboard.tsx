@@ -30,7 +30,10 @@ import {
 import { isTowingTechnician as isTowingTechnicianRole } from "@/utils/technicianRole";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
 import { getTowingAction } from "@/lib/towingActionState";
-import { getTechnicianActiveJobPath } from "@/lib/technicianActiveJobRoute";
+import {
+  getTechnicianActiveJobNavigation,
+  getTechnicianActiveJobPath,
+} from "@/lib/technicianActiveJobRoute";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import FleetManagementModule from "@/components/technician/dashboard/towing/FleetManagementModule";
@@ -1549,31 +1552,16 @@ const TechnicianDashboard = () => {
   };
 
   const openNavigation = () => {
-    // Safely read coordinates — activeJob or its location may be null.
-    const status = normalizeTechnicianStatus(activeJob?.status);
-    const navigateToDrop =
-      isTowingJob(activeJob) &&
-      ["vehicle_loaded", "enroute_drop", "arrived_drop", "service_completed", "payment_pending", "closed"].includes(status);
-    const pickupLat = activeJob?.location?.lat ?? activeJob?.location_lat ?? null;
-    const pickupLng = activeJob?.location?.lng ?? activeJob?.location_lng ?? null;
-    const dropLat = activeJob?.dropLocation?.lat ?? activeJob?.drop_latitude ?? activeJob?.destinationLatitude ?? null;
-    const dropLng = activeJob?.dropLocation?.lng ?? activeJob?.drop_longitude ?? activeJob?.destinationLongitude ?? null;
-    const lat = navigateToDrop ? dropLat ?? pickupLat : pickupLat;
-    const lng = navigateToDrop ? dropLng ?? pickupLng : pickupLng;
-    const address = navigateToDrop
-      ? activeJob?.dropLocation?.address || activeJob?.dropAddress || activeJob?.drop_address || activeJob?.address || ""
-      : activeJob?.location?.address || activeJob?.address || "";
-
-    if ((lat !== null && lng !== null) && (Number(lat) !== 0 || Number(lng) !== 0)) {
-      const url = currentLocation
-        ? `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${currentLocation.lat}%2C${currentLocation.lng}%3B${Number(lat)}%2C${Number(lng)}`
-        : `https://www.openstreetmap.org/?mlat=${Number(lat)}&mlon=${Number(lng)}#map=16/${Number(lat)}/${Number(lng)}`;
-      window.open(url, '_blank');
-    } else if (address) {
-      window.open(`https://www.openstreetmap.org/search?query=${encodeURIComponent(address)}`, '_blank');
-    } else {
-      toast.error('No location details available for navigation.');
+    // Active Job owns embedded navigation, including the correct towing leg.
+    const activeJobNavigation = getTechnicianActiveJobNavigation(activeJob, {
+      openNavigation: true,
+    });
+    if (!activeJobNavigation) {
+      toast.error("No active job is available for navigation.");
+      return;
     }
+
+    navigate(activeJobNavigation.path, { state: activeJobNavigation.state });
   };
 
   // Calculate Distance and ETA

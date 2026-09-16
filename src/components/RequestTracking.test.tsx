@@ -16,24 +16,13 @@ import RequestTracking from "./RequestTracking";
 
 const trackingHarness = vi.hoisted(() => ({
   technician: {} as Record<string, unknown>,
+  request: {} as Record<string, unknown>,
   mapProps: null as Record<string, unknown> | null,
 }));
 
 vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
   useRealtimeServiceRequest: () => ({
-    request: {
-      id: "request-1",
-      isTowing: false,
-      user_id: "user-1",
-      status: "en-route",
-      service_type: "puncture",
-      address: "Customer location",
-      location_lat: 0,
-      location_lng: 0,
-      created_at: "2026-09-15T00:00:00.000Z",
-      payment_status: "pending",
-      price: 500,
-    },
+    request: trackingHarness.request,
     technician: trackingHarness.technician,
     isLoading: false,
     isConnected: true,
@@ -80,6 +69,19 @@ describe("RequestTracking live metrics", () => {
 
   beforeEach(() => {
     trackingHarness.mapProps = null;
+    trackingHarness.request = {
+      id: "request-1",
+      isTowing: false,
+      user_id: "user-1",
+      status: "en-route",
+      service_type: "puncture",
+      address: "Customer location",
+      location_lat: 0,
+      location_lng: 0,
+      created_at: "2026-09-15T00:00:00.000Z",
+      payment_status: "pending",
+      price: 500,
+    };
     trackingHarness.technician = {
       id: "technician-1",
       name: "Test Technician",
@@ -93,6 +95,8 @@ describe("RequestTracking live metrics", () => {
       routeEtaText: "17 min",
       routeEtaSource: "mappls",
       routeRequestId: "request-1",
+      routeLocationLat: 0,
+      routeLocationLng: 0.01,
     };
 
     container = document.createElement("div");
@@ -123,6 +127,8 @@ describe("RequestTracking live metrics", () => {
     expect(trackingHarness.mapProps).toMatchObject({
       eta: "17 min",
       distanceLabel: "12.3 km away",
+      showRoutePath: true,
+      routeDestination: { lat: 0, lng: 0 },
     });
   });
 
@@ -176,6 +182,61 @@ describe("RequestTracking live metrics", () => {
     expect(trackingHarness.mapProps).toMatchObject({
       eta: "3 min",
       distanceLabel: "1.1 km away",
+    });
+  });
+
+  it("uses the fallback until route metrics match the latest technician coordinate", async () => {
+    trackingHarness.technician = {
+      ...trackingHarness.technician,
+      routeLocationLat: 0,
+      routeLocationLng: 0.02,
+    };
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter
+          initialEntries={["/requests/request-1"]}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <Routes>
+            <Route path="/requests/:requestId" element={<RequestTracking />} />
+          </Routes>
+        </MemoryRouter>
+      );
+    });
+
+    expect(trackingHarness.mapProps).toMatchObject({
+      eta: "3 min",
+      distanceLabel: "1.1 km away",
+    });
+  });
+
+  it("switches a towing live route to the drop after the vehicle is loaded", async () => {
+    trackingHarness.request = {
+      ...trackingHarness.request,
+      isTowing: true,
+      service_type: "towing",
+      status: "vehicle_loaded",
+      drop_latitude: 0.02,
+      drop_longitude: 0.03,
+    };
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter
+          initialEntries={["/requests/request-1"]}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <Routes>
+            <Route path="/requests/:requestId" element={<RequestTracking />} />
+          </Routes>
+        </MemoryRouter>
+      );
+    });
+
+    expect(trackingHarness.mapProps).toMatchObject({
+      showRoutePath: true,
+      routeDestination: { lat: 0.02, lng: 0.03 },
     });
   });
 });

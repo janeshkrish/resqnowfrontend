@@ -217,4 +217,61 @@ describe("technician active-job navigation", () => {
       }),
     );
   });
+
+  it("reopens embedded navigation from an arrived dashboard job once GPS and route are ready", async () => {
+    activeJobState.value = {
+      id: "request-42",
+      requestId: "request-42",
+      status: "arrived",
+      pickupLatitude: 12.97,
+      pickupLongitude: 77.59,
+      amount: 500,
+    };
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        watchPosition: vi.fn((success: PositionCallback) => {
+          success({
+            coords: {
+              latitude: 12.969,
+              longitude: 77.589,
+              accuracy: 10,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+              toJSON: () => ({}),
+            },
+            timestamp: Date.now(),
+            toJSON: () => ({}),
+          } as GeolocationPosition);
+          return 11;
+        }),
+        clearWatch: vi.fn(),
+      },
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[{
+          pathname: "/technician/active-job/request-42",
+          state: { openNavigation: true },
+        }]}
+      >
+        <Routes>
+          <Route path="/technician/active-job/:requestId" element={<ActiveJob />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      (capture.mapProps?.onRouteStateChange as ((value: unknown) => void) | undefined)?.({
+        status: "ready",
+        distanceKm: 0.2,
+        durationMinutes: 1,
+      });
+    });
+
+    await waitFor(() => expect(capture.mapProps?.navigationMode).toBe(true));
+  });
 });

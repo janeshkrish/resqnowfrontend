@@ -72,6 +72,9 @@ interface TechnicianData {
   routeEtaText?: string;
   routeEtaSource?: string;
   routeRequestId?: string;
+  routeLocationLat?: number;
+  routeLocationLng?: number;
+  locationUpdatedAt?: number;
 }
 
 interface RealtimeOptions {
@@ -157,6 +160,8 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
               routeEtaText: preserveRouteMetrics ? prev.routeEtaText : undefined,
               routeEtaSource: preserveRouteMetrics ? prev.routeEtaSource : undefined,
               routeRequestId: preserveRouteMetrics ? prev.routeRequestId : undefined,
+              routeLocationLat: preserveRouteMetrics ? prev.routeLocationLat : undefined,
+              routeLocationLng: preserveRouteMetrics ? prev.routeLocationLng : undefined,
             };
           });
 
@@ -243,8 +248,17 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         const eventRequestId = data?.requestId != null ? String(data.requestId) : "";
         if (eventRequestId && String(eventRequestId) !== String(requestId)) return;
 
+        const eventTechnicianId = data?.technicianId != null
+          ? String(data.technicianId)
+          : "";
+
         const lat = Number(data?.lat);
         const lng = Number(data?.lng);
+        const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+        const parsedLocationUpdatedAt = Date.parse(String(data?.locationUpdatedAt || ""));
+        const locationUpdatedAt = Number.isFinite(parsedLocationUpdatedAt)
+          ? parsedLocationUpdatedAt
+          : undefined;
         const parseRouteMetric = (value: unknown) => {
           if (value == null || (typeof value === "string" && value.trim() === "")) return undefined;
           const parsed = Number(value);
@@ -258,23 +272,43 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         const routeEtaSource = typeof data?.etaSource === "string" && data.etaSource.trim()
           ? data.etaSource.trim()
           : undefined;
-        const routeRequestId = routeDistanceKm !== undefined && routeEtaMinutes !== undefined
+        const hasRouteMetrics =
+          hasLocation && routeDistanceKm !== undefined && routeEtaMinutes !== undefined;
+        const routeRequestId = hasRouteMetrics
           ? String(requestId)
           : undefined;
         // We set the location on the technician object in state
         setTechnician(prev => {
           if (!prev) return null;
+          if (eventTechnicianId && String(prev.id) !== eventTechnicianId) return prev;
+
+          const currentLocationUpdatedAt = Number(prev.locationUpdatedAt);
+          // Route enrichment is asynchronous. The backend sends its original
+          // GPS timestamp back with the enriched event, allowing an older road
+          // route response to be ignored without rejecting compatible servers
+          // that do not yet send that optional timestamp.
+          if (
+            locationUpdatedAt !== undefined &&
+            Number.isFinite(currentLocationUpdatedAt) &&
+            locationUpdatedAt < currentLocationUpdatedAt
+          ) {
+            return prev;
+          }
+
           return {
             ...prev,
-            location_lat: Number.isFinite(lat) ? lat : prev.location_lat,
-            location_lng: Number.isFinite(lng) ? lng : prev.location_lng,
+            location_lat: hasLocation ? lat : prev.location_lat,
+            location_lng: hasLocation ? lng : prev.location_lng,
             routeDistanceKm,
             routeEtaMinutes,
             routeEtaText,
             routeEtaSource,
             routeRequestId,
+            routeLocationLat: hasRouteMetrics ? lat : undefined,
+            routeLocationLng: hasRouteMetrics ? lng : undefined,
+            locationUpdatedAt: locationUpdatedAt ?? prev.locationUpdatedAt,
             // Map legacy 'location' string if needed
-            location: `${data?.lat}, ${data?.lng}`
+            location: hasLocation ? `${lat}, ${lng}` : prev.location
           };
         });
       };

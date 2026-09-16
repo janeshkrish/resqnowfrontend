@@ -101,6 +101,7 @@ const ActiveJob = () => {
 
   const { activeJob, dues, setDues, refreshActiveJob, refreshDues } = useTechnicianActiveJob(technician?.id, 15000);
   const stateJob = selectMatchingActiveJobNavigationState(state?.job, routeRequestId);
+  const shouldAutoOpenNavigationRef = useRef(Boolean(state?.openNavigation));
   const [status, setStatus] = useState(normalizeTechnicianStatus(stateJob?.status || 'accepted'));
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<TechnicianLocationFix | null>(null);
@@ -574,6 +575,17 @@ const ActiveJob = () => {
     }
     setIsNavigationActive(true);
   };
+
+  useEffect(() => {
+    if (
+      !shouldAutoOpenNavigationRef.current ||
+      !navigationStartReady ||
+      status === 'accepted' ||
+      status === 'assigned'
+    ) return;
+    shouldAutoOpenNavigationRef.current = false;
+    setIsNavigationActive(true);
+  }, [navigationStartReady, status]);
 
   if (visibleCancelledJob) {
     return (

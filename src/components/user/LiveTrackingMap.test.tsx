@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -21,6 +21,7 @@ type CapturedSurfaceProps = {
 const surfaceCapture = vi.hoisted(() => ({
   props: null as CapturedSurfaceProps | null,
 }));
+const fetchRouteMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/mapProvider/MapplsMapSurface", () => ({
   MapplsMapSurface: (props: CapturedSurfaceProps) => {
@@ -33,13 +34,15 @@ vi.mock("@/lib/geo", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/geo")>();
   return {
     ...actual,
-    fetchRoute: vi.fn().mockResolvedValue({ polyline: [] }),
+    fetchRoute: fetchRouteMock,
   };
 });
 
 describe("LiveTrackingMap", () => {
   beforeEach(() => {
     surfaceCapture.props = null;
+    fetchRouteMock.mockReset();
+    fetchRouteMock.mockResolvedValue({ polyline: [] });
   });
 
   it("passes pulse markers, circles, cased route, and fit camera to Mappls", () => {
@@ -86,5 +89,49 @@ describe("LiveTrackingMap", () => {
       screen.getByRole("button", { name: "Recenter live tracking map" }),
     );
     expect(surfaceCapture.props?.camera.revision).toBeGreaterThan(before);
+  });
+
+  it("uses the changing technician position and active destination instead of a static booking route", async () => {
+    fetchRouteMock.mockResolvedValue({
+      polyline: [
+        [12.97, 77.59],
+        [12.975, 77.595],
+        [12.98, 77.6],
+      ],
+    });
+    const { rerender } = render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        routeDestination={{ lat: 12.98, lng: 77.6 }}
+        routePolyline={[
+          [12.8, 77.4],
+          [12.9, 77.5],
+        ]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(fetchRouteMock).toHaveBeenLastCalledWith(
+        [{ lat: 12.97, lng: 77.59 }, { lat: 12.98, lng: 77.6 }],
+        "full",
+      ),
+    );
+
+    rerender(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.971, lng: 77.591 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        routeDestination={{ lat: 12.98, lng: 77.6 }}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(fetchRouteMock).toHaveBeenLastCalledWith(
+        [{ lat: 12.971, lng: 77.591 }, { lat: 12.98, lng: 77.6 }],
+        "full",
+      ),
+    );
+    expect(fetchRouteMock).toHaveBeenCalledTimes(2);
   });
 });

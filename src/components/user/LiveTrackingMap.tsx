@@ -29,10 +29,13 @@ interface LiveTrackingMapProps {
   mapMode?: TrackingMapMode;
   onInteract?: () => void;
   routePolyline?: Array<[number, number]> | null;
+  routeDestination?: { lat: number; lng: number } | null;
   showRoutePath?: boolean;
 }
 
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
+const ROUTE_REFRESH_MIN_DISTANCE_METERS = 25;
+const ROUTE_REFRESH_MIN_INTERVAL_MS = 5_000;
 
 const normalizeStatusLabel = (status: string | undefined) => {
   const raw = String(status || "").trim().toLowerCase();
@@ -117,6 +120,22 @@ function coordinateRevision(points: MapPoint[]) {
   );
 }
 
+function distanceMeters(from: MapPoint, to: MapPoint) {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const deltaLat = toRadians(to.lat - from.lat);
+  const deltaLng = toRadians(to.lng - from.lng);
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(toRadians(from.lat)) * Math.cos(toRadians(to.lat)) *
+      Math.sin(deltaLng / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function samePoint(left: MapPoint, right: MapPoint) {
+  return Math.abs(left.lat - right.lat) < 0.000001 && Math.abs(left.lng - right.lng) < 0.000001;
+}
+
 function useInterpolatedPoint(target: MapPoint | null, reduceMotion: boolean) {
   const [displayed, setDisplayed] = useState<MapPoint | null>(target);
   const displayedRef = useRef<MapPoint | null>(target);
@@ -161,6 +180,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   mapMode = "balanced",
   onInteract,
   routePolyline,
+  routeDestination,
   showRoutePath = true,
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
@@ -169,79 +189,105 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   const [recenterKey, setRecenterKey] = useState(0);
   const [autoFrame, setAutoFrame] = useState(true);
   const lockedCameraRevisionRef = useRef<number | null>(null);
+  const lastRouteRequestRef = useRef<{
+    origin: MapPoint;
+    destination: MapPoint;
+    requestedAt: number;
+  } | null>(null);
+  const routeRequestVersionRef = useRef(0);
 
-  const techPosition = useMemo<[number, number] | null>(
-    () => displayedTechLocation
-      ? [displayedTechLocation.lat, displayedTechLocation.lng]
-      : null,
-    [displayedTechLocation],
+  const activeRouteDestination = useMemo<MapPoint | null>(
+    () => routeDestination ? { lat: routeDestination.lat, lng: routeDestination.lng } : null,
+    [routeDestination?.lat, routeDestination?.lng],
   );
-  const userPosition = useMemo<[number, number] | null>(
-    () => userLocation ? [userLocation.lat, userLocation.lng] : null,
-    [userLocation],
-  );
-  const dropPosition = useMemo<[number, number] | null>(
-    () => dropLocation ? [dropLocation.lat, dropLocation.lng] : null,
-    [dropLocation],
-  );
+  const routeWaypoints = useMemo<MapPoint[]>(() => {
+    if (techLocation && activeRouteDestination) {
+      return [techLocation, activeRouteDestination];
+    }
+
+    return [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[];
+  }, [activeRouteDestination, dropLocation, techLocation, userLocation]);
 
   const routeFallback = useMemo(() => {
     if (!showRoutePath) return [];
-    if (techPosition && userPosition && dropPosition) {
-      return [
-        ...buildRouteCurve(techPosition, userPosition),
-        ...buildRouteCurve(userPosition, dropPosition).slice(1),
-      ];
-    }
-    if (techPosition && userPosition) return buildRouteCurve(techPosition, userPosition);
-    if (userPosition && dropPosition) return buildRouteCurve(userPosition, dropPosition);
-    return [];
-  }, [dropPosition, showRoutePath, techPosition, userPosition]);
+    const positions = routeWaypoints.map(
+      (point) => [point.lat, point.lng] as [number, number],
+    );
+    if (positions.length < 2) return [];
+
+    return positions.slice(1).reduce<Array<[number, number]>>(
+      (path, current, index) => {
+        const segment = buildRouteCurve(positions[index], current);
+        return path.length ? [...path, ...segment.slice(1)] : segment;
+      },
+      [],
+    );
+  }, [routeWaypoints, showRoutePath]);
 
   useEffect(() => {
     if (!showRoutePath) {
       setRoutePath([]);
+      lastRouteRequestRef.current = null;
       return;
     }
 
-    const suppliedRoute = routePolylineFromMetadata({ polyline: routePolyline });
+    // A booking polyline is historical once a technician is moving. The active
+    // leg must always start at the latest technician coordinate instead.
+    const suppliedRoute = activeRouteDestination && techLocation
+      ? []
+      : routePolylineFromMetadata({ polyline: routePolyline });
     if (suppliedRoute.length > 1) {
       setRoutePath(suppliedRoute);
       return;
     }
 
-    const waypoints = [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[];
-    if (waypoints.length < 2) {
+    if (routeWaypoints.length < 2) {
       setRoutePath([]);
       return;
     }
 
-    const waypointPositions = waypoints.map(
-      (point) => [point.lat, point.lng] as [number, number],
-    );
-    const fallbackPath = waypointPositions.slice(1).reduce<Array<[number, number]>>(
-      (path, current, index) => {
-        const segment = buildRouteCurve(waypointPositions[index], current);
-        return path.length ? [...path, ...segment.slice(1)] : segment;
-      },
-      [],
-    );
-    setRoutePath(fallbackPath);
+    const origin = routeWaypoints[0];
+    const destination = routeWaypoints[routeWaypoints.length - 1];
+    const now = Date.now();
+    const previousRouteRequest = lastRouteRequestRef.current;
+    const destinationChanged = previousRouteRequest
+      ? !samePoint(previousRouteRequest.destination, destination)
+      : true;
+    const technicianMovedEnough = previousRouteRequest
+      ? distanceMeters(previousRouteRequest.origin, origin) >= ROUTE_REFRESH_MIN_DISTANCE_METERS
+      : true;
+    const refreshIntervalElapsed = previousRouteRequest
+      ? now - previousRouteRequest.requestedAt >= ROUTE_REFRESH_MIN_INTERVAL_MS
+      : true;
+
+    if (!destinationChanged && !technicianMovedEnough && !refreshIntervalElapsed) return;
+
+    lastRouteRequestRef.current = { origin, destination, requestedAt: now };
+    const requestVersion = routeRequestVersionRef.current + 1;
+    routeRequestVersionRef.current = requestVersion;
+    setRoutePath(routeFallback);
 
     let stale = false;
-    void fetchRoute(waypoints, "full")
+    void fetchRoute(routeWaypoints, "full")
       .then((route) => {
-        if (stale) return;
+        if (stale || routeRequestVersionRef.current !== requestVersion) return;
         const coordinates = routePolylineFromMetadata(route);
         if (coordinates.length > 1) setRoutePath(coordinates);
       })
       .catch(() => {
-        if (!stale) setRoutePath(fallbackPath);
+        if (!stale && routeRequestVersionRef.current === requestVersion) setRoutePath(routeFallback);
       });
     return () => {
       stale = true;
     };
-  }, [dropLocation, routePolyline, showRoutePath, techLocation, userLocation]);
+  }, [
+    activeRouteDestination,
+    routeFallback,
+    routePolyline,
+    routeWaypoints,
+    showRoutePath,
+    techLocation,
+  ]);
 
   const etaLabel = normalizeEtaLabel(eta) || "Live";
   const markers = useMemo<MapMarkerSpec[]>(() => {
@@ -340,8 +386,10 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   }, [showRoutePath, visibleRoute]);
 
   const cameraPoints = useMemo(
-    () => [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[],
-    [dropLocation, techLocation, userLocation],
+    () => activeRouteDestination
+      ? [techLocation, activeRouteDestination].filter(Boolean) as MapPoint[]
+      : [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[],
+    [activeRouteDestination, dropLocation, techLocation, userLocation],
   );
   const baseCameraRevision =
     coordinateRevision(cameraPoints) +

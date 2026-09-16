@@ -741,8 +741,19 @@ const RequestTracking = () => {
   const liveTrackingMetrics = useMemo(() => {
     const serverDistanceKm = technician?.routeDistanceKm;
     const serverEtaMinutes = technician?.routeEtaMinutes;
+    const routeLocationLat = technician?.routeLocationLat;
+    const routeLocationLng = technician?.routeLocationLng;
+    const routeMatchesLatestTechnicianLocation =
+      technicianMapLocation !== null &&
+      typeof routeLocationLat === "number" &&
+      Number.isFinite(routeLocationLat) &&
+      typeof routeLocationLng === "number" &&
+      Number.isFinite(routeLocationLng) &&
+      Math.abs(routeLocationLat - technicianMapLocation.lat) < 0.000001 &&
+      Math.abs(routeLocationLng - technicianMapLocation.lng) < 0.000001;
     const hasServerRouteMetrics =
       technician?.routeRequestId === String(requestId) &&
+      routeMatchesLatestTechnicianLocation &&
       typeof serverDistanceKm === "number" &&
       Number.isFinite(serverDistanceKm) &&
       serverDistanceKm >= 0 &&
@@ -822,6 +833,8 @@ const RequestTracking = () => {
     technician?.routeEtaMinutes,
     technician?.routeEtaText,
     technician?.routeRequestId,
+    technician?.routeLocationLat,
+    technician?.routeLocationLng,
     technicianMapLocation,
   ]);
   const eta = liveTrackingMetrics.eta;
@@ -832,6 +845,21 @@ const RequestTracking = () => {
     Number.isFinite(dropLat) && Number.isFinite(dropLng)
       ? { lat: dropLat, lng: dropLng }
       : null;
+  const isTowingDropLeg =
+    isTowingRequest &&
+    [
+      "vehicle_loaded",
+      "enroute_drop",
+      "arrived_drop",
+      "service_completed",
+      "payment_pending",
+      "paid",
+      "completed",
+      "closed",
+    ].includes(status);
+  const liveTrackingDestination =
+    isTowingDropLeg && dropLocation ? dropLocation : requestMapLocation;
+  const shouldShowLiveRoute = Boolean(liveTrackingDestination);
   const routeDistanceKm = Number(request?.routeDistanceKm ?? request?.route_distance_km);
   const routeSummaryVisible = isTowingRequest && Boolean(request?.drop_address || request?.dropLocation?.address || Number.isFinite(routeDistanceKm));
   const routePolyline = useMemo(
@@ -1252,13 +1280,14 @@ const RequestTracking = () => {
             userLocation={requestMapLocation}
             dropLocation={trackingDropLocation}
             routePolyline={trackingRoutePolyline}
+            routeDestination={liveTrackingDestination}
             eta={eta}
             variant="fullscreen"
             status={status}
             distanceLabel={mapDistanceLabel}
             mapMode={trackingMapModeFromSheetSnap(sheetSnapState)}
             onInteract={() => snapTo("collapsed")}
-            showRoutePath={isTowingRequest}
+            showRoutePath={shouldShowLiveRoute}
             className="h-full w-full"
           />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-32 z-20 bg-gradient-to-b from-black/60 to-transparent" />
@@ -1751,10 +1780,11 @@ const RequestTracking = () => {
                 userLocation={requestMapLocation}
                 dropLocation={trackingDropLocation}
                 routePolyline={trackingRoutePolyline}
+                routeDestination={liveTrackingDestination}
                 eta={eta}
                 status={status}
                 distanceLabel={mapDistanceLabel}
-                showRoutePath={isTowingRequest}
+                showRoutePath={shouldShowLiveRoute}
                 className="h-[380px] sm:h-[440px] w-full mb-0"
               />
             </CardContent>

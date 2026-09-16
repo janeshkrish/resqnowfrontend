@@ -126,6 +126,8 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
         routeEtaMinutes: 17,
         routeEtaText: "17 min",
         routeEtaSource: "mappls",
+        routeLocationLat: 12.97,
+        routeLocationLng: 77.59,
       });
 
       await act(async () => {
@@ -207,6 +209,82 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
     ).toBeUndefined();
     expect(
       (result?.technician as unknown as Record<string, unknown>).routeEtaMinutes
+    ).toBeUndefined();
+  });
+
+  it("ignores a location event from another technician", async () => {
+    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
+    const Harness = () => {
+      result = useRealtimeServiceRequest("request-1");
+      return null;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    act(() => {
+      socketHarness.handlers.get("technician:location_update")?.({
+        requestId: "request-1",
+        technicianId: "another-technician",
+        lat: 28.61,
+        lng: 77.21,
+        distanceKm: 5.4,
+        durationMinutes: 12,
+      });
+    });
+
+    expect(result?.technician).toMatchObject({
+      id: "technician-1",
+      location_lat: 12.96,
+      location_lng: 77.58,
+    });
+    expect(
+      (result?.technician as unknown as Record<string, unknown>).routeDistanceKm,
+    ).toBeUndefined();
+  });
+
+  it("rejects delayed route metrics for an older technician coordinate", async () => {
+    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
+    const Harness = () => {
+      result = useRealtimeServiceRequest("request-1");
+      return null;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    act(() => {
+      socketHarness.handlers.get("location_update")?.({
+        requestId: "request-1",
+        technicianId: "technician-1",
+        lat: 12.98,
+        lng: 77.6,
+        locationUpdatedAt: "2026-09-16T10:00:02.000Z",
+      });
+    });
+
+    act(() => {
+      socketHarness.handlers.get("technician:location_update")?.({
+        requestId: "request-1",
+        technicianId: "technician-1",
+        lat: 12.97,
+        lng: 77.59,
+        distanceKm: 12.3,
+        durationMinutes: 17,
+        locationUpdatedAt: "2026-09-16T10:00:01.000Z",
+      });
+    });
+
+    expect(result?.technician).toMatchObject({
+      location_lat: 12.98,
+      location_lng: 77.6,
+    });
+    expect(
+      (result?.technician as unknown as Record<string, unknown>).routeDistanceKm,
     ).toBeUndefined();
   });
 });

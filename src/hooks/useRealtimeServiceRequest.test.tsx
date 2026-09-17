@@ -329,4 +329,45 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
       sequenceId: 2,
     });
   });
+
+  it("applies the canonical P1 through P4 stream to customer map state and restores LIVE freshness", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-17T10:00:15.000Z"));
+    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
+    const Harness = () => {
+      result = useRealtimeServiceRequest("request-1");
+      return null;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    const points = [
+      [11.0000, 76.0000, 100],
+      [11.0010, 76.0010, 101],
+      [11.0020, 76.0020, 102],
+      [11.0030, 76.0030, 103],
+    ];
+    for (const [lat, lng, sequenceId] of points) {
+      act(() => {
+        socketHarness.handlers.get("tracking:location:v1")?.({
+          requestId: "request-1",
+          technicianId: "technician-1",
+          lat,
+          lng,
+          sequenceId,
+          recordedAt: new Date(Date.now()).toISOString(),
+          receivedAt: new Date(Date.now()).toISOString(),
+        });
+      });
+      expect(result?.technician).toMatchObject({ location_lat: lat, location_lng: lng, sequenceId });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+
+    expect(result?.trackingFreshness).toBe("LIVE");
+  });
 });

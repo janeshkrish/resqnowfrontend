@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useLocation } from 'react-router-dom';
 import {
   FRONTEND_ONLY_MODE,
   getRequiredApiBaseUrl,
@@ -22,11 +23,27 @@ const SocketContext = createContext<SocketContextType>({
 
 export const useSocket = () => useContext(SocketContext);
 
+const isTechnicianPortalPath = (pathname: string) =>
+  pathname === '/active-job' ||
+  pathname.startsWith('/active-job/') ||
+  pathname === '/technician' ||
+  pathname.startsWith('/technician/');
+
+const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
+  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
+  console.info('[LiveTracking Diagnostics]', { event, ...details });
+};
+
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { technician, isAuthenticated: isTechAuth } = useTechnicianAuth();
   const { user, isAuthenticated: isUserAuth } = useAuth();
+  const { pathname } = useLocation();
+  const technicianPortal = isTechnicianPortalPath(pathname);
+  const socketRole = technicianPortal ? 'technician' : 'user';
+  const socketAuthenticated = technicianPortal ? isTechAuth : isUserAuth;
+  const socketIdentity = technicianPortal ? technician : user;
 
   useEffect(() => {
     if (FRONTEND_ONLY_MODE) {
@@ -38,8 +55,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // Only connect if either technician or user is authenticated
-    if (!isTechAuth && !isUserAuth) {
+    // A browser can retain both role sessions. The socket must represent the
+    // portal currently being viewed; a customer route must never authenticate
+    // as a technician just because that token also exists in local storage.
+    if (!socketAuthenticated) {
       if (socket) {
         socket.disconnect();
         setSocket(null);
@@ -50,7 +69,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Initialize socket
     const socketBaseUrl = getRequiredApiBaseUrl();
-    const authToken = isTechAuth ? getTechnicianToken() : getUserToken();
+    const authToken = socketRole === 'technician' ? getTechnicianToken() : getUserToken();
     if (!authToken) {
       setIsConnected(false);
       return;
@@ -62,28 +81,34 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       autoConnect: true,
       auth: { token: authToken },
     });
+    logTrackingDiagnostic('socket_connecting', { role: socketRole, portal: technicianPortal ? 'technician' : 'customer' });
 
     socketInstance.on('connect', () => {
       console.log('Socket connected');
       setIsConnected(true);
+      logTrackingDiagnostic('socket_connected', { role: socketRole, socketId: socketInstance.id ?? null });
 
       // Join appropriate rooms
-      if (isTechAuth && technician) {
-        socketInstance.emit('join_technician_room', technician.id);
-      }
-
-      if (isUserAuth && user) {
-        socketInstance.emit('join_user_room', user.id);
+      if (socketRole === 'technician' && technician) {
+        socketInstance.emit('join_technician_room', technician.id, (ack: { ok?: boolean; code?: string }) => {
+          logTrackingDiagnostic('room_join', { role: socketRole, roomIdentityId: technician.id, ok: Boolean(ack?.ok), code: ack?.code ?? null });
+        });
+      } else if (socketRole === 'user' && user) {
+        socketInstance.emit('join_user_room', user.id, (ack: { ok?: boolean; code?: string }) => {
+          logTrackingDiagnostic('room_join', { role: socketRole, roomIdentityId: user.id, ok: Boolean(ack?.ok), code: ack?.code ?? null });
+        });
       }
     });
 
-    socketInstance.on('disconnect', () => {
+    socketInstance.on('disconnect', (reason) => {
       console.log('Socket disconnected');
       setIsConnected(false);
+      logTrackingDiagnostic('socket_disconnected', { role: socketRole, reason });
     });
 
     socketInstance.on('connect_error', (err) => {
       console.error('Socket connection error:', err);
+      logTrackingDiagnostic('socket_connect_error', { role: socketRole, message: err?.message || 'unknown' });
     });
 
     setSocket(socketInstance);
@@ -91,7 +116,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       socketInstance.disconnect();
     };
-  }, [isTechAuth, technician?.id, isUserAuth, user?.id]);
+  }, [socketAuthenticated, socketIdentity?.id, socketRole]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

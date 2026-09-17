@@ -54,6 +54,11 @@ import {
 
 const EMPTY_VALUE_TOKENS = new Set(['not available', 'n/a', 'na', 'null', 'undefined', 'no phone number']);
 
+const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
+  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
+  console.info('[LiveTracking Diagnostics]', { event, ...details });
+};
+
 const toOptionalString = (value: any) => {
   const normalized = String(value ?? '').trim();
   if (!normalized) return null;
@@ -412,6 +417,11 @@ const ActiveJob = () => {
         recordedAt: new Date(timestamp).toISOString(),
         sequenceId,
       };
+      logTrackingDiagnostic('technician_location_ready', {
+        requestId: String(activeRequestId), sequenceId, lat: latitude, lng: longitude,
+        speed: locationPayload.speed, heading: locationPayload.heading,
+        accuracy: locationPayload.accuracy, recordedAt: locationPayload.recordedAt,
+      });
       let recoverySent = false;
       const sendRestRecovery = () => {
         if (recoverySent) return;
@@ -435,6 +445,9 @@ const ActiveJob = () => {
       const acknowledgementTimeout = window.setTimeout(sendRestRecovery, 3_500);
       trackingSocket.emit('tracking:location:v1', locationPayload, (acknowledgement: { ok?: boolean } | undefined) => {
         window.clearTimeout(acknowledgementTimeout);
+        logTrackingDiagnostic('technician_location_acknowledged', {
+          requestId: String(activeRequestId), sequenceId, ok: Boolean(acknowledgement?.ok),
+        });
         if (!acknowledgement?.ok) sendRestRecovery();
       });
     };

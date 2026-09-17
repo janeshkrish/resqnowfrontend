@@ -103,6 +103,11 @@ const TOWING_STATUS_EVENTS = [
 // request fetch per customer while still recovering missed status transitions.
 const REQUEST_STATUS_POLL_MS = 10_000;
 
+const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
+  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
+  console.info('[LiveTracking Diagnostics]', { event, ...details });
+};
+
 const normalizeRequestData = (data: any): RequestData => {
   const paymentDetails = resolveServiceRequestPaymentDetails(data);
 
@@ -259,6 +264,14 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         console.log("Tracking location update:", data);
         const eventRequestId = data?.requestId != null ? String(data.requestId) : "";
         if (eventRequestId && String(eventRequestId) !== String(requestId)) return;
+        logTrackingDiagnostic('customer_location_received', {
+          requestId: eventRequestId || String(requestId),
+          technicianId: data?.technicianId ?? null,
+          sequenceId: data?.sequenceId ?? null,
+          lat: data?.lat ?? null,
+          lng: data?.lng ?? null,
+          recordedAt: data?.recordedAt ?? data?.locationUpdatedAt ?? null,
+        });
 
         const eventTechnicianId = data?.technicianId != null
           ? String(data.technicianId)
@@ -360,7 +373,21 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
     }
 
     const subscribeToRequest = () => {
+      logTrackingDiagnostic('customer_subscription_requested', { requestId: String(requestId), socketId: socket.id ?? null });
       socket.emit("tracking:subscribe:v1", { requestId }, (acknowledgement: any) => {
+        logTrackingDiagnostic('customer_subscription_acknowledged', {
+          requestId: String(requestId),
+          socketId: socket.id ?? null,
+          ok: Boolean(acknowledgement?.ok),
+          code: acknowledgement?.code ?? null,
+          recoverySequenceId: acknowledgement?.location?.sequenceId ?? null,
+        });
+        if (!acknowledgement?.ok) {
+          logTrackingDiagnostic('customer_subscription_failed', {
+            requestId: String(requestId),
+            code: acknowledgement?.code ?? 'UNKNOWN',
+          });
+        }
         if (acknowledgement?.ok && acknowledgement.location && handleLocationUpdate) {
           handleLocationUpdate(acknowledgement.location);
         }

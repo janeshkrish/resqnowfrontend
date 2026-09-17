@@ -45,6 +45,11 @@ const interactionEvents = [
   "zoomstart",
 ] as const;
 
+const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
+  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
+  console.info('[LiveTracking Diagnostics]', { event, ...details });
+};
+
 function removeOverlay(
   runtime: MapplsRuntime,
   map: MapplsMap,
@@ -256,6 +261,13 @@ export function MapplsMapSurface({
       const sameContent = markerContentRef.current.get(marker.id) === marker.html;
       if (existing && sameContent) {
         existing.setPosition?.(marker.position);
+        if (marker.id === 'technician') {
+          logTrackingDiagnostic('map_marker_position', {
+            markerId: marker.id,
+            lat: marker.position.lat,
+            lng: marker.position.lng,
+          });
+        }
         updateMarkerHeading(existing, marker.heading, marker.id, containerRef.current);
         return;
       }

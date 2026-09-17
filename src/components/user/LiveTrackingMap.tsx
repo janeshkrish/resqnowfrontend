@@ -50,6 +50,11 @@ const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
 const ROUTE_REFRESH_MIN_DISTANCE_METERS = 25;
 const ROUTE_REFRESH_MIN_INTERVAL_MS = 5_000;
 
+const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
+  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
+  console.info('[LiveTracking Diagnostics]', { event, ...details });
+};
+
 const normalizeStatusLabel = (status: string | undefined) => {
   const raw = String(status || "").trim().toLowerCase();
   if (raw === "en-route" || raw === "on_the_way" || raw === "on-the-way") return "On the way";
@@ -238,6 +243,16 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     trackingFreshness !== "RECONNECTING",
   );
   const displayedTechLocation = playback.position;
+
+  useEffect(() => {
+    if (!displayedTechLocation) return;
+    logTrackingDiagnostic('playback_position', {
+      lat: displayedTechLocation.lat,
+      lng: displayedTechLocation.lng,
+      bearing: playback.bearing ?? null,
+      freshness: playback.freshness,
+    });
+  }, [displayedTechLocation?.lat, displayedTechLocation?.lng, playback.bearing, playback.freshness]);
   const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
   const [autoFrame, setAutoFrame] = useState(true);
   const [initialCameraRevision, setInitialCameraRevision] = useState(0);

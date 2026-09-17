@@ -6,6 +6,7 @@ import {
   deriveTrackingFreshness,
   type TrackingFreshness,
 } from '@/lib/liveTrackingPlayback';
+import { logLiveTrackingDiagnostic } from '@/lib/liveTrackingDiagnostics';
 import { resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayment';
 
 interface RequestData {
@@ -102,11 +103,6 @@ const TOWING_STATUS_EVENTS = [
 // for the technician's live coordinate. A modest interval avoids a 2-second
 // request fetch per customer while still recovering missed status transitions.
 const REQUEST_STATUS_POLL_MS = 10_000;
-
-const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
-  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
-  console.info('[LiveTracking Diagnostics]', { event, ...details });
-};
 
 const normalizeRequestData = (data: any): RequestData => {
   const paymentDetails = resolveServiceRequestPaymentDetails(data);
@@ -263,8 +259,13 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       handleLocationUpdate = (data: any) => {
         console.log("Tracking location update:", data);
         const eventRequestId = data?.requestId != null ? String(data.requestId) : "";
-        if (eventRequestId && String(eventRequestId) !== String(requestId)) return;
-        logTrackingDiagnostic('customer_location_received', {
+        if (eventRequestId && String(eventRequestId) !== String(requestId)) {
+          logLiveTrackingDiagnostic('[RT-CUSTOMER-STATE]', 'location_ignored_request_mismatch', {
+            requestId: String(requestId), eventRequestId, sequenceId: data?.sequenceId ?? null,
+          });
+          return;
+        }
+        logLiveTrackingDiagnostic('[RT-CUSTOMER-RECEIVE]', 'location_received', {
           requestId: eventRequestId || String(requestId),
           technicianId: data?.technicianId ?? null,
           sequenceId: data?.sequenceId ?? null,
@@ -317,8 +318,19 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           : undefined;
         // We set the location on the technician object in state
         setTechnician(prev => {
-          if (!prev) return null;
-          if (eventTechnicianId && String(prev.id) !== eventTechnicianId) return prev;
+          if (!prev) {
+            logLiveTrackingDiagnostic('[RT-CUSTOMER-STATE]', 'location_ignored_missing_technician', {
+              requestId: String(requestId), sequenceId: sequenceId ?? null, lat, lng,
+            });
+            return null;
+          }
+          if (eventTechnicianId && String(prev.id) !== eventTechnicianId) {
+            logLiveTrackingDiagnostic('[RT-CUSTOMER-STATE]', 'location_ignored_technician_mismatch', {
+              requestId: String(requestId), sequenceId: sequenceId ?? null,
+              expectedTechnicianId: String(prev.id), eventTechnicianId,
+            });
+            return prev;
+          }
 
           const currentLocationUpdatedAt = Number(prev.locationUpdatedAt);
           const currentSequenceId = Number(prev.sequenceId);
@@ -335,6 +347,13 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
                 Number.isFinite(currentSequenceId) &&
                 sequenceId < currentSequenceId))
           ) {
+            logLiveTrackingDiagnostic('[RT-CUSTOMER-STATE]', 'location_ignored_stale', {
+              requestId: String(requestId), sequenceId: sequenceId ?? null,
+              incomingLat: lat, incomingLng: lng,
+              previousLat: prev.location_lat ?? null, previousLng: prev.location_lng ?? null,
+              incomingRecordedAt: locationUpdatedAt ?? null,
+              previousRecordedAt: prev.locationUpdatedAt ?? null,
+            });
             return prev;
           }
 
@@ -345,7 +364,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             );
           }
 
-          return {
+          const next = {
             ...prev,
             location_lat: hasLocation ? lat : prev.location_lat,
             location_lng: hasLocation ? lng : prev.location_lng,
@@ -365,6 +384,14 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             // Map legacy 'location' string if needed
             location: hasLocation ? `${lat}, ${lng}` : prev.location
           };
+          logLiveTrackingDiagnostic('[RT-CUSTOMER-STATE]', 'location_applied', {
+            requestId: String(requestId), sequenceId: next.sequenceId ?? null,
+            previousLat: prev.location_lat ?? null, previousLng: prev.location_lng ?? null,
+            incomingLat: hasLocation ? lat : null, incomingLng: hasLocation ? lng : null,
+            displayedLat: next.location_lat ?? null, displayedLng: next.location_lng ?? null,
+            freshness: deriveTrackingFreshness(lastTrackingFixAtRef.current, Date.now(), Boolean(socket.connected)),
+          });
+          return next;
         });
       };
       socket.on("tracking:location:v1", handleLocationUpdate);
@@ -373,9 +400,11 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
     }
 
     const subscribeToRequest = () => {
-      logTrackingDiagnostic('customer_subscription_requested', { requestId: String(requestId), socketId: socket.id ?? null });
+      logLiveTrackingDiagnostic('[RT-CUSTOMER-SOCKET]', 'subscription_requested', {
+        requestId: String(requestId), socketId: socket.id ?? null, connected: socket.connected,
+      });
       socket.emit("tracking:subscribe:v1", { requestId }, (acknowledgement: any) => {
-        logTrackingDiagnostic('customer_subscription_acknowledged', {
+        logLiveTrackingDiagnostic('[RT-CUSTOMER-SOCKET]', 'subscription_acknowledged', {
           requestId: String(requestId),
           socketId: socket.id ?? null,
           ok: Boolean(acknowledgement?.ok),
@@ -383,7 +412,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           recoverySequenceId: acknowledgement?.location?.sequenceId ?? null,
         });
         if (!acknowledgement?.ok) {
-          logTrackingDiagnostic('customer_subscription_failed', {
+          logLiveTrackingDiagnostic('[RT-CUSTOMER-SOCKET]', 'subscription_failed', {
             requestId: String(requestId),
             code: acknowledgement?.code ?? 'UNKNOWN',
           });

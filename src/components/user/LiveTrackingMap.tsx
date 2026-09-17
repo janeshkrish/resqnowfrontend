@@ -9,6 +9,7 @@ import {
   type TrackingPlaybackFrame,
   type TrackingPlaybackPoint,
 } from "@/lib/liveTrackingPlayback";
+import { logLiveTrackingDiagnostic } from "@/lib/liveTrackingDiagnostics";
 import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
 import type {
   MapCameraSpec,
@@ -49,11 +50,6 @@ interface LiveTrackingMapProps {
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
 const ROUTE_REFRESH_MIN_DISTANCE_METERS = 25;
 const ROUTE_REFRESH_MIN_INTERVAL_MS = 5_000;
-
-const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
-  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
-  console.info('[LiveTracking Diagnostics]', { event, ...details });
-};
 
 const normalizeStatusLabel = (status: string | undefined) => {
   const raw = String(status || "").trim().toLowerCase();
@@ -160,7 +156,17 @@ function useInterpolatedPoint(
   const controllerRef = useRef<LiveTrackingPlaybackController | null>(null);
   if (!controllerRef.current) {
     controllerRef.current = new LiveTrackingPlaybackController();
-    if (target) controllerRef.current.push(target, performance.now());
+    if (target) {
+      controllerRef.current.push(target, performance.now());
+      logLiveTrackingDiagnostic('[RT-PLAYBACK]', 'authoritative_input', {
+        sequenceId: target.sequenceId ?? null,
+        lat: target.lat,
+        lng: target.lng,
+        recordedAtMs: target.recordedAtMs ?? null,
+        accepted: true,
+        ...controllerRef.current.diagnosticSnapshot(),
+      });
+    }
   }
   const [frame, setFrame] = useState<TrackingPlaybackFrame>(() =>
     controllerRef.current!.frame(performance.now(), isConnected),
@@ -178,7 +184,15 @@ function useInterpolatedPoint(
       });
       return;
     }
-    controllerRef.current!.push(target, performance.now());
+    const accepted = controllerRef.current!.push(target, performance.now());
+    logLiveTrackingDiagnostic('[RT-PLAYBACK]', 'authoritative_input', {
+      sequenceId: target.sequenceId ?? null,
+      lat: target.lat,
+      lng: target.lng,
+      recordedAtMs: target.recordedAtMs ?? null,
+      accepted,
+      ...controllerRef.current!.diagnosticSnapshot(),
+    });
   }, [reduceMotion, target]);
 
   useEffect(() => {
@@ -246,11 +260,13 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
 
   useEffect(() => {
     if (!displayedTechLocation) return;
-    logTrackingDiagnostic('playback_position', {
+    logLiveTrackingDiagnostic('[RT-PLAYBACK]', 'playback_frame', {
       lat: displayedTechLocation.lat,
       lng: displayedTechLocation.lng,
       bearing: playback.bearing ?? null,
       freshness: playback.freshness,
+      isPredicting: playback.isPredicting,
+      isRepositioning: playback.isRepositioning,
     });
   }, [displayedTechLocation?.lat, displayedTechLocation?.lng, playback.bearing, playback.freshness]);
   const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);

@@ -7,6 +7,7 @@ import {
   getTechnicianToken,
   getUserToken,
 } from '@/lib/api';
+import { logLiveTrackingDiagnostic } from '@/lib/liveTrackingDiagnostics';
 import { useTechnicianAuth } from './TechnicianAuthContext';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -28,11 +29,6 @@ const isTechnicianPortalPath = (pathname: string) =>
   pathname.startsWith('/active-job/') ||
   pathname === '/technician' ||
   pathname.startsWith('/technician/');
-
-const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
-  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
-  console.info('[LiveTracking Diagnostics]', { event, ...details });
-};
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -70,6 +66,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Initialize socket
     const socketBaseUrl = getRequiredApiBaseUrl();
     const authToken = socketRole === 'technician' ? getTechnicianToken() : getUserToken();
+    const diagnosticPrefix = socketRole === 'technician'
+      ? '[RT-TECH-SOCKET]'
+      : '[RT-CUSTOMER-SOCKET]';
     if (!authToken) {
       setIsConnected(false);
       return;
@@ -81,21 +80,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       autoConnect: true,
       auth: { token: authToken },
     });
-    logTrackingDiagnostic('socket_connecting', { role: socketRole, portal: technicianPortal ? 'technician' : 'customer' });
+    logLiveTrackingDiagnostic(diagnosticPrefix, 'socket_connecting', {
+      role: socketRole,
+      portal: technicianPortal ? 'technician' : 'customer',
+    });
 
     socketInstance.on('connect', () => {
       console.log('Socket connected');
       setIsConnected(true);
-      logTrackingDiagnostic('socket_connected', { role: socketRole, socketId: socketInstance.id ?? null });
+      logLiveTrackingDiagnostic(diagnosticPrefix, 'socket_connected', {
+        role: socketRole,
+        socketId: socketInstance.id ?? null,
+      });
 
       // Join appropriate rooms
       if (socketRole === 'technician' && technician) {
         socketInstance.emit('join_technician_room', technician.id, (ack: { ok?: boolean; code?: string }) => {
-          logTrackingDiagnostic('room_join', { role: socketRole, roomIdentityId: technician.id, ok: Boolean(ack?.ok), code: ack?.code ?? null });
+          logLiveTrackingDiagnostic(diagnosticPrefix, 'room_join', {
+            role: socketRole, roomIdentityId: technician.id, ok: Boolean(ack?.ok), code: ack?.code ?? null,
+          });
         });
       } else if (socketRole === 'user' && user) {
         socketInstance.emit('join_user_room', user.id, (ack: { ok?: boolean; code?: string }) => {
-          logTrackingDiagnostic('room_join', { role: socketRole, roomIdentityId: user.id, ok: Boolean(ack?.ok), code: ack?.code ?? null });
+          logLiveTrackingDiagnostic(diagnosticPrefix, 'room_join', {
+            role: socketRole, roomIdentityId: user.id, ok: Boolean(ack?.ok), code: ack?.code ?? null,
+          });
         });
       }
     });
@@ -103,12 +112,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     socketInstance.on('disconnect', (reason) => {
       console.log('Socket disconnected');
       setIsConnected(false);
-      logTrackingDiagnostic('socket_disconnected', { role: socketRole, reason });
+      logLiveTrackingDiagnostic(diagnosticPrefix, 'socket_disconnected', { role: socketRole, reason });
     });
 
     socketInstance.on('connect_error', (err) => {
       console.error('Socket connection error:', err);
-      logTrackingDiagnostic('socket_connect_error', { role: socketRole, message: err?.message || 'unknown' });
+      logLiveTrackingDiagnostic(diagnosticPrefix, 'socket_connect_error', {
+        role: socketRole, message: err?.message || 'unknown',
+      });
     });
 
     setSocket(socketInstance);

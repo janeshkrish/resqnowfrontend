@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { initializeMapplsSdk } from "./mapplsSdk";
+import { logLiveTrackingDiagnostic } from "@/lib/liveTrackingDiagnostics";
 import { MapProviderError } from "./types";
 import type {
   MapCameraSpec,
@@ -44,11 +45,6 @@ const interactionEvents = [
   "dragstart",
   "zoomstart",
 ] as const;
-
-const logTrackingDiagnostic = (event: string, details: Record<string, unknown>) => {
-  if (String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '').trim().toLowerCase() !== 'true') return;
-  console.info('[LiveTracking Diagnostics]', { event, ...details });
-};
 
 function removeOverlay(
   runtime: MapplsRuntime,
@@ -262,10 +258,12 @@ export function MapplsMapSurface({
       if (existing && sameContent) {
         existing.setPosition?.(marker.position);
         if (marker.id === 'technician') {
-          logTrackingDiagnostic('map_marker_position', {
+          logLiveTrackingDiagnostic('[RT-MAPPLS-MARKER]', 'set_position', {
             markerId: marker.id,
             lat: marker.position.lat,
             lng: marker.position.lng,
+            source: 'playback',
+            renderedAt: new Date().toISOString(),
           });
         }
         updateMarkerHeading(existing, marker.heading, marker.id, containerRef.current);
@@ -290,6 +288,15 @@ export function MapplsMapSurface({
       });
       markerLayersRef.current.set(marker.id, layer);
       markerContentRef.current.set(marker.id, marker.html);
+      if (marker.id === 'technician') {
+        logLiveTrackingDiagnostic('[RT-MAPPLS-MARKER]', 'marker_created', {
+          markerId: marker.id,
+          lat: marker.position.lat,
+          lng: marker.position.lng,
+          source: 'playback',
+          renderedAt: new Date().toISOString(),
+        });
+      }
       updateMarkerHeading(layer, marker.heading, marker.id, containerRef.current);
       window.requestAnimationFrame(() => {
         updateMarkerHeading(layer, marker.heading, marker.id, containerRef.current);

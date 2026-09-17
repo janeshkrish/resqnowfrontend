@@ -273,6 +273,23 @@ export class LiveTrackingPlaybackController {
     return true;
   }
 
+  diagnosticSnapshot() {
+    return {
+      queueLength: this.queue.length,
+      displayed: this.displayed,
+      lastAccepted: this.lastAccepted,
+      activeSegment: this.activeSegment
+        ? {
+          from: this.activeSegment.from,
+          to: { lat: this.activeSegment.to.lat, lng: this.activeSegment.to.lng },
+          startedAt: this.activeSegment.startedAt,
+          durationMs: this.activeSegment.durationMs,
+        }
+        : null,
+      rebaseUntil: this.rebase?.until ?? null,
+    };
+  }
+
   frame(now: number, isConnected = true): TrackingPlaybackFrame {
     if (this.rebase) {
       if (now < this.rebase.until) {

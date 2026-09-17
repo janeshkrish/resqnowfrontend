@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
+import {
+  FRONTEND_ONLY_MODE,
+  getRequiredApiBaseUrl,
+  getTechnicianToken,
+  getUserToken,
+} from '@/lib/api';
 import { useTechnicianAuth } from './TechnicianAuthContext';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -45,11 +50,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Initialize socket
     const socketBaseUrl = getRequiredApiBaseUrl();
+    const authToken = isTechAuth ? getTechnicianToken() : getUserToken();
+    if (!authToken) {
+      setIsConnected(false);
+      return;
+    }
     const socketInstance = io(socketBaseUrl, {
       path: '/socket.io',
       transports: ['websocket', 'polling'], // optimize for mobile
       withCredentials: true,
       autoConnect: true,
+      auth: { token: authToken },
     });
 
     socketInstance.on('connect', () => {

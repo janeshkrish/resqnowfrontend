@@ -125,6 +125,7 @@ const ActiveJob = () => {
   const previousLocationRef = useRef<TechnicianLocationFix | null>(null);
   const vehicleSelectionTouchedRef = useRef(false);
   const locationSocketRef = useRef(socket);
+  const trackingSequenceRef = useRef(0);
   locationSocketRef.current = socket;
   const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
   const navigationTarget = useMemo(
@@ -391,23 +392,51 @@ const ActiveJob = () => {
           : 'Improving GPS accuracy before navigation can start.',
       );
 
-      fetch(apiUrl('/api/technicians/me/location'), {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ latitude, longitude })
-      }).catch(console.error);
+      const sequenceId = Math.max(timestamp * 1000, trackingSequenceRef.current + 1);
+      trackingSequenceRef.current = sequenceId;
+      const locationPayload = {
+        version: 1 as const,
+        technicianId: String(technician?.id || ''),
+        jobId: String(activeRequestId),
+        lat: latitude,
+        lng: longitude,
+        speed: Number.isFinite(Number(position.coords.speed)) && Number(position.coords.speed) >= 0
+          ? Number(position.coords.speed)
+          : null,
+        heading: Number.isFinite(Number(position.coords.heading)) && Number(position.coords.heading) >= 0
+          ? Number(position.coords.heading)
+          : null,
+        accuracy: Number.isFinite(Number(position.coords.accuracy)) && Number(position.coords.accuracy) >= 0
+          ? Number(position.coords.accuracy)
+          : null,
+        recordedAt: new Date(timestamp).toISOString(),
+        sequenceId,
+      };
+      let recoverySent = false;
+      const sendRestRecovery = () => {
+        if (recoverySent) return;
+        recoverySent = true;
+        fetch(apiUrl('/api/technicians/me/location'), {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(locationPayload),
+        }).catch(console.error);
+      };
 
-      if (locationSocketRef.current) {
-        locationSocketRef.current.emit('technician:location_update', {
-          technicianId: technician?.id,
-          lat: latitude,
-          lng: longitude,
-          requestId: activeRequestId
-        });
+      const trackingSocket = locationSocketRef.current;
+      if (!trackingSocket?.connected) {
+        sendRestRecovery();
+        return;
       }
+
+      const acknowledgementTimeout = window.setTimeout(sendRestRecovery, 3_500);
+      trackingSocket.emit('tracking:location:v1', locationPayload, (acknowledgement: { ok?: boolean } | undefined) => {
+        window.clearTimeout(acknowledgementTimeout);
+        if (!acknowledgement?.ok) sendRestRecovery();
+      });
     };
 
     const ensureNativePermission = async () => {
@@ -440,7 +469,7 @@ const ActiveJob = () => {
       }
 
       watchId = await Geolocation.watchPosition(
-        { enableHighAccuracy: true, timeout: 10000 },
+        { enableHighAccuracy: true, timeout: 10000, minimumUpdateInterval: 1000, interval: 1000 } as any,
         (position, error) => {
           if (error) {
             console.warn('Native geolocation error:', error);

@@ -75,6 +75,11 @@ interface TechnicianData {
   routeLocationLat?: number;
   routeLocationLng?: number;
   locationUpdatedAt?: number;
+  recordedAt?: string;
+  sequenceId?: number;
+  speed?: number | null;
+  heading?: number | null;
+  accuracy?: number | null;
 }
 
 interface RealtimeOptions {
@@ -152,9 +157,22 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
           setTechnician(prev => {
             if (!prev || String(prev.id) !== techId) return techData;
+            const snapshotUpdatedAt = Date.parse(String(techData?.location?.recordedAt ?? techData?.recordedAt ?? techData?.locationUpdatedAt ?? ''));
+            const currentUpdatedAt = Number(prev.locationUpdatedAt);
+            const snapshotIsNewer = Number.isFinite(snapshotUpdatedAt) &&
+              (!Number.isFinite(currentUpdatedAt) || snapshotUpdatedAt > currentUpdatedAt);
             const preserveRouteMetrics = prev.routeRequestId === String(requestId);
             return {
               ...techData,
+              location_lat: snapshotIsNewer ? techData.location_lat : prev.location_lat,
+              location_lng: snapshotIsNewer ? techData.location_lng : prev.location_lng,
+              location: snapshotIsNewer ? techData.location : prev.location,
+              locationUpdatedAt: snapshotIsNewer ? snapshotUpdatedAt : prev.locationUpdatedAt,
+              recordedAt: snapshotIsNewer ? techData.recordedAt : prev.recordedAt,
+              sequenceId: snapshotIsNewer ? techData.sequenceId : prev.sequenceId,
+              speed: snapshotIsNewer ? techData.speed : prev.speed,
+              heading: snapshotIsNewer ? techData.heading : prev.heading,
+              accuracy: snapshotIsNewer ? techData.accuracy : prev.accuracy,
               routeDistanceKm: preserveRouteMetrics ? prev.routeDistanceKm : undefined,
               routeEtaMinutes: preserveRouteMetrics ? prev.routeEtaMinutes : undefined,
               routeEtaText: preserveRouteMetrics ? prev.routeEtaText : undefined,
@@ -210,7 +228,11 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         socket.emit("join_user_room", user.id);
       }
       if (requestId) {
-        socket.emit("join_request_room", requestId);
+        socket.emit("tracking:subscribe:v1", { requestId }, (acknowledgement: any) => {
+          if (acknowledgement?.ok && acknowledgement.location && handleLocationUpdate) {
+            handleLocationUpdate(acknowledgement.location);
+          }
+        });
       }
     });
 
@@ -255,10 +277,19 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         const lat = Number(data?.lat);
         const lng = Number(data?.lng);
         const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
-        const parsedLocationUpdatedAt = Date.parse(String(data?.locationUpdatedAt || ""));
+        const parsedLocationUpdatedAt = Date.parse(String(data?.recordedAt ?? data?.locationUpdatedAt ?? ""));
         const locationUpdatedAt = Number.isFinite(parsedLocationUpdatedAt)
           ? parsedLocationUpdatedAt
           : undefined;
+        const parsedSequenceId = Number(data?.sequenceId);
+        const sequenceId = Number.isSafeInteger(parsedSequenceId) && parsedSequenceId > 0
+          ? parsedSequenceId
+          : undefined;
+        const parseMotion = (value: unknown, minimum: number, maximum: number) => {
+          if (value == null || value === '') return null;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+        };
         const parseRouteMetric = (value: unknown) => {
           if (value == null || (typeof value === "string" && value.trim() === "")) return undefined;
           const parsed = Number(value);
@@ -283,6 +314,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           if (eventTechnicianId && String(prev.id) !== eventTechnicianId) return prev;
 
           const currentLocationUpdatedAt = Number(prev.locationUpdatedAt);
+          const currentSequenceId = Number(prev.sequenceId);
           // Route enrichment is asynchronous. The backend sends its original
           // GPS timestamp back with the enriched event, allowing an older road
           // route response to be ignored without rejecting compatible servers
@@ -290,7 +322,11 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           if (
             locationUpdatedAt !== undefined &&
             Number.isFinite(currentLocationUpdatedAt) &&
-            locationUpdatedAt < currentLocationUpdatedAt
+            (locationUpdatedAt < currentLocationUpdatedAt ||
+              (locationUpdatedAt === currentLocationUpdatedAt &&
+                sequenceId !== undefined &&
+                Number.isFinite(currentSequenceId) &&
+                sequenceId < currentSequenceId))
           ) {
             return prev;
           }
@@ -307,11 +343,17 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             routeLocationLat: hasRouteMetrics ? lat : undefined,
             routeLocationLng: hasRouteMetrics ? lng : undefined,
             locationUpdatedAt: locationUpdatedAt ?? prev.locationUpdatedAt,
+            recordedAt: typeof data?.recordedAt === 'string' ? data.recordedAt : prev.recordedAt,
+            sequenceId: sequenceId ?? prev.sequenceId,
+            speed: parseMotion(data?.speed, 0, 100),
+            heading: parseMotion(data?.heading, 0, 359.999999),
+            accuracy: parseMotion(data?.accuracy, 0, 500),
             // Map legacy 'location' string if needed
             location: hasLocation ? `${lat}, ${lng}` : prev.location
           };
         });
       };
+      socket.on("tracking:location:v1", handleLocationUpdate);
       socket.on("location_update", handleLocationUpdate);
       socket.on("technician:location_update", handleLocationUpdate);
     }
@@ -325,6 +367,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         });
       }
       if (handleLocationUpdate) {
+        socket.off("tracking:location:v1", handleLocationUpdate);
         socket.off("location_update", handleLocationUpdate);
         socket.off("technician:location_update", handleLocationUpdate);
       }

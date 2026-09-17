@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
+import type { TrackingFreshness } from "@/lib/liveTrackingPlayback";
 
 export type MobileTrackingSummary = {
   eyebrow: string;
@@ -36,6 +37,7 @@ export interface MobileTrackingSummaryDockProps {
   summary: MobileTrackingSummary;
   technician?: MobileTrackingTechnician | null;
   isConnected: boolean;
+  trackingFreshness?: TrackingFreshness;
   isMapFocus: boolean;
   paymentAction?: MobileTrackingPaymentAction | null;
   onShowMap: () => void;
@@ -46,11 +48,27 @@ const MobileTrackingSummaryDock = ({
   summary,
   technician,
   isConnected,
+  trackingFreshness,
   isMapFocus,
   paymentAction,
   onShowMap,
   onShowDetails,
-}: MobileTrackingSummaryDockProps) => (
+}: MobileTrackingSummaryDockProps) => {
+  const freshness = trackingFreshness ?? (isConnected ? "LIVE" : "RECONNECTING");
+  const freshnessLabel: Record<TrackingFreshness, string> = {
+    LIVE: "Live",
+    UPDATING: "Updating",
+    DELAYED: "Delayed",
+    RECONNECTING: "Reconnecting",
+    OFFLINE: "Offline",
+  };
+  const freshnessClass = freshness === "LIVE"
+    ? "bg-emerald-50 text-emerald-700"
+    : freshness === "DELAYED" || freshness === "RECONNECTING"
+      ? "bg-amber-50 text-amber-700"
+      : "bg-slate-100 text-slate-700";
+
+  return (
   <section
     data-testid="mobile-tracking-summary"
     aria-live="polite"
@@ -68,10 +86,10 @@ const MobileTrackingSummaryDock = ({
       <span
         className={cn(
           "rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em]",
-          isConnected ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+          freshnessClass,
         )}
       >
-        {isConnected ? "Live" : "Reconnecting"}
+        {freshnessLabel[freshness]}
       </span>
       <button
         type="button"
@@ -157,6 +175,7 @@ const MobileTrackingSummaryDock = ({
       </Button>
     )}
   </section>
-);
+  );
+};
 
 export default MobileTrackingSummaryDock;

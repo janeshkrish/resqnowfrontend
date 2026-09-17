@@ -54,6 +54,22 @@ describe("MobileTrackingSummaryDock", () => {
     expect(screen.getByText("Reconnecting")).toBeInTheDocument();
   });
 
+  it("does not call a stale live location current", () => {
+    render(
+      <MobileTrackingSummaryDock
+        summary={summary}
+        isConnected={true}
+        trackingFreshness="DELAYED"
+        isMapFocus={false}
+        onShowMap={vi.fn()}
+        onShowDetails={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Delayed")).toBeInTheDocument();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
+  });
+
   it("keeps an online payment CTA reachable in map focus", () => {
     const onPayOnline = vi.fn();
     render(

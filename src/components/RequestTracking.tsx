@@ -62,6 +62,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { routePolylineFromMetadata } from "@/lib/geo";
 import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
+import type { TrackingFreshness } from "@/lib/liveTrackingPlayback";
 import {
   resolveServiceRequestPaymentDetails,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
@@ -83,6 +84,21 @@ const buildMapLocation = (latValue: unknown, lngValue: unknown): MapLocation | n
   const lng = normalizeMapCoordinate(lngValue);
   return lat === null || lng === null ? null : { lat, lng };
 };
+
+const TRACKING_FRESHNESS_LABELS: Record<TrackingFreshness, string> = {
+  LIVE: "Live",
+  UPDATING: "Updating",
+  DELAYED: "Location delayed",
+  RECONNECTING: "Reconnecting",
+  OFFLINE: "Location offline",
+};
+
+const trackingFreshnessBadgeClass = (freshness: TrackingFreshness) =>
+  freshness === "LIVE"
+    ? "bg-emerald-500/90"
+    : freshness === "DELAYED" || freshness === "RECONNECTING"
+      ? "bg-amber-500/90"
+      : "bg-slate-500/90";
 
 const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   pending: {
@@ -310,10 +326,11 @@ const RequestTracking = () => {
     []
   );
 
-  const { request, technician, isLoading, isConnected, refresh } = useRealtimeServiceRequest(
+  const { request, technician, isLoading, isConnected, trackingFreshness, refresh } = useRealtimeServiceRequest(
     requestId,
     realtimeOptions
   );
+  const effectiveTrackingFreshness = trackingFreshness ?? (isConnected ? "LIVE" : "RECONNECTING");
 
   useEffect(() => {
     function compute() {
@@ -992,6 +1009,14 @@ const RequestTracking = () => {
     HALF_Y + 92,
     Math.max(EXPANDED_Y + 242, viewportHeight - MOBILE_MAP_DOCK_HEIGHT),
   );
+  const technicianMotionProps = {
+    technicianSpeed: technician?.speed,
+    technicianHeading: technician?.heading,
+    technicianAccuracy: technician?.accuracy,
+    technicianRecordedAt: technician?.locationUpdatedAt,
+    technicianSequenceId: technician?.sequenceId,
+    trackingFreshness: effectiveTrackingFreshness,
+  };
 
   const mapHeight = useTransform(sheetY, (y) => Math.max(160, (y as number) + 32)); // Smooth overlap under sheet's rounded corners
 
@@ -1298,6 +1323,7 @@ const RequestTracking = () => {
         <motion.div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: mapHeight }}>
           <LiveTrackingMap
             techLocation={technicianMapLocation}
+            {...technicianMotionProps}
             userLocation={requestMapLocation}
             dropLocation={trackingDropLocation}
             routePolyline={trackingRoutePolyline}
@@ -1330,10 +1356,10 @@ const RequestTracking = () => {
                 <Badge
                   className={cn(
                     "border-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-md",
-                    isConnected ? "bg-emerald-500/90" : "bg-amber-500/90"
+                    trackingFreshnessBadgeClass(effectiveTrackingFreshness)
                   )}
                 >
-                  {isConnected ? (
+                  {effectiveTrackingFreshness === "LIVE" ? (
                     <span className="inline-flex items-center gap-1.5">
                       <Wifi className="h-3 w-3" />
                       Live
@@ -1341,7 +1367,7 @@ const RequestTracking = () => {
                   ) : (
                     <span className="inline-flex items-center gap-1.5">
                       <WifiOff className="h-3 w-3" />
-                      Reconnecting
+                      {TRACKING_FRESHNESS_LABELS[effectiveTrackingFreshness]}
                     </span>
                   )}
                 </Badge>
@@ -1380,6 +1406,7 @@ const RequestTracking = () => {
             summary={compactTrackingSummary}
             technician={compactTechnician}
             isConnected={isConnected}
+            trackingFreshness={effectiveTrackingFreshness}
             isMapFocus={isMapFocus}
             onShowMap={() => snapTo("collapsed")}
             onShowDetails={() => snapTo("expanded")}
@@ -1778,6 +1805,7 @@ const RequestTracking = () => {
             <CardContent className="p-0">
               <LiveTrackingMap
                 techLocation={technicianMapLocation}
+                {...technicianMotionProps}
                 userLocation={requestMapLocation}
                 dropLocation={trackingDropLocation}
                 routePolyline={trackingRoutePolyline}
@@ -1866,8 +1894,8 @@ const RequestTracking = () => {
           <Card className="rounded-2xl border-border/80 shadow-md">
             <CardContent className="space-y-5 p-5 sm:p-6">
               <div className="flex items-center justify-between">
-                <Badge className={isConnected ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}>
-                  {isConnected ? "LIVE" : "RECONNECTING"}
+                <Badge className={cn("text-white", trackingFreshnessBadgeClass(effectiveTrackingFreshness))}>
+                  {TRACKING_FRESHNESS_LABELS[effectiveTrackingFreshness].toUpperCase()}
                 </Badge>
                 <p className="text-xs text-muted-foreground">Request #{request.id}</p>
               </div>

@@ -497,6 +497,15 @@
   box-shadow: 0 16px 26px -18px hsla(var(--primary) / 0.9);
 }
 
+.tracking-tech-marker__vehicle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(var(--tracking-heading, 0deg));
+  transform-origin: center;
+  transition: transform 180ms linear;
+}
+
 .tracking-tech-marker__pin::after {
   content: "";
   position: absolute;

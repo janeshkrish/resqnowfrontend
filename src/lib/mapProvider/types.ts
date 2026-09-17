@@ -15,6 +15,7 @@ export interface MapplsLayer {
 
 export interface MapplsMarker extends MapplsLayer {
   addListener?: (event: string, handler: (event?: unknown) => void) => void;
+  getElement?: () => HTMLElement | null;
   getPosition?: () => unknown;
   setPosition?: (position: MapPoint | [number, number]) => void;
   setLngLat?: (position: [number, number]) => void;

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -82,13 +82,77 @@ describe("LiveTrackingMap", () => {
       />,
     );
 
-    surfaceCapture.props?.onInteract();
+    act(() => surfaceCapture.props?.onInteract?.());
     expect(onInteract).toHaveBeenCalledTimes(1);
     const before = surfaceCapture.props?.camera.revision;
     fireEvent.click(
       screen.getByRole("button", { name: "Recenter live tracking map" }),
     );
     expect(surfaceCapture.props?.camera.revision).toBeGreaterThan(before);
+  });
+
+  it("keeps the initial camera frame stable while routine technician fixes arrive", () => {
+    const { rerender } = render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        routeDestination={{ lat: 12.98, lng: 77.6 }}
+        variant="fullscreen"
+      />,
+    );
+    const initialRevision = surfaceCapture.props?.camera?.revision;
+
+    rerender(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.971, lng: 77.591 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        routeDestination={{ lat: 12.98, lng: 77.6 }}
+        variant="fullscreen"
+      />,
+    );
+
+    expect(surfaceCapture.props?.camera?.revision).toBe(initialRevision);
+  });
+
+  it("stops automatic following after a customer manually moves the map", () => {
+    const { rerender } = render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        variant="fullscreen"
+        mapMode="map"
+      />,
+    );
+
+    act(() => surfaceCapture.props?.onInteract?.());
+    const lockedRevision = surfaceCapture.props?.camera?.revision;
+    expect(surfaceCapture.props?.camera?.mode).toBe("fit");
+
+    rerender(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.972, lng: 77.592 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        variant="fullscreen"
+        mapMode="map"
+      />,
+    );
+
+    expect(surfaceCapture.props?.camera?.mode).toBe("fit");
+    expect(surfaceCapture.props?.camera?.revision).toBe(lockedRevision);
+  });
+
+  it("passes a heading-aware vehicle marker without rotating the map", () => {
+    render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        technicianHeading={90}
+        technicianSpeed={8}
+      />,
+    );
+
+    expect(surfaceCapture.props?.markers.find((marker) => marker.id === "technician")?.heading).toBe(90);
+    expect(surfaceCapture.props?.camera?.mode).not.toBe("follow");
   });
 
   it("uses the changing technician position and active destination instead of a static booking route", async () => {

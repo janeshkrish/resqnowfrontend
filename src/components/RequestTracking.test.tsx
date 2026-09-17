@@ -153,6 +153,28 @@ describe("RequestTracking live metrics", () => {
     });
   });
 
+  it("passes canonical motion and freshness fields through to the live map", async () => {
+    trackingHarness.technician = {
+      ...trackingHarness.technician,
+      speed: 8,
+      heading: 91,
+      accuracy: 7,
+      locationUpdatedAt: 1_789_729_200_000,
+      sequenceId: 88,
+    };
+
+    await renderTracking();
+
+    expect(trackingHarness.mapProps).toMatchObject({
+      technicianSpeed: 8,
+      technicianHeading: 91,
+      technicianAccuracy: 7,
+      technicianRecordedAt: 1_789_729_200_000,
+      technicianSequenceId: 88,
+      trackingFreshness: "LIVE",
+    });
+  });
+
   it("retains the Haversine and flat-speed fallback before route metrics arrive", async () => {
     trackingHarness.technician = {
       id: "technician-1",

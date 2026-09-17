@@ -77,6 +77,19 @@ function readMapPoint(value: unknown): MapMarkerSpec["position"] | null {
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
+function updateMarkerHeading(
+  marker: MapplsMarker,
+  heading: number | null | undefined,
+  markerId: string,
+  container: HTMLElement | null,
+) {
+  if (heading == null || !Number.isFinite(heading)) return;
+  const element = marker.getElement?.() || Array
+    .from(container?.querySelectorAll<HTMLElement>("[data-tracking-marker]") || [])
+    .find((candidate) => candidate.dataset.trackingMarker === markerId);
+  element?.style.setProperty("--tracking-heading", `${heading}deg`);
+}
+
 export function MapplsMapSurface({
   ariaLabel,
   markers,
@@ -243,6 +256,7 @@ export function MapplsMapSurface({
       const sameContent = markerContentRef.current.get(marker.id) === marker.html;
       if (existing && sameContent) {
         existing.setPosition?.(marker.position);
+        updateMarkerHeading(existing, marker.heading, marker.id, containerRef.current);
         return;
       }
       if (existing) removeOverlay(runtime, map, existing);
@@ -264,6 +278,10 @@ export function MapplsMapSurface({
       });
       markerLayersRef.current.set(marker.id, layer);
       markerContentRef.current.set(marker.id, marker.html);
+      updateMarkerHeading(layer, marker.heading, marker.id, containerRef.current);
+      window.requestAnimationFrame(() => {
+        updateMarkerHeading(layer, marker.heading, marker.id, containerRef.current);
+      });
     });
   }, [loaded, markers]);
 

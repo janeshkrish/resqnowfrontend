@@ -21,12 +21,16 @@ const createFakeRuntime = () => {
     resize: vi.fn(),
     remove: vi.fn(),
   };
-  const layer = () => ({
+  const layer = () => {
+    const element = document.createElement("div");
+    return {
     addListener: vi.fn((_event: string, _handler: () => void) => {}),
+    getElement: vi.fn(() => element),
     remove: vi.fn(),
     setPosition: vi.fn(),
     setData: vi.fn(),
-  });
+    };
+  };
 
   return {
     fakeMap,
@@ -122,6 +126,44 @@ describe("Mappls map surface", () => {
     view.rerender(<MapplsMapSurface ariaLabel="Map" markers={[{...marker, onClick:nextClick}]} circles={[]} polylines={[]} loadSdk={loadSdk} />);
     click();
     expect(nextClick).toHaveBeenCalledOnce();
+    expect(runtime.Marker).toHaveBeenCalledOnce();
+  });
+
+  it("updates vehicle heading in place without recreating the marker", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const loadSdk = async () => runtime;
+    const marker = {
+      id: "tech",
+      position: { lat: 11, lng: 77 },
+      html: "<span>Technician</span>",
+      heading: 359,
+    };
+    const view = render(
+      <MapplsMapSurface
+        ariaLabel="Map"
+        markers={[marker]}
+        circles={[]}
+        polylines={[]}
+        loadSdk={loadSdk}
+      />,
+    );
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+    const layer = runtime.Marker.mock.results[0].value;
+    expect(layer.getElement().style.getPropertyValue("--tracking-heading")).toBe("359deg");
+
+    view.rerender(
+      <MapplsMapSurface
+        ariaLabel="Map"
+        markers={[{ ...marker, position: { lat: 11.0001, lng: 77.0001 }, heading: 0 }]}
+        circles={[]}
+        polylines={[]}
+        loadSdk={loadSdk}
+      />,
+    );
+
+    expect(layer.setPosition).toHaveBeenCalledWith({ lat: 11.0001, lng: 77.0001 });
+    expect(layer.getElement().style.getPropertyValue("--tracking-heading")).toBe("0deg");
     expect(runtime.Marker).toHaveBeenCalledOnce();
   });
 

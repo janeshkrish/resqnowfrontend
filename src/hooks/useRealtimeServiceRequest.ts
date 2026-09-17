@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl } from '@/lib/api';
+import { apiFetch, apiUrl, FRONTEND_ONLY_MODE } from '@/lib/api';
 import { toast } from 'sonner';
-import { io } from 'socket.io-client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
+import {
+  deriveTrackingFreshness,
+  type TrackingFreshness,
+} from '@/lib/liveTrackingPlayback';
 import { resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayment';
 
 interface RequestData {
@@ -95,6 +98,10 @@ const TOWING_STATUS_EVENTS = [
   "payment_pending",
   "job_closed",
 ];
+// Request status remains recoverable without letting REST compete with Socket.IO
+// for the technician's live coordinate. A modest interval avoids a 2-second
+// request fetch per customer while still recovering missed status transitions.
+const REQUEST_STATUS_POLL_MS = 10_000;
 
 const normalizeRequestData = (data: any): RequestData => {
   const paymentDetails = resolveServiceRequestPaymentDetails(data);
@@ -121,9 +128,10 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
   const [request, setRequest] = useState<RequestData | null>(null);
   const [technician, setTechnician] = useState<TechnicianData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
+  const [trackingFreshness, setTrackingFreshness] = useState<TrackingFreshness>('UPDATING');
   const lastTechnicianIdRef = useRef<string | null>(null);
-  const { user } = useAuth();
+  const lastTrackingFixAtRef = useRef<number | null>(null);
+  const { socket, isConnected } = useSocket();
 
   const fetchRequest = async () => {
     if (!requestId) return;
@@ -145,6 +153,9 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           const parsedRating = Number(techData?.rating);
           const parsedCompletedJobs = Number(techData?.completedJobs ?? techData?.jobs_completed ?? 0);
           const rawAvatarUrl = String(techData?.avatar_url || techData?.profile_photo || "").trim();
+          const snapshotUpdatedAt = Date.parse(String(
+            techData?.location?.recordedAt ?? techData?.recordedAt ?? techData?.locationUpdatedAt ?? '',
+          ));
 
           techData.id = techId;
           techData.location_lat = Number.isFinite(parsedLat) ? parsedLat : undefined;
@@ -155,9 +166,15 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             ? (/^https?:\/\//i.test(rawAvatarUrl) ? rawAvatarUrl : apiUrl(rawAvatarUrl))
             : undefined;
 
+          if (Number.isFinite(snapshotUpdatedAt)) {
+            lastTrackingFixAtRef.current = Math.max(
+              lastTrackingFixAtRef.current ?? Number.NEGATIVE_INFINITY,
+              snapshotUpdatedAt,
+            );
+          }
+
           setTechnician(prev => {
             if (!prev || String(prev.id) !== techId) return techData;
-            const snapshotUpdatedAt = Date.parse(String(techData?.location?.recordedAt ?? techData?.recordedAt ?? techData?.locationUpdatedAt ?? ''));
             const currentUpdatedAt = Number(prev.locationUpdatedAt);
             const snapshotIsNewer = Number.isFinite(snapshotUpdatedAt) &&
               (!Number.isFinite(currentUpdatedAt) || snapshotUpdatedAt > currentUpdatedAt);
@@ -205,40 +222,13 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
   useEffect(() => {
     fetchRequest();
 
-    if (FRONTEND_ONLY_MODE) {
-      setIsConnected(false);
-      return;
-    }
+  }, [requestId]);
 
-    // Initialize Socket.IO
-    const socketBaseUrl = getRequiredApiBaseUrl();
-    const socket = io(socketBaseUrl, {
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-      withCredentials: true,
-      auth: { token: localStorage.getItem('resqnow_user_token') || undefined },
-    });
+  useEffect(() => {
+    if (FRONTEND_ONLY_MODE || !requestId || !socket) return;
+
     let handleStatusUpdate: ((data: any) => void) | null = null;
     let handleLocationUpdate: ((data: any) => void) | null = null;
-
-    socket.on("connect", () => {
-      console.log("Socket connected for tracking");
-      setIsConnected(true);
-      if (user?.id) {
-        socket.emit("join_user_room", user.id);
-      }
-      if (requestId) {
-        socket.emit("tracking:subscribe:v1", { requestId }, (acknowledgement: any) => {
-          if (acknowledgement?.ok && acknowledgement.location && handleLocationUpdate) {
-            handleLocationUpdate(acknowledgement.location);
-          }
-        });
-      }
-    });
-
-    socket.on("disconnect", () => {
-      setIsConnected(false);
-    });
 
     if (requestId) {
       // Listen for status updates from backend (notifyUser/notifyTechnician)
@@ -281,6 +271,10 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         const locationUpdatedAt = Number.isFinite(parsedLocationUpdatedAt)
           ? parsedLocationUpdatedAt
           : undefined;
+        const parsedReceivedAt = Date.parse(String(data?.receivedAt ?? ""));
+        const authoritativeReceivedAt = Number.isFinite(parsedReceivedAt)
+          ? parsedReceivedAt
+          : locationUpdatedAt ?? Date.now();
         const parsedSequenceId = Number(data?.sequenceId);
         const sequenceId = Number.isSafeInteger(parsedSequenceId) && parsedSequenceId > 0
           ? parsedSequenceId
@@ -331,6 +325,13 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             return prev;
           }
 
+          if (hasLocation) {
+            lastTrackingFixAtRef.current = Math.max(
+              lastTrackingFixAtRef.current ?? Number.NEGATIVE_INFINITY,
+              authoritativeReceivedAt,
+            );
+          }
+
           return {
             ...prev,
             location_lat: hasLocation ? lat : prev.location_lat,
@@ -358,7 +359,19 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       socket.on("technician:location_update", handleLocationUpdate);
     }
 
+    const subscribeToRequest = () => {
+      socket.emit("tracking:subscribe:v1", { requestId }, (acknowledgement: any) => {
+        if (acknowledgement?.ok && acknowledgement.location && handleLocationUpdate) {
+          handleLocationUpdate(acknowledgement.location);
+        }
+      });
+    };
+    const handleConnect = () => subscribeToRequest();
+    socket.on("connect", handleConnect);
+    if (socket.connected) handleConnect();
+
     return () => {
+      socket.off("connect", handleConnect);
       if (handleStatusUpdate) {
         socket.off("job:status_update", handleStatusUpdate);
         if (requestId) socket.off(`job_update_${requestId}`, handleStatusUpdate);
@@ -371,11 +384,20 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
         socket.off("location_update", handleLocationUpdate);
         socket.off("technician:location_update", handleLocationUpdate);
       }
-      socket.disconnect();
     };
-  }, [requestId, user?.id]);
+  }, [requestId, socket]);
 
-  // Polling fallback (2 seconds) to keep user timeline in near-real-time if sockets miss an event.
+  useEffect(() => {
+    const updateFreshness = () => {
+      setTrackingFreshness(deriveTrackingFreshness(lastTrackingFixAtRef.current, Date.now(), isConnected));
+    };
+    updateFreshness();
+    const interval = window.setInterval(updateFreshness, 1_000);
+    return () => window.clearInterval(interval);
+  }, [isConnected, requestId]);
+
+  // Status-only recovery. `fetchRequest` preserves a newer realtime coordinate,
+  // so Socket.IO remains the customer map's authoritative live-location feed.
   useEffect(() => {
     const normalizedStatus = String(request?.status || "").trim().toLowerCase();
     const normalizedPaymentStatus = String(request?.payment_status || "").trim().toLowerCase();
@@ -391,7 +413,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
     const interval = setInterval(() => {
       fetchRequest();
-    }, 2000);
+    }, REQUEST_STATUS_POLL_MS);
 
     return () => clearInterval(interval);
   }, [requestId, request?.status, request?.payment_status]);
@@ -406,6 +428,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
     technician,
     isLoading,
     isConnected,
+    trackingFreshness,
     refresh
   };
 };

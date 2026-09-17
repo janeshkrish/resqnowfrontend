@@ -17,6 +17,7 @@ const socketHarness = vi.hoisted(() => {
   return {
     handlers,
     socket: {
+      connected: true,
       on: vi.fn((event: string, handler: (data: unknown) => void) => {
         handlers.set(event, handler);
       }),
@@ -42,6 +43,10 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
+}));
+
+vi.mock("@/contexts/SocketContext", () => ({
+  useSocket: () => ({ socket: socketHarness.socket, isConnected: true }),
 }));
 
 vi.mock("sonner", () => ({
@@ -90,6 +95,7 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.useRealTimers();
   });
 
   it.each(["location_update", "technician:location_update"])(
@@ -286,5 +292,41 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
     expect(
       (result?.technician as unknown as Record<string, unknown>).routeDistanceKm,
     ).toBeUndefined();
+  });
+
+  it("keeps the newer Socket.IO coordinate when the status recovery poll returns an older snapshot", async () => {
+    vi.useFakeTimers();
+    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
+    const Harness = () => {
+      result = useRealtimeServiceRequest("request-1");
+      return null;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    act(() => {
+      socketHarness.handlers.get("tracking:location:v1")?.({
+        requestId: "request-1",
+        technicianId: "technician-1",
+        lat: 12.98,
+        lng: 77.6,
+        recordedAt: "2026-09-17T10:00:02.000Z",
+        sequenceId: 2,
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(result?.technician).toMatchObject({
+      location_lat: 12.98,
+      location_lng: 77.6,
+      sequenceId: 2,
+    });
   });
 });

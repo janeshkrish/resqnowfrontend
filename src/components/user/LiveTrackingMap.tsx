@@ -3,6 +3,12 @@ import { useReducedMotion } from "framer-motion";
 import { LocateFixed, RadioTower } from "lucide-react";
 
 import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
+import {
+  LiveTrackingPlaybackController,
+  type TrackingFreshness,
+  type TrackingPlaybackFrame,
+  type TrackingPlaybackPoint,
+} from "@/lib/liveTrackingPlayback";
 import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
 import type {
   MapCameraSpec,
@@ -19,6 +25,12 @@ type TrackingMapMode = "map" | "balanced" | "sheet";
 
 interface LiveTrackingMapProps {
   techLocation: { lat: number; lng: number } | null;
+  technicianSpeed?: number | null;
+  technicianHeading?: number | null;
+  technicianAccuracy?: number | null;
+  technicianRecordedAt?: number | null;
+  technicianSequenceId?: number | null;
+  trackingFreshness?: TrackingFreshness;
   userLocation: { lat: number; lng: number } | null;
   dropLocation?: { lat: number; lng: number } | null;
   eta?: string;
@@ -100,7 +112,7 @@ const destinationMarkerHtml = `
 `;
 
 const createTechnicianMarkerHtml = (etaLabel: string) => `
-  <div class="mappls-marker-shell tracking-tech-marker">
+  <div class="mappls-marker-shell tracking-tech-marker" data-tracking-marker="technician" style="--tracking-heading:0deg">
     <div class="tracking-tech-marker__bubble">
       <span class="tracking-tech-marker__badge"></span>
       <div class="tracking-tech-marker__copy">
@@ -109,17 +121,15 @@ const createTechnicianMarkerHtml = (etaLabel: string) => `
       </div>
     </div>
     <span class="tracking-tech-marker__pulse"></span>
-    <span class="tracking-tech-marker__pin"></span>
+    <span class="tracking-tech-marker__pin">
+      <span class="tracking-tech-marker__vehicle" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3L20 20L12 16.5L4 20L12 3Z" fill="white"/>
+        </svg>
+      </span>
+    </span>
   </div>
 `;
-
-function coordinateRevision(points: MapPoint[]) {
-  return points.reduce(
-    (revision, point) =>
-      revision + Math.round(point.lat * 10_000) * 31 + Math.round(point.lng * 10_000),
-    points.length,
-  );
-}
 
 function distanceMeters(from: MapPoint, to: MapPoint) {
   const earthRadiusMeters = 6_371_000;
@@ -137,40 +147,57 @@ function samePoint(left: MapPoint, right: MapPoint) {
   return Math.abs(left.lat - right.lat) < 0.000001 && Math.abs(left.lng - right.lng) < 0.000001;
 }
 
-function useInterpolatedPoint(target: MapPoint | null, reduceMotion: boolean) {
-  const [displayed, setDisplayed] = useState<MapPoint | null>(target);
-  const displayedRef = useRef<MapPoint | null>(target);
+function useInterpolatedPoint(
+  target: TrackingPlaybackPoint | null,
+  reduceMotion: boolean,
+  isConnected: boolean,
+) {
+  const controllerRef = useRef<LiveTrackingPlaybackController | null>(null);
+  if (!controllerRef.current) {
+    controllerRef.current = new LiveTrackingPlaybackController();
+    if (target) controllerRef.current.push(target, performance.now());
+  }
+  const [frame, setFrame] = useState<TrackingPlaybackFrame>(() =>
+    controllerRef.current!.frame(performance.now(), isConnected),
+  );
 
   useEffect(() => {
-    if (!target || !displayedRef.current || reduceMotion) {
-      displayedRef.current = target;
-      setDisplayed(target);
+    if (!target) return;
+    if (reduceMotion) {
+      setFrame({
+        position: { lat: target.lat, lng: target.lng },
+        bearing: Number.isFinite(Number(target.heading)) ? Number(target.heading) : null,
+        freshness: "LIVE",
+        isPredicting: false,
+        isRepositioning: false,
+      });
       return;
     }
-
-    const from = displayedRef.current;
-    const startedAt = performance.now();
-    let frameId = 0;
-    const animate = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / 900);
-      const eased = 1 - (1 - progress) ** 3;
-      const next = {
-        lat: from.lat + (target.lat - from.lat) * eased,
-        lng: from.lng + (target.lng - from.lng) * eased,
-      };
-      displayedRef.current = next;
-      setDisplayed(next);
-      if (progress < 1) frameId = window.requestAnimationFrame(animate);
-    };
-    frameId = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(frameId);
+    controllerRef.current!.push(target, performance.now());
   }, [reduceMotion, target]);
 
-  return displayed;
+  useEffect(() => {
+    if (reduceMotion) return;
+    let frameId = 0;
+    const renderFrame = (now: number) => {
+      setFrame(controllerRef.current!.frame(now, isConnected));
+      frameId = window.requestAnimationFrame(renderFrame);
+    };
+    frameId = window.requestAnimationFrame(renderFrame);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isConnected, reduceMotion]);
+
+  return frame;
 }
 
 const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   techLocation,
+  technicianSpeed,
+  technicianHeading,
+  technicianAccuracy,
+  technicianRecordedAt,
+  technicianSequenceId,
+  trackingFreshness,
   userLocation,
   dropLocation,
   eta,
@@ -186,11 +213,38 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   showStatusOverlay = true,
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
-  const displayedTechLocation = useInterpolatedPoint(techLocation, reduceMotion);
+  const playbackTarget = useMemo<TrackingPlaybackPoint | null>(() => {
+    if (!techLocation) return null;
+    return {
+      lat: techLocation.lat,
+      lng: techLocation.lng,
+      speed: technicianSpeed,
+      heading: technicianHeading,
+      accuracy: technicianAccuracy,
+      recordedAtMs: technicianRecordedAt,
+      sequenceId: technicianSequenceId,
+    };
+  }, [
+    techLocation,
+    technicianAccuracy,
+    technicianHeading,
+    technicianRecordedAt,
+    technicianSequenceId,
+    technicianSpeed,
+  ]);
+  const playback = useInterpolatedPoint(
+    playbackTarget,
+    reduceMotion,
+    trackingFreshness !== "RECONNECTING",
+  );
+  const displayedTechLocation = playback.position;
   const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
-  const [recenterKey, setRecenterKey] = useState(0);
   const [autoFrame, setAutoFrame] = useState(true);
-  const lockedCameraRevisionRef = useRef<number | null>(null);
+  const [initialCameraRevision, setInitialCameraRevision] = useState(0);
+  const [followCameraRevision, setFollowCameraRevision] = useState(0);
+  const [followCenter, setFollowCenter] = useState<MapPoint | null>(null);
+  const initialCameraPointsRef = useRef<MapPoint[] | null>(null);
+  const lastFollowRef = useRef<{ center: MapPoint; updatedAt: number } | null>(null);
   const lastRouteRequestRef = useRef<{
     origin: MapPoint;
     destination: MapPoint;
@@ -200,7 +254,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
 
   const activeRouteDestination = useMemo<MapPoint | null>(
     () => routeDestination ? { lat: routeDestination.lat, lng: routeDestination.lng } : null,
-    [routeDestination?.lat, routeDestination?.lng],
+    [routeDestination],
   );
   const routeWaypoints = useMemo<MapPoint[]>(() => {
     if (techLocation && activeRouteDestination) {
@@ -318,11 +372,12 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         offset: [0, -18],
       });
     }
-    if (displayedTechLocation) {
+    if (displayedTechLocation && !playback.isRepositioning) {
       next.push({
         id: "technician",
         position: displayedTechLocation,
         html: createTechnicianMarkerHtml(etaLabel),
+        heading: playback.bearing,
         anchor: "center",
         zIndex: 720,
         width: 108,
@@ -331,7 +386,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       });
     }
     return next;
-  }, [displayedTechLocation, dropLocation, etaLabel, userLocation]);
+  }, [displayedTechLocation, dropLocation, etaLabel, playback.bearing, playback.isRepositioning, userLocation]);
 
   const circles = useMemo<MapCircleSpec[]>(() => {
     const next: MapCircleSpec[] = [];
@@ -353,17 +408,20 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         },
       );
     }
-    if (displayedTechLocation) {
+    // The accuracy halo is deliberately authoritative rather than animated:
+    // recreating a Mappls circle every animation frame would compete with the
+    // marker animation without improving the customer's perception of motion.
+    if (techLocation && !playback.isRepositioning) {
       next.push({
         id: "technician-radius",
-        center: displayedTechLocation,
+        center: techLocation,
         radiusMeters: 170,
         fillColor: "#ef4444",
         fillOpacity: 0.08,
       });
     }
     return next;
-  }, [displayedTechLocation, userLocation]);
+  }, [playback.isRepositioning, techLocation, userLocation]);
 
   const visibleRoute = routePath.length > 1 ? routePath : routeFallback;
   const polylines = useMemo<MapPolylineSpec[]>(() => {
@@ -393,13 +451,43 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       : [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[],
     [activeRouteDestination, dropLocation, techLocation, userLocation],
   );
-  const baseCameraRevision =
-    coordinateRevision(cameraPoints) +
-    recenterKey * 10_000_000 +
-    (mapMode === "sheet" ? 2 : mapMode === "balanced" ? 1 : 0);
-  const cameraRevision = autoFrame
-    ? baseCameraRevision
-    : (lockedCameraRevisionRef.current ?? baseCameraRevision);
+  useEffect(() => {
+    if (initialCameraPointsRef.current || cameraPoints.length === 0) return;
+    initialCameraPointsRef.current = cameraPoints;
+    setInitialCameraRevision((revision) => revision + 1);
+  }, [cameraPoints]);
+
+  useEffect(() => {
+    if (
+      !autoFrame ||
+      variant !== "fullscreen" ||
+      mapMode !== "map" ||
+      !displayedTechLocation
+    ) {
+      return;
+    }
+    const now = performance.now();
+    const previous = lastFollowRef.current;
+    if (
+      previous &&
+      distanceMeters(previous.center, displayedTechLocation) < 12 &&
+      now - previous.updatedAt < 750
+    ) {
+      return;
+    }
+    const center = { ...displayedTechLocation };
+    lastFollowRef.current = { center, updatedAt: now };
+    setFollowCenter(center);
+    setFollowCameraRevision((revision) => revision + 1);
+  }, [
+    autoFrame,
+    displayedTechLocation,
+    displayedTechLocation?.lat,
+    displayedTechLocation?.lng,
+    mapMode,
+    variant,
+  ]);
+
   const topPadding = variant === "fullscreen" ? 180 : 48;
   const bottomPadding =
     variant === "fullscreen"
@@ -409,27 +497,57 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           ? 300
           : 136
       : 72;
-  const camera = useMemo<MapCameraSpec>(
-    () => ({
+  const camera = useMemo<MapCameraSpec>(() => {
+    if (
+      autoFrame &&
+      variant === "fullscreen" &&
+      mapMode === "map" &&
+      followCenter
+    ) {
+      return {
+        mode: "follow",
+        center: followCenter,
+        zoom: 15,
+        bearing: 0,
+        pitch: 0,
+        revision: followCameraRevision,
+      };
+    }
+    const points = initialCameraPointsRef.current ?? cameraPoints;
+    return {
       mode: "fit",
-      points: cameraPoints.length ? cameraPoints : [FALLBACK_CENTER],
+      points: points.length ? points : [FALLBACK_CENTER],
       padding: { top: topPadding, right: 24, bottom: bottomPadding, left: 24 },
-      maxZoom: cameraPoints.length > 1 ? 15 : cameraPoints.length === 1 ? 14 : 5,
-      revision: cameraRevision,
-    }),
-    [bottomPadding, cameraPoints, cameraRevision, topPadding],
-  );
+      maxZoom: points.length > 1 ? 15 : points.length === 1 ? 14 : 5,
+      revision: initialCameraRevision,
+    };
+  }, [
+    autoFrame,
+    bottomPadding,
+    cameraPoints,
+    followCameraRevision,
+    followCenter,
+    initialCameraRevision,
+    mapMode,
+    topPadding,
+    variant,
+  ]);
 
   const handleInteract = () => {
-    lockedCameraRevisionRef.current = cameraRevision;
     setAutoFrame(false);
     onInteract?.();
   };
 
   const recenter = () => {
-    lockedCameraRevisionRef.current = null;
+    initialCameraPointsRef.current = cameraPoints.length ? cameraPoints : [FALLBACK_CENTER];
+    setInitialCameraRevision((revision) => revision + 1);
+    if (displayedTechLocation) {
+      const center = { ...displayedTechLocation };
+      lastFollowRef.current = { center, updatedAt: performance.now() };
+      setFollowCenter(center);
+      setFollowCameraRevision((revision) => revision + 1);
+    }
     setAutoFrame(true);
-    setRecenterKey((current) => current + 1);
   };
 
   const map = (
@@ -440,13 +558,31 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       circles={circles}
       camera={camera}
       className="tracking-live-map h-full w-full"
-      onInteract={variant === "fullscreen" && onInteract ? handleInteract : undefined}
+      onInteract={variant === "fullscreen" ? handleInteract : undefined}
     />
   );
 
   if (variant === "fullscreen") {
     const statusLabel = normalizeStatusLabel(status);
-    const supportingLabel = distanceLabel || normalizeEtaLabel(eta) || "Live location";
+    const effectiveFreshness = trackingFreshness ?? playback.freshness;
+    const freshnessLabels: Record<TrackingFreshness, string> = {
+      LIVE: distanceLabel || normalizeEtaLabel(eta) || "Live location",
+      UPDATING: "Updating technician location",
+      DELAYED: "Location update delayed",
+      RECONNECTING: "Reconnecting live tracking",
+      OFFLINE: "Technician location is unavailable",
+    };
+    const supportingLabel = freshnessLabels[effectiveFreshness];
+    const freshnessColor = effectiveFreshness === "LIVE"
+      ? "text-emerald-600"
+      : effectiveFreshness === "DELAYED" || effectiveFreshness === "RECONNECTING"
+        ? "text-amber-600"
+        : "text-slate-600";
+    const freshnessDot = effectiveFreshness === "LIVE"
+      ? "bg-emerald-500"
+      : effectiveFreshness === "DELAYED" || effectiveFreshness === "RECONNECTING"
+        ? "bg-amber-500"
+        : "bg-slate-400";
     return (
       <div className={cn("relative h-full w-full overflow-hidden", className)}>
         {map}
@@ -464,12 +600,12 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           <div className="flex items-start justify-between gap-3">
             {showStatusOverlay ? (
               <div className="pointer-events-auto rounded-[1.5rem] border border-white/80 bg-white/92 px-4 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl">
-                <div className="flex items-center gap-2 text-[15px] font-bold text-emerald-600">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <div className={cn("flex items-center gap-2 text-[15px] font-bold", freshnessColor)}>
+                  <span className={cn("h-2.5 w-2.5 rounded-full", freshnessDot)} />
                   {statusLabel}
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
-                  <RadioTower className="h-3.5 w-3.5 text-emerald-500" />
+                  <RadioTower className={cn("h-3.5 w-3.5", freshnessColor)} />
                   {supportingLabel}
                 </div>
               </div>

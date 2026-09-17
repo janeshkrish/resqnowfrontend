@@ -33,6 +33,7 @@ import {
   UserCheck,
   Truck,
   Banknote,
+  ShieldAlert,
 } from "lucide-react";
 
 import ClientJobCompletion from "./ClientJobCompletion";
@@ -297,6 +298,8 @@ const RequestTracking = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"online" | "cash">("online");
   const [paymentQuote, setPaymentQuote] = useState<PaymentQuoteResponse | null>(null);
+  const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
+  const [isMobileCancellationOpen, setIsMobileCancellationOpen] = useState(false);
   const [isFetchingQuote, setIsFetchingQuote] = useState(false);
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
@@ -1018,6 +1021,33 @@ const RequestTracking = () => {
     trackingFreshness: effectiveTrackingFreshness,
   };
 
+  const handleShareTracking = async () => {
+    const trackingUrl = window.location.href;
+    const shareData = {
+      title: "ResQNow live tracking",
+      text: "Follow the live progress of this ResQNow request.",
+      url: trackingUrl,
+    };
+
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share(shareData);
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(trackingUrl);
+        toast.success("Tracking link copied");
+        return;
+      }
+
+      toast.error("Sharing is not available in this browser");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("Unable to share the tracking link");
+    }
+  };
+
   const mapHeight = useTransform(sheetY, (y) => Math.max(160, (y as number) + 32)); // Smooth overlap under sheet's rounded corners
 
   useEffect(() => {
@@ -1269,6 +1299,38 @@ const RequestTracking = () => {
         completedJobs: Number.isFinite(technicianJobs) ? technicianJobs : 0,
       }
     : null;
+  const mobileTimeline = [
+    {
+      label: "Accepted",
+      caption: formatCompactTime(request?.created_at) || (technician ? "Matched" : "Matching"),
+      complete: stageIndex >= 1,
+      active: stageIndex <= 1,
+    },
+    {
+      label: "On the way",
+      caption: eta || (stageIndex < 2 ? "Waiting" : "Live route"),
+      complete: stageIndex >= 3,
+      active: stageIndex === 2,
+    },
+    {
+      label: "Arrived",
+      caption: status === "arrived" ? "Now" : stageIndex >= 3 ? "On site" : "Next",
+      complete: stageIndex >= 3,
+      active: status === "arrived",
+    },
+  ];
+  const mobileServiceSummary = (() => {
+    const total = Number(summaryPaymentDetails.finalAmount ?? summaryPaymentDetails.totalAmount);
+    if (!Number.isFinite(total) || total <= 0) return null;
+
+    return {
+      title: serviceTypeLabel || "Service request",
+      detail: request?.vehicle_model || request?.vehicle_name || request?.vehicle_type || "Request details",
+      amountLabel: `${currency} ${total.toFixed(2)}`,
+      guaranteeLabel: request?.price_locked ? "Price locked" : null,
+    };
+  })();
+  const canCancelRequest = status !== "cancelled" && status !== "completed" && !paymentCompleted;
   const isMapFocus = sheetSnapState === "collapsed";
   const isDetailsFocus = sheetSnapState === "expanded";
   const showExpandedPaymentBar =
@@ -1352,27 +1414,48 @@ const RequestTracking = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div className="flex items-center gap-2">
-                <Badge
-                  className={cn(
-                    "border-0 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-md",
-                    trackingFreshnessBadgeClass(effectiveTrackingFreshness)
-                  )}
-                >
-                  {effectiveTrackingFreshness === "LIVE" ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Wifi className="h-3 w-3" />
-                      Live
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5">
-                      <WifiOff className="h-3 w-3" />
-                      {TRACKING_FRESHNESS_LABELS[effectiveTrackingFreshness]}
-                    </span>
-                  )}
-                </Badge>
-              </div>
+              <Badge
+                className={cn(
+                  "border-0 px-3 py-2 text-[11px] font-bold normal-case tracking-normal text-white shadow-md",
+                  trackingFreshnessBadgeClass(effectiveTrackingFreshness)
+                )}
+              >
+                {effectiveTrackingFreshness === "LIVE" ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Wifi className="h-3 w-3" />
+                    ResQNow Live
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <WifiOff className="h-3 w-3" />
+                    {TRACKING_FRESHNESS_LABELS[effectiveTrackingFreshness]}
+                  </span>
+                )}
+              </Badge>
+              <Button
+                type="button"
+                onClick={() => setIsEmergencyDialogOpen(true)}
+                className="h-10 rounded-full bg-red-600 px-3 text-xs font-black text-white shadow-lg shadow-red-950/20 hover:bg-red-700"
+                aria-label="Open SOS support"
+              >
+                <ShieldAlert className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                SOS
+              </Button>
             </div>
+            {request?.address?.trim() ? (
+              <div className="mt-11 flex justify-end">
+                <span className="max-w-[15.5rem] truncate rounded-md bg-slate-950 px-3 py-1.5 text-[11px] font-bold text-white shadow-lg">
+                  {request.address}
+                </span>
+              </div>
+            ) : null}
+            {technician && eta ? (
+              <div className="mt-4 flex">
+                <span className="rounded-full border border-white/50 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-900 shadow-lg backdrop-blur">
+                  {eta}
+                </span>
+              </div>
+            ) : null}
           </div>
         </motion.div>
 
@@ -1408,6 +1491,16 @@ const RequestTracking = () => {
             isConnected={isConnected}
             trackingFreshness={effectiveTrackingFreshness}
             isMapFocus={isMapFocus}
+            timeline={mobileTimeline}
+            serviceSummary={mobileServiceSummary}
+            onRefresh={refresh}
+            onEmergency={() => setIsEmergencyDialogOpen(true)}
+            onShare={() => void handleShareTracking()}
+            canCancel={canCancelRequest}
+            onRequestCancellation={() => {
+              snapTo("expanded");
+              setIsMobileCancellationOpen(true);
+            }}
             onShowMap={() => snapTo("collapsed")}
             onShowDetails={() => snapTo("expanded")}
             paymentAction={
@@ -1653,11 +1746,12 @@ const RequestTracking = () => {
             </div>
 
             {/* Cancel Request Dialog */}
-            {status !== "cancelled" && status !== "completed" && !paymentCompleted && (
-              <Dialog>
+            {canCancelRequest && (
+              <Dialog open={isMobileCancellationOpen} onOpenChange={setIsMobileCancellationOpen}>
                 <DialogTrigger asChild>
                   <Button
                     variant="ghost"
+                    onClick={() => setIsMobileCancellationOpen(true)}
                     className="h-10 w-full rounded-xl text-[11px] font-semibold uppercase tracking-[0.12em] text-red-500 hover:bg-red-50 hover:text-red-600"
                   >
                     Cancel request
@@ -1680,6 +1774,7 @@ const RequestTracking = () => {
                         });
                         if (res.ok) {
                           refresh();
+                          setIsMobileCancellationOpen(false);
                           toast.success("Request cancelled");
                         } else {
                           toast.error("Unable to cancel request");
@@ -1754,6 +1849,30 @@ const RequestTracking = () => {
             </div>
           )}
         </motion.div>
+
+        <Dialog open={isEmergencyDialogOpen} onOpenChange={setIsEmergencyDialogOpen}>
+          <DialogContent className="w-[calc(100%-1.5rem)] max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Emergency &amp; support</DialogTitle>
+              <DialogDescription>
+                Choose the quickest safe way to get help for this active request.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2.5 pt-1">
+              <Button asChild className="h-11 rounded-xl bg-red-600 font-bold text-white hover:bg-red-700">
+                <a href="/emergency" aria-label="Open emergency assistance">
+                  <ShieldAlert className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Emergency assistance
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="h-11 rounded-xl border-slate-200 font-bold text-slate-700">
+                <a href="/contact" aria-label="Contact ResQNow support">
+                  Contact support
+                </a>
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <PaymentSummaryDialog
           isOpen={showPaymentSummary}

@@ -212,6 +212,7 @@ describe("LiveTrackingMap", () => {
     );
 
     expect(screen.queryByText("On the way")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Recenter live tracking map" })).toBeInTheDocument();
+    expect(screen.getByTestId("live-tracking-recenter")).toHaveAccessibleName("Recenter live tracking map");
+    expect(screen.getByTestId("live-tracking-recenter").parentElement).toHaveClass("bottom-20");
   });
 });

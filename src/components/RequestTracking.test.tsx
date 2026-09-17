@@ -19,6 +19,7 @@ const trackingHarness = vi.hoisted(() => ({
   technician: {} as Record<string, unknown>,
   request: {} as Record<string, unknown>,
   mapProps: null as Record<string, unknown> | null,
+  refresh: vi.fn(),
 }));
 
 const viewportHarness = vi.hoisted(() => ({ isMobile: false }));
@@ -29,7 +30,7 @@ vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
     technician: trackingHarness.technician,
     isLoading: false,
     isConnected: true,
-    refresh: vi.fn(),
+    refresh: trackingHarness.refresh,
   }),
 }));
 
@@ -73,6 +74,7 @@ describe("RequestTracking live metrics", () => {
   beforeEach(() => {
     viewportHarness.isMobile = false;
     trackingHarness.mapProps = null;
+    trackingHarness.refresh.mockReset();
     trackingHarness.request = {
       id: "request-1",
       isTowing: false,
@@ -304,6 +306,32 @@ describe("RequestTracking live metrics", () => {
     });
     expect(trackingHarness.mapProps).toMatchObject({ mapMode: "sheet" });
     expect(screen.getByText("Journey progress")).toBeInTheDocument();
+  });
+
+  it("wires the mobile dock and floating SOS control to the existing request actions", async () => {
+    viewportHarness.isMobile = true;
+    await renderTracking();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh live tracking" }));
+    });
+    expect(trackingHarness.refresh).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open emergency support" }));
+    });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Emergency & support");
+    expect(screen.getByRole("link", { name: "Open emergency assistance" })).toHaveAttribute("href", "/emergency");
+    expect(screen.getByRole("link", { name: "Contact ResQNow support" })).toHaveAttribute("href", "/contact");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open SOS support" }));
+    });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Emergency & support");
   });
 
   it("keeps payment reachable in map focus without forcing the details sheet", async () => {

@@ -628,30 +628,29 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           className="pointer-events-none absolute inset-x-4 z-[410]"
           style={{ top: "calc(env(safe-area-inset-top) + 6.75rem)" }}
         >
-          <div className="flex items-start justify-between gap-3">
-            {showStatusOverlay ? (
-              <div className="pointer-events-auto rounded-[1.5rem] border border-white/80 bg-white/92 px-4 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl">
-                <div className={cn("flex items-center gap-2 text-[15px] font-bold", freshnessColor)}>
-                  <span className={cn("h-2.5 w-2.5 rounded-full", freshnessDot)} />
-                  {statusLabel}
-                </div>
-                <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
-                  <RadioTower className={cn("h-3.5 w-3.5", freshnessColor)} />
-                  {supportingLabel}
-                </div>
+          {showStatusOverlay ? (
+            <div className="pointer-events-auto inline-block rounded-[1.5rem] border border-white/80 bg-white/92 px-4 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+              <div className={cn("flex items-center gap-2 text-[15px] font-bold", freshnessColor)}>
+                <span className={cn("h-2.5 w-2.5 rounded-full", freshnessDot)} />
+                {statusLabel}
               </div>
-            ) : (
-              <span />
-            )}
-            <button
-              type="button"
-              onClick={recenter}
-              className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/75 bg-white/92 text-slate-700 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl transition hover:bg-white"
-              aria-label="Recenter live tracking map"
-            >
-              <LocateFixed className="h-5 w-5" />
-            </button>
-          </div>
+              <div className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
+                <RadioTower className={cn("h-3.5 w-3.5", freshnessColor)} />
+                {supportingLabel}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div className="pointer-events-none absolute bottom-20 right-4 z-[410]">
+          <button
+            type="button"
+            onClick={recenter}
+            data-testid="live-tracking-recenter"
+            className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/75 bg-white/92 text-slate-700 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-xl transition hover:bg-white"
+            aria-label="Recenter live tracking map"
+          >
+            <LocateFixed className="h-5 w-5" />
+          </button>
         </div>
       </div>
     );

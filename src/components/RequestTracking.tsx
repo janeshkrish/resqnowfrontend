@@ -1086,17 +1086,6 @@ const RequestTracking = () => {
     });
   };
 
-  const toggleSheet = () => {
-    const currentY = sheetY.get();
-    if (Math.abs(currentY - EXPANDED_Y) < 40) {
-      snapTo("half");
-    } else if (Math.abs(currentY - HALF_Y) < 40) {
-      snapTo("expanded");
-    } else {
-      snapTo("half");
-    }
-  };
-
   const handleDragEnd = (_: any, info: any) => {
     const currentY = sheetY.get();
     const velocity = info.velocity.y;
@@ -1106,13 +1095,8 @@ const RequestTracking = () => {
 
     if (velocity < -350) {
       // Swiping up
-      if (currentY > HALF_Y + 30) {
-        nextSnap = "half";
-        targetY = HALF_Y;
-      } else {
-        nextSnap = "expanded";
-        targetY = EXPANDED_Y;
-      }
+      nextSnap = "half";
+      targetY = HALF_Y;
     } else if (velocity > 350) {
       // Swiping down
       if (currentY < HALF_Y - 30) {
@@ -1124,7 +1108,6 @@ const RequestTracking = () => {
       }
     } else {
       const distances = [
-        { snap: "expanded" as const, y: EXPANDED_Y, dist: Math.abs(currentY - EXPANDED_Y) },
         { snap: "half" as const, y: HALF_Y, dist: Math.abs(currentY - HALF_Y) },
         { snap: "collapsed" as const, y: COLLAPSED_Y, dist: Math.abs(currentY - COLLAPSED_Y) },
       ];
@@ -1466,7 +1449,7 @@ const RequestTracking = () => {
           drag="y"
           dragControls={dragControls}
           dragListener={false}
-          dragConstraints={{ top: EXPANDED_Y, bottom: COLLAPSED_Y }}
+          dragConstraints={{ top: HALF_Y, bottom: COLLAPSED_Y }}
           dragElastic={0.08}
           onDragEnd={handleDragEnd}
         >
@@ -1477,8 +1460,8 @@ const RequestTracking = () => {
           >
             <button
               type="button"
-              onClick={() => snapTo(isDetailsFocus ? "half" : "expanded")}
-              aria-label={isDetailsFocus ? "Show balanced tracking view" : "Expand service panel"}
+              onClick={() => snapTo(isMapFocus ? "half" : "collapsed")}
+              aria-label={isMapFocus ? "Show balanced tracking view" : "Show map focus"}
               className="flex h-11 w-20 items-center justify-center rounded-full"
             >
               <span className="h-1.5 w-12 rounded-full bg-slate-300 transition-colors" />
@@ -1498,11 +1481,11 @@ const RequestTracking = () => {
             onShare={() => void handleShareTracking()}
             canCancel={canCancelRequest}
             onRequestCancellation={() => {
-              snapTo("expanded");
+              snapTo("half");
               setIsMobileCancellationOpen(true);
             }}
             onShowMap={() => snapTo("collapsed")}
-            onShowDetails={() => snapTo("expanded")}
+            onShowDetails={() => snapTo("half")}
             paymentAction={
               showPayment && !paymentCompleted && isMapFocus
                 ? {

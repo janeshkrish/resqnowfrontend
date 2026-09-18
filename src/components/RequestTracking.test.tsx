@@ -285,7 +285,7 @@ describe("RequestTracking live metrics", () => {
     });
   });
 
-  it("starts mobile tracking in balanced focus and lets the customer select map and details focus", async () => {
+  it("keeps mobile tracking to one redesigned dock when returning from map focus", async () => {
     viewportHarness.isMobile = true;
     await renderTracking();
 
@@ -294,7 +294,7 @@ describe("RequestTracking live metrics", () => {
       mapMode: "balanced",
       showStatusOverlay: false,
     });
-    expect(screen.getByRole("button", { name: "Expand service panel" })).toHaveClass("h-11");
+    expect(screen.getByRole("button", { name: "Show map focus" })).toHaveClass("h-11");
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Show more map" }));
@@ -304,8 +304,9 @@ describe("RequestTracking live metrics", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "View service details" }));
     });
-    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "sheet" });
-    expect(screen.getByText("Journey progress")).toBeInTheDocument();
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "balanced" });
+    expect(screen.queryByText("Journey progress")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Test Technician")).toHaveLength(1);
   });
 
   it("wires the mobile dock and floating SOS control to the existing request actions", async () => {

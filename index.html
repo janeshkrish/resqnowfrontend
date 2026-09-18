@@ -21,7 +21,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    
+
+    <!-- Zoho Marketing Automation / PageSense: asynchronous visitor tracking -->
+    <script type="text/javascript">
+      (function (w, s) {
+        var e = document.createElement("script");
+        e.type = "text/javascript";
+        e.async = true;
+        e.src = "https://cdn-in.pagesense.io/js/60088040938/51b9c6385db24e9395c60bc0be9b5829.js";
+        var x = document.getElementsByTagName("script")[0];
+        x.parentNode.insertBefore(e, x);
+      })(window, "script");
+    </script>
+
     <!-- Razorpay Payment Gateway -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </head>

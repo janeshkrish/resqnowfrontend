@@ -294,7 +294,7 @@ describe("RequestTracking live metrics", () => {
       mapMode: "balanced",
       showStatusOverlay: false,
     });
-    expect(screen.getByRole("button", { name: "Show map focus" })).toHaveClass("h-11");
+    expect(screen.queryByRole("button", { name: "Show map focus" })).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Show more map" }));

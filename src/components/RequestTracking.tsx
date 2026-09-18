@@ -1444,7 +1444,7 @@ const RequestTracking = () => {
 
         {/* Draggable Bottom Sheet */}
         <motion.div
-          className="absolute inset-x-0 bottom-0 z-40 w-full rounded-t-[28px] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border-t border-slate-100"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-40 w-full"
           style={{ y: sheetY, top: 0, height: "100dvh" }}
           drag="y"
           dragControls={dragControls}
@@ -1453,21 +1453,6 @@ const RequestTracking = () => {
           dragElastic={0.08}
           onDragEnd={handleDragEnd}
         >
-          {/* Drag is attached to the handle; the button keeps the same interaction available without a gesture. */}
-          <div
-            className="flex h-11 w-full items-center justify-center bg-white touch-none"
-            onPointerDown={(event) => dragControls.start(event)}
-          >
-            <button
-              type="button"
-              onClick={() => snapTo(isMapFocus ? "half" : "collapsed")}
-              aria-label={isMapFocus ? "Show balanced tracking view" : "Show map focus"}
-              className="flex h-11 w-20 items-center justify-center rounded-full"
-            >
-              <span className="h-1.5 w-12 rounded-full bg-slate-300 transition-colors" />
-            </button>
-          </div>
-
           <MobileTrackingSummaryDock
             summary={compactTrackingSummary}
             technician={compactTechnician}
@@ -1484,6 +1469,7 @@ const RequestTracking = () => {
               snapTo("half");
               setIsMobileCancellationOpen(true);
             }}
+            onDragStart={(event) => dragControls.start(event)}
             onShowMap={() => snapTo("collapsed")}
             onShowDetails={() => snapTo("half")}
             paymentAction={
@@ -1800,7 +1786,7 @@ const RequestTracking = () => {
 
           {/* Sticky Bottom Quick-Pay Bar when payment is pending */}
           {showExpandedPaymentBar && (
-            <div className="border-t border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] backdrop-blur-md pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+            <div className="pointer-events-auto border-t border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] backdrop-blur-md pb-[max(env(safe-area-inset-bottom),0.75rem)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Total Due</span>

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -67,6 +67,7 @@ export type MobileTrackingSummaryDockProps = {
   onEmergency?: () => void;
   onShare?: () => void;
   onRequestCancellation?: () => void;
+  onDragStart?: (event: PointerEvent<HTMLElement>) => void;
   onShowMap: () => void;
   onShowDetails: () => void;
 };
@@ -107,6 +108,7 @@ function MobileTrackingSummaryDock({
   onEmergency,
   onShare,
   onRequestCancellation,
+  onDragStart,
   onShowMap,
   onShowDetails,
 }: MobileTrackingSummaryDockProps) {
@@ -140,9 +142,9 @@ function MobileTrackingSummaryDock({
     <section
       data-testid="mobile-tracking-summary"
       aria-live="polite"
-      className="overflow-hidden rounded-t-[28px] border border-slate-200/90 bg-slate-50 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_34px_rgba(15,23,42,0.13)]"
+      className="pointer-events-auto overflow-hidden rounded-t-[28px] border border-slate-200/90 bg-slate-50 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_34px_rgba(15,23,42,0.13)]"
     >
-      <div className="flex justify-center bg-white pt-2.5">
+      <div className="flex justify-center bg-white pt-2.5 touch-none" onPointerDown={onDragStart}>
         <span aria-hidden="true" className="h-1.5 w-11 rounded-full bg-slate-200" />
       </div>
 

@@ -265,6 +265,27 @@ export function MapplsMapSurface({
             source: 'playback',
             renderedAt: new Date().toISOString(),
           });
+          const hasSetPosition = typeof existing.setPosition === 'function';
+          const hasGetPosition = typeof existing.getPosition === 'function';
+          let actualPosition: MapMarkerSpec['position'] | null = null;
+          if (hasGetPosition) {
+            try {
+              actualPosition = readMapPoint(existing.getPosition?.());
+            } catch {
+              actualPosition = null;
+            }
+          }
+          logLiveTrackingDiagnostic('[RT-MAPPLS-MARKER-VERIFY]', 'sdk_position_verified', {
+            markerId: marker.id,
+            requestedLat: marker.position.lat,
+            requestedLng: marker.position.lng,
+            actualLat: actualPosition?.lat ?? null,
+            actualLng: actualPosition?.lng ?? null,
+            hasSetPosition,
+            hasGetPosition,
+            setPositionType: typeof existing.setPosition,
+            getPositionType: typeof existing.getPosition,
+          });
         }
         updateMarkerHeading(existing, marker.heading, marker.id, containerRef.current);
         return;

@@ -5,7 +5,8 @@ export type LiveTrackingDiagnosticPrefix =
   | '[RT-CUSTOMER-RECEIVE]'
   | '[RT-CUSTOMER-STATE]'
   | '[RT-PLAYBACK]'
-  | '[RT-MAPPLS-MARKER]';
+  | '[RT-MAPPLS-MARKER]'
+  | '[RT-MAPPLS-MARKER-VERIFY]';
 
 function isEnabled() {
   return String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '')

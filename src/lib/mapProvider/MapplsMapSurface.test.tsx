@@ -3,6 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MapplsMapSurface } from "./MapplsMapSurface";
 
+const { logLiveTrackingDiagnostic } = vi.hoisted(() => ({
+  logLiveTrackingDiagnostic: vi.fn(),
+}));
+
+vi.mock("@/lib/liveTrackingDiagnostics", () => ({
+  logLiveTrackingDiagnostic,
+}));
+
 const createFakeRuntime = () => {
   const handlers = new Map<string, Set<(event?: unknown) => void>>();
   const fakeMap = {
@@ -165,6 +173,58 @@ describe("Mappls map surface", () => {
     expect(layer.setPosition).toHaveBeenCalledWith({ lat: 11.0001, lng: 77.0001 });
     expect(layer.getElement().style.getPropertyValue("--tracking-heading")).toBe("0deg");
     expect(runtime.Marker).toHaveBeenCalledOnce();
+  });
+
+  it("records the SDK technician position after updating it", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const loadSdk = async () => runtime;
+    const marker = {
+      id: "technician",
+      position: { lat: 11, lng: 77 },
+      html: "<span>Technician</span>",
+    };
+    const view = render(
+      <MapplsMapSurface
+        ariaLabel="Map"
+        markers={[marker]}
+        circles={[]}
+        polylines={[]}
+        loadSdk={loadSdk}
+      />,
+    );
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+    const layer = runtime.Marker.mock.results[0].value;
+    let actualPosition = marker.position;
+    layer.setPosition = vi.fn((position) => { actualPosition = position; });
+    layer.getPosition = vi.fn(() => actualPosition);
+    logLiveTrackingDiagnostic.mockClear();
+
+    view.rerender(
+      <MapplsMapSurface
+        ariaLabel="Map"
+        markers={[{ ...marker, position: { lat: 11.0001, lng: 77.0001 } }]}
+        circles={[]}
+        polylines={[]}
+        loadSdk={loadSdk}
+      />,
+    );
+
+    expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAPPLS-MARKER-VERIFY]",
+      "sdk_position_verified",
+      expect.objectContaining({
+        markerId: "technician",
+        requestedLat: 11.0001,
+        requestedLng: 77.0001,
+        actualLat: 11.0001,
+        actualLng: 77.0001,
+        hasSetPosition: true,
+        hasGetPosition: true,
+        setPositionType: "function",
+        getPositionType: "function",
+      }),
+    );
   });
 
   it("returns coordinates when the map is clicked or a draggable marker is released", async () => {

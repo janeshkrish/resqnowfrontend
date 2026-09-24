@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   MapCameraSpec,
@@ -16,6 +16,17 @@ type CapturedSurfaceProps = {
   circles: MapCircleSpec[];
   camera?: MapCameraSpec;
   onInteract?: () => void;
+  advancedTracking?: {
+    enabled: boolean;
+    technician: {
+      lat: number;
+      lng: number;
+      speed?: number | null;
+      heading?: number | null;
+      recordedAtMs?: number | null;
+    } | null;
+    destination: { lat: number; lng: number } | null;
+  };
 };
 
 const surfaceCapture = vi.hoisted(() => ({
@@ -47,6 +58,7 @@ vi.mock("@/lib/liveTrackingDiagnostics", () => ({
 
 describe("LiveTrackingMap", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     surfaceCapture.props = null;
     fetchRouteMock.mockReset();
     fetchRouteMock.mockResolvedValue({ polyline: [] });
@@ -96,6 +108,10 @@ describe("LiveTrackingMap", () => {
       screen.getByRole("button", { name: "Recenter live tracking map" }),
     );
     expect(surfaceCapture.props?.camera.revision).toBeGreaterThan(before);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("keeps the initial camera frame stable while routine technician fixes arrive", () => {
@@ -186,6 +202,47 @@ describe("LiveTrackingMap", () => {
 
     expect(surfaceCapture.props?.markers.find((marker) => marker.id === "technician")?.heading).toBe(90);
     expect(surfaceCapture.props?.camera?.mode).not.toBe("follow");
+  });
+
+  it("keeps the current renderer untouched unless the advanced tracking flag is enabled", () => {
+    render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        routeDestination={{ lat: 12.98, lng: 77.6 }}
+        technicianSpeed={8}
+        technicianHeading={90}
+        technicianRecordedAt={1_000}
+      />,
+    );
+
+    expect(surfaceCapture.props?.advancedTracking).toBeUndefined();
+  });
+
+  it("passes the existing authoritative technician stream to the feature-flagged renderer", () => {
+    vi.stubEnv("VITE_MAPPLS_ADVANCED_TRACKING", "true");
+    render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        routeDestination={{ lat: 12.98, lng: 77.6 }}
+        technicianSpeed={8}
+        technicianHeading={90}
+        technicianRecordedAt={1_000}
+      />,
+    );
+
+    expect(surfaceCapture.props?.advancedTracking).toEqual({
+      enabled: true,
+      technician: {
+        lat: 12.97,
+        lng: 77.59,
+        speed: 8,
+        heading: 90,
+        recordedAtMs: 1_000,
+      },
+      destination: { lat: 12.98, lng: 77.6 },
+    });
   });
 
   it("uses the changing technician position and active destination instead of a static booking route", async () => {

@@ -149,10 +149,11 @@ describe("RequestTracking live metrics", () => {
     expect(trackingHarness.mapProps).not.toBeNull();
     expect(trackingHarness.mapProps).toMatchObject({
       eta: "17 min",
-      distanceLabel: "12.3 km away",
-      showRoutePath: true,
-      routeDestination: { lat: 0, lng: 0 },
-    });
+        distanceLabel: "12.3 km away",
+        showRoutePath: true,
+        routeDestination: { lat: 0, lng: 0 },
+        trackingSessionId: "request-1",
+      });
   });
 
   it("passes canonical motion and freshness fields through to the live map", async () => {

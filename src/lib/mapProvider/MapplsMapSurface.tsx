@@ -10,8 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { initializeMapplsSdk } from "./mapplsSdk";
+import { initializeMapplsSdk, initializeMapplsTracking } from "./mapplsSdk";
 import { logLiveTrackingDiagnostic } from "@/lib/liveTrackingDiagnostics";
+import {
+  createMapplsAdvancedTrackingAdapter,
+  type MapplsAdvancedTrackingAdapter,
+  type MapplsAdvancedTrackingPoint,
+  type MapplsTrackingPlugin,
+} from "./mapplsAdvancedTracking";
 import { MapProviderError } from "./types";
 import type {
   MapCameraSpec,
@@ -40,6 +46,13 @@ type MapplsMapSurfaceProps = {
     autoFrame: boolean;
     mapMode: string;
   };
+  advancedTracking?: {
+    enabled: boolean;
+    sessionId?: string | number | null;
+    technician: MapplsAdvancedTrackingPoint | null;
+    destination: MapMarkerSpec["position"] | null;
+  };
+  loadTrackingPlugin?: () => Promise<MapplsTrackingPlugin>;
 };
 
 const interactionEvents = [
@@ -176,6 +189,8 @@ export function MapplsMapSurface({
   fallbackDescription = "Live job details will continue updating.",
   loadSdk = initializeMapplsSdk,
   cameraDiagnostics,
+  advancedTracking,
+  loadTrackingPlugin = initializeMapplsTracking,
 }: MapplsMapSurfaceProps) {
   const reactId = useId();
   const mapId = useMemo(
@@ -194,9 +209,19 @@ export function MapplsMapSurface({
   const polylineLayersRef = useRef(new Map<string, MapplsLayer>());
   const circleLayersRef = useRef(new Map<string, MapplsLayer>());
   const lastCameraRef = useRef<{ mode: MapCameraSpec["mode"]; revision: number } | null>(null);
+  const advancedTrackingAdapterRef = useRef<MapplsAdvancedTrackingAdapter | null>(null);
+  const advancedTrackingUpdateCountRef = useRef(0);
   const [loadRevision, setLoadRevision] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [advancedTrackingStatus, setAdvancedTrackingStatus] = useState<
+    "inactive" | "initializing" | "active" | "failed"
+  >("inactive");
+  const advancedTrackingSessionKey = advancedTracking?.enabled
+    && advancedTracking.technician
+    && advancedTracking.destination
+    ? `${advancedTracking.sessionId ?? "default"}:${advancedTracking.destination.lat},${advancedTracking.destination.lng}`
+    : null;
 
   useEffect(() => {
     if (error) onUnavailable?.();
@@ -314,18 +339,110 @@ export function MapplsMapSurface({
   }, [loaded, onMapClick]);
 
   useEffect(() => {
+    let disposed = false;
+    const previousAdapter = advancedTrackingAdapterRef.current;
+    advancedTrackingAdapterRef.current = null;
+    previousAdapter?.dispose();
+    advancedTrackingUpdateCountRef.current = 0;
+    setAdvancedTrackingStatus("inactive");
+
+    const map = mapRef.current;
+    const technician = advancedTracking?.technician;
+    const destination = advancedTracking?.destination;
+    if (!advancedTrackingSessionKey || !map || !loaded || !technician || !destination) return;
+
+    setAdvancedTrackingStatus("initializing");
+    const fail = () => {
+      if (disposed) return;
+      advancedTrackingAdapterRef.current = null;
+      setAdvancedTrackingStatus("failed");
+      logLiveTrackingDiagnostic('[RT-MAPPLS-ADV]', 'initialization_failed', {
+        lat: technician.lat,
+        lng: technician.lng,
+        heading: technician.heading ?? null,
+        initialized: false,
+        updateCount: advancedTrackingUpdateCountRef.current,
+      });
+    };
+
+    void loadTrackingPlugin()
+      .then((plugin) => {
+        if (disposed) return;
+        const adapter = createMapplsAdvancedTrackingAdapter({
+          map,
+          destination,
+          plugin,
+          onReady: () => {
+            if (disposed) return;
+            setAdvancedTrackingStatus("active");
+            logLiveTrackingDiagnostic('[RT-MAPPLS-ADV]', 'initialized', {
+              lat: technician.lat,
+              lng: technician.lng,
+              heading: technician.heading ?? null,
+              initialized: true,
+              updateCount: advancedTrackingUpdateCountRef.current,
+            });
+          },
+          onFailure: fail,
+        });
+        advancedTrackingAdapterRef.current = adapter;
+        adapter.initialize(technician);
+      })
+      .catch(fail);
+
+    return () => {
+      disposed = true;
+      const adapter = advancedTrackingAdapterRef.current;
+      advancedTrackingAdapterRef.current = null;
+      adapter?.dispose();
+      logLiveTrackingDiagnostic('[RT-MAPPLS-ADV]', 'disposed', {
+        lat: technician.lat,
+        lng: technician.lng,
+        heading: technician.heading ?? null,
+        initialized: adapter?.isActive() ?? false,
+        updateCount: advancedTrackingUpdateCountRef.current,
+      });
+    };
+  }, [advancedTrackingSessionKey, loadTrackingPlugin, loaded]);
+
+  useEffect(() => {
+    const technician = advancedTracking?.technician;
+    const adapter = advancedTrackingAdapterRef.current;
+    if (advancedTrackingStatus !== "active" || !adapter || !technician) return;
+    if (!adapter.update(technician)) return;
+    advancedTrackingUpdateCountRef.current += 1;
+    logLiveTrackingDiagnostic('[RT-MAPPLS-ADV]', 'position_submitted', {
+      lat: technician.lat,
+      lng: technician.lng,
+      heading: technician.heading ?? null,
+      initialized: true,
+      updateCount: advancedTrackingUpdateCountRef.current,
+    });
+  }, [
+    advancedTracking?.technician?.heading,
+    advancedTracking?.technician?.lat,
+    advancedTracking?.technician?.lng,
+    advancedTracking?.technician?.recordedAtMs,
+    advancedTrackingStatus,
+  ]);
+
+  const renderedMarkers = advancedTrackingStatus === "active"
+    ? markers.filter((marker) => marker.id !== "technician")
+    : markers;
+
+  useEffect(() => {
     const runtime = runtimeRef.current;
     const map = mapRef.current;
     if (!runtime || !map || !loaded) return;
 
     markerLayersRef.current.forEach((layer, id) => {
-      if (markers.some((marker) => marker.id === id)) return;
+      if (renderedMarkers.some((marker) => marker.id === id)) return;
       removeOverlay(runtime, map, layer);
       markerLayersRef.current.delete(id);
       markerContentRef.current.delete(id);
     });
 
-    markers.forEach((marker) => {
+    renderedMarkers.forEach((marker) => {
       const existing = markerLayersRef.current.get(marker.id);
       const sameContent = markerContentRef.current.get(marker.id) === marker.html;
       if (existing && sameContent) {
@@ -412,7 +529,7 @@ export function MapplsMapSurface({
         updateMarkerHeading(layer, marker.heading, marker.id, containerRef.current);
       });
     });
-  }, [loaded, markers]);
+  }, [loaded, renderedMarkers]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;

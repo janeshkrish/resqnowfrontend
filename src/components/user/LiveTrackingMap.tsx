@@ -45,11 +45,16 @@ interface LiveTrackingMapProps {
   routeDestination?: { lat: number; lng: number } | null;
   showRoutePath?: boolean;
   showStatusOverlay?: boolean;
+  trackingSessionId?: string | number | null;
 }
 
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
 const ROUTE_REFRESH_MIN_DISTANCE_METERS = 25;
 const ROUTE_REFRESH_MIN_INTERVAL_MS = 5_000;
+
+export function isMapplsAdvancedTrackingEnabled(value = import.meta.env.VITE_MAPPLS_ADVANCED_TRACKING) {
+  return String(value || "").trim().toLowerCase() === "true";
+}
 
 const normalizeStatusLabel = (status: string | undefined) => {
   const raw = String(status || "").trim().toLowerCase();
@@ -230,6 +235,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   routeDestination,
   showRoutePath = true,
   showStatusOverlay = true,
+  trackingSessionId,
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
   const playbackTarget = useMemo<TrackingPlaybackPoint | null>(() => {
@@ -297,6 +303,24 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     () => routeDestination ? { lat: routeDestination.lat, lng: routeDestination.lng } : null,
     [routeDestination],
   );
+  const advancedTrackingDestination = activeRouteDestination ?? dropLocation ?? userLocation ?? null;
+  const advancedTracking = useMemo(() => {
+    if (!isMapplsAdvancedTrackingEnabled() || !playbackTarget || !advancedTrackingDestination) {
+      return undefined;
+    }
+    return {
+      enabled: true,
+      ...(trackingSessionId != null ? { sessionId: trackingSessionId } : {}),
+      technician: {
+        lat: playbackTarget.lat,
+        lng: playbackTarget.lng,
+        speed: playbackTarget.speed ?? null,
+        heading: playbackTarget.heading ?? null,
+        recordedAtMs: playbackTarget.recordedAtMs ?? null,
+      },
+      destination: advancedTrackingDestination,
+    };
+  }, [advancedTrackingDestination, playbackTarget, trackingSessionId]);
   const routeWaypoints = useMemo<MapPoint[]>(() => {
     if (techLocation && activeRouteDestination) {
       return [techLocation, activeRouteDestination];
@@ -599,6 +623,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       circles={circles}
       camera={camera}
       cameraDiagnostics={{ autoFrame, mapMode }}
+      advancedTracking={advancedTracking}
       className="tracking-live-map h-full w-full"
       onInteract={variant === "fullscreen" ? handleInteract : undefined}
     />

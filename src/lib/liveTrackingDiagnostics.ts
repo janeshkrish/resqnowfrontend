@@ -9,6 +9,7 @@ export type LiveTrackingDiagnosticPrefix =
   | '[RT-MAPPLS-MARKER-VERIFY]'
   | '[RT-MAPPLS-DOM-VERIFY]'
   | '[RT-MAPPLS-DOM-POSITION]'
+  | '[RT-MAPPLS-ADV]'
   | '[RT-MAP-CAMERA-VERIFY]'
   | '[RT-MAP-CAMERA-CALL]';
 

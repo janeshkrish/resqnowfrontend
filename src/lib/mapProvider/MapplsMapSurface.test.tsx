@@ -110,6 +110,101 @@ describe("Mappls map surface", () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the existing technician marker when advanced tracking is disabled", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const loadTrackingPlugin = vi.fn();
+    render(
+      <MapplsMapSurface
+        ariaLabel="Tracking map"
+        loadSdk={async () => runtime}
+        loadTrackingPlugin={loadTrackingPlugin}
+        advancedTracking={{
+          enabled: false,
+          technician: { lat: 12.9716, lng: 77.5946 },
+          destination: { lat: 12.9352, lng: 77.6245 },
+        }}
+        markers={[{ id: "technician", position: { lat: 12.9716, lng: 77.5946 }, html: "Technician" }]}
+        polylines={[]}
+        circles={[]}
+      />,
+    );
+
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+
+    await waitFor(() => expect(runtime.Marker).toHaveBeenCalledOnce());
+    expect(loadTrackingPlugin).not.toHaveBeenCalled();
+  });
+
+  it("switches from the custom marker only after the advanced tracking plugin initializes", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const controller = {
+      trackingCall: vi.fn(),
+      settrackfit: vi.fn(),
+      setLineVisible: vi.fn(),
+      setCcpVisible: vi.fn(),
+      removeCurveLine: vi.fn(),
+    };
+    const tracking = vi.fn((_options, onReady) => onReady(controller));
+    const loadTrackingPlugin = vi.fn().mockResolvedValue({ tracking });
+
+    render(
+      <MapplsMapSurface
+        ariaLabel="Tracking map"
+        loadSdk={async () => runtime}
+        loadTrackingPlugin={loadTrackingPlugin}
+        advancedTracking={{
+          enabled: true,
+          technician: { lat: 12.9716, lng: 77.5946, heading: 90, recordedAtMs: 1_000 },
+          destination: { lat: 12.9352, lng: 77.6245 },
+        }}
+        markers={[{ id: "technician", position: { lat: 12.9716, lng: 77.5946 }, html: "Technician" }]}
+        polylines={[]}
+        circles={[]}
+      />,
+    );
+
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+
+    await waitFor(() => expect(tracking).toHaveBeenCalledOnce());
+    expect(runtime.removeLayer).toHaveBeenCalled();
+    expect(controller.settrackfit).toHaveBeenCalledWith(false);
+    expect(controller.setLineVisible).toHaveBeenCalledWith(false);
+  });
+
+  it("retains the existing technician marker if advanced tracking cannot initialize", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const loadTrackingPlugin = vi.fn().mockRejectedValue(new Error("tracking unavailable"));
+
+    render(
+      <MapplsMapSurface
+        ariaLabel="Tracking map"
+        loadSdk={async () => runtime}
+        loadTrackingPlugin={loadTrackingPlugin}
+        advancedTracking={{
+          enabled: true,
+          technician: { lat: 12.9716, lng: 77.5946 },
+          destination: { lat: 12.9352, lng: 77.6245 },
+        }}
+        markers={[{ id: "technician", position: { lat: 12.9716, lng: 77.5946 }, html: "Technician" }]}
+        polylines={[]}
+        circles={[]}
+      />,
+    );
+
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+
+    await waitFor(() => expect(loadTrackingPlugin).toHaveBeenCalledOnce());
+    expect(runtime.Marker).toHaveBeenCalledOnce();
+    expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAPPLS-ADV]",
+      "initialization_failed",
+      expect.objectContaining({ initialized: false }),
+    );
+  });
+
   it("reports the actual follow-camera call with caller tracking state", async () => {
     const { fakeMap, runtime } = createFakeRuntime();
     render(

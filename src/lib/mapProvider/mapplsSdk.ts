@@ -11,11 +11,21 @@ type LoaderDependencies = {
 };
 
 type MapplsPlacesPlugin = Pick<mappls_plugin, "search">;
+export type MapplsTrackingPlugin = Pick<mappls_plugin, "tracking">;
 type PlacesLoaderDependencies = {
   readKey: () => string | undefined;
   createSdk: () => Promise<{
     sdk: Pick<mappls, "initialize">;
     plugin: MapplsPlacesPlugin;
+  }>;
+  timeoutMs?: number;
+};
+
+type TrackingLoaderDependencies = {
+  readKey: () => string | undefined;
+  createSdk: () => Promise<{
+    sdk: Pick<mappls, "initialize">;
+    plugin: MapplsTrackingPlugin;
   }>;
   timeoutMs?: number;
 };
@@ -173,6 +183,49 @@ export function createMapplsPlacesLoader({
   };
 }
 
+export function createMapplsTrackingLoader({
+  readKey,
+  createSdk,
+  timeoutMs = 15_000,
+}: TrackingLoaderDependencies) {
+  let initialization: Promise<MapplsTrackingPlugin> | null = null;
+  return () => {
+    if (initialization) return initialization;
+    const key = readKey()?.trim();
+    if (!key) {
+      return Promise.reject(new MapProviderError("missing_key", "VITE_MAPPLS_MAP_SDK_KEY is not configured."));
+    }
+
+    initialization = createSdk().then(({ sdk, plugin }) => new Promise<MapplsTrackingPlugin>((resolve, reject) => {
+      let settled = false;
+      const finish = (operation: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        operation();
+      };
+      const timer = setTimeout(
+        () => finish(() => reject(new MapProviderError("sdk_load_failed", "Mappls tracking plugin loading timed out."))),
+        timeoutMs,
+      );
+      try {
+        // This loads only the tracking plugin. The live Mappls map has already
+        // been created by initializeMapplsSdk(), so the plugin receives map:false.
+        sdk.initialize(key, { map: false, plugins: ["tracking"], version: "3.0" }, () => {
+          finish(() => resolve(plugin));
+        });
+      } catch {
+        finish(() => reject(new MapProviderError("sdk_load_failed", "Mappls tracking plugin initialization failed.")));
+      }
+    })).catch((error: unknown) => {
+      initialization = null;
+      if (error instanceof MapProviderError) throw error;
+      throw new MapProviderError("sdk_load_failed", "Mappls tracking plugin could not be loaded.");
+    });
+    return initialization;
+  };
+}
+
 const toFiniteCoordinate = (value: unknown, min: number, max: number) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
@@ -282,5 +335,14 @@ const defaultPlacesLoader = createMapplsPlacesLoader({
   },
 });
 
+const defaultTrackingLoader = createMapplsTrackingLoader({
+  readKey: () => import.meta.env.VITE_MAPPLS_MAP_SDK_KEY,
+  createSdk: async () => {
+    const { mappls, mappls_plugin } = await import("mappls-web-maps");
+    return { sdk: new mappls(), plugin: new mappls_plugin() };
+  },
+});
+
 export const initializeMapplsPlaces = () => defaultPlacesLoader();
+export const initializeMapplsTracking = () => defaultTrackingLoader();
 export const searchMapplsPlaces = createMapplsPlacesSearch({ loadPlugin: initializeMapplsPlaces });

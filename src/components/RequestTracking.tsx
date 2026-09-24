@@ -1373,6 +1373,7 @@ const RequestTracking = () => {
             dropLocation={trackingDropLocation}
             routePolyline={trackingRoutePolyline}
             routeDestination={liveTrackingDestination}
+            trackingSessionId={request.id}
             eta={eta}
             variant="fullscreen"
             status={status}
@@ -1898,6 +1899,7 @@ const RequestTracking = () => {
                 dropLocation={trackingDropLocation}
                 routePolyline={trackingRoutePolyline}
                 routeDestination={liveTrackingDestination}
+                trackingSessionId={request.id}
                 eta={eta}
                 status={status}
                 distanceLabel={mapDistanceLabel}

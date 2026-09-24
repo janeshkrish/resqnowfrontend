@@ -91,6 +91,74 @@ function updateMarkerHeading(
   element?.style.setProperty("--tracking-heading", `${heading}deg`);
 }
 
+function readMarkerPosition(marker: MapplsMarker): MapMarkerSpec["position"] | null {
+  try {
+    return readMapPoint(marker.getPosition?.());
+  } catch {
+    return null;
+  }
+}
+
+function inspectTechnicianMarkerDom(
+  marker: MapplsMarker,
+  markerId: string,
+  mapContainer: HTMLElement | null,
+) {
+  const selector = `[data-tracking-marker="${markerId}"]`;
+  const matchingElements = typeof document === "undefined"
+    ? []
+    : Array.from(document.querySelectorAll<HTMLElement>(selector));
+  let sdkElement: HTMLElement | null = null;
+  try {
+    sdkElement = marker.getElement?.() ?? null;
+  } catch {
+    sdkElement = null;
+  }
+  const element = sdkElement?.matches(selector)
+    ? sdkElement
+    : sdkElement?.querySelector<HTMLElement>(selector)
+      ?? mapContainer?.querySelector<HTMLElement>(selector)
+      ?? matchingElements[0]
+      ?? sdkElement;
+  const outerElement = sdkElement ?? element;
+  const computed = element && typeof window !== "undefined"
+    ? window.getComputedStyle(element)
+    : null;
+  const outerComputed = outerElement && typeof window !== "undefined"
+    ? window.getComputedStyle(outerElement)
+    : null;
+  const vehicle = element?.querySelector<HTMLElement>(".tracking-tech-marker__vehicle") ?? null;
+  const vehicleComputed = vehicle && typeof window !== "undefined"
+    ? window.getComputedStyle(vehicle)
+    : null;
+  const rect = element?.getBoundingClientRect();
+  const mapRect = mapContainer?.getBoundingClientRect();
+
+  return {
+    markerId,
+    elementFound: Boolean(element),
+    elementTag: element?.tagName ?? null,
+    className: element?.className || null,
+    connected: element?.isConnected ?? false,
+    elementCountForTechnician: matchingElements.length,
+    outerPositionStyle: outerComputed?.position ?? null,
+    computedTransform: computed?.transform ?? null,
+    computedLeft: computed?.left ?? null,
+    computedTop: computed?.top ?? null,
+    cssHeadingTransform: computed?.getPropertyValue("--tracking-heading").trim() || null,
+    outerComputedTransform: outerComputed?.transform ?? null,
+    vehicleComputedTransform: vehicleComputed?.transform ?? null,
+    rectLeft: rect?.left ?? null,
+    rectTop: rect?.top ?? null,
+    rectWidth: rect?.width ?? null,
+    rectHeight: rect?.height ?? null,
+    mapRectLeft: mapRect?.left ?? null,
+    mapRectTop: mapRect?.top ?? null,
+    mapRectWidth: mapRect?.width ?? null,
+    mapRectHeight: mapRect?.height ?? null,
+  };
+}
+
 export function MapplsMapSurface({
   ariaLabel,
   markers,
@@ -267,14 +335,7 @@ export function MapplsMapSurface({
           });
           const hasSetPosition = typeof existing.setPosition === 'function';
           const hasGetPosition = typeof existing.getPosition === 'function';
-          let actualPosition: MapMarkerSpec['position'] | null = null;
-          if (hasGetPosition) {
-            try {
-              actualPosition = readMapPoint(existing.getPosition?.());
-            } catch {
-              actualPosition = null;
-            }
-          }
+          const actualPosition = hasGetPosition ? readMarkerPosition(existing) : null;
           logLiveTrackingDiagnostic('[RT-MAPPLS-MARKER-VERIFY]', 'sdk_position_verified', {
             markerId: marker.id,
             requestedLat: marker.position.lat,
@@ -285,6 +346,29 @@ export function MapplsMapSurface({
             hasGetPosition,
             setPositionType: typeof existing.setPosition,
             getPositionType: typeof existing.getPosition,
+          });
+          logLiveTrackingDiagnostic('[RT-MAPPLS-DOM-VERIFY]', 'technician_marker_element', {
+            ...inspectTechnicianMarkerDom(existing, marker.id, containerRef.current),
+          });
+          window.requestAnimationFrame(() => {
+            const positionAfterPaint = readMarkerPosition(existing);
+            const dom = inspectTechnicianMarkerDom(existing, marker.id, containerRef.current);
+            logLiveTrackingDiagnostic('[RT-MAPPLS-DOM-POSITION]', 'technician_marker_screen_position', {
+              markerId: marker.id,
+              requestedLat: marker.position.lat,
+              requestedLng: marker.position.lng,
+              actualLat: positionAfterPaint?.lat ?? null,
+              actualLng: positionAfterPaint?.lng ?? null,
+              rectLeft: dom.rectLeft,
+              rectTop: dom.rectTop,
+              rectWidth: dom.rectWidth,
+              rectHeight: dom.rectHeight,
+              computedTransform: dom.computedTransform,
+              mapRectLeft: dom.mapRectLeft,
+              mapRectTop: dom.mapRectTop,
+              mapRectWidth: dom.mapRectWidth,
+              mapRectHeight: dom.mapRectHeight,
+            });
           });
         }
         updateMarkerHeading(existing, marker.heading, marker.id, containerRef.current);

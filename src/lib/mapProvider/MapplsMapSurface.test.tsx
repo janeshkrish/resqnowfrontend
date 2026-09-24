@@ -227,6 +227,88 @@ describe("Mappls map surface", () => {
     );
   });
 
+  it("records the visible technician marker DOM geometry after an SDK update", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    const loadSdk = async () => runtime;
+    const marker = {
+      id: "technician",
+      position: { lat: 11, lng: 77 },
+      html: "<span>Technician</span>",
+    };
+    const view = render(
+      <MapplsMapSurface
+        ariaLabel="Map"
+        markers={[marker]}
+        circles={[]}
+        polylines={[]}
+        loadSdk={loadSdk}
+      />,
+    );
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+
+    const layer = runtime.Marker.mock.results[0].value;
+    const element = document.createElement("div");
+    element.dataset.trackingMarker = "technician";
+    element.className = "mappls-marker-shell tracking-tech-marker";
+    element.style.transform = "translate3d(120px, 80px, 0px)";
+    element.style.setProperty("--tracking-heading", "90deg");
+    element.getBoundingClientRect = vi.fn(() => ({
+      left: 120, top: 80, width: 28, height: 36,
+      right: 148, bottom: 116, x: 120, y: 80, toJSON: () => ({}),
+    }));
+    document.body.append(element);
+    let actualPosition = marker.position;
+    layer.setPosition = vi.fn((position) => { actualPosition = position; });
+    layer.getPosition = vi.fn(() => actualPosition);
+    layer.getElement = vi.fn(() => element);
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+    logLiveTrackingDiagnostic.mockClear();
+
+    view.rerender(
+      <MapplsMapSurface
+        ariaLabel="Map"
+        markers={[{ ...marker, position: { lat: 11.0001, lng: 77.0001 } }]}
+        circles={[]}
+        polylines={[]}
+        loadSdk={loadSdk}
+      />,
+    );
+
+    expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAPPLS-DOM-VERIFY]",
+      "technician_marker_element",
+      expect.objectContaining({
+        markerId: "technician",
+        elementFound: true,
+        elementTag: "DIV",
+        className: "mappls-marker-shell tracking-tech-marker",
+        connected: true,
+        elementCountForTechnician: 1,
+        cssHeadingTransform: "90deg",
+      }),
+    );
+    expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAPPLS-DOM-POSITION]",
+      "technician_marker_screen_position",
+      expect.objectContaining({
+        markerId: "technician",
+        requestedLat: 11.0001,
+        requestedLng: 77.0001,
+        actualLat: 11.0001,
+        actualLng: 77.0001,
+        rectLeft: 120,
+        rectTop: 80,
+        rectWidth: 28,
+        rectHeight: 36,
+      }),
+    );
+    element.remove();
+  });
+
   it("returns coordinates when the map is clicked or a draggable marker is released", async () => {
     const { fakeMap, runtime } = createFakeRuntime();
     const onMapClick = vi.fn();

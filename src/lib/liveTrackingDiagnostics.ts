@@ -6,7 +6,9 @@ export type LiveTrackingDiagnosticPrefix =
   | '[RT-CUSTOMER-STATE]'
   | '[RT-PLAYBACK]'
   | '[RT-MAPPLS-MARKER]'
-  | '[RT-MAPPLS-MARKER-VERIFY]';
+  | '[RT-MAPPLS-MARKER-VERIFY]'
+  | '[RT-MAPPLS-DOM-VERIFY]'
+  | '[RT-MAPPLS-DOM-POSITION]';
 
 function isEnabled() {
   return String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '')

@@ -25,6 +25,7 @@ const createFakeRuntime = () => {
     emit: (event: string, payload?: unknown) =>
       handlers.get(event)?.forEach((handler) => handler(payload)),
     fitBounds: vi.fn(),
+    easeTo: vi.fn(),
     jumpTo: vi.fn(),
     resize: vi.fn(),
     remove: vi.fn(),
@@ -107,6 +108,44 @@ describe("Mappls map surface", () => {
     );
     await act(async () => { fakeMap.emit("dragstart"); });
     expect(onInteract).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the actual follow-camera call with caller tracking state", async () => {
+    const { fakeMap, runtime } = createFakeRuntime();
+    render(
+      <MapplsMapSurface
+        ariaLabel="Tracking map"
+        loadSdk={async () => runtime}
+        markers={[]}
+        polylines={[]}
+        circles={[]}
+        camera={{
+          mode: "follow",
+          center: { lat: 12.97, lng: 77.59 },
+          zoom: 15,
+          revision: 1,
+        }}
+        cameraDiagnostics={{ autoFrame: true, mapMode: "map" }}
+      />,
+    );
+
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+
+    expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAP-CAMERA-CALL]",
+      "camera_call",
+      expect.objectContaining({
+        method: "easeTo",
+        reason: "follow",
+        centerLat: 12.97,
+        centerLng: 77.59,
+        zoom: 15,
+        duration: 550,
+        autoFrame: true,
+        mapMode: "map",
+      }),
+    );
   });
 
   it("does not create a map after unmounting during SDK loading", async () => {

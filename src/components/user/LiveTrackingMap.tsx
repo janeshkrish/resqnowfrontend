@@ -283,6 +283,16 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   } | null>(null);
   const routeRequestVersionRef = useRef(0);
 
+  useEffect(() => {
+    logLiveTrackingDiagnostic('[RT-MAP-CAMERA-VERIFY]', 'camera_state', {
+      autoFrame,
+      mapMode,
+      variant,
+      displayedTechLat: displayedTechLocation?.lat ?? null,
+      displayedTechLng: displayedTechLocation?.lng ?? null,
+    });
+  }, [autoFrame, displayedTechLocation?.lat, displayedTechLocation?.lng, mapMode, variant]);
+
   const activeRouteDestination = useMemo<MapPoint | null>(
     () => routeDestination ? { lat: routeDestination.lat, lng: routeDestination.lng } : null,
     [routeDestination],
@@ -588,6 +598,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       polylines={polylines}
       circles={circles}
       camera={camera}
+      cameraDiagnostics={{ autoFrame, mapMode }}
       className="tracking-live-map h-full w-full"
       onInteract={variant === "fullscreen" ? handleInteract : undefined}
     />

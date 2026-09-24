@@ -8,7 +8,9 @@ export type LiveTrackingDiagnosticPrefix =
   | '[RT-MAPPLS-MARKER]'
   | '[RT-MAPPLS-MARKER-VERIFY]'
   | '[RT-MAPPLS-DOM-VERIFY]'
-  | '[RT-MAPPLS-DOM-POSITION]';
+  | '[RT-MAPPLS-DOM-POSITION]'
+  | '[RT-MAP-CAMERA-VERIFY]'
+  | '[RT-MAP-CAMERA-CALL]';
 
 function isEnabled() {
   return String(import.meta.env.VITE_LIVE_TRACKING_DIAGNOSTICS || '')

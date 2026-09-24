@@ -22,6 +22,9 @@ const surfaceCapture = vi.hoisted(() => ({
   props: null as CapturedSurfaceProps | null,
 }));
 const fetchRouteMock = vi.hoisted(() => vi.fn());
+const { logLiveTrackingDiagnostic } = vi.hoisted(() => ({
+  logLiveTrackingDiagnostic: vi.fn(),
+}));
 
 vi.mock("@/lib/mapProvider/MapplsMapSurface", () => ({
   MapplsMapSurface: (props: CapturedSurfaceProps) => {
@@ -37,6 +40,10 @@ vi.mock("@/lib/geo", async (importOriginal) => {
     fetchRoute: fetchRouteMock,
   };
 });
+
+vi.mock("@/lib/liveTrackingDiagnostics", () => ({
+  logLiveTrackingDiagnostic,
+}));
 
 describe("LiveTrackingMap", () => {
   beforeEach(() => {
@@ -139,6 +146,32 @@ describe("LiveTrackingMap", () => {
 
     expect(surfaceCapture.props?.camera?.mode).toBe("fit");
     expect(surfaceCapture.props?.camera?.revision).toBe(lockedRevision);
+  });
+
+  it("reports that manual map interaction disables auto-frame", async () => {
+    render(
+      <LiveTrackingMap
+        techLocation={{ lat: 12.97, lng: 77.59 }}
+        userLocation={{ lat: 12.98, lng: 77.6 }}
+        variant="fullscreen"
+        mapMode="map"
+      />,
+    );
+    logLiveTrackingDiagnostic.mockClear();
+
+    act(() => surfaceCapture.props?.onInteract?.());
+
+    await waitFor(() => expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAP-CAMERA-VERIFY]",
+      "camera_state",
+      expect.objectContaining({
+        autoFrame: false,
+        mapMode: "map",
+        variant: "fullscreen",
+        displayedTechLat: 12.97,
+        displayedTechLng: 77.59,
+      }),
+    ));
   });
 
   it("passes a heading-aware vehicle marker without rotating the map", () => {

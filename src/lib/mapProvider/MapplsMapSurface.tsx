@@ -36,6 +36,10 @@ type MapplsMapSurfaceProps = {
   onUnavailable?: () => void;
   fallbackDescription?: string;
   loadSdk?: () => Promise<MapplsRuntime>;
+  cameraDiagnostics?: {
+    autoFrame: boolean;
+    mapMode: string;
+  };
 };
 
 const interactionEvents = [
@@ -171,6 +175,7 @@ export function MapplsMapSurface({
   onUnavailable,
   fallbackDescription = "Live job details will continue updating.",
   loadSdk = initializeMapplsSdk,
+  cameraDiagnostics,
 }: MapplsMapSurfaceProps) {
   const reactId = useId();
   const mapId = useMemo(
@@ -467,6 +472,16 @@ export function MapplsMapSurface({
     if (camera.mode === "fit") {
       if (camera.points.length === 0) return;
       if (camera.points.length === 1) {
+        logLiveTrackingDiagnostic('[RT-MAP-CAMERA-CALL]', 'camera_call', {
+          method: 'jumpTo',
+          reason: 'fit_single_point',
+          centerLat: camera.points[0].lat,
+          centerLng: camera.points[0].lng,
+          zoom: camera.maxZoom,
+          duration: null,
+          autoFrame: cameraDiagnostics?.autoFrame ?? null,
+          mapMode: cameraDiagnostics?.mapMode ?? null,
+        });
         map.jumpTo({
           center: [camera.points[0].lng, camera.points[0].lat],
           zoom: camera.maxZoom,
@@ -474,6 +489,16 @@ export function MapplsMapSurface({
       } else {
         const lngs = camera.points.map((point) => point.lng);
         const lats = camera.points.map((point) => point.lat);
+        logLiveTrackingDiagnostic('[RT-MAP-CAMERA-CALL]', 'camera_call', {
+          method: 'fitBounds',
+          reason: 'fit_points',
+          centerLat: (Math.min(...lats) + Math.max(...lats)) / 2,
+          centerLng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+          zoom: camera.maxZoom,
+          duration: null,
+          autoFrame: cameraDiagnostics?.autoFrame ?? null,
+          mapMode: cameraDiagnostics?.mapMode ?? null,
+        });
         map.fitBounds(
           [
             [Math.min(...lngs), Math.min(...lats)],
@@ -492,11 +517,31 @@ export function MapplsMapSurface({
       duration: 550,
     };
     if (typeof map.easeTo === "function") {
+      logLiveTrackingDiagnostic('[RT-MAP-CAMERA-CALL]', 'camera_call', {
+        method: 'easeTo',
+        reason: 'follow',
+        centerLat: camera.center.lat,
+        centerLng: camera.center.lng,
+        zoom: camera.zoom,
+        duration: followCamera.duration,
+        autoFrame: cameraDiagnostics?.autoFrame ?? null,
+        mapMode: cameraDiagnostics?.mapMode ?? null,
+      });
       map.easeTo(followCamera);
     } else {
+      logLiveTrackingDiagnostic('[RT-MAP-CAMERA-CALL]', 'camera_call', {
+        method: 'jumpTo',
+        reason: 'follow_fallback',
+        centerLat: camera.center.lat,
+        centerLng: camera.center.lng,
+        zoom: camera.zoom,
+        duration: 0,
+        autoFrame: cameraDiagnostics?.autoFrame ?? null,
+        mapMode: cameraDiagnostics?.mapMode ?? null,
+      });
       map.jumpTo(followCamera);
     }
-  }, [camera, camera?.mode, camera?.revision, loaded]);
+  }, [camera, camera?.mode, camera?.revision, cameraDiagnostics, loaded]);
 
   if (error) {
     return (

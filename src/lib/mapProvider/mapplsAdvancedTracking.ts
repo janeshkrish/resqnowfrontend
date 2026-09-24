@@ -7,6 +7,13 @@ import type { MapplsMap, MapPoint } from "./types";
  */
 export const MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS = 3_000;
 
+/**
+ * The mappls-web-maps wrapper forwards only tracking(props, callback) and
+ * swallows synchronous throws, so a failed plugin never reports back. Without
+ * this bound the adapter would wait in its initializing state indefinitely.
+ */
+export const MAPPLS_ADVANCED_TRACKING_INIT_TIMEOUT_MS = 10_000;
+
 export type MapplsAdvancedTrackingPoint = MapPoint & {
   speed?: number | null;
   heading?: number | null;
@@ -83,13 +90,77 @@ export function createMapplsAdvancedTrackingAdapter({
   let hasFailed = false;
   let disposed = false;
   let lastSubmittedAt: number | null = null;
+  let initTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingPoint: MapplsAdvancedTrackingPoint | null = null;
+  let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearInitTimer = () => {
+    if (initTimer != null) clearTimeout(initTimer);
+    initTimer = null;
+  };
+
+  const clearPending = () => {
+    if (trailingTimer != null) clearTimeout(trailingTimer);
+    trailingTimer = null;
+    pendingPoint = null;
+  };
 
   const fail = (reason: unknown, fallback: string) => {
     if (hasFailed || disposed) return;
     hasFailed = true;
+    clearInitTimer();
+    clearPending();
     if (controller) hidePluginVisuals(controller);
     controller = null;
     onFailure?.(toError(reason, fallback));
+  };
+
+  const submit = (point: MapplsAdvancedTrackingPoint, submittedAt: number) => {
+    if (!controller) return false;
+    try {
+      const trackingResult = controller.trackingCall?.({
+        location: [point.lng, point.lat],
+        reRoute: false,
+        // Mappls accepts a documented boolean toggle here; it does not
+        // accept ResQNow's numeric bearing as a public plugin argument.
+        heading: point.heading != null && Number.isFinite(Number(point.heading)),
+        mapCenter: false,
+        fitBounds: false,
+        polylineRefresh: false,
+        etaRefresh: false,
+        delay: MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS,
+      });
+      if (isPromiseLike(trackingResult)) {
+        void trackingResult.catch((error) => fail(error, "Mappls tracking plugin update failed."));
+      }
+      lastSubmittedAt = submittedAt;
+      return true;
+    } catch (error) {
+      fail(error, "Mappls tracking plugin update failed.");
+      return false;
+    }
+  };
+
+  // Trailing edge of the throttle: the newest point received during a cooldown
+  // is delivered once the cooldown ends, so the plugin never rests on a stale
+  // position after the technician's updates stop.
+  const flushPending = () => {
+    trailingTimer = null;
+    if (!pendingPoint || !controller || disposed || hasFailed) {
+      pendingPoint = null;
+      return;
+    }
+    const currentTime = now();
+    if (lastSubmittedAt != null && currentTime - lastSubmittedAt < MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS) {
+      trailingTimer = setTimeout(
+        flushPending,
+        MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS - (currentTime - lastSubmittedAt),
+      );
+      return;
+    }
+    const point = pendingPoint;
+    pendingPoint = null;
+    submit(point, currentTime);
   };
 
   const activate = (candidate: unknown) => {
@@ -97,11 +168,14 @@ export function createMapplsAdvancedTrackingAdapter({
       fail(candidate, "Mappls tracking plugin did not return a tracking controller.");
       return;
     }
-    if (disposed) {
+    // A success that arrives after dispose or after the initialization timeout
+    // must not leave plugin visuals beside the restored custom marker.
+    if (disposed || hasFailed) {
       hidePluginVisuals(candidate);
       return;
     }
-    if (hasFailed || controller) return;
+    if (controller) return;
+    clearInitTimer();
     controller = candidate;
     try {
       // The tracking plugin otherwise owns fitBounds by default. The existing
@@ -116,7 +190,11 @@ export function createMapplsAdvancedTrackingAdapter({
 
   return {
     initialize(point) {
-      if (disposed || hasFailed || controller) return;
+      if (disposed || hasFailed || controller || initTimer != null) return;
+      initTimer = setTimeout(() => {
+        initTimer = null;
+        if (!controller) fail(undefined, "Mappls tracking plugin initialization timed out.");
+      }, MAPPLS_ADVANCED_TRACKING_INIT_TIMEOUT_MS);
       try {
         const returned = plugin.tracking(
           {
@@ -151,34 +229,24 @@ export function createMapplsAdvancedTrackingAdapter({
         lastSubmittedAt != null
         && currentTime - lastSubmittedAt < MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS
       ) {
-        return false;
-      }
-      try {
-        const trackingResult = controller.trackingCall?.({
-          location: [point.lng, point.lat],
-          reRoute: false,
-          // Mappls accepts a documented boolean toggle here; it does not
-          // accept ResQNow's numeric bearing as a public plugin argument.
-          heading: point.heading != null && Number.isFinite(Number(point.heading)),
-          mapCenter: false,
-          fitBounds: false,
-          polylineRefresh: false,
-          etaRefresh: false,
-          delay: MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS,
-        });
-        if (isPromiseLike(trackingResult)) {
-          void trackingResult.catch((error) => fail(error, "Mappls tracking plugin update failed."));
+        // Only the newest point is kept; intermediate points are superseded.
+        pendingPoint = point;
+        if (trailingTimer == null) {
+          trailingTimer = setTimeout(
+            flushPending,
+            MAPPLS_ADVANCED_TRACKING_MIN_INTERVAL_MS - (currentTime - lastSubmittedAt),
+          );
         }
-        lastSubmittedAt = currentTime;
-        return true;
-      } catch (error) {
-        fail(error, "Mappls tracking plugin update failed.");
         return false;
       }
+      clearPending();
+      return submit(point, currentTime);
     },
 
     dispose() {
       disposed = true;
+      clearInitTimer();
+      clearPending();
       if (controller) hidePluginVisuals(controller);
       controller = null;
       lastSubmittedAt = null;

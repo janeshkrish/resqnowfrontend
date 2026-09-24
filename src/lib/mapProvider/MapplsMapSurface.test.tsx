@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MapplsMapSurface } from "./MapplsMapSurface";
+import { MAPPLS_ADVANCED_TRACKING_INIT_TIMEOUT_MS } from "./mapplsAdvancedTracking";
 
 const { logLiveTrackingDiagnostic } = vi.hoisted(() => ({
   logLiveTrackingDiagnostic: vi.fn(),
@@ -203,6 +204,50 @@ describe("Mappls map surface", () => {
       "initialization_failed",
       expect.objectContaining({ initialized: false }),
     );
+  });
+
+  it("keeps the existing technician marker and reports failure when the two-argument plugin never answers", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    logLiveTrackingDiagnostic.mockClear();
+    const { fakeMap, runtime } = createFakeRuntime();
+    // Mirrors the installed wrapper: tracking(props, callback), no failure callback.
+    const tracking = vi.fn((_options: Record<string, unknown>, _callback?: (controller: unknown) => void) => undefined);
+    const loadTrackingPlugin = vi.fn().mockResolvedValue({ tracking });
+
+    render(
+      <MapplsMapSurface
+        ariaLabel="Tracking map"
+        loadSdk={async () => runtime}
+        loadTrackingPlugin={loadTrackingPlugin}
+        advancedTracking={{
+          enabled: true,
+          technician: { lat: 12.9716, lng: 77.5946 },
+          destination: { lat: 12.9352, lng: 77.6245 },
+        }}
+        markers={[{ id: "technician", position: { lat: 12.9716, lng: 77.5946 }, html: "Technician" }]}
+        polylines={[]}
+        circles={[]}
+      />,
+    );
+
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledOnce());
+    await act(async () => { fakeMap.emit("load"); });
+    await waitFor(() => expect(tracking).toHaveBeenCalledOnce());
+    expect(logLiveTrackingDiagnostic).not.toHaveBeenCalledWith(
+      "[RT-MAPPLS-ADV]",
+      "initialization_failed",
+      expect.anything(),
+    );
+
+    await act(async () => { vi.advanceTimersByTime(MAPPLS_ADVANCED_TRACKING_INIT_TIMEOUT_MS); });
+
+    expect(logLiveTrackingDiagnostic).toHaveBeenCalledWith(
+      "[RT-MAPPLS-ADV]",
+      "initialization_failed",
+      expect.objectContaining({ initialized: false }),
+    );
+    expect(runtime.Marker).toHaveBeenCalledOnce();
+    expect(runtime.removeLayer).not.toHaveBeenCalled();
   });
 
   it("reports the actual follow-camera call with caller tracking state", async () => {

@@ -30,6 +30,12 @@ import {
   type TrackingLocationV1Payload,
 } from '@/lib/technicianLocationSender';
 import {
+  isNativeBackgroundTrackingEnabled,
+  nativeBackgroundTracking,
+  type NativeTrackingStatus,
+} from '@/lib/nativeBackgroundTracking';
+import type { PluginListenerHandle } from '@capacitor/core';
+import {
   formatTechnicianStatus,
   isTechnicianCompletionStatus,
   normalizeTechnicianStatus,
@@ -144,6 +150,8 @@ const ActiveJob = () => {
   const trackingSequenceRef = useRef(0);
   const locationSenderRef = useRef<TechnicianLocationSender | null>(null);
   const trackingEndedRef = useRef(false);
+  const refreshActiveJobRef = useRef(refreshActiveJob);
+  refreshActiveJobRef.current = refreshActiveJob;
   locationSocketRef.current = socket;
   const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
   const navigationTarget = useMemo(
@@ -272,12 +280,13 @@ const ActiveJob = () => {
   }, [status]);
 
   // Canonical ingestion only accepts locations while the request is live. Once it
-  // ends, stop offering fixes and drop anything still pending for this job.
+  // ends, stop offering fixes and drop anything still pending for this job. The
+  // geolocation effect also re-runs on this flag, which stops native tracking.
+  const trackingEnded = TRACKING_ENDED_STATUSES.includes(status);
   useEffect(() => {
-    const ended = TRACKING_ENDED_STATUSES.includes(status);
-    trackingEndedRef.current = ended;
-    if (ended) locationSenderRef.current?.clearPending('request_ended');
-  }, [status]);
+    trackingEndedRef.current = trackingEnded;
+    if (trackingEnded) locationSenderRef.current?.clearPending('request_ended');
+  }, [trackingEnded]);
 
   // Connectivity is back: deliver the newest location that could not be sent.
   useEffect(() => {
@@ -413,6 +422,8 @@ const ActiveJob = () => {
         heading?: number | null;
       };
       timestamp?: number;
+      /** Assigned by the native tracking service, which numbers every fix it produces. */
+      sequenceId?: number;
     }) => {
       if (cancelled) return;
       const latitude = Number(position.coords.latitude);
@@ -449,7 +460,10 @@ const ActiveJob = () => {
           : 'Improving GPS accuracy before navigation can start.',
       );
 
-      const sequenceId = Math.max(timestamp * 1000, trackingSequenceRef.current + 1);
+      const sequenceId = Math.max(
+        Number.isSafeInteger(position.sequenceId) ? Number(position.sequenceId) : timestamp * 1000,
+        trackingSequenceRef.current + 1,
+      );
       trackingSequenceRef.current = sequenceId;
       const locationPayload: TrackingLocationV1Payload = {
         version: 1,
@@ -551,7 +565,99 @@ const ActiveJob = () => {
       );
     };
 
-    if (Capacitor.isNativePlatform()) {
+    // Android app with the flag on: the native live tracking service is the single
+    // GPS source. While this screen is visible its fixes still go through
+    // locationSender; when the app is backgrounded or locked the service posts the
+    // same TrackingLocationV1 payload natively to the canonical REST endpoint.
+    const nativeListeners: PluginListenerHandle[] = [];
+    let nativeTrackingActive = false;
+    const keepNativeListener = (handle: PluginListenerHandle) => {
+      if (cancelled) void handle.remove();
+      else nativeListeners.push(handle);
+    };
+
+    const handleNativeStatus = (nativeStatus: NativeTrackingStatus) => {
+      if (nativeStatus.jobId && String(nativeStatus.jobId) !== String(activeRequestId)) return;
+      logLiveTrackingDiagnostic('[RT-TECH-GPS]', 'native_tracking_status', {
+        requestId: String(activeRequestId),
+        state: nativeStatus.state,
+        reason: nativeStatus.reason ?? null,
+      });
+      if (nativeStatus.state === 'delivery_js') {
+        // Back in the foreground: anything this page still holds is older than what
+        // the service delivered natively while the app was in the background.
+        locationSender.clearPending('native_background_handover');
+      } else if (nativeStatus.state === 'location_unavailable') {
+        setLocationError('Location is off or unavailable. Turn it on to keep sharing your live position.');
+      } else if (nativeStatus.state === 'stopped') {
+        nativeTrackingActive = false;
+        if (nativeStatus.reason === 'AUTH_FAILED') {
+          setLocationError('Live tracking stopped. Please sign in again to keep sharing your location.');
+        } else if (nativeStatus.reason === 'PERMISSION_DENIED') {
+          setLocationError('Location permission is required to track this job.');
+        } else if (nativeStatus.reason === 'NO_ACTIVE_JOB' || nativeStatus.reason === 'FORBIDDEN') {
+          void refreshActiveJobRef.current();
+        }
+      }
+    };
+
+    const startNativeBackgroundTracking = async () => {
+      const granted = await ensureNativePermission();
+      if (cancelled) return;
+      if (!granted) {
+        setLocationError('Location permission is required to start navigation.');
+        if (!permissionNotified) {
+          permissionNotified = true;
+          toast.error('Location permission is required to track this job.');
+        }
+        return;
+      }
+      try {
+        keepNativeListener(await nativeBackgroundTracking.onLocation((fix) => {
+          if (fix.jobId && String(fix.jobId) !== String(activeRequestId)) return;
+          applyLocationUpdate({
+            coords: {
+              latitude: fix.latitude,
+              longitude: fix.longitude,
+              accuracy: fix.accuracy ?? null,
+              speed: fix.speed ?? null,
+              heading: fix.heading ?? null,
+            },
+            timestamp: fix.timestamp,
+            sequenceId: fix.sequenceId,
+          });
+        }));
+        keepNativeListener(await nativeBackgroundTracking.onStatus(handleNativeStatus));
+        if (cancelled) return;
+        await nativeBackgroundTracking.start({
+          jobId: String(activeRequestId),
+          technicianId: String(technician?.id || ''),
+          endpointUrl: apiUrl('/api/technicians/me/location'),
+          token: String(token || ''),
+          sequenceFloor: trackingSequenceRef.current,
+        });
+        if (cancelled) {
+          // The cleanup ran while the service was starting and could not stop it.
+          void nativeBackgroundTracking.stop('tracking_stopped', String(activeRequestId));
+          return;
+        }
+        nativeTrackingActive = true;
+        logLiveTrackingDiagnostic('[RT-TECH-GPS]', 'native_tracking_started', { requestId: String(activeRequestId) });
+      } catch (error) {
+        nativeListeners.splice(0).forEach((handle) => void handle.remove());
+        logLiveTrackingDiagnostic('[RT-TECH-GPS]', 'native_tracking_unavailable', {
+          requestId: String(activeRequestId),
+          code: (error as { code?: string } | null)?.code ?? null,
+        });
+        if (cancelled) return;
+        // Foreground-only fallback: the existing single plugin watcher.
+        await startNativeWatch();
+      }
+    };
+
+    if (!trackingEnded && isNativeBackgroundTrackingEnabled()) {
+      void startNativeBackgroundTracking();
+    } else if (Capacitor.isNativePlatform()) {
       void startNativeWatch();
     } else {
       startWebWatch();
@@ -559,6 +665,8 @@ const ActiveJob = () => {
 
     return () => {
       cancelled = true;
+      nativeListeners.splice(0).forEach((handle) => void handle.remove());
+      if (nativeTrackingActive) void nativeBackgroundTracking.stop('tracking_stopped', String(activeRequestId));
       window.removeEventListener('online', handleBrowserOnline);
       locationSender.dispose();
       if (locationSenderRef.current === locationSender) locationSenderRef.current = null;
@@ -570,7 +678,7 @@ const ActiveJob = () => {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [activeRequestId, technician?.id, token]);
+  }, [activeRequestId, technician?.id, token, trackingEnded]);
 
   // 4. Update Status Logic
   const updateStatus = async (newStatus: string) => {

@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.util.Log;
 import com.getcapacitor.BridgeActivity;
 import com.google.firebase.FirebaseApp;
+import com.resqnow1.app.tracking.TechnicianTrackingPlugin;
 
 public class MainActivity extends BridgeActivity {
 
@@ -11,6 +12,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Local plugins must be registered before the bridge is created.
+        registerPlugin(TechnicianTrackingPlugin.class);
         super.onCreate(savedInstanceState);
         ensureFirebaseInitialized();
         EmergencyNotificationHelper.ensureEmergencyChannel(this);

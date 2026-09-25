@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import ActiveJob from "./ActiveJob";
@@ -62,6 +62,42 @@ vi.mock("@capacitor/geolocation", () => ({
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+type NativeFix = {
+  jobId?: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  speed?: number | null;
+  heading?: number | null;
+  timestamp: number;
+  sequenceId: number;
+};
+type NativeStatus = { state: string; reason?: string | null; jobId?: string | null };
+
+const nativeTracking = vi.hoisted(() => ({
+  enabled: false,
+  start: vi.fn(),
+  stop: vi.fn(),
+  locationListeners: new Set<(fix: NativeFix) => void>(),
+  statusListeners: new Set<(status: NativeStatus) => void>(),
+}));
+
+vi.mock("@/lib/nativeBackgroundTracking", () => ({
+  isNativeBackgroundTrackingEnabled: () => nativeTracking.enabled,
+  nativeBackgroundTracking: {
+    start: (options: unknown) => nativeTracking.start(options),
+    stop: (reason: string, jobId?: string) => nativeTracking.stop(reason, jobId),
+    onLocation: async (listener: (fix: NativeFix) => void) => {
+      nativeTracking.locationListeners.add(listener);
+      return { remove: async () => { nativeTracking.locationListeners.delete(listener); } };
+    },
+    onStatus: async (listener: (status: NativeStatus) => void) => {
+      nativeTracking.statusListeners.add(listener);
+      return { remove: async () => { nativeTracking.statusListeners.delete(listener); } };
+    },
+  },
 }));
 
 describe("technician active-job navigation", () => {
@@ -403,5 +439,202 @@ describe("technician active-job live location sending", () => {
     await act(async () => { resolveWatch("native-watch-1"); });
 
     expect(nativeGeolocation.clearWatch).toHaveBeenCalledWith({ id: "native-watch-1" });
+  });
+});
+
+describe("technician active-job native background tracking (Android)", () => {
+  const tree = () => (
+    <MemoryRouter initialEntries={["/technician/active-job/request-42"]}>
+      <Routes>
+        <Route path="/technician/active-job/:requestId" element={<ActiveJob />} />
+      </Routes>
+    </MemoryRouter>
+  );
+  const renderActiveJob = () => render(tree());
+  const emitFix = (fix: NativeFix) => act(() => {
+    nativeTracking.locationListeners.forEach((listener) => listener(fix));
+  });
+  const emitStatus = (status: NativeStatus) => act(() => {
+    nativeTracking.statusListeners.forEach((listener) => listener(status));
+  });
+  const locationCalls = (fetchMock: ReturnType<typeof vi.fn>) =>
+    fetchMock.mock.calls.filter(([url]) => String(url).includes("/technicians/me/location"));
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    platform.native = true;
+    nativeTracking.enabled = true;
+    nativeTracking.start.mockReset().mockResolvedValue({ started: true, alreadyRunning: false });
+    nativeTracking.stop.mockReset().mockResolvedValue(undefined);
+    nativeTracking.locationListeners.clear();
+    nativeTracking.statusListeners.clear();
+    nativeGeolocation.checkPermissions.mockReset().mockResolvedValue({ location: "granted" });
+    nativeGeolocation.requestPermissions.mockReset().mockResolvedValue({ location: "denied" });
+    nativeGeolocation.watchPosition.mockReset().mockResolvedValue("plugin-watch-1");
+    nativeGeolocation.clearWatch.mockReset().mockResolvedValue(undefined);
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    activeJobState.value = {
+      id: "request-42",
+      requestId: "request-42",
+      status: "en-route",
+      pickupLatitude: 12.97,
+      pickupLongitude: 77.59,
+      amount: 500,
+    };
+  });
+
+  afterEach(() => {
+    nativeTracking.enabled = false;
+    platform.native = false;
+  });
+
+  it("starts the native service once for the job and never starts a second watcher", async () => {
+    const { rerender } = renderActiveJob();
+
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+    expect(nativeTracking.start).toHaveBeenCalledWith({
+      jobId: "request-42",
+      technicianId: "tech-1",
+      endpointUrl: expect.stringContaining("/api/technicians/me/location"),
+      token: "test-token",
+      sequenceFloor: expect.any(Number),
+    });
+    rerender(tree());
+    await act(async () => { await Promise.resolve(); });
+    expect(nativeTracking.start).toHaveBeenCalledOnce();
+    expect(nativeGeolocation.watchPosition).not.toHaveBeenCalled();
+  });
+
+  it("delivers the service's fixes through the existing sender with the native sequence id", async () => {
+    renderActiveJob();
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+    const timestamp = Date.now();
+
+    emitFix({
+      jobId: "request-42",
+      latitude: 12.97,
+      longitude: 77.59,
+      accuracy: 6,
+      speed: 7.5,
+      heading: 90,
+      timestamp,
+      sequenceId: timestamp * 1000 + 7,
+    });
+
+    await waitFor(() => expect(locationCalls(fetchMock)).toHaveLength(1));
+    const body = JSON.parse(String(locationCalls(fetchMock)[0][1]?.body));
+    expect(body).toMatchObject({
+      version: 1,
+      jobId: "request-42",
+      lat: 12.97,
+      lng: 77.59,
+      speed: 7.5,
+      heading: 90,
+      accuracy: 6,
+      recordedAt: new Date(timestamp).toISOString(),
+      sequenceId: timestamp * 1000 + 7,
+    });
+  });
+
+  it("ignores fixes and status events that belong to another job", async () => {
+    renderActiveJob();
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+
+    emitFix({ jobId: "request-99", latitude: 12.97, longitude: 77.59, timestamp: Date.now(), sequenceId: Date.now() * 1000 });
+    emitStatus({ state: "stopped", reason: "AUTH_FAILED", jobId: "request-99" });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(locationCalls(fetchMock)).toHaveLength(0);
+    expect(screen.queryByText(/please sign in again/i)).not.toBeInTheDocument();
+  });
+
+  it("drops a fix the page could not send once the service reports the app is back in the foreground", async () => {
+    fetchMock.mockImplementation((url: string) => String(url).includes("/technicians/me/location")
+      ? Promise.reject(new Error("offline"))
+      : Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true }) }));
+    renderActiveJob();
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+    emitFix({ jobId: "request-42", latitude: 12.97, longitude: 77.59, accuracy: 6, timestamp: Date.now(), sequenceId: Date.now() * 1000 });
+    await waitFor(() => expect(locationCalls(fetchMock)).toHaveLength(1));
+    await act(async () => { await Promise.resolve(); });
+
+    // Backgrounded meanwhile: the service delivered newer fixes natively.
+    emitStatus({ state: "delivery_js", jobId: "request-42" });
+    act(() => { window.dispatchEvent(new Event("online")); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(locationCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("stops the service and removes its listeners when the job screen closes", async () => {
+    const { unmount } = renderActiveJob();
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+    await waitFor(() => expect(nativeTracking.locationListeners.size).toBe(1));
+
+    unmount();
+
+    expect(nativeTracking.stop).toHaveBeenCalledWith("tracking_stopped", "request-42");
+    await waitFor(() => expect(nativeTracking.locationListeners.size).toBe(0));
+    expect(nativeTracking.statusListeners.size).toBe(0);
+  });
+
+  it("stops native tracking when the job completes and does not start it again", async () => {
+    const { rerender } = renderActiveJob();
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+
+    activeJobState.value = { ...activeJobState.value, status: "service_completed" };
+    rerender(tree());
+
+    await waitFor(() => expect(nativeTracking.stop).toHaveBeenCalledWith("tracking_stopped", "request-42"));
+    expect(nativeTracking.start).toHaveBeenCalledOnce();
+  });
+
+  it("switches the service to the next job with a sequence floor that keeps ids increasing", async () => {
+    const { rerender } = renderActiveJob();
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledOnce());
+    const timestamp = Date.now();
+    emitFix({ jobId: "request-42", latitude: 12.97, longitude: 77.59, accuracy: 6, timestamp, sequenceId: timestamp * 1000 + 50 });
+
+    activeJobState.value = { ...activeJobState.value, id: "request-43", requestId: "request-43" };
+    rerender(tree());
+
+    await waitFor(() => expect(nativeTracking.start).toHaveBeenCalledTimes(2));
+    expect(nativeTracking.stop).toHaveBeenCalledWith("tracking_stopped", "request-42");
+    const nextStart = nativeTracking.start.mock.calls[1][0] as { jobId: string; sequenceFloor: number };
+    expect(nextStart.jobId).toBe("request-43");
+    expect(nextStart.sequenceFloor).toBeGreaterThanOrEqual(timestamp * 1000 + 50);
+    // The old job's stop is requested before the new job's start.
+    expect(nativeTracking.stop.mock.invocationCallOrder[0]).toBeLessThan(nativeTracking.start.mock.invocationCallOrder[1]);
+  });
+
+  it("falls back to the foreground watcher when the service cannot start", async () => {
+    nativeTracking.start.mockRejectedValue(Object.assign(new Error("off"), { code: "LOCATION_DISABLED" }));
+
+    renderActiveJob();
+
+    await waitFor(() => expect(nativeGeolocation.watchPosition).toHaveBeenCalledOnce());
+    expect(nativeTracking.locationListeners.size).toBe(0);
+    expect(nativeTracking.statusListeners.size).toBe(0);
+  });
+
+  it("starts neither the service nor a watcher without location permission", async () => {
+    nativeGeolocation.checkPermissions.mockResolvedValue({ location: "prompt" });
+
+    renderActiveJob();
+
+    await waitFor(() => expect(screen.getByText(/location permission is required/i)).toBeInTheDocument());
+    expect(nativeTracking.start).not.toHaveBeenCalled();
+    expect(nativeGeolocation.watchPosition).not.toHaveBeenCalled();
+  });
+
+  it("tells the technician to sign in again when the service reports an auth failure", async () => {
+    renderActiveJob();
+    await waitFor(() => expect(nativeTracking.statusListeners.size).toBe(1));
+
+    emitStatus({ state: "stopped", reason: "AUTH_FAILED", jobId: "request-42" });
+
+    expect(await screen.findByText(/please sign in again/i)).toBeInTheDocument();
   });
 });

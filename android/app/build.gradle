@@ -42,6 +42,9 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
     implementation 'com.google.firebase:firebase-messaging:24.1.0'
+    // Same artifact and version @capacitor/geolocation already ships; declared so the
+    // app's live tracking service can compile against the fused location client.
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 }
 
 apply from: 'capacitor.build.gradle'

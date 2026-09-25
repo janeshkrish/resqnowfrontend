@@ -3,6 +3,7 @@ import { Technician } from "@/types/technician";
 import { technicianAuthService } from "@/services/technicianAuthService";
 import { technicianAdminService } from "@/services/technicianAdminService";
 import { getTechnicianToken } from "@/lib/api";
+import { stopNativeBackgroundTracking } from "@/lib/nativeBackgroundTracking";
 
 export const useTechnicianAuth = () => {
   const [technician, setTechnician] = useState<Technician | null>(null);
@@ -101,6 +102,8 @@ export const useTechnicianAuth = () => {
   };
 
   const logout = async () => {
+    // The Android tracking service must not keep sharing location after sign-out.
+    await stopNativeBackgroundTracking("logout");
     await technicianAuthService.logout();
     setTechnician(null);
   };

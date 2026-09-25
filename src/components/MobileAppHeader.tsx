@@ -8,6 +8,7 @@ import {
   isLiveMapPath,
   isServiceRequestFlowPath,
   isTrackingExperiencePath,
+  isVehicleSelectionPath,
 } from "@/lib/appShellRoutes";
 // Dropdown imports removed for cleaner mobile header with bottom nav
 
@@ -23,6 +24,9 @@ const MobileAppHeader = () => {
 
   // The home screen uses the floating glass header (location, greeting, SOS).
   if (location.pathname === "/") return <HomeGlassHeader />;
+
+  // Vehicle selection is full screen and brings its own back button.
+  if (isVehicleSelectionPath(location.pathname)) return null;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border">

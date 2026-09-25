@@ -2,7 +2,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap");
 /* Only the glyphs the home header uses (about 8 KB); names must stay alphabetical. */
-@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&icon_names=arrow_forward,call,chevron_right,keyboard_arrow_down,location_off,my_location,near_me&display=block");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&icon_names=arrow_back,arrow_forward,call,check_circle,chevron_right,keyboard_arrow_down,location_off,my_location,near_me,verified_user&display=block");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1962,4 +1962,320 @@
   .rq-sos-glow { animation: none; }
   .rq-glass-capsule,
   .rq-greeting { transition: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Vehicle selection (first step of every service request)            */
+/* ------------------------------------------------------------------ */
+.rq-vs {
+  min-height: 100dvh;
+  background: #F6F7FB;
+  color: #0B1B3D;
+  font-family: "Manrope", "Inter", system-ui, sans-serif;
+}
+
+.rq-vs-inner {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.rq-vs-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rq-vs-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #E6E8EF;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #0B1B3D;
+  cursor: pointer;
+}
+
+.rq-vs-back .rq-symbol { font-size: 22px; }
+
+.rq-vs-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #5B6478;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.rq-vs-step-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.rq-vs-step-bar span {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: #E2E8F0;
+}
+
+.rq-vs-step-bar span.is-done { background: #DC2626; }
+
+.rq-vs-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.rq-vs-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #DC2626;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.rq-vs-kicker::before {
+  content: "";
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.rq-vs-title {
+  margin: 0;
+  color: #0B1B3D;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 36px;
+  letter-spacing: -0.025em;
+}
+
+.rq-vs-title span { color: #DC2626; }
+
+.rq-vs-subtitle {
+  margin: 0;
+  color: #5B6478;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.rq-vs-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.rq-vs-card {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  width: 100%;
+  height: 124px;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #E6E8EF;
+  border-radius: 22px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 24px -18px rgba(15, 23, 42, 0.25);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.3s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.rq-vs-card:active { transform: scale(0.985); }
+
+.rq-vs-card:focus-visible {
+  outline: 2px solid #DC2626;
+  outline-offset: 3px;
+}
+
+.rq-vs-card.is-selected {
+  border-color: #DC2626;
+  background-color: #FFF6F6;
+  box-shadow: inset 0 0 0 1px #DC2626, 0 14px 30px -18px rgba(220, 38, 38, 0.55);
+}
+
+/*
+ * Studio photos on white: multiply drops the white so only the vehicle and its shadow show.
+ * Each vehicle bleeds off the left edge by at least --art-left, and further on narrow phones
+ * so its front always stops --art-reserve short of the card's right edge (where the text sits).
+ */
+.rq-vs-art {
+  position: absolute;
+  bottom: 4px;
+  left: min(var(--art-left), calc(100% - var(--art-reserve) - var(--art-h) * var(--art-ratio)));
+  display: block;
+  width: auto;
+  max-width: none;
+  height: var(--art-h);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  user-select: none;
+  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.rq-vs-art-car { --art-h: clamp(76px, 22.5vw, 90px); --art-ratio: 2.561; --art-left: -34px; --art-reserve: 158px; }
+.rq-vs-art-bike { --art-h: 110px; --art-ratio: 1.61; --art-left: -6px; --art-reserve: 140px; }
+.rq-vs-art-commercial { --art-h: 86px; --art-ratio: 2.719; --art-left: -40px; --art-reserve: 135px; }
+.rq-vs-art-ev { --art-h: 90px; --art-ratio: 2.598; --art-left: -38px; --art-reserve: 120px; }
+
+.rq-vs-card.is-selected .rq-vs-art { transform: translateX(6px); }
+
+.rq-vs-copy {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  text-align: right;
+}
+
+.rq-vs-lead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #0B1B3D;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.rq-vs-lead .rq-symbol { color: #DC2626; }
+
+.rq-vs-word {
+  color: #DC2626;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 34px;
+  letter-spacing: 0.01em;
+}
+
+.rq-vs-detail {
+  margin-top: 2px;
+  color: #5B6478;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.rq-vs-continue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  margin: 28px auto 0;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 999px;
+  background: #DC2626;
+  box-shadow: 0 10px 24px -12px rgba(185, 28, 28, 0.7);
+  color: #FFFFFF;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rq-vs-continue:disabled {
+  background: #E2E8F0;
+  box-shadow: none;
+  color: #64748B;
+  cursor: not-allowed;
+}
+
+.rq-vs-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 18px 0 0;
+  color: #5B6478;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.rq-vs-trust .rq-symbol {
+  color: #0B1B3D;
+  font-size: 16px;
+}
+
+.rq-vs-enter {
+  animation: rqVsEnter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.rq-vs-pop {
+  animation: rqVsPop 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (min-width: 768px) {
+  .rq-vs-inner {
+    max-width: 880px;
+    padding: 40px 24px 64px;
+  }
+
+  .rq-vs-title {
+    font-size: 40px;
+    line-height: 46px;
+  }
+
+  .rq-vs-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+/* Cards stay light in dark mode so the studio photos keep their white backdrop. */
+.dark .rq-vs { background: #0B1220; color: #F1F5F9; }
+.dark .rq-vs-title { color: #F8FAFC; }
+.dark .rq-vs-steps,
+.dark .rq-vs-subtitle,
+.dark .rq-vs-trust { color: #94A3B8; }
+.dark .rq-vs-trust .rq-symbol { color: #E2E8F0; }
+.dark .rq-vs-back { border-color: #1F2937; background: #111827; color: #F1F5F9; }
+.dark .rq-vs-step-bar span:not(.is-done) { background: #1F2937; }
+.dark .rq-vs-card:not(.is-selected) { border-color: transparent; }
+
+@keyframes rqVsEnter {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes rqVsPop {
+  0% { opacity: 0; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rq-vs-enter,
+  .rq-vs-pop { animation: none; }
+  .rq-vs-card,
+  .rq-vs-art { transition: none; }
 }

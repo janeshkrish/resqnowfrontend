@@ -28,4 +28,15 @@ describe("MobileAppHeader", () => {
     expect(screen.getByAltText("ResQNow Logo")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /sos/i })).toHaveAttribute("href", "/request-service/emergency");
   });
+
+  it("steps aside on vehicle selection, which has its own back button", () => {
+    const { container } = renderAt("/request-service/towing");
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("keeps the logo header with a back button on the later request steps", () => {
+    renderAt("/request-service/towing/car");
+    expect(screen.getByAltText("ResQNow Logo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /go back/i })).toBeInTheDocument();
+  });
 });

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ArrowLeft, PhoneCall } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import HomeGlassHeader from "./home/HomeGlassHeader";
 import {
   isLiveMapPath,
   isServiceRequestFlowPath,
@@ -19,6 +20,9 @@ const MobileAppHeader = () => {
   const isTrackingExperience = isTrackingExperiencePath(location.pathname);
 
   if (!isMobile || isTrackingExperience) return null;
+
+  // The home screen uses the floating glass header (location, greeting, SOS).
+  if (location.pathname === "/") return <HomeGlassHeader />;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border">

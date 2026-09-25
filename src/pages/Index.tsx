@@ -4,10 +4,11 @@ import VehicleTypes from "@/components/VehicleTypes";
 import Testimonials from "@/components/Testimonials";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
-import { MapPin, ArrowRight, Bell, Briefcase, Download, Smartphone, User, Users, Car, Clock } from "lucide-react";
+import { ArrowRight, Briefcase, Download, Smartphone, User, Users, Car, Clock } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/api";
 import { lazyWithReload } from "@/lib/lazyWithReload";
 import AnimatedCounter from "@/components/AnimatedCounter";
+import { HOME_HEADER_HEIGHT } from "@/components/home/HomeGlassHeader";
 import msmeLogo from "../../assets/msme-logo.png";
 
 const EnterpriseDesktopHome = lazyWithReload(() => import("@/components/desktop/EnterpriseDesktopHome"));
@@ -291,29 +292,14 @@ const MobileDashboard = () => {
   };
 
   return (
-    <div className="bg-muted min-h-screen pb-20 animate-fade-in">
-      {/* Sticky Top App Bar */}
-      <div className="sticky top-0 z-50 bg-card dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-[0_2px_20px_rgba(0,0,0,0.03)] flex justify-between items-center transition-all border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-primary to-rose-600 p-2 rounded-xl shadow-sm text-white">
-            <MapPin className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-1">
-              Current Location <ArrowRight className="h-3 w-3 rotate-90" />
-            </span>
-            <span className="text-sm font-bold text-foreground truncate max-w-[180px]">
-              Searching nearby...
-            </span>
-          </div>
-        </div>
-        <Link to="/notifications" className="p-2.5 bg-muted rounded-full border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)] relative active:scale-95 transition-transform flex-shrink-0">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute top-1 right-1.5 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-slate-50"></span>
-        </Link>
-      </div>
+    <div
+      className="relative bg-muted min-h-screen pb-20 animate-fade-in"
+      style={{ paddingTop: HOME_HEADER_HEIGHT }}
+    >
+      {/* Brand colour under the floating glass header (rendered by MobileAppHeader). */}
+      <div aria-hidden="true" className="rq-home-backdrop" />
 
-      <div className="p-4 space-y-6">
+      <div className="relative p-4 space-y-6">
         {/* Promotional Hero Banner (Swiggy Style Edge-to-Edge) */}
         <div className="-mx-4 px-4 overflow-x-auto snap-x snap-mandatory flex gap-4 hide-scrollbar pb-2">
           <div className="snap-center shrink-0 w-[85vw] sm:w-[300px] bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-[0_12px_24px_-8px_rgba(15,23,42,0.5)] relative overflow-hidden isolate">

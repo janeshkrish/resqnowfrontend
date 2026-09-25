@@ -32,7 +32,8 @@ describe("native background tracking flag", () => {
   });
 
   it("is off unless the build flag is exactly true", () => {
-    expect(isNativeBackgroundTrackingEnabled(undefined)).toBe(false);
+    // Passing undefined would fall back to the real build flag from .env.
+    expect(isNativeBackgroundTrackingEnabled("")).toBe(false);
     expect(isNativeBackgroundTrackingEnabled("false")).toBe(false);
     expect(isNativeBackgroundTrackingEnabled(" TRUE ")).toBe(true);
   });

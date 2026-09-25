@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { apiUrl } from '@/lib/api';
+import { summarizePlace, type PlaceSummary } from '@/lib/placeSummary';
 
 export interface GeolocationCoordinates {
   lat: number;
@@ -9,8 +10,12 @@ export interface GeolocationCoordinates {
 export interface UseGeolocationReturn {
   coordinates: GeolocationCoordinates | null;
   address: string | null;
+  /** Area title and short address line, when the reverse geocode had address details. */
+  place: PlaceSummary | null;
   loading: boolean;
   error: string | null;
+  /** GeolocationPositionError code (1 denied, 2 unavailable, 3 timeout) when known. */
+  errorCode: number | null;
   requestLocation: () => void;
   reset: () => void;
 }
@@ -22,11 +27,14 @@ export interface UseGeolocationReturn {
 export function useGeolocation(): UseGeolocationReturn {
   const [coordinates, setCoordinates] = useState<GeolocationCoordinates | null>(null);
   const [address, setAddress] = useState<string | null>(null);
+  const [place, setPlace] = useState<PlaceSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<number | null>(null);
 
   // Helper: Reverse geocode coordinates to address
-  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<{ address: string; place: PlaceSummary | null }> => {
+    const fallback = { address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, place: null };
     try {
       const response = await fetch(
         apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`)
@@ -34,16 +42,16 @@ export function useGeolocation(): UseGeolocationReturn {
 
       if (!response.ok) {
         console.warn('[Geocode] API failed, using fallback coordinates');
-        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        return fallback;
       }
 
       const data = await response.json();
-      const resolvedAddress = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      const resolvedAddress = data.display_name || fallback.address;
       console.log('[Geocode] Success:', resolvedAddress);
-      return resolvedAddress;
+      return { address: resolvedAddress, place: summarizePlace(data) };
     } catch (err) {
       console.error('[Geocode] Error:', err);
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      return fallback;
     }
   }, []);
 
@@ -57,10 +65,12 @@ export function useGeolocation(): UseGeolocationReturn {
   const requestLocation = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
 
     // Validate browser & security
     if (!navigator.geolocation) {
       setError('Geolocation API not available. Please use a modern browser.');
+      setErrorCode(2);
       setLoading(false);
       console.error('[Geolocation] API not supported');
       return;
@@ -69,6 +79,7 @@ export function useGeolocation(): UseGeolocationReturn {
     // HTTPS check for production
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
       setError('Geolocation requires HTTPS. Please connect securely.');
+      setErrorCode(2);
       setLoading(false);
       console.error('[Geolocation] Not HTTPS or localhost');
       return;
@@ -84,8 +95,9 @@ export function useGeolocation(): UseGeolocationReturn {
           setCoordinates(newCoordinates);
 
           // Reverse geocode to get address
-          const resolvedAddress = await reverseGeocode(latitude, longitude);
-          setAddress(resolvedAddress);
+          const resolved = await reverseGeocode(latitude, longitude);
+          setAddress(resolved.address);
+          setPlace(resolved.place);
 
           setLoading(false);
         } catch (err) {
@@ -115,8 +127,10 @@ export function useGeolocation(): UseGeolocationReturn {
         }
 
         setError(errorMessage);
+        setErrorCode(err.code);
         setCoordinates(null);
         setAddress(null);
+        setPlace(null);
         setLoading(false);
       },
       {
@@ -131,15 +145,19 @@ export function useGeolocation(): UseGeolocationReturn {
   const reset = useCallback(() => {
     setCoordinates(null);
     setAddress(null);
+    setPlace(null);
     setLoading(false);
     setError(null);
+    setErrorCode(null);
   }, []);
 
   return {
     coordinates,
     address,
+    place,
     loading,
     error,
+    errorCode,
     requestLocation,
     reset
   };

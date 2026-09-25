@@ -50,6 +50,7 @@ export const MAX_PREDICTION_ACCURACY_METERS = 50;
 export const JUMP_REBASE_MS = 300;
 
 const LIVE_THRESHOLD_MS = 3_000;
+const MAX_LIVE_THRESHOLD_MS = 15_000;
 const UPDATING_THRESHOLD_MS = 8_000;
 const DELAYED_THRESHOLD_MS = 20_000;
 const STATIONARY_SPEED_METERS_PER_SECOND = 0.75;
@@ -215,17 +216,30 @@ function initialBearing(point: QueuedPoint["point"]) {
     : null;
 }
 
+/**
+ * `observedIntervalMs` is the recent gap between authoritative fixes. The
+ * technician sends adaptively (about 2.5 s moving, 12 s stationary), so a
+ * point is only late once it misses that cadence: the LIVE window stretches to
+ * the observed gap plus the original 3 s grace, capped at 15 s, and the later
+ * thresholds shift by the same allowance. Without a known gap the thresholds
+ * are exactly 3 / 8 / 20 s.
+ */
 export function deriveTrackingFreshness(
   lastAuthoritativeAt: number | null,
   now: number,
   isConnected: boolean,
+  observedIntervalMs: number | null = null,
 ): TrackingFreshness {
   if (!isConnected) return "RECONNECTING";
   if (lastAuthoritativeAt == null) return "UPDATING";
   const ageMs = Math.max(0, now - lastAuthoritativeAt);
-  if (ageMs <= LIVE_THRESHOLD_MS) return "LIVE";
-  if (ageMs <= UPDATING_THRESHOLD_MS) return "UPDATING";
-  if (ageMs <= DELAYED_THRESHOLD_MS) return "DELAYED";
+  const cadenceAllowanceMs = observedIntervalMs != null && Number.isFinite(observedIntervalMs)
+    ? Math.min(MAX_LIVE_THRESHOLD_MS, Math.max(LIVE_THRESHOLD_MS, observedIntervalMs + LIVE_THRESHOLD_MS)) -
+      LIVE_THRESHOLD_MS
+    : 0;
+  if (ageMs <= LIVE_THRESHOLD_MS + cadenceAllowanceMs) return "LIVE";
+  if (ageMs <= UPDATING_THRESHOLD_MS + cadenceAllowanceMs) return "UPDATING";
+  if (ageMs <= DELAYED_THRESHOLD_MS + cadenceAllowanceMs) return "DELAYED";
   return "OFFLINE";
 }
 

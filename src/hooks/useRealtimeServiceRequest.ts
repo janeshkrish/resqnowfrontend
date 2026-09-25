@@ -132,6 +132,20 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
   const [trackingFreshness, setTrackingFreshness] = useState<TrackingFreshness>('UPDATING');
   const lastTechnicianIdRef = useRef<string | null>(null);
   const lastTrackingFixAtRef = useRef<number | null>(null);
+  // Recent gap between authoritative socket fixes; the technician sends adaptively.
+  const observedFixIntervalRef = useRef<number | null>(null);
+  const lastReceivedSequenceRef = useRef<number | null>(null);
+  const freshnessTrackerRef = useRef<{
+    requestId: string | null;
+    state: TrackingFreshness | null;
+    since: number;
+    totalsMs: Record<TrackingFreshness, number>;
+  }>({
+    requestId: null,
+    state: null,
+    since: 0,
+    totalsMs: { LIVE: 0, UPDATING: 0, DELAYED: 0, RECONNECTING: 0, OFFLINE: 0 },
+  });
   const { socket, isConnected } = useSocket();
 
   const fetchRequest = async () => {
@@ -265,6 +279,13 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           });
           return;
         }
+        const clientReceivedAtMs = Date.now();
+        const receivedSequenceId = Number(data?.sequenceId);
+        const recordedAtMs = Date.parse(String(data?.recordedAt ?? data?.locationUpdatedAt ?? ""));
+        const backendReceivedAtMs = Date.parse(String(data?.receivedAt ?? ""));
+        const latency = (from: number, to: number) =>
+          Number.isFinite(from) && Number.isFinite(to) ? to - from : null;
+        // Latencies cross device and server clocks, so they include any clock skew.
         logLiveTrackingDiagnostic('[RT-CUSTOMER-RECEIVE]', 'location_received', {
           requestId: eventRequestId || String(requestId),
           technicianId: data?.technicianId ?? null,
@@ -272,7 +293,16 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           lat: data?.lat ?? null,
           lng: data?.lng ?? null,
           recordedAt: data?.recordedAt ?? data?.locationUpdatedAt ?? null,
+          backendReceivedAt: data?.receivedAt ?? null,
+          clientReceivedAt: new Date(clientReceivedAtMs).toISOString(),
+          gpsToBackendMs: latency(recordedAtMs, backendReceivedAtMs),
+          backendToCustomerMs: latency(backendReceivedAtMs, clientReceivedAtMs),
+          gpsToCustomerMs: latency(recordedAtMs, clientReceivedAtMs),
+          // The backend emits each fix under a canonical and a compatibility event name.
+          repeatedSequence: Number.isSafeInteger(receivedSequenceId) &&
+            receivedSequenceId === lastReceivedSequenceRef.current,
         });
+        if (Number.isSafeInteger(receivedSequenceId)) lastReceivedSequenceRef.current = receivedSequenceId;
 
         const eventTechnicianId = data?.technicianId != null
           ? String(data.technicianId)
@@ -358,8 +388,14 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           }
 
           if (hasLocation) {
+            const previousFixAt = lastTrackingFixAtRef.current;
+            // Only a strictly newer fix updates the cadence; duplicate events and
+            // route-metric republishes carry the same receivedAt.
+            if (previousFixAt != null && authoritativeReceivedAt > previousFixAt) {
+              observedFixIntervalRef.current = authoritativeReceivedAt - previousFixAt;
+            }
             lastTrackingFixAtRef.current = Math.max(
-              lastTrackingFixAtRef.current ?? Number.NEGATIVE_INFINITY,
+              previousFixAt ?? Number.NEGATIVE_INFINITY,
               authoritativeReceivedAt,
             );
           }
@@ -389,7 +425,12 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             previousLat: prev.location_lat ?? null, previousLng: prev.location_lng ?? null,
             incomingLat: hasLocation ? lat : null, incomingLng: hasLocation ? lng : null,
             displayedLat: next.location_lat ?? null, displayedLng: next.location_lng ?? null,
-            freshness: deriveTrackingFreshness(lastTrackingFixAtRef.current, Date.now(), Boolean(socket.connected)),
+            freshness: deriveTrackingFreshness(
+              lastTrackingFixAtRef.current,
+              Date.now(),
+              Boolean(socket.connected),
+              observedFixIntervalRef.current,
+            ),
           });
           return next;
         });
@@ -445,7 +486,42 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
 
   useEffect(() => {
     const updateFreshness = () => {
-      setTrackingFreshness(deriveTrackingFreshness(lastTrackingFixAtRef.current, Date.now(), isConnected));
+      const now = Date.now();
+      const next = deriveTrackingFreshness(
+        lastTrackingFixAtRef.current,
+        now,
+        isConnected,
+        observedFixIntervalRef.current,
+      );
+      setTrackingFreshness(next);
+
+      // Log only state transitions, with time spent per state for this request.
+      const tracker = freshnessTrackerRef.current;
+      const trackerRequestId = requestId ? String(requestId) : null;
+      if (tracker.requestId !== trackerRequestId) {
+        if (tracker.requestId !== null) {
+          observedFixIntervalRef.current = null;
+          lastReceivedSequenceRef.current = null;
+        }
+        tracker.requestId = trackerRequestId;
+        tracker.state = null;
+        tracker.totalsMs = { LIVE: 0, UPDATING: 0, DELAYED: 0, RECONNECTING: 0, OFFLINE: 0 };
+      }
+      if (tracker.state === next) return;
+      const previousStateDurationMs = tracker.state ? now - tracker.since : null;
+      if (tracker.state && previousStateDurationMs != null) {
+        tracker.totalsMs[tracker.state] += previousStateDurationMs;
+      }
+      logLiveTrackingDiagnostic('[RT-CUSTOMER-STATE]', 'freshness_changed', {
+        requestId: trackerRequestId,
+        from: tracker.state,
+        to: next,
+        previousStateDurationMs,
+        observedIntervalMs: observedFixIntervalRef.current,
+        totalsMs: { ...tracker.totalsMs },
+      });
+      tracker.state = next;
+      tracker.since = now;
     };
     updateFreshness();
     const interval = window.setInterval(updateFreshness, 1_000);

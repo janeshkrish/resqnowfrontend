@@ -25,6 +25,11 @@ import CancelledJobCard, { CancelledJobDetails } from '@/components/technician/C
 import { apiUrl } from '@/lib/api';
 import { logLiveTrackingDiagnostic } from '@/lib/liveTrackingDiagnostics';
 import {
+  createTechnicianLocationSender,
+  type TechnicianLocationSender,
+  type TrackingLocationV1Payload,
+} from '@/lib/technicianLocationSender';
+import {
   formatTechnicianStatus,
   isTechnicianCompletionStatus,
   normalizeTechnicianStatus,
@@ -54,6 +59,16 @@ import {
 } from '@/lib/navigation/technicianNavigation';
 
 const EMPTY_VALUE_TOKENS = new Set(['not available', 'n/a', 'na', 'null', 'undefined', 'no phone number']);
+// Statuses outside the backend's LIVE_TRACKING_STATUSES; locations sent now are rejected.
+const TRACKING_ENDED_STATUSES: string[] = [
+  'service_completed',
+  'payment_pending',
+  'paid',
+  'completed',
+  'closed',
+  'cancelled',
+  'rejected',
+];
 
 const toOptionalString = (value: any) => {
   const normalized = String(value ?? '').trim();
@@ -97,7 +112,7 @@ const ActiveJob = () => {
   const { state } = location;
   const { requestId: routeRequestId } = useParams();
   const navigate = useNavigate();
-  const { socket } = useSocket();
+  const { socket, isConnected: isSocketConnected } = useSocket();
   const { token, technician } = useTechnicianAuth();
 
   const { activeJob, dues, setDues, refreshActiveJob, refreshDues } = useTechnicianActiveJob(technician?.id, 15000);
@@ -127,6 +142,8 @@ const ActiveJob = () => {
   const vehicleSelectionTouchedRef = useRef(false);
   const locationSocketRef = useRef(socket);
   const trackingSequenceRef = useRef(0);
+  const locationSenderRef = useRef<TechnicianLocationSender | null>(null);
+  const trackingEndedRef = useRef(false);
   locationSocketRef.current = socket;
   const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
   const navigationTarget = useMemo(
@@ -254,6 +271,19 @@ const ActiveJob = () => {
     }
   }, [status]);
 
+  // Canonical ingestion only accepts locations while the request is live. Once it
+  // ends, stop offering fixes and drop anything still pending for this job.
+  useEffect(() => {
+    const ended = TRACKING_ENDED_STATUSES.includes(status);
+    trackingEndedRef.current = ended;
+    if (ended) locationSenderRef.current?.clearPending('request_ended');
+  }, [status]);
+
+  // Connectivity is back: deliver the newest location that could not be sent.
+  useEffect(() => {
+    if (isSocketConnected) locationSenderRef.current?.flush('socket_connected');
+  }, [isSocketConnected]);
+
   useEffect(() => {
     const completionJobId = String(job?.requestId || job?.id || stateJob?.requestId || stateJob?.id || '').trim();
     if (!completionJobId) return;
@@ -348,6 +378,32 @@ const ActiveJob = () => {
     let cancelled = false;
     let permissionNotified = false;
 
+    // One sender per active job: its pending location can never leak into another job.
+    const locationSender = createTechnicianLocationSender({
+      jobId: String(activeRequestId),
+      transport: {
+        isSocketConnected: () => Boolean(locationSocketRef.current?.connected),
+        emitSocket: (payload, acknowledge) => {
+          locationSocketRef.current?.emit('tracking:location:v1', payload, acknowledge);
+        },
+        sendRest: async (payload) => {
+          const response = await fetch(apiUrl('/api/technicians/me/location'), {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
+          const body = await response.json().catch(() => null);
+          return { ok: response.ok, status: response.status, code: body?.code };
+        },
+      },
+    });
+    locationSenderRef.current = locationSender;
+    const handleBrowserOnline = () => locationSender.flush('browser_online');
+    window.addEventListener('online', handleBrowserOnline);
+
     const applyLocationUpdate = (position: {
       coords: {
         latitude: number;
@@ -395,8 +451,8 @@ const ActiveJob = () => {
 
       const sequenceId = Math.max(timestamp * 1000, trackingSequenceRef.current + 1);
       trackingSequenceRef.current = sequenceId;
-      const locationPayload = {
-        version: 1 as const,
+      const locationPayload: TrackingLocationV1Payload = {
+        version: 1,
         technicianId: String(technician?.id || ''),
         jobId: String(activeRequestId),
         lat: latitude,
@@ -422,42 +478,9 @@ const ActiveJob = () => {
         socketConnected: Boolean(trackingSocket?.connected),
         socketId: trackingSocket?.id ?? null,
       });
-      let recoverySent = false;
-      const sendRestRecovery = () => {
-        if (recoverySent) return;
-        recoverySent = true;
-        fetch(apiUrl('/api/technicians/me/location'), {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(locationPayload),
-        }).catch(console.error);
-        logLiveTrackingDiagnostic('[RT-TECH-SOCKET]', 'rest_recovery_sent', {
-          requestId: String(activeRequestId), sequenceId, lat: latitude, lng: longitude,
-          socketConnected: Boolean(trackingSocket?.connected),
-        });
-      };
-
-      if (!trackingSocket?.connected) {
-        sendRestRecovery();
-        return;
-      }
-
-      const acknowledgementTimeout = window.setTimeout(sendRestRecovery, 3_500);
-      logLiveTrackingDiagnostic('[RT-TECH-SOCKET]', 'location_emitted', {
-        requestId: String(activeRequestId), sequenceId, lat: latitude, lng: longitude,
-        socketId: trackingSocket.id ?? null, socketConnected: trackingSocket.connected,
-      });
-      trackingSocket.emit('tracking:location:v1', locationPayload, (acknowledgement: { ok?: boolean } | undefined) => {
-        window.clearTimeout(acknowledgementTimeout);
-        logLiveTrackingDiagnostic('[RT-TECH-SOCKET]', 'location_acknowledged', {
-          requestId: String(activeRequestId), sequenceId, ok: Boolean(acknowledgement?.ok),
-          code: (acknowledgement as { code?: string } | undefined)?.code ?? null,
-        });
-        if (!acknowledgement?.ok) sendRestRecovery();
-      });
+      // The sender applies the adaptive cadence and the latest-point recovery queue
+      // over the same canonical Socket.IO / REST recovery path.
+      if (!trackingEndedRef.current) locationSender.handleFix(locationPayload);
     };
 
     const ensureNativePermission = async () => {
@@ -480,6 +503,7 @@ const ActiveJob = () => {
 
     const startNativeWatch = async () => {
       const granted = await ensureNativePermission();
+      if (cancelled) return;
       if (!granted) {
         setLocationError('Location permission is required to start navigation.');
         if (!permissionNotified) {
@@ -501,6 +525,9 @@ const ActiveJob = () => {
           applyLocationUpdate(position);
         }
       );
+      // The job ended or changed while the native watch was starting; the effect
+      // cleanup has already run and could not see this id.
+      if (cancelled) Geolocation.clearWatch({ id: watchId as string }).catch(() => {});
     };
 
     const startWebWatch = () => {
@@ -532,6 +559,9 @@ const ActiveJob = () => {
 
     return () => {
       cancelled = true;
+      window.removeEventListener('online', handleBrowserOnline);
+      locationSender.dispose();
+      if (locationSenderRef.current === locationSender) locationSenderRef.current = null;
       if (Capacitor.isNativePlatform()) {
         if (watchId != null) {
           Geolocation.clearWatch({ id: watchId as string }).catch(() => {});

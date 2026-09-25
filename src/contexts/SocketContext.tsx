@@ -85,13 +85,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       portal: technicianPortal ? 'technician' : 'customer',
     });
 
+    let disconnectedAt: number | null = null;
     socketInstance.on('connect', () => {
       console.log('Socket connected');
       setIsConnected(true);
       logLiveTrackingDiagnostic(diagnosticPrefix, 'socket_connected', {
         role: socketRole,
         socketId: socketInstance.id ?? null,
+        reconnected: disconnectedAt != null,
+        downtimeMs: disconnectedAt != null ? Date.now() - disconnectedAt : null,
       });
+      disconnectedAt = null;
 
       // Join appropriate rooms
       if (socketRole === 'technician' && technician) {
@@ -111,6 +115,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     socketInstance.on('disconnect', (reason) => {
       console.log('Socket disconnected');
+      disconnectedAt = Date.now();
       setIsConnected(false);
       logLiveTrackingDiagnostic(diagnosticPrefix, 'socket_disconnected', { role: socketRole, reason });
     });

@@ -142,4 +142,28 @@ describe("deriveTrackingFreshness", () => {
     expect(deriveTrackingFreshness(0, 25_000, true)).toBe("OFFLINE");
     expect(deriveTrackingFreshness(0, 500, false)).toBe("RECONNECTING");
   });
+
+  it("keeps the original thresholds when no cadence has been observed", () => {
+    expect(deriveTrackingFreshness(0, 3_000, true, null)).toBe("LIVE");
+    expect(deriveTrackingFreshness(0, 3_001, true, null)).toBe("UPDATING");
+    expect(deriveTrackingFreshness(0, 8_001, true, null)).toBe("DELAYED");
+    expect(deriveTrackingFreshness(0, 20_001, true, null)).toBe("OFFLINE");
+  });
+
+  it("stays LIVE between stationary heartbeats and still escalates when one is missed", () => {
+    const stationaryGap = 12_000;
+    expect(deriveTrackingFreshness(0, 11_000, true, stationaryGap)).toBe("LIVE");
+    expect(deriveTrackingFreshness(0, 15_000, true, stationaryGap)).toBe("LIVE");
+    expect(deriveTrackingFreshness(0, 15_001, true, stationaryGap)).toBe("UPDATING");
+    expect(deriveTrackingFreshness(0, 20_001, true, stationaryGap)).toBe("DELAYED");
+    expect(deriveTrackingFreshness(0, 32_001, true, stationaryGap)).toBe("OFFLINE");
+  });
+
+  it("uses a tight window for a moving cadence and caps a long gap at fifteen seconds", () => {
+    expect(deriveTrackingFreshness(0, 5_500, true, 2_500)).toBe("LIVE");
+    expect(deriveTrackingFreshness(0, 5_501, true, 2_500)).toBe("UPDATING");
+    expect(deriveTrackingFreshness(0, 15_000, true, 90_000)).toBe("LIVE");
+    expect(deriveTrackingFreshness(0, 15_001, true, 90_000)).toBe("UPDATING");
+    expect(deriveTrackingFreshness(0, 500, false, 12_000)).toBe("RECONNECTING");
+  });
 });

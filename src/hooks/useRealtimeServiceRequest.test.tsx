@@ -370,4 +370,46 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
 
     expect(result?.trackingFreshness).toBe("LIVE");
   });
+
+  it("stays LIVE between stationary heartbeats and ignores repeated events for the cadence", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-25T10:00:00.000Z"));
+    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
+    const Harness = () => {
+      result = useRealtimeServiceRequest("request-1");
+      return null;
+    };
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    const deliver = (sequenceId: number) => {
+      const point = {
+        requestId: "request-1",
+        technicianId: "technician-1",
+        lat: 11,
+        lng: 76,
+        sequenceId,
+        recordedAt: new Date(Date.now()).toISOString(),
+        receivedAt: new Date(Date.now()).toISOString(),
+      };
+      act(() => {
+        // The backend emits each accepted fix under both event names.
+        socketHarness.handlers.get("tracking:location:v1")?.(point);
+        socketHarness.handlers.get("technician:location_update")?.(point);
+      });
+    };
+
+    deliver(200);
+    await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+    deliver(201);
+    await act(async () => { await vi.advanceTimersByTimeAsync(11_000); });
+
+    expect(result?.trackingFreshness).toBe("LIVE");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(result?.trackingFreshness).toBe("DELAYED");
+  });
 });

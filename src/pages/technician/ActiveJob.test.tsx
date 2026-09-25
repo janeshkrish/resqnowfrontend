@@ -44,12 +44,20 @@ vi.mock("@/contexts/SocketContext", () => ({
   useSocket: () => ({ socket: { emit: vi.fn() } }),
 }));
 
+const platform = vi.hoisted(() => ({ native: false }));
+const nativeGeolocation = vi.hoisted(() => ({
+  checkPermissions: vi.fn(),
+  requestPermissions: vi.fn(),
+  watchPosition: vi.fn(),
+  clearWatch: vi.fn(),
+}));
+
 vi.mock("@capacitor/core", () => ({
-  Capacitor: { isNativePlatform: () => false },
+  Capacitor: { isNativePlatform: () => platform.native },
 }));
 
 vi.mock("@capacitor/geolocation", () => ({
-  Geolocation: {},
+  Geolocation: nativeGeolocation,
 }));
 
 vi.mock("sonner", () => ({
@@ -59,6 +67,7 @@ vi.mock("sonner", () => ({
 describe("technician active-job navigation", () => {
   beforeEach(() => {
     capture.mapProps = null;
+    platform.native = false;
     refreshActiveJob.mockClear();
     activeJobState.value = {
       id: "request-42",
@@ -273,5 +282,126 @@ describe("technician active-job navigation", () => {
     });
 
     await waitFor(() => expect(capture.mapProps?.navigationMode).toBe(true));
+  });
+});
+
+describe("technician active-job live location sending", () => {
+  const position = (latitude: number, timestamp: number) => ({
+    coords: {
+      latitude,
+      longitude: 77.59,
+      accuracy: 6,
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: 90,
+      speed: 0,
+      toJSON: () => ({}),
+    },
+    timestamp,
+    toJSON: () => ({}),
+  } as GeolocationPosition);
+
+  const locationCalls = (fetchMock: ReturnType<typeof vi.fn>) =>
+    fetchMock.mock.calls.filter(([url]) => String(url).includes("/technicians/me/location"));
+
+  const renderActiveJob = () => render(
+    <MemoryRouter initialEntries={["/technician/active-job/request-42"]}>
+      <Routes>
+        <Route path="/technician/active-job/:requestId" element={<ActiveJob />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  let emitFix: PositionCallback | null = null;
+  let clearWatch: ReturnType<typeof vi.fn>;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    platform.native = false;
+    emitFix = null;
+    clearWatch = vi.fn();
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    activeJobState.value = {
+      id: "request-42",
+      requestId: "request-42",
+      status: "en-route",
+      pickupLatitude: 12.97,
+      pickupLongitude: 77.59,
+      amount: 500,
+    };
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        watchPosition: vi.fn((success: PositionCallback) => {
+          emitFix = success;
+          return 7;
+        }),
+        clearWatch,
+      },
+    });
+  });
+
+  it("sends the first fix, holds stationary jitter for the heartbeat, and stops on unmount", async () => {
+    const { unmount } = renderActiveJob();
+    await waitFor(() => expect(emitFix).not.toBeNull());
+    const start = Date.now();
+
+    act(() => emitFix?.(position(12.97, start)));
+    await waitFor(() => expect(locationCalls(fetchMock)).toHaveLength(1));
+    const firstBody = JSON.parse(String(locationCalls(fetchMock)[0][1]?.body));
+    expect(firstBody).toMatchObject({
+      version: 1,
+      technicianId: "tech-1",
+      jobId: "request-42",
+      lat: 12.97,
+      lng: 77.59,
+      heading: 90,
+      speed: 0,
+      accuracy: 6,
+      recordedAt: new Date(start).toISOString(),
+    });
+
+    act(() => {
+      emitFix?.(position(12.97001, start + 1_000));
+      emitFix?.(position(12.97002, start + 2_000));
+    });
+    await Promise.resolve();
+    expect(locationCalls(fetchMock)).toHaveLength(1);
+
+    unmount();
+    expect(clearWatch).toHaveBeenCalledWith(7);
+    act(() => emitFix?.(position(12.98, start + 20_000)));
+    expect(locationCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("does not transmit locations once the request has ended", async () => {
+    activeJobState.value = { ...activeJobState.value, status: "service_completed" };
+    renderActiveJob();
+    await waitFor(() => expect(emitFix).not.toBeNull());
+
+    act(() => emitFix?.(position(12.97, Date.now())));
+    await Promise.resolve();
+
+    expect(locationCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("clears a native watch that finished starting after the job page unmounted", async () => {
+    platform.native = true;
+    let resolveWatch: (id: string) => void = () => {};
+    nativeGeolocation.checkPermissions.mockResolvedValue({ location: "granted" });
+    nativeGeolocation.watchPosition.mockImplementation(() => new Promise<string>((resolve) => {
+      resolveWatch = resolve;
+    }));
+    nativeGeolocation.clearWatch.mockResolvedValue(undefined);
+
+    const { unmount } = renderActiveJob();
+    await waitFor(() => expect(nativeGeolocation.watchPosition).toHaveBeenCalled());
+    unmount();
+    expect(nativeGeolocation.clearWatch).not.toHaveBeenCalled();
+
+    await act(async () => { resolveWatch("native-watch-1"); });
+
+    expect(nativeGeolocation.clearWatch).toHaveBeenCalledWith({ id: "native-watch-1" });
   });
 });

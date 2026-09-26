@@ -62,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { routePolylineFromMetadata } from "@/lib/geo";
+import { distanceMeters, etaBasisLabel, formatEtaDuration, usableLiveEta } from "@/lib/liveEta";
 import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
 import type { TrackingFreshness } from "@/lib/liveTrackingPlayback";
 import {
@@ -759,107 +760,6 @@ const RequestTracking = () => {
     () => buildMapLocation(request?.location_lat, request?.location_lng),
     [request?.location_lat, request?.location_lng]
   );
-  const liveTrackingMetrics = useMemo(() => {
-    const serverDistanceKm = technician?.routeDistanceKm;
-    const serverEtaMinutes = technician?.routeEtaMinutes;
-    const routeLocationLat = technician?.routeLocationLat;
-    const routeLocationLng = technician?.routeLocationLng;
-    const routeMatchesLatestTechnicianLocation =
-      technicianMapLocation !== null &&
-      typeof routeLocationLat === "number" &&
-      Number.isFinite(routeLocationLat) &&
-      typeof routeLocationLng === "number" &&
-      Number.isFinite(routeLocationLng) &&
-      Math.abs(routeLocationLat - technicianMapLocation.lat) < 0.000001 &&
-      Math.abs(routeLocationLng - technicianMapLocation.lng) < 0.000001;
-    const hasServerRouteMetrics =
-      technician?.routeRequestId === String(requestId) &&
-      routeMatchesLatestTechnicianLocation &&
-      typeof serverDistanceKm === "number" &&
-      Number.isFinite(serverDistanceKm) &&
-      serverDistanceKm >= 0 &&
-      typeof serverEtaMinutes === "number" &&
-      Number.isFinite(serverEtaMinutes) &&
-      serverEtaMinutes >= 0;
-
-    if (!hasServerRouteMetrics && (!technicianMapLocation || !requestMapLocation)) {
-      return {
-        eta:
-          status === "arrived"
-            ? "Arrived"
-            : status === "en-route"
-              ? "On the way"
-              : status === "in-progress"
-                ? "Live"
-                : undefined,
-        etaDisplay:
-          status === "arrived"
-            ? "Arrived"
-            : status === "en-route"
-              ? "On the way"
-              : status === "in-progress"
-                ? "Live"
-                : undefined,
-        distanceKm: null as number | null,
-        distanceLabel: null as string | null,
-      };
-    }
-
-    let distanceKm: number;
-    let etaLabel: string;
-
-    if (hasServerRouteMetrics) {
-      distanceKm = serverDistanceKm;
-      etaLabel = technician?.routeEtaText?.trim() || `${serverEtaMinutes} min`;
-    } else {
-      const technicianLat = technicianMapLocation!.lat;
-      const technicianLng = technicianMapLocation!.lng;
-      const requestLat = requestMapLocation!.lat;
-      const requestLng = requestMapLocation!.lng;
-      const toRad = (value: number) => (value * Math.PI) / 180;
-      const earthRadiusKm = 6371;
-      const deltaLat = toRad(requestLat - technicianLat);
-      const deltaLng = toRad(requestLng - technicianLng);
-      const a =
-        Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-        Math.cos(toRad(technicianLat)) *
-          Math.cos(toRad(requestLat)) *
-          Math.sin(deltaLng / 2) *
-          Math.sin(deltaLng / 2);
-      distanceKm = Number((2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1));
-      const minutes = Math.max(1, Math.ceil((distanceKm / 30) * 60));
-      etaLabel = `${minutes} min`;
-    }
-
-    if (status === "arrived") {
-      return {
-        eta: "Arrived",
-        etaDisplay: "Arrived",
-        distanceKm,
-        distanceLabel: "At your location",
-      };
-    }
-
-    return {
-      eta: status === "en-route" ? etaLabel : status === "in-progress" ? "Live" : undefined,
-      etaDisplay: status === "en-route" ? etaLabel : status === "in-progress" ? "Live" : undefined,
-      distanceKm,
-      distanceLabel: `${distanceKm.toFixed(1)} km away`,
-    };
-  }, [
-    requestMapLocation,
-    requestId,
-    status,
-    technician?.routeDistanceKm,
-    technician?.routeEtaMinutes,
-    technician?.routeEtaText,
-    technician?.routeRequestId,
-    technician?.routeLocationLat,
-    technician?.routeLocationLng,
-    technicianMapLocation,
-  ]);
-  const eta = liveTrackingMetrics.eta;
-  const distanceLabel = liveTrackingMetrics.distanceLabel;
   const dropLat = Number(request?.dropLocation?.lat ?? request?.drop_latitude);
   const dropLng = Number(request?.dropLocation?.lng ?? request?.drop_longitude);
   const dropLocation =
@@ -880,6 +780,49 @@ const RequestTracking = () => {
     ].includes(status);
   const liveTrackingDestination =
     isTowingDropLeg && dropLocation ? dropLocation : requestMapLocation;
+  const liveEta = useMemo(
+    () => usableLiveEta(technician?.liveEta, { requestId: String(requestId), destination: liveTrackingDestination }),
+    [liveTrackingDestination, requestId, technician?.liveEta]
+  );
+  const liveTrackingMetrics = useMemo(() => {
+    const statusLabel =
+      status === "arrived"
+        ? "Arrived"
+        : status === "en-route"
+          ? "On the way"
+          : status === "in-progress"
+            ? "Live"
+            : undefined;
+
+    let distanceKm: number | null = null;
+    let distanceLabel: string | null = null;
+    let etaLabel = statusLabel;
+    if (liveEta) {
+      distanceKm = liveEta.distanceMeters / 1000;
+      distanceLabel = `${distanceKm.toFixed(1)} km away`;
+      if (status === "en-route") etaLabel = formatEtaDuration(liveEta.etaSeconds);
+    } else if (technicianMapLocation && liveTrackingDestination) {
+      // Without a road ETA, show only an approximate straight-line distance;
+      // minutes guessed from it would jump against the road ETA.
+      distanceKm = Number((distanceMeters(technicianMapLocation, liveTrackingDestination) / 1000).toFixed(1));
+      distanceLabel = `≈ ${distanceKm.toFixed(1)} km away`;
+    }
+
+    if (status === "arrived" && distanceKm !== null) {
+      distanceLabel = "At your location";
+    }
+
+    return {
+      eta: etaLabel,
+      etaDisplay: etaLabel,
+      etaBasis: liveEta && status === "en-route" ? etaBasisLabel(liveEta) : null,
+      distanceKm,
+      distanceLabel,
+    };
+  }, [liveEta, liveTrackingDestination, status, technicianMapLocation]);
+  const eta = liveTrackingMetrics.eta;
+  const distanceLabel = liveTrackingMetrics.distanceLabel;
+  const etaBasis = liveTrackingMetrics.etaBasis;
   const shouldShowLiveRoute = Boolean(liveTrackingDestination);
   const routeDistanceKm = Number(request?.routeDistanceKm ?? request?.route_distance_km);
   const routeSummaryVisible = isTowingRequest && Boolean(request?.drop_address || request?.dropLocation?.address || Number.isFinite(routeDistanceKm));
@@ -1140,7 +1083,7 @@ const RequestTracking = () => {
       return {
         eyebrow: "Tow partner heading to pickup",
         value: eta || "Live",
-        detail: distanceLabel || serviceLocationLabel,
+        detail: [distanceLabel || serviceLocationLabel, etaBasis].filter(Boolean).join(" · "),
       };
     }
 
@@ -1164,7 +1107,7 @@ const RequestTracking = () => {
       return {
         eyebrow: "Technician arriving in",
         value: eta || "Live",
-        detail: distanceLabel || "Live location active",
+        detail: [distanceLabel || "Live location active", etaBasis].filter(Boolean).join(" · "),
       };
     }
 
@@ -1210,6 +1153,7 @@ const RequestTracking = () => {
     currency,
     distanceLabel,
     elapsedSeconds,
+    etaBasis,
     isTowingRequest,
     paymentCompleted,
     request?.dropLocation?.address,

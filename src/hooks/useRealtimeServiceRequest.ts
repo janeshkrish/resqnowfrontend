@@ -7,6 +7,13 @@ import {
   type TrackingFreshness,
 } from '@/lib/liveTrackingPlayback';
 import { logLiveTrackingDiagnostic } from '@/lib/liveTrackingDiagnostics';
+import {
+  isTerminalRequestStatus,
+  LIVE_ETA_MAX_AGE_MS,
+  mergeLiveEta,
+  parseLiveEta,
+  type LiveEta,
+} from '@/lib/liveEta';
 import { resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayment';
 
 interface RequestData {
@@ -71,13 +78,8 @@ interface TechnicianData {
   location_lat?: number;
   location_lng?: number;
   completedJobs?: number;
-  routeDistanceKm?: number;
-  routeEtaMinutes?: number;
-  routeEtaText?: string;
-  routeEtaSource?: string;
-  routeRequestId?: string;
-  routeLocationLat?: number;
-  routeLocationLng?: number;
+  // Kept apart from the coordinate so GPS-only events never clear it.
+  liveEta?: LiveEta | null;
   locationUpdatedAt?: number;
   recordedAt?: string;
   sequenceId?: number;
@@ -135,6 +137,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
   // Recent gap between authoritative socket fixes; the technician sends adaptively.
   const observedFixIntervalRef = useRef<number | null>(null);
   const lastReceivedSequenceRef = useRef<number | null>(null);
+  const requestTerminalRef = useRef(false);
   const freshnessTrackerRef = useRef<{
     requestId: string | null;
     state: TrackingFreshness | null;
@@ -155,6 +158,8 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       if (res.ok) {
         const data = await res.json();
         const normalizedRequest = normalizeRequestData(data);
+        const requestIsTerminal = isTerminalRequestStatus(normalizedRequest.status);
+        requestTerminalRef.current = requestIsTerminal;
         // Backend returns the full request object. If it has a technician property, use it.
         setRequest(normalizedRequest);
         if (normalizedRequest.technician) {
@@ -193,7 +198,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             const currentUpdatedAt = Number(prev.locationUpdatedAt);
             const snapshotIsNewer = Number.isFinite(snapshotUpdatedAt) &&
               (!Number.isFinite(currentUpdatedAt) || snapshotUpdatedAt > currentUpdatedAt);
-            const preserveRouteMetrics = prev.routeRequestId === String(requestId);
+            const preserveEta = !requestIsTerminal && prev.liveEta?.requestId === String(requestId);
             return {
               ...techData,
               location_lat: snapshotIsNewer ? techData.location_lat : prev.location_lat,
@@ -205,13 +210,7 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
               speed: snapshotIsNewer ? techData.speed : prev.speed,
               heading: snapshotIsNewer ? techData.heading : prev.heading,
               accuracy: snapshotIsNewer ? techData.accuracy : prev.accuracy,
-              routeDistanceKm: preserveRouteMetrics ? prev.routeDistanceKm : undefined,
-              routeEtaMinutes: preserveRouteMetrics ? prev.routeEtaMinutes : undefined,
-              routeEtaText: preserveRouteMetrics ? prev.routeEtaText : undefined,
-              routeEtaSource: preserveRouteMetrics ? prev.routeEtaSource : undefined,
-              routeRequestId: preserveRouteMetrics ? prev.routeRequestId : undefined,
-              routeLocationLat: preserveRouteMetrics ? prev.routeLocationLat : undefined,
-              routeLocationLng: preserveRouteMetrics ? prev.routeLocationLng : undefined,
+              liveEta: preserveEta ? prev.liveEta : null,
             };
           });
 
@@ -235,9 +234,31 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
   };
 
   useEffect(() => {
+    requestTerminalRef.current = false;
     fetchRequest();
 
   }, [requestId]);
+
+  // Drop the ETA once it has gone unrefreshed for too long, rather than
+  // showing an old figure indefinitely.
+  const liveEta = technician?.liveEta ?? null;
+  useEffect(() => {
+    if (!liveEta) return;
+    const expire = () => {
+      logLiveTrackingDiagnostic('[RT-CUSTOMER-ETA]', 'eta_expired', {
+        requestId: liveEta.requestId, provider: liveEta.provider,
+        calculatedAt: new Date(liveEta.calculatedAt).toISOString(),
+      });
+      setTechnician(prev => (prev?.liveEta === liveEta ? { ...prev, liveEta: null } : prev));
+    };
+    const remainingMs = liveEta.receivedAt + LIVE_ETA_MAX_AGE_MS - Date.now();
+    if (remainingMs < 0) {
+      expire();
+      return;
+    }
+    const timer = window.setTimeout(expire, remainingMs + 1);
+    return () => window.clearTimeout(timer);
+  }, [liveEta]);
 
   useEffect(() => {
     if (FRONTEND_ONLY_MODE || !requestId || !socket) return;
@@ -250,6 +271,10 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
       handleStatusUpdate = (data: any) => {
         console.log("Status update received:", data);
         if (String(data.requestId) === String(requestId) || String(data.id) === String(requestId)) {
+          if (isTerminalRequestStatus(data.status)) {
+            requestTerminalRef.current = true;
+            setTechnician(prev => (prev?.liveEta ? { ...prev, liveEta: null } : prev));
+          }
           // Pull full request to ensure normalized fields (joined data, timestamps)
           fetchRequest();
 
@@ -328,24 +353,10 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
           const parsed = Number(value);
           return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
         };
-        const parseRouteMetric = (value: unknown) => {
-          if (value == null || (typeof value === "string" && value.trim() === "")) return undefined;
-          const parsed = Number(value);
-          return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
-        };
-        const routeDistanceKm = parseRouteMetric(data?.distanceKm);
-        const routeEtaMinutes = parseRouteMetric(data?.durationMinutes);
-        const routeEtaText = typeof data?.etaText === "string" && data.etaText.trim()
-          ? data.etaText.trim()
-          : undefined;
-        const routeEtaSource = typeof data?.etaSource === "string" && data.etaSource.trim()
-          ? data.etaSource.trim()
-          : undefined;
-        const hasRouteMetrics =
-          hasLocation && routeDistanceKm !== undefined && routeEtaMinutes !== undefined;
-        const routeRequestId = hasRouteMetrics
-          ? String(requestId)
-          : undefined;
+        // A request that has ended keeps no ETA, even from a late event.
+        const incomingEta = requestTerminalRef.current
+          ? null
+          : parseLiveEta(data, String(requestId), clientReceivedAtMs);
         // We set the location on the technician object in state
         setTechnician(prev => {
           if (!prev) {
@@ -400,17 +411,22 @@ export const useRealtimeServiceRequest = (requestId: string | undefined, options
             );
           }
 
+          const liveEta = mergeLiveEta(prev.liveEta, incomingEta);
+          if (incomingEta) {
+            logLiveTrackingDiagnostic('[RT-CUSTOMER-ETA]', liveEta === prev.liveEta ? 'eta_kept_current' : 'eta_applied', {
+              requestId: String(requestId), sequenceId: sequenceId ?? null,
+              provider: incomingEta.provider, trafficAware: incomingEta.trafficAware,
+              etaSeconds: incomingEta.etaSeconds, distanceMeters: incomingEta.distanceMeters,
+              calculatedAt: new Date(incomingEta.calculatedAt).toISOString(),
+              displayedCalculatedAt: liveEta ? new Date(liveEta.calculatedAt).toISOString() : null,
+            });
+          }
+
           const next = {
             ...prev,
             location_lat: hasLocation ? lat : prev.location_lat,
             location_lng: hasLocation ? lng : prev.location_lng,
-            routeDistanceKm,
-            routeEtaMinutes,
-            routeEtaText,
-            routeEtaSource,
-            routeRequestId,
-            routeLocationLat: hasRouteMetrics ? lat : undefined,
-            routeLocationLng: hasRouteMetrics ? lng : undefined,
+            liveEta,
             locationUpdatedAt: locationUpdatedAt ?? prev.locationUpdatedAt,
             recordedAt: typeof data?.recordedAt === 'string' ? data.recordedAt : prev.recordedAt,
             sequenceId: sequenceId ?? prev.sequenceId,

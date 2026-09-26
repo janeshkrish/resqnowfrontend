@@ -4,6 +4,7 @@ export type LiveTrackingDiagnosticPrefix =
   | '[RT-CUSTOMER-SOCKET]'
   | '[RT-CUSTOMER-RECEIVE]'
   | '[RT-CUSTOMER-STATE]'
+  | '[RT-CUSTOMER-ETA]'
   | '[RT-PLAYBACK]'
   | '[RT-MAPPLS-MARKER]'
   | '[RT-MAPPLS-MARKER-VERIFY]'

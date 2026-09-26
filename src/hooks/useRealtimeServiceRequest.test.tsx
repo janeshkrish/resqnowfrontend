@@ -98,200 +98,266 @@ describe("useRealtimeServiceRequest technician route metrics", () => {
     vi.useRealTimers();
   });
 
-  it.each(["location_update", "technician:location_update"])(
-    "stores route metrics from the latest %s event and clears stale metrics",
-    async (eventName) => {
-      let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
-      const Harness = () => {
-        result = useRealtimeServiceRequest("request-1");
-        return null;
-      };
+  const liveEtaOf = (value: ReturnType<typeof useRealtimeServiceRequest> | undefined) =>
+    value?.technician?.liveEta ?? null;
 
-      await act(async () => {
-        root.render(<Harness />);
-        await Promise.resolve();
-      });
-      expect(result?.technician?.id).toBe("technician-1");
-
-      act(() => {
-        socketHarness.handlers.get(eventName)?.({
-          requestId: "request-1",
-          lat: 12.97,
-          lng: 77.59,
-          distanceKm: 12.3,
-          durationMinutes: 17,
-          etaText: "17 min",
-          etaSource: "mappls",
-        });
-      });
-
-      expect(result?.technician).toMatchObject({
-        location_lat: 12.97,
-        location_lng: 77.59,
-        routeDistanceKm: 12.3,
-        routeEtaMinutes: 17,
-        routeEtaText: "17 min",
-        routeEtaSource: "mappls",
-        routeLocationLat: 12.97,
-        routeLocationLng: 77.59,
-      });
-
-      await act(async () => {
-        result?.refresh();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      expect(result?.technician).toMatchObject({
-        routeDistanceKm: 12.3,
-        routeEtaMinutes: 17,
-        routeEtaText: "17 min",
-        routeEtaSource: "mappls",
-      });
-
-      act(() => {
-        socketHarness.handlers.get(eventName)?.({
-          requestId: "request-1",
-          lat: 12.98,
-          lng: 77.6,
-        });
-      });
-
-      expect(result?.technician).toMatchObject({
-        location_lat: 12.98,
-        location_lng: 77.6,
-      });
-      expect(
-        (result?.technician as unknown as Record<string, unknown>)
-          .routeDistanceKm
-      ).toBeUndefined();
-      expect(
-        (result?.technician as unknown as Record<string, unknown>)
-          .routeEtaMinutes
-      ).toBeUndefined();
-      expect(
-        (result?.technician as unknown as Record<string, unknown>).routeEtaText
-      ).toBeUndefined();
-      expect(
-        (result?.technician as unknown as Record<string, unknown>)
-          .routeEtaSource
-      ).toBeUndefined();
-    }
-  );
-
-  it("does not preserve route metrics when the request changes but the technician does not", async () => {
-    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
-    const Harness = ({ requestId }: { requestId: string }) => {
-      result = useRealtimeServiceRequest(requestId);
+  const renderHarness = async (requestId = "request-1") => {
+    const state: { result?: ReturnType<typeof useRealtimeServiceRequest> } = {};
+    const Harness = ({ id }: { id: string }) => {
+      state.result = useRealtimeServiceRequest(id);
       return null;
     };
-
     await act(async () => {
-      root.render(<Harness requestId="request-1" />);
+      root.render(<Harness id={requestId} />);
       await Promise.resolve();
     });
+    return {
+      state,
+      rerender: async (id: string) => {
+        await act(async () => {
+          root.render(<Harness id={id} />);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      },
+    };
+  };
 
+  const emit = (eventName: string, data: Record<string, unknown>) => {
     act(() => {
-      socketHarness.handlers.get("technician:location_update")?.({
+      socketHarness.handlers.get(eventName)?.(data);
+    });
+  };
+
+  it.each(["tracking:location:v1", "location_update", "technician:location_update"])(
+    "keeps the ETA when a later %s event carries only GPS",
+    async (eventName) => {
+      const { state } = await renderHarness();
+      expect(state.result?.technician?.id).toBe("technician-1");
+
+      emit(eventName, {
         requestId: "request-1",
         lat: 12.97,
         lng: 77.59,
         distanceKm: 12.3,
         durationMinutes: 17,
         etaText: "17 min",
-        etaSource: "mappls",
+        etaSource: "road_route",
+        receivedAt: "2026-09-26T10:00:00.000Z",
       });
-    });
-    expect(result?.technician).toMatchObject({ routeDistanceKm: 12.3 });
 
+      expect(state.result?.technician).toMatchObject({ location_lat: 12.97, location_lng: 77.59 });
+      expect(liveEtaOf(state.result)).toMatchObject({
+        requestId: "request-1",
+        etaSeconds: 17 * 60,
+        distanceMeters: 12_300,
+        trafficAware: false,
+        provider: "road_route",
+      });
+
+      await act(async () => {
+        state.result?.refresh();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(liveEtaOf(state.result)).toMatchObject({ etaSeconds: 17 * 60 });
+
+      emit(eventName, {
+        requestId: "request-1",
+        lat: 12.98,
+        lng: 77.6,
+        receivedAt: "2026-09-26T10:00:03.000Z",
+      });
+
+      expect(state.result?.technician).toMatchObject({ location_lat: 12.98, location_lng: 77.6 });
+      expect(liveEtaOf(state.result)).toMatchObject({ etaSeconds: 17 * 60, distanceMeters: 12_300 });
+    }
+  );
+
+  it("reads the normalized traffic-aware ETA the backend attaches to each location", async () => {
+    const { state } = await renderHarness();
+
+    emit("tracking:location:v1", {
+      requestId: "request-1",
+      technicianId: "technician-1",
+      lat: 12.97,
+      lng: 77.59,
+      eta: {
+        requestId: "request-1",
+        technicianLat: 12.97,
+        technicianLng: 77.59,
+        destinationLat: 12.9,
+        destinationLng: 77.5,
+        etaSeconds: 1_260,
+        distanceMeters: 9_800,
+        trafficAware: true,
+        provider: "mappls",
+        calculatedAt: "2026-09-26T10:00:00.000Z",
+      },
+    });
+
+    expect(liveEtaOf(state.result)).toMatchObject({
+      etaSeconds: 1_260,
+      distanceMeters: 9_800,
+      trafficAware: true,
+      provider: "mappls",
+      destinationLat: 12.9,
+      destinationLng: 77.5,
+      calculatedAt: Date.parse("2026-09-26T10:00:00.000Z"),
+    });
+  });
+
+  it("replaces the ETA only with a newer calculation", async () => {
+    const { state } = await renderHarness();
+    const withEta = (etaSeconds: number, calculatedAt: string, recordedAt: string) => ({
+      requestId: "request-1",
+      technicianId: "technician-1",
+      lat: 12.97,
+      lng: 77.59,
+      recordedAt,
+      eta: { requestId: "request-1", etaSeconds, distanceMeters: 5_000, trafficAware: true, provider: "mappls", calculatedAt },
+    });
+
+    emit("tracking:location:v1", withEta(900, "2026-09-26T10:00:30.000Z", "2026-09-26T10:00:30.000Z"));
+    expect(liveEtaOf(state.result)?.etaSeconds).toBe(900);
+
+    // A newer GPS fix that still carries an older cached calculation.
+    emit("tracking:location:v1", withEta(1_200, "2026-09-26T10:00:00.000Z", "2026-09-26T10:00:35.000Z"));
+    expect(liveEtaOf(state.result)?.etaSeconds).toBe(900);
+
+    emit("tracking:location:v1", withEta(840, "2026-09-26T10:01:15.000Z", "2026-09-26T10:01:15.000Z"));
+    expect(liveEtaOf(state.result)?.etaSeconds).toBe(840);
+  });
+
+  it("drops an ETA that is not refreshed in time, even while GPS keeps arriving", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-26T10:00:00.000Z"));
+    const { state } = await renderHarness();
+    const cachedEta = {
+      requestId: "request-1",
+      etaSeconds: 600,
+      distanceMeters: 4_000,
+      trafficAware: true,
+      provider: "mappls",
+      calculatedAt: "2026-09-26T10:00:00.000Z",
+    };
+
+    emit("tracking:location:v1", { requestId: "request-1", lat: 12.97, lng: 77.59, eta: cachedEta });
+    expect(liveEtaOf(state.result)?.etaSeconds).toBe(600);
+
+    for (let second = 30; second <= 150; second += 30) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+      // The same cached calculation re-sent with each fix must not extend its life.
+      emit("tracking:location:v1", {
+        requestId: "request-1",
+        lat: 12.97 + second / 100_000,
+        lng: 77.59,
+        recordedAt: new Date(Date.now()).toISOString(),
+        eta: cachedEta,
+      });
+      expect(liveEtaOf(state.result)?.etaSeconds).toBe(600);
+    }
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(31_000); });
+    expect(liveEtaOf(state.result)).toBeNull();
+  });
+
+  it("clears the ETA when the request changes but the technician does not", async () => {
+    const { state, rerender } = await renderHarness();
+
+    emit("technician:location_update", {
+      requestId: "request-1",
+      lat: 12.97,
+      lng: 77.59,
+      distanceKm: 12.3,
+      durationMinutes: 17,
+    });
+    expect(liveEtaOf(state.result)).toMatchObject({ distanceMeters: 12_300 });
+
+    await rerender("request-2");
+
+    expect(liveEtaOf(state.result)).toBeNull();
+  });
+
+  it("clears the ETA and ignores late ETAs once the request is cancelled", async () => {
+    const { state } = await renderHarness();
+
+    emit("tracking:location:v1", {
+      requestId: "request-1",
+      lat: 12.97,
+      lng: 77.59,
+      distanceKm: 3,
+      durationMinutes: 6,
+    });
+    expect(liveEtaOf(state.result)).not.toBeNull();
+
+    const loadRequest = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation(async (path: string) => {
+      const body = await (await loadRequest(path)).json();
+      return { ok: true, json: async () => ({ ...body, status: "cancelled" }) };
+    });
     await act(async () => {
-      root.render(<Harness requestId="request-2" />);
-      await Promise.resolve();
+      socketHarness.handlers.get("job:status_update")?.({ requestId: "request-1", status: "cancelled" });
       await Promise.resolve();
     });
+    expect(liveEtaOf(state.result)).toBeNull();
 
-    expect(
-      (result?.technician as unknown as Record<string, unknown>).routeDistanceKm
-    ).toBeUndefined();
-    expect(
-      (result?.technician as unknown as Record<string, unknown>).routeEtaMinutes
-    ).toBeUndefined();
+    emit("tracking:location:v1", {
+      requestId: "request-1",
+      lat: 12.971,
+      lng: 77.591,
+      distanceKm: 2.5,
+      durationMinutes: 5,
+    });
+    expect(liveEtaOf(state.result)).toBeNull();
   });
 
   it("ignores a location event from another technician", async () => {
-    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
-    const Harness = () => {
-      result = useRealtimeServiceRequest("request-1");
-      return null;
-    };
+    const { state } = await renderHarness();
 
-    await act(async () => {
-      root.render(<Harness />);
-      await Promise.resolve();
+    emit("technician:location_update", {
+      requestId: "request-1",
+      technicianId: "another-technician",
+      lat: 28.61,
+      lng: 77.21,
+      distanceKm: 5.4,
+      durationMinutes: 12,
     });
 
-    act(() => {
-      socketHarness.handlers.get("technician:location_update")?.({
-        requestId: "request-1",
-        technicianId: "another-technician",
-        lat: 28.61,
-        lng: 77.21,
-        distanceKm: 5.4,
-        durationMinutes: 12,
-      });
-    });
-
-    expect(result?.technician).toMatchObject({
+    expect(state.result?.technician).toMatchObject({
       id: "technician-1",
       location_lat: 12.96,
       location_lng: 77.58,
     });
-    expect(
-      (result?.technician as unknown as Record<string, unknown>).routeDistanceKm,
-    ).toBeUndefined();
+    expect(liveEtaOf(state.result)).toBeNull();
   });
 
-  it("rejects delayed route metrics for an older technician coordinate", async () => {
-    let result: ReturnType<typeof useRealtimeServiceRequest> | undefined;
-    const Harness = () => {
-      result = useRealtimeServiceRequest("request-1");
-      return null;
-    };
+  it("rejects a delayed ETA for an older technician coordinate", async () => {
+    const { state } = await renderHarness();
 
-    await act(async () => {
-      root.render(<Harness />);
-      await Promise.resolve();
+    emit("location_update", {
+      requestId: "request-1",
+      technicianId: "technician-1",
+      lat: 12.98,
+      lng: 77.6,
+      locationUpdatedAt: "2026-09-16T10:00:02.000Z",
     });
 
-    act(() => {
-      socketHarness.handlers.get("location_update")?.({
-        requestId: "request-1",
-        technicianId: "technician-1",
-        lat: 12.98,
-        lng: 77.6,
-        locationUpdatedAt: "2026-09-16T10:00:02.000Z",
-      });
+    emit("technician:location_update", {
+      requestId: "request-1",
+      technicianId: "technician-1",
+      lat: 12.97,
+      lng: 77.59,
+      distanceKm: 12.3,
+      durationMinutes: 17,
+      locationUpdatedAt: "2026-09-16T10:00:01.000Z",
     });
 
-    act(() => {
-      socketHarness.handlers.get("technician:location_update")?.({
-        requestId: "request-1",
-        technicianId: "technician-1",
-        lat: 12.97,
-        lng: 77.59,
-        distanceKm: 12.3,
-        durationMinutes: 17,
-        locationUpdatedAt: "2026-09-16T10:00:01.000Z",
-      });
-    });
-
-    expect(result?.technician).toMatchObject({
+    expect(state.result?.technician).toMatchObject({
       location_lat: 12.98,
       location_lng: 77.6,
     });
-    expect(
-      (result?.technician as unknown as Record<string, unknown>).routeDistanceKm,
-    ).toBeUndefined();
+    expect(liveEtaOf(state.result)).toBeNull();
   });
 
   it("keeps the newer Socket.IO coordinate when the status recovery poll returns an older snapshot", async () => {

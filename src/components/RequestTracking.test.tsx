@@ -24,6 +24,19 @@ const trackingHarness = vi.hoisted(() => ({
 
 const viewportHarness = vi.hoisted(() => ({ isMobile: false }));
 
+const roadEta = (overrides: Record<string, unknown> = {}) => ({
+  requestId: "request-1",
+  etaSeconds: 17 * 60,
+  distanceMeters: 12_300,
+  trafficAware: true,
+  provider: "mappls",
+  calculatedAt: Date.now(),
+  receivedAt: Date.now(),
+  destinationLat: 0,
+  destinationLng: 0,
+  ...overrides,
+});
+
 vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
   useRealtimeServiceRequest: () => ({
     request: trackingHarness.request,
@@ -96,13 +109,7 @@ describe("RequestTracking live metrics", () => {
       completedJobs: 10,
       location_lat: 0,
       location_lng: 0.01,
-      routeDistanceKm: 12.3,
-      routeEtaMinutes: 17,
-      routeEtaText: "17 min",
-      routeEtaSource: "mappls",
-      routeRequestId: "request-1",
-      routeLocationLat: 0,
-      routeLocationLng: 0.01,
+      liveEta: roadEta(),
     };
 
     container = document.createElement("div");
@@ -178,7 +185,7 @@ describe("RequestTracking live metrics", () => {
     });
   });
 
-  it("retains the Haversine and flat-speed fallback before route metrics arrive", async () => {
+  it("shows only an approximate distance, not guessed minutes, before a road ETA arrives", async () => {
     trackingHarness.technician = {
       id: "technician-1",
       name: "Test Technician",
@@ -189,72 +196,85 @@ describe("RequestTracking live metrics", () => {
       location_lng: 0.01,
     };
 
-    await act(async () => {
-      root.render(
-        <MemoryRouter
-          initialEntries={["/requests/request-1"]}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          <Routes>
-            <Route path="/requests/:requestId" element={<RequestTracking />} />
-          </Routes>
-        </MemoryRouter>
-      );
-    });
+    await renderTracking();
 
-    expect(trackingHarness.mapProps).not.toBeNull();
     expect(trackingHarness.mapProps).toMatchObject({
-      eta: "3 min",
-      distanceLabel: "1.1 km away",
+      eta: "On the way",
+      distanceLabel: "≈ 1.1 km away",
     });
   });
 
-  it("ignores route metrics from a different request", async () => {
-    trackingHarness.technician.routeRequestId = "request-0";
+  it("ignores an ETA from a different request", async () => {
+    trackingHarness.technician.liveEta = roadEta({ requestId: "request-0" });
 
-    await act(async () => {
-      root.render(
-        <MemoryRouter
-          initialEntries={["/requests/request-1"]}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          <Routes>
-            <Route path="/requests/:requestId" element={<RequestTracking />} />
-          </Routes>
-        </MemoryRouter>
-      );
-    });
+    await renderTracking();
 
     expect(trackingHarness.mapProps).toMatchObject({
-      eta: "3 min",
-      distanceLabel: "1.1 km away",
+      eta: "On the way",
+      distanceLabel: "≈ 1.1 km away",
     });
   });
 
-  it("uses the fallback until route metrics match the latest technician coordinate", async () => {
+  it("keeps the road ETA while the technician moves between ETA refreshes", async () => {
+    // The ETA was calculated at an earlier coordinate; newer GPS must not
+    // swap it for a straight-line guess.
     trackingHarness.technician = {
       ...trackingHarness.technician,
-      routeLocationLat: 0,
-      routeLocationLng: 0.02,
+      location_lat: 0.004,
+      location_lng: 0.02,
     };
 
-    await act(async () => {
-      root.render(
-        <MemoryRouter
-          initialEntries={["/requests/request-1"]}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          <Routes>
-            <Route path="/requests/:requestId" element={<RequestTracking />} />
-          </Routes>
-        </MemoryRouter>
-      );
-    });
+    await renderTracking();
 
     expect(trackingHarness.mapProps).toMatchObject({
-      eta: "3 min",
-      distanceLabel: "1.1 km away",
+      eta: "17 min",
+      distanceLabel: "12.3 km away",
     });
+  });
+
+  it("drops an ETA that has gone unrefreshed for too long", async () => {
+    trackingHarness.technician.liveEta = roadEta({ receivedAt: Date.now() - 3 * 60_000 - 1_000 });
+
+    await renderTracking();
+
+    expect(trackingHarness.mapProps).toMatchObject({ eta: "On the way" });
+  });
+
+  it("ignores an ETA calculated for another destination", async () => {
+    trackingHarness.request = {
+      ...trackingHarness.request,
+      isTowing: true,
+      service_type: "towing",
+      status: "vehicle_loaded",
+      drop_latitude: 0.2,
+      drop_longitude: 0.3,
+    };
+
+    await renderTracking();
+
+    expect(trackingHarness.mapProps).toMatchObject({ distanceLabel: expect.stringMatching(/^≈ /) });
+  });
+
+  it.each([
+    [true, "Traffic-aware"],
+    [false, "Estimated"],
+  ])("labels the ETA by its basis (trafficAware=%s)", async (trafficAware, label) => {
+    viewportHarness.isMobile = true;
+    trackingHarness.technician.liveEta = roadEta({ trafficAware, provider: trafficAware ? "mappls" : "osrm" });
+
+    await renderTracking();
+
+    const summary = screen.getByTestId("mobile-tracking-summary");
+    expect(summary).toHaveTextContent("17 min");
+    expect(summary).toHaveTextContent(`12.3 km away · ${label}`);
+  });
+
+  it("formats long ETAs in hours", async () => {
+    trackingHarness.technician.liveEta = roadEta({ etaSeconds: 95 * 60 });
+
+    await renderTracking();
+
+    expect(trackingHarness.mapProps).toMatchObject({ eta: "1 hr 35 min" });
   });
 
   it("switches a towing live route to the drop after the vehicle is loaded", async () => {

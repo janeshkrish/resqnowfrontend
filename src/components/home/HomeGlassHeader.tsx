@@ -6,8 +6,10 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { setHomeCoordinates } from "@/lib/homeLocation";
 import type { PlaceSummary } from "@/lib/placeSummary";
 import { cn } from "@/lib/utils";
+import MaterialSymbol from "./MaterialSymbol";
 
 /** Space the floating header covers; the home page pads its content by this much. */
 export const HOME_HEADER_HEIGHT = 100;
@@ -18,17 +20,9 @@ const PERMISSION_DENIED = 1;
 // while a fresh fix is taken, instead of flashing the loading state again.
 let lastKnownPlace: PlaceSummary | null = null;
 
-function MaterialSymbol({ name, className }: { name: string; className?: string }) {
-  return (
-    <span aria-hidden="true" className={cn("rq-symbol", className)}>
-      {name}
-    </span>
-  );
-}
-
 export default function HomeGlassHeader() {
   const { user } = useAuth();
-  const { place, address, loading, error, errorCode, requestLocation } = useGeolocation();
+  const { coordinates, place, address, loading, error, errorCode, requestLocation } = useGeolocation();
   const [cachedPlace] = useState<PlaceSummary | null>(() => lastKnownPlace);
   const [compact, setCompact] = useState(false);
 
@@ -42,6 +36,10 @@ export default function HomeGlassHeader() {
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
+
+  useEffect(() => {
+    if (coordinates) setHomeCoordinates(coordinates);
+  }, [coordinates]);
 
   useEffect(() => {
     if (detectedPlace) lastKnownPlace = detectedPlace;

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, MapPin, Grid, Clock, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useAutoHideBottomNav } from "@/hooks/useAutoHideBottomNav";
 import { isTrackingExperiencePath } from "@/lib/appShellRoutes";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
 
 const MobileBottomNav = () => {
     const location = useLocation();
@@ -60,12 +60,12 @@ const MobileBottomNav = () => {
         return location.pathname === path;
     };
 
-    const navItems = [
-        { name: "Home", path: "/", icon: Home },
-        { name: "Map", path: "/map", icon: MapPin },
-        { name: "Services", path: "/services", icon: Grid },
-        { name: "Activity", path: "/my-requests", icon: Clock },
-        { name: "Profile", path: isAuthenticated ? "/settings" : "/login?from=profile", icon: User },
+    const accountPath = isAuthenticated ? "/settings" : "/login?from=profile";
+    const tabs = [
+        { name: "Home", path: "/", icon: "home" },
+        { name: "Map", path: "/map", icon: "map" },
+        { name: "Activity", path: "/my-requests", icon: "receipt_long" },
+        { name: "Account", path: accountPath, icon: "person" },
     ];
 
     const isServiceRequest = location.pathname.startsWith("/request-service");
@@ -75,55 +75,39 @@ const MobileBottomNav = () => {
         return null;
     }
 
+    const renderTab = (tab: (typeof tabs)[number]) => {
+        const active = isActive(tab.path);
+        return (
+            <Link
+                key={tab.name}
+                to={tab.path}
+                className={cn("rq-nav-tab", active && "is-on")}
+                aria-current={active ? "page" : undefined}
+            >
+                <span className="rq-nav-ind">
+                    <MaterialSymbol name={tab.icon} />
+                </span>
+                <span className="rq-nav-label">{tab.name}</span>
+            </Link>
+        );
+    };
+
     return (
-        <div
-            className={cn(
-                "fixed left-1/2 -translate-x-1/2 z-50 lg:hidden",
-                "bg-white/60 dark:bg-[#121212]/70 backdrop-blur-[40px] backdrop-saturate-[200%]",
-                "border border-white/50 dark:border-white/10",
-                "shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
-                "rounded-[2.5rem] p-1.5",
-                "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex items-center justify-between",
-                isVisible ? "bottom-6 w-[92%] max-w-[400px] scale-100 opacity-100" : "bottom-4 w-[75%] max-w-[300px] scale-95 opacity-70"
-            )}
+        <nav
+            aria-label="Main"
+            className={cn("rq-nav lg:hidden", !isVisible && "is-compact")}
             onPointerDown={revealNav}
         >
-            {navItems.map((item) => {
-                const active = isActive(item.path);
-                const hasNotification = item.name === "Activity";
-                
-                return (
-                    <Link
-                        key={item.name}
-                        to={item.path}
-                        className={cn(
-                            "relative flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                            active 
-                                ? "w-16 h-12 bg-white/60 dark:bg-white/15 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.2)]"
-                                : "w-12 h-12 bg-transparent rounded-full hover:bg-black/5 dark:hover:bg-white/5 active:scale-90"
-                        )}
-                    >
-                        <div className="relative flex items-center justify-center w-full h-full">
-                            <item.icon 
-                                className={cn(
-                                    "transition-all duration-500",
-                                    active 
-                                        ? "text-slate-900 dark:text-white h-[26px] w-[26px]" 
-                                        : "text-slate-500 dark:text-[#a0a0a0] h-[24px] w-[24px]"
-                                )} 
-                                strokeWidth={active ? 2.5 : 2}
-                            />
-                            {hasNotification && (
-                                <div className={cn(
-                                    "absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 transition-all duration-300",
-                                    active ? "opacity-0 scale-0" : "opacity-100 scale-100"
-                                )} />
-                            )}
-                        </div>
-                    </Link>
-                );
-            })}
-        </div>
+            {tabs.slice(0, 2).map(renderTab)}
+            {/* Primary action in thumb reach: pick a service and get help. */}
+            <Link to="/services" className="rq-nav-help rq-press" aria-label="Get help: choose a service">
+                <span className="rq-nav-help-btn">
+                    <MaterialSymbol name="car_repair" />
+                </span>
+                <span className="rq-nav-label">Get help</span>
+            </Link>
+            {tabs.slice(2).map(renderTab)}
+        </nav>
     );
 };
 

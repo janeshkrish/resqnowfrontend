@@ -34,6 +34,22 @@ describe("Nearby technician Mappls map", () => {
     expect(onInteract).toHaveBeenCalledOnce();
     view.rerender(<NearbyMapCanvas {...props} selectedTechId="two" activeTechPosition={[11.2, 77.5]} />);
     expect(captured.camera.revision).toBeGreaterThan(revision);
-    expect(captured.markers[2].html).toContain("#ea4335");
+    expect(captured.markers[2].html).toContain("#B01F2A");
+  });
+
+  it("shows EV stations as static markers instead of technicians on the EV layer", () => {
+    const onSelectEv = vi.fn();
+    const placed = { id: "EVA001", latitude: 11.02, longitude: 76.96 };
+    const unplaced = { id: "EVA004", latitude: null, longitude: null };
+    render(<NearbyMapCanvas center={[11, 77]} userPosition={[11, 77]} activeTechPosition={[11.1, 77.4]}
+      technicians={[{ id: "one", latitude: 11.1, longitude: 77.4 }]} selectedTechId="one" routePath={[[11, 77], [11.1, 77.4]]}
+      bottomPadding={300} rightPadding={24} onSelect={vi.fn()} layer="ev" evStations={[placed, unplaced]}
+      selectedEvId="EVA001" onSelectEv={onSelectEv} />);
+    expect(captured.markers.map((marker) => marker.id)).toEqual(["user", "ev-EVA001"]);
+    expect(captured.polylines).toEqual([]);
+    expect(captured.circles.map((circle) => circle.id)).toEqual(["user-outer", "user-inner"]);
+    expect(captured.camera).toMatchObject({ points: [{ lat: 11, lng: 77 }, { lat: 11.02, lng: 76.96 }] });
+    fireEvent.click(screen.getByText("ev-EVA001"));
+    expect(onSelectEv).toHaveBeenCalledWith(placed);
   });
 });

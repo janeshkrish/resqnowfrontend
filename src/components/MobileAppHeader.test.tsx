@@ -34,6 +34,11 @@ describe("MobileAppHeader", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("steps aside on the live radar, which has its own floating location bar", () => {
+    const { container } = renderAt("/map");
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("keeps the logo header with a back button on the later request steps", () => {
     renderAt("/request-service/towing/car");
     expect(screen.getByAltText("ResQNow Logo")).toBeInTheDocument();

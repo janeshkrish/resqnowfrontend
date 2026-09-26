@@ -1,978 +1,458 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { animate, motion, useDragControls, useMotionValue, useReducedMotion, type PanInfo } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+
+import { NearbyMapCanvas, type RadarPin } from "@/components/NearbyMapCanvas";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
 import {
-  animate,
-  motion,
-  useDragControls,
-  useMotionValue,
-  useReducedMotion,
-  type PanInfo,
-} from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { NearbyMapCanvas } from "@/components/NearbyMapCanvas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { SERVICE_CATALOG } from "@/config/serviceCatalog";
+  CardSkeletons,
+  EvCard,
+  FuelCard,
+  PeekCard,
+  PlaceRow,
+  RadarMessage,
+  StationDetail,
+  TechnicianCard,
+  TechnicianProfile,
+  type RowView,
+} from "@/components/radar/RadarParts";
+import { placePinHtml, placePinSize, technicianPinHtml, technicianPinSize } from "@/components/radar/pins";
+import {
+  evRow,
+  fuelRow,
+  normalizeTechnicians,
+  techRow,
+  toEvView,
+  toFuelView,
+  toTechnicianView,
+  type Technician,
+} from "@/components/radar/radarModel";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { apiUrl } from "@/lib/api";
-import {
-  ArrowRight,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Clock3,
-  Loader2,
-  LocateFixed,
-  Navigation,
-  ShieldCheck,
-  Star,
-  Wrench,
-} from "lucide-react";
-import { toast } from "sonner";
+import { EV_SEARCH_RADIUS_METERS, EVStationsError, fetchEvStations, formatRadius, nextSearchAnchor } from "@/lib/evCharging";
+import { FUEL_SEARCH_RADIUS_METERS, FuelStationsError, fetchFuelStations } from "@/lib/fuelStations";
+import { fetchFuelPrices } from "@/lib/homeApi";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_CENTER: [number, number] = [12.9716, 77.5946];
+const WIDER_RADIUS_METERS = 10_000;
 
-type MapMode = "page" | "preview";
+type Layer = "tech" | "ev" | "fuel";
+type Snap = "peek" | "normal" | "full";
+type Detail = { kind: "tech" | "ev"; id: string } | null;
 
-interface MapProps {
-  mode?: MapMode;
+const LAYERS: Array<{ id: Layer; label: string; icon: string; param: string | null }> = [
+  { id: "tech", label: "Technicians", icon: "engineering", param: null },
+  { id: "ev", label: "EV charging", icon: "bolt", param: "ev" },
+  { id: "fuel", label: "Fuel", icon: "local_gas_station", param: "fuel" },
+];
+
+// Phone layout: the sheet sits under the header and legend and slides between three heights.
+const SHEET_TOP = 132;
+const NAV_CLEARANCE = 92;
+const VISIBLE: Record<Exclude<Snap, "full">, number> = { peek: 104 + NAV_CLEARANCE, normal: 292 + NAV_CLEARANCE };
+const HEADER_CLEARANCE = 150;
+
+const layerFromParam = (value: string | null): Layer => (value === "ev" ? "ev" : value === "fuel" ? "fuel" : "tech");
+
+async function fetchTechnicians(lat: number, lng: number, signal?: AbortSignal): Promise<Technician[]> {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  try {
+    const token = localStorage.getItem("resqnow_user_token");
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    // Storage can be unavailable; nearby technicians don't need a login.
+  }
+  const response = await fetch(apiUrl(`/api/technicians/nearby?lat=${lat}&lng=${lng}`), { headers, signal });
+  if (!response.ok) throw new Error(`Nearby technicians failed (${response.status})`);
+  return normalizeTechnicians(await response.json(), [lat, lng], apiUrl);
 }
 
-interface Technician {
-  id: string;
-  name: string;
-  service_type: string;
-  distance: number;
-  rating: number;
-  latitude: number;
-  longitude: number;
-  aiRecommended?: boolean;
-  specialties?: string[];
-  vehicle_types?: Record<string, boolean> | string[];
-}
-
-interface FilterChip {
-  id: string;
-  label: string;
-}
-
-const SERVICE_LABEL_BY_KEY = SERVICE_CATALOG.reduce<Record<string, string>>((accumulator, service) => {
-  if (service.id !== "other") {
-    accumulator[service.id] = service.name;
-  }
-  return accumulator;
-}, {});
-
-const SERVICE_ORDER_BY_KEY = SERVICE_CATALOG.reduce<Record<string, number>>((accumulator, service, index) => {
-  if (service.id !== "other") {
-    accumulator[service.id] = index;
-  }
-  return accumulator;
-}, {});
-
-const toNumber = (value: unknown, fallback = 0) => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-};
-
-const toDisplayTitle = (value: string) =>
-  String(value || "")
-    .trim()
-    .replace(/[_-]+/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-
-const normalizeServiceFilterKey = (value: string) => {
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_-]+/g, " ");
-
-  if (!normalized) return "";
-  if (normalized.includes("tow") || normalized.includes("recover")) return "towing";
-  if (normalized.includes("tyre") || normalized.includes("tire") || normalized.includes("puncture")) {
-    return "flat-tire";
-  }
-  if (normalized.includes("battery") || normalized.includes("jump start") || normalized.includes("jumpstart")) {
-    return "battery";
-  }
-  if (normalized.includes("fuel")) return "fuel";
-  if (normalized.includes("lock")) return "lockout";
-  if (normalized.includes("winch")) return "winching";
-  if (normalized.includes("charge") || normalized.includes("charger") || normalized.includes("ev")) {
-    return "ev-charging";
-  }
-  if (
-    normalized.includes("mechanic") ||
-    normalized.includes("engine") ||
-    normalized.includes("repair") ||
-    normalized.includes("roadside help")
-  ) {
-    return "mechanical";
-  }
-
-  return normalized.replace(/\s+/g, "-");
-};
-
-const getServiceFilterLabel = (serviceKey: string) =>
-  SERVICE_LABEL_BY_KEY[serviceKey] || toDisplayTitle(serviceKey);
-
-const estimateDistanceKm = (
-  fromLat: number,
-  fromLng: number,
-  toLat: number,
-  toLng: number,
-) => {
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const deltaLat = toRadians(toLat - fromLat);
-  const deltaLng = toRadians(toLng - fromLng);
-  const a =
-    Math.sin(deltaLat / 2) ** 2 +
-    Math.cos(toRadians(fromLat)) * Math.cos(toRadians(toLat)) * Math.sin(deltaLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusKm * c;
-};
-
-const calculateEtaMinutes = (distance: number) => Math.max(8, Math.round(toNumber(distance, 0) * 2.15 + 4));
-
-const formatDistanceCompact = (distance: number) => {
-  const value = toNumber(distance, NaN);
-  return Number.isFinite(value) ? `${value.toFixed(1)} km` : "-- km";
-};
-
-const formatDistanceDetailed = (distance: number) => {
-  const value = toNumber(distance, NaN);
-  return Number.isFinite(value) ? `${value.toFixed(1)} km` : "--";
-};
-
-const formatEtaWindow = (distance: number) => {
-  const eta = calculateEtaMinutes(distance);
-  return `${eta} - ${eta + 5} mins`;
-};
-
-const formatRating = (rating: number) => {
-  const value = toNumber(rating, NaN);
-  return Number.isFinite(value) && value > 0 ? value.toFixed(1) : "New";
-};
-
-const getVendorInitials = (name: string) => {
-  const parts = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (parts.length === 0) return "RN";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
-};
-
-const getServiceHighlights = (tech: Technician) => {
-  if (Array.isArray(tech.specialties) && tech.specialties.length > 0) {
-    return tech.specialties.slice(0, 3).map(toDisplayTitle).join(" / ");
-  }
-
-  const serviceType = tech.service_type.trim();
-  return serviceType ? `${toDisplayTitle(serviceType)} / Roadside Help` : "Towing / Recovery / Roadside Help";
-};
-
-const buildRouteCurve = (from: [number, number], to: [number, number]): [number, number][] => {
-  const [fromLat, fromLng] = from;
-  const [toLat, toLng] = to;
-  const latDelta = toLat - fromLat;
-  const lngDelta = toLng - fromLng;
-
-  const firstCurve: [number, number] = [
-    fromLat + latDelta * 0.28 + lngDelta * 0.08,
-    fromLng + lngDelta * 0.28 - latDelta * 0.08,
-  ];
-  const middleCurve: [number, number] = [
-    (fromLat + toLat) / 2 + lngDelta * 0.14,
-    (fromLng + toLng) / 2 - latDelta * 0.14,
-  ];
-  const secondCurve: [number, number] = [
-    fromLat + latDelta * 0.74 + lngDelta * 0.03,
-    fromLng + lngDelta * 0.74 - latDelta * 0.03,
-  ];
-
-  return [from, firstCurve, middleCurve, secondCurve, to];
-};
-
-const buildFilterId = (serviceType: string) => `service:${serviceType.trim().toLowerCase()}`;
-
-const getTechnicianServiceKeys = (tech: Technician) =>
-  Array.from(
-    new Set(
-      [tech.service_type, ...(Array.isArray(tech.specialties) ? tech.specialties : [])]
-        .map(normalizeServiceFilterKey)
-        .filter(Boolean),
-    ),
-  );
-
-const getPrimaryTechnicianServiceKey = (tech: Technician) =>
-  getTechnicianServiceKeys(tech)[0] || normalizeServiceFilterKey(tech.service_type) || "other";
-
-const getTechnicianServiceLabel = (tech: Technician) => getServiceFilterLabel(getPrimaryTechnicianServiceKey(tech));
-
-const normalizeTechnicians = (input: unknown, origin: [number, number]) => {
-  if (!Array.isArray(input)) return [];
-
-  return input
-    .map((item, index): Technician | null => {
-      const raw = (item ?? {}) as Record<string, unknown>;
-      const latitude = toNumber(raw.latitude ?? raw.lat, NaN);
-      const longitude = toNumber(raw.longitude ?? raw.lng, NaN);
-
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude === 0 || longitude === 0) {
-        return null;
-      }
-
-      const specialties = Array.isArray(raw.specialties)
-        ? raw.specialties.map((entry) => String(entry)).filter(Boolean)
-        : [];
-
-      const vehicleTypes =
-        Array.isArray(raw.vehicle_types) || typeof raw.vehicle_types === "object"
-          ? (raw.vehicle_types as Record<string, boolean> | string[])
-          : Array.isArray(raw.vehicleTypes)
-            ? (raw.vehicleTypes as string[])
-            : undefined;
-
-      return {
-        id: String(raw.id ?? `tech-${index}`),
-        name: String(raw.name ?? raw.shop_name ?? raw.business_name ?? "Nearby Technician"),
-        service_type: String(raw.service_type ?? raw.serviceType ?? raw.primary_service ?? "Roadside Help"),
-        distance: toNumber(raw.distance, estimateDistanceKm(origin[0], origin[1], latitude, longitude)),
-        rating: toNumber(raw.rating ?? raw.average_rating ?? raw.avg_rating, 4.8),
-        latitude,
-        longitude,
-        aiRecommended: Boolean(
-          raw.aiRecommended ?? raw.ai_recommended ?? raw.best_match ?? raw.is_recommended,
-        ),
-        specialties,
-        vehicle_types: vehicleTypes,
-      } satisfies Technician;
-    })
-    .filter((tech): tech is Technician => Boolean(tech));
-};
-
-const RadarMap = ({ mode = "page" }: MapProps) => {
-  const navigate = useNavigate();
+const RadarMap = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
-  const panelRef = useRef<HTMLElement | null>(null);
-  const sheetDragY = useMotionValue(0);
+  const { coordinates, place, loading: locating, requestLocation } = useGeolocation();
+
+  const layer = layerFromParam(searchParams.get("layer"));
+  const [snap, setSnap] = useState<Snap>("normal");
+  const [detail, setDetail] = useState<Detail>(null);
+  const [selected, setSelected] = useState<Record<Layer, string | null>>({ tech: null, ev: null, fuel: null });
+  const [radius, setRadius] = useState<Record<"ev" | "fuel", number>>({ ev: EV_SEARCH_RADIUS_METERS, fuel: FUEL_SEARCH_RADIUS_METERS });
+  const [anchor, setAnchor] = useState<{ lat: number; lng: number } | null>(null);
+  const [containerHeight, setContainerHeight] = useState(844);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const cardRefs = useRef(new Map<string, HTMLElement>());
+  const sheetY = useMotionValue(0);
   const dragControls = useDragControls();
-  const { coordinates, loading: loadingLocation, error: locationError, requestLocation } = useGeolocation();
+  const tapStart = useRef<{ y: number; t: number } | null>(null);
+  const draggable = isMobile;
 
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
-  const [selectedTechId, setSelectedTechId] = useState<string | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [panelHeight, setPanelHeight] = useState(0);
-
-  const isPreview = mode === "preview";
-  const isDraggableSheet = !isPreview && isMobile;
-  const collapsedPeekHeight = isDraggableSheet ? (selectedTechId ? 210 : 130) : 0;
-  const collapsedSheetOffset = isDraggableSheet ? Math.max(0, panelHeight - collapsedPeekHeight) : 0;
-  const mapCenter: [number, number] = coordinates ? [coordinates.lat, coordinates.lng] : DEFAULT_CENTER;
+  useEffect(() => { requestLocation(); }, [requestLocation]);
+  // Searches follow the customer, but only after a real move.
+  useEffect(() => { setAnchor((current) => nextSearchAnchor(current, coordinates)); }, [coordinates]);
 
   useEffect(() => {
-    requestLocation();
-  }, [requestLocation]);
+    const node = containerRef.current;
+    if (!node) return;
+    const measure = () => setContainerHeight(Math.round(node.getBoundingClientRect().height) || 844);
+    measure();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    observer?.observe(node);
+    return () => observer?.disconnect();
+  }, []);
+
+  const techQuery = useQuery({
+    queryKey: ["radar", "technicians", anchor?.lat, anchor?.lng],
+    queryFn: ({ signal }) => fetchTechnicians(anchor!.lat, anchor!.lng, signal),
+    enabled: anchor !== null,
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const evQuery = useQuery({
+    queryKey: ["radar", "ev-stations", anchor?.lat, anchor?.lng, radius.ev],
+    queryFn: ({ signal }) => fetchEvStations(anchor!, radius.ev, signal),
+    enabled: anchor !== null,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
+    placeholderData: keepPreviousData,
+  });
+  const fuelQuery = useQuery({
+    queryKey: ["radar", "fuel-stations", anchor?.lat, anchor?.lng, radius.fuel],
+    queryFn: ({ signal }) => fetchFuelStations(anchor!, radius.fuel, signal),
+    enabled: anchor !== null,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
+    placeholderData: keepPreviousData,
+  });
+  const priceCoords = anchor ? { lat: Math.round(anchor.lat * 100) / 100, lng: Math.round(anchor.lng * 100) / 100 } : null;
+  const pricesQuery = useQuery({
+    queryKey: ["radar", "fuel-prices", priceCoords?.lat, priceCoords?.lng],
+    queryFn: ({ signal }) => fetchFuelPrices(priceCoords!, signal),
+    enabled: priceCoords !== null,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+
+  const technicians = useMemo(() => techQuery.data ?? [], [techQuery.data]);
+  const techViews = useMemo(() => technicians.map(toTechnicianView), [technicians]);
+  const evStations = useMemo(() => evQuery.data?.stations ?? [], [evQuery.data]);
+  const evViews = useMemo(() => evStations.map(toEvView), [evStations]);
+  const fuelStations = useMemo(() => fuelQuery.data?.stations ?? [], [fuelQuery.data]);
+  const prices = pricesQuery.data?.available ? pricesQuery.data.prices : undefined;
+  const fuelViews = useMemo(() => fuelStations.map((f) => toFuelView(f, prices)), [fuelStations, prices]);
+
+  const selectedId = (list: Array<{ id: string }>, key: Layer) =>
+    (list.some((item) => item.id === selected[key]) ? selected[key] : list[0]?.id) ?? null;
+  const techId = selectedId(techViews, "tech");
+  const evId = selectedId(evViews, "ev");
+  const fuelId = selectedId(fuelViews, "fuel");
+
+  // ---------- Sheet sizes ----------
+  const sheetHeight = Math.max(0, containerHeight - SHEET_TOP);
+  const offsets = useMemo(() => ({
+    full: 0,
+    normal: Math.max(0, sheetHeight - VISIBLE.normal),
+    peek: Math.max(0, sheetHeight - VISIBLE.peek),
+  }), [sheetHeight]);
+  const effectiveSnap: Snap = !draggable ? "full" : detail ? "full" : snap;
 
   useEffect(() => {
-    if (!isDraggableSheet) {
-      setSheetExpanded(true);
-    }
-  }, [isDraggableSheet]);
+    const target = draggable ? offsets[effectiveSnap] : 0;
+    if (reduceMotion) { sheetY.set(target); return; }
+    const controls = animate(sheetY, target, { type: "spring", stiffness: 380, damping: 38, mass: 0.9 });
+    return () => controls.stop();
+  }, [draggable, effectiveSnap, offsets, reduceMotion, sheetY]);
 
-  useEffect(() => {
-    if (!isDraggableSheet || !panelRef.current) return;
+  const settle = useCallback((next: Snap) => {
+    setSnap(next);
+    if (next !== "full") setDetail(null);
+  }, []);
 
-    const panelNode = panelRef.current;
-    const updatePanelHeight = () => {
-      setPanelHeight(Math.round(panelNode.getBoundingClientRect().height));
-    };
-
-    updatePanelHeight();
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updatePanelHeight()) : null;
-    resizeObserver?.observe(panelNode);
-    window.addEventListener("resize", updatePanelHeight);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updatePanelHeight);
-    };
-  }, [isDraggableSheet]);
-
-  useEffect(() => {
-    if (coordinates) {
-      fetchTechnicians(coordinates.lat, coordinates.lng);
-    }
-  }, [coordinates]);
-
-  useEffect(() => {
-    const targetY = isDraggableSheet && !sheetExpanded ? collapsedSheetOffset : 0;
-
-    if (reduceMotion) {
-      sheetDragY.set(targetY);
-      return;
-    }
-
-    const controls = animate(sheetDragY, targetY, {
-      type: "spring",
-      stiffness: 360,
-      damping: 34,
-      mass: 0.78,
-    });
-
-    return () => {
-      controls.stop();
-    };
-  }, [collapsedSheetOffset, isDraggableSheet, reduceMotion, sheetDragY, sheetExpanded]);
-
-  const fetchTechnicians = async (lat: number, lng: number) => {
-    setLoadingTechnicians(true);
-
-    try {
-      const token = localStorage.getItem("resqnow_user_token");
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const response = await fetch(apiUrl(`/api/technicians/nearby?lat=${lat}&lng=${lng}`), { headers });
-
-      if (response.status === 401) {
-        setTechnicians([]);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch technicians");
-      }
-
-      const data = await response.json();
-      setTechnicians(normalizeTechnicians(data, [lat, lng]));
-    } catch (error) {
-      console.error("Error fetching technicians:", error);
-      toast.error("Unable to load nearby technicians", {
-        description: "Showing demo radar positions so you can still preview the layout.",
-      });
-
-      if (import.meta.env.DEV) {
-        const mockTechs = normalizeTechnicians(
-          [
-            {
-              id: "m1",
-              name: "Squad Recovery Service",
-              service_type: "Towing",
-              distance: 4.6,
-              rating: 5,
-              latitude: lat + 0.012,
-              longitude: lng - 0.006,
-              aiRecommended: true,
-              specialties: ["Towing", "Recovery", "Roadside Help"],
-              vehicle_types: ["car", "truck"],
-            },
-            {
-              id: "m2",
-              name: "Rapid Tow Service",
-              service_type: "Battery",
-              distance: 6.2,
-              rating: 4.8,
-              latitude: lat - 0.011,
-              longitude: lng - 0.012,
-              specialties: ["Towing", "Battery", "Fuel Delivery"],
-              vehicle_types: ["car", "bike"],
-            },
-            {
-              id: "m3",
-              name: "AutoTech Service",
-              service_type: "Tyre Change",
-              distance: 7.1,
-              rating: 4.6,
-              latitude: lat + 0.018,
-              longitude: lng + 0.01,
-              specialties: ["Tyre Change", "Jump Start", "Roadside Help"],
-              vehicle_types: ["car"],
-            },
-          ],
-          [lat, lng],
-        );
-
-        setTechnicians(mockTechs);
-      } else {
-        setTechnicians([]);
-      }
-    } finally {
-      setLoadingTechnicians(false);
-    }
+  const onDragEnd = (_event: unknown, info: PanInfo) => {
+    const projected = sheetY.get() + info.velocity.y * 0.18;
+    const next = (["full", "normal", "peek"] as Snap[]).reduce((best, key) =>
+      Math.abs(offsets[key] - projected) < Math.abs(offsets[best] - projected) ? key : best, "normal" as Snap);
+    // Always settle, even onto the same size, so the sheet springs back into place.
+    const target = offsets[next];
+    animate(sheetY, target, { type: "spring", stiffness: 380, damping: 38 });
+    settle(next);
   };
 
-  const serviceKeysByTechnicianId = useMemo(
-    () =>
-      new Map(
-        technicians.map((tech) => [tech.id, getTechnicianServiceKeys(tech)]),
-      ),
-    [technicians],
-  );
+  const onHandlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    tapStart.current = { y: event.clientY, t: Date.now() };
+    if (draggable) dragControls.start(event);
+  };
+  const cycle = () => settle(effectiveSnap === "peek" ? "normal" : effectiveSnap === "normal" ? "full" : "normal");
+  const onHandlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const start = tapStart.current;
+    tapStart.current = null;
+    if (draggable && start && Math.abs(event.clientY - start.y) < 6 && Date.now() - start.t < 400) cycle();
+  };
+  const onHandleKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); cycle(); }
+  };
 
-  const filterChips = useMemo<FilterChip[]>(() => {
-    const serviceKeys = Array.from(
-      new Set(
-        technicians.flatMap((tech) => serviceKeysByTechnicianId.get(tech.id) || []),
-      ),
-    ).sort((left, right) => {
-      const leftOrder = SERVICE_ORDER_BY_KEY[left] ?? Number.MAX_SAFE_INTEGER;
-      const rightOrder = SERVICE_ORDER_BY_KEY[right] ?? Number.MAX_SAFE_INTEGER;
+  // ---------- Selection ----------
+  const setLayer = (next: Layer) => {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      const param = LAYERS.find((entry) => entry.id === next)?.param;
+      if (param) params.set("layer", param); else params.delete("layer");
+      return params;
+    }, { replace: true });
+    setDetail(null);
+    if (snap === "full") setSnap("normal");
+  };
 
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder;
-      }
-
-      return getServiceFilterLabel(left).localeCompare(getServiceFilterLabel(right));
-    });
-
-    return [
-      { id: "all", label: "All" },
-      { id: "recommended", label: "Best Match" },
-      ...serviceKeys.map((serviceKey) => ({
-        id: buildFilterId(serviceKey),
-        label: getServiceFilterLabel(serviceKey),
-      })),
-    ];
-  }, [serviceKeysByTechnicianId, technicians]);
-
-  const filteredTechnicians = useMemo(() => {
-    return technicians.filter((tech) => {
-      if (activeFilter === "all") return true;
-      if (activeFilter === "recommended") return Boolean(tech.aiRecommended);
-      if (activeFilter.startsWith("service:")) {
-        const activeServiceKey = activeFilter.replace(/^service:/, "");
-        return (serviceKeysByTechnicianId.get(tech.id) || []).includes(activeServiceKey);
-      }
-
-      return true;
-    });
-  }, [activeFilter, serviceKeysByTechnicianId, technicians]);
-
-  const orderedTechnicians = useMemo(() => {
-    return [...filteredTechnicians].sort((a, b) => {
-      if (a.aiRecommended && !b.aiRecommended) return -1;
-      if (!a.aiRecommended && b.aiRecommended) return 1;
-      return toNumber(a.distance, Number.MAX_SAFE_INTEGER) - toNumber(b.distance, Number.MAX_SAFE_INTEGER);
-    });
-  }, [filteredTechnicians]);
-
-  useEffect(() => {
-    if (!filterChips.some((chip) => chip.id === activeFilter)) {
-      setActiveFilter("all");
+  const select = useCallback((key: Layer, id: string, fromMap: boolean) => {
+    setSelected((current) => ({ ...current, [key]: id }));
+    if (fromMap) {
+      setSnap((current) => (current === "full" ? "normal" : current));
+      requestAnimationFrame(() => cardRefs.current.get(`${key}:${id}`)?.scrollIntoView?.({ behavior: "smooth", inline: "start", block: "nearest" }));
     }
-  }, [activeFilter, filterChips]);
+  }, []);
 
-  useEffect(() => {
-    if (orderedTechnicians.length === 0) {
-      setSelectedTechId(null);
-      return;
-    }
+  const onCardSelect = (key: Layer, id: string, isSelected: boolean) => {
+    if (isSelected && (key === "tech" || key === "ev")) { setDetail({ kind: key, id }); return; }
+    select(key, id, false);
+  };
 
-    const hasActiveSelection = selectedTechId
-      ? orderedTechnicians.some((tech) => tech.id === selectedTechId)
-      : false;
+  const onMapTap = useCallback(() => {
+    if (draggable) { setDetail(null); setSnap("peek"); }
+  }, [draggable]);
 
-    if (!hasActiveSelection) {
-      setSelectedTechId(orderedTechnicians[0].id);
-    }
-  }, [orderedTechnicians, selectedTechId]);
-
-  const bestMatch = orderedTechnicians.find((tech) => tech.aiRecommended) ?? orderedTechnicians[0] ?? null;
-  const activeTech = orderedTechnicians.find((tech) => tech.id === selectedTechId) ?? bestMatch;
+  // ---------- Map ----------
   const userPosition = coordinates ? ([coordinates.lat, coordinates.lng] as [number, number]) : null;
-  const activeTechPosition = activeTech ? ([activeTech.latitude, activeTech.longitude] as [number, number]) : null;
-  const routePath = userPosition && activeTechPosition ? buildRouteCurve(activeTechPosition, userPosition) : [];
-  const nearbyCount = orderedTechnicians.length;
-  const mapPriority = isDraggableSheet && !sheetExpanded;
-  const secondaryTechnicians = orderedTechnicians.filter((tech) => tech.id !== activeTech?.id);
-  const visibleSecondaryTechnicians =
-    sheetExpanded || !isDraggableSheet ? secondaryTechnicians : secondaryTechnicians.slice(0, 2);
-  const activeTechServiceLabel = activeTech ? getTechnicianServiceLabel(activeTech) : "";
+  const mapCenter: [number, number] = userPosition ?? DEFAULT_CENTER;
 
-  const handleTechSelect = (tech: Technician, source: "map" | "sheet" = "sheet") => {
-    setSelectedTechId(tech.id);
-
-    if (isDraggableSheet && source === "sheet") {
-      setSheetExpanded(true);
+  const pins: RadarPin[] = useMemo(() => {
+    if (layer === "tech") {
+      return technicians.map((t) => {
+        const view = techViews.find((v) => v.id === t.id)!;
+        const on = t.id === techId;
+        return {
+          id: `tech-${t.id}`, lat: t.latitude, lng: t.longitude, anchor: "bottom" as const, zIndex: on ? 400 : 150,
+          html: technicianPinHtml({ name: t.name, photo: view.photo, initials: view.initials, selected: on }),
+          ...technicianPinSize(on),
+          onClick: () => select("tech", t.id, true),
+        };
+      });
     }
-  };
+    const list = layer === "ev" ? evStations : fuelStations;
+    return list.flatMap((station) => {
+      if (typeof station.latitude !== "number" || typeof station.longitude !== "number") return [];
+      const view = layer === "ev" ? evViews.find((v) => v.id === station.id)! : fuelViews.find((v) => v.id === station.id)!;
+      const on = station.id === (layer === "ev" ? evId : fuelId);
+      const label = layer === "ev"
+        ? ((view as ReturnType<typeof toEvView>).kw ? `${(view as ReturnType<typeof toEvView>).kw} kW` : "EV")
+        : ((view as ReturnType<typeof toFuelView>).prices[0]?.value ?? "Fuel");
+      return [{
+        id: `${layer}-${station.id}`, lat: station.latitude, lng: station.longitude, zIndex: on ? 400 : 140,
+        html: placePinHtml({ name: station.name, logo: view.logo, initials: view.initials, label, selected: on }),
+        ...placePinSize(label, on),
+        onClick: () => select(layer, station.id, true),
+      }];
+    });
+  }, [layer, technicians, techViews, techId, evStations, evViews, evId, fuelStations, fuelViews, fuelId, select]);
 
-  const handleMapInteract = () => {
-    if (isDraggableSheet && sheetExpanded) {
-      setSheetExpanded(false);
+  const focus: Array<[number, number]> = useMemo(() => {
+    if (layer === "tech") {
+      const t = technicians.find((x) => x.id === techId);
+      return t ? [[t.latitude, t.longitude]] : [];
     }
-  };
+    const list = layer === "ev" ? evStations : fuelStations;
+    const s = list.find((x) => x.id === (layer === "ev" ? evId : fuelId));
+    return s && typeof s.latitude === "number" && typeof s.longitude === "number" ? [[s.latitude, s.longitude]] : [];
+  }, [layer, technicians, techId, evStations, evId, fuelStations, fuelId]);
 
-  const handleSheetPreviewClick = () => {
-    if (isDraggableSheet && !sheetExpanded) {
-      setSheetExpanded(true);
+  const visibleSheet = draggable ? (effectiveSnap === "full" ? sheetHeight : VISIBLE[effectiveSnap]) : 0;
+  const bottomPadding = draggable ? Math.min(visibleSheet, containerHeight - 220) + 12 : 64;
+
+  // ---------- Sheet content ----------
+  const counts: Record<Layer, string> = {
+    tech: techQuery.data ? String(techViews.length) : "–",
+    ev: evQuery.data ? String(evViews.length) : "–",
+    fuel: fuelQuery.data ? String(fuelViews.length) : "–",
+  };
+  const rows: RowView[] = layer === "tech" ? techViews.map(techRow) : layer === "ev" ? evViews.map(evRow) : fuelViews.map(fuelRow);
+  const activeId = layer === "tech" ? techId : layer === "ev" ? evId : fuelId;
+  const peekRow = rows.find((row) => row.id === activeId) ?? rows[0] ?? null;
+  const query = layer === "tech" ? techQuery : layer === "ev" ? evQuery : fuelQuery;
+  const loading = locating || (anchor !== null && query.isPending);
+  const searchError = query.error instanceof EVStationsError || query.error instanceof FuelStationsError ? query.error.code : null;
+  const titles: Record<Layer, [string, string]> = {
+    tech: ["Technicians near you", `${techViews.length} online · updated just now`],
+    ev: ["EV charging near you", `${evViews.length} stations within ${formatRadius(radius.ev)} · live availability not shared`],
+    fuel: ["Fuel pumps near you", `${fuelViews.length} pumps within ${formatRadius(radius.fuel)} · city prices today`],
+  };
+  const detailTech = detail?.kind === "tech" ? techViews.find((t) => t.id === detail.id) : undefined;
+  const detailEv = detail?.kind === "ev" ? evViews.find((e) => e.id === detail.id) : undefined;
+  const notConfigured = searchError === "ev_search_unavailable" || searchError === "fuel_search_unavailable";
+
+  const listBody = () => {
+    if (!coordinates && !locating) {
+      return (
+        <RadarMessage
+          icon="location_off"
+          title="See help, charging and fuel near you"
+          body="Turn on location and Live radar shows technicians, EV charging stations and fuel pumps around you."
+          action={<button type="button" className="rq-h-btn rq-h-btn-block rq-press" onClick={requestLocation}><MaterialSymbol name="my_location" />Turn on location</button>}
+        />
+      );
     }
-  };
-
-  const handleBookService = (tech: Technician) => {
-    const token = localStorage.getItem("resqnow_user_token");
-    const serviceRoute = getPrimaryTechnicianServiceKey(tech);
-
-    const targetUrl = `/request-service/${serviceRoute}?techId=${tech.id}`;
-
-    if (!token) {
-      sessionStorage.setItem("returnUrl", targetUrl);
-      navigate("/login");
-      return;
+    if (loading) {
+      return (
+        <>
+          <p className="rqr-searching"><span className="rq-h-live-dot" aria-hidden="true" />{layer === "tech" ? "Finding technicians near you…" : layer === "ev" ? `Finding charging stations within ${formatRadius(radius.ev)}…` : `Finding fuel pumps within ${formatRadius(radius.fuel)}…`}</p>
+          <CardSkeletons />
+        </>
+      );
     }
-
-    navigate(targetUrl);
+    if (query.isError) {
+      const what = layer === "tech" ? "technicians" : layer === "ev" ? "chargers" : "fuel pumps";
+      return (
+        <RadarMessage
+          tone="error"
+          icon="error"
+          title={`Couldn’t load ${what}`}
+          body={notConfigured ? "This search isn’t switched on yet. Other categories still work." : "Something went wrong on our side. The other categories still work."}
+          action={<button type="button" className="rq-h-btn rq-h-btn-block rq-press" onClick={() => void query.refetch()}><MaterialSymbol name="refresh" />Try again</button>}
+        />
+      );
+    }
+    if (rows.length === 0) {
+      if (layer === "tech") {
+        return <RadarMessage icon="engineering" title="No technicians online nearby" body="Partners come online through the day. Check again in a few minutes." />;
+      }
+      const key = layer;
+      const wider = radius[key] < WIDER_RADIUS_METERS;
+      return (
+        <RadarMessage
+          icon={layer === "ev" ? "ev_station" : "local_gas_station"}
+          title={`No ${layer === "ev" ? "chargers" : "fuel pumps"} within ${formatRadius(radius[key])}`}
+          body={`Mappls has no ${layer === "ev" ? "charging stations" : "fuel pumps"} listed near you yet.`}
+          action={wider ? <button type="button" className="rqr-btn-outline rq-press" onClick={() => setRadius((r) => ({ ...r, [key]: WIDER_RADIUS_METERS }))}>Search within {formatRadius(WIDER_RADIUS_METERS)}</button> : undefined}
+        />
+      );
+    }
+    return (
+      <>
+        <div className="rqr-carousel" role="list" aria-label={titles[layer][0]}>
+          {layer === "tech" && techViews.map((t) => (
+            <TechnicianCard key={t.id} ref={(node) => { if (node) cardRefs.current.set(`tech:${t.id}`, node); }} technician={t} selected={t.id === techId} onSelect={() => onCardSelect("tech", t.id, t.id === techId)} />
+          ))}
+          {layer === "ev" && evViews.map((e) => (
+            <EvCard key={e.id} ref={(node) => { if (node) cardRefs.current.set(`ev:${e.id}`, node); }} station={e} selected={e.id === evId} onSelect={() => onCardSelect("ev", e.id, e.id === evId)} />
+          ))}
+          {layer === "fuel" && fuelViews.map((f) => (
+            <FuelCard key={f.id} ref={(node) => { if (node) cardRefs.current.set(`fuel:${f.id}`, node); }} station={f} selected={f.id === fuelId} onSelect={() => onCardSelect("fuel", f.id, f.id === fuelId)} />
+          ))}
+        </div>
+        <section className="rqr-all" aria-label="Everything nearby">
+          <p className="rqr-all__title"><span>{layer === "tech" ? "All technicians" : layer === "ev" ? "All charging stations" : "All fuel pumps"}</span><span>Nearest first</span></p>
+          {rows.map((row) => <PlaceRow key={row.id} row={row} onSelect={() => { select(layer, row.id, false); settle("normal"); }} />)}
+        </section>
+        {layer === "ev" ? <p className="rqr-foot">Station details from Mappls. Directions open in Google Maps.</p> : null}
+        {layer === "fuel" ? <p className="rqr-foot">Prices are today’s city prices for {pricesQuery.data?.location?.area || "your area"}. Directions open in Google Maps.</p> : null}
+      </>
+    );
   };
 
-  const handleSheetDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDraggableSheet) return;
-    dragControls.start(event);
-  };
-
-  const handleSheetDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (!isDraggableSheet || collapsedSheetOffset === 0) return;
-
-    const projectedY = sheetDragY.get() + info.velocity.y * 0.12;
-    setSheetExpanded(projectedY < collapsedSheetOffset * 0.48);
-  };
-
-  const containerClasses = isPreview
-    ? "relative isolate mx-auto h-[760px] w-full max-w-6xl overflow-hidden rounded-[2.75rem] border border-slate-200 bg-[#eef3fb] shadow-[0_45px_90px_-50px_rgba(15,23,42,0.5)]"
-    : "relative isolate h-[calc(100dvh-3.5rem)] overflow-hidden bg-[#eef3fb] md:h-[calc(100dvh-4rem)] lg:h-[calc(100dvh-5rem)]";
-
-  const panelClasses = cn(
-    "absolute z-[420] overflow-hidden bg-white/97 backdrop-blur-xl border border-white/70 shadow-[0_-14px_45px_rgba(15,23,42,0.16)]",
-    isPreview
-      ? "right-6 top-6 bottom-6 w-[392px] rounded-[2rem]"
-      : "inset-x-0 bottom-0 h-[73dvh] rounded-t-[1.9rem] md:inset-y-6 md:right-6 md:left-auto md:h-auto md:w-[396px] md:rounded-[2rem]",
-  );
-
-  const mapFitBottomPadding = isDraggableSheet
-    ? sheetExpanded
-      ? Math.min(Math.max(Math.round(panelHeight * 0.46), 280), 360)
-      : collapsedPeekHeight + 26
-    : isPreview
-      ? 78
-      : 64;
-  const mapFitRightPadding = isPreview ? 430 : isMobile ? 32 : 430;
-  const shouldShowBodyHeader = isPreview || !isMobile;
-  const renderFilterChips = (variant: "panel" | "overlay" = "panel") => (
-    <div className={cn("overflow-x-auto hide-scrollbar -mx-1 px-1", variant === "overlay" && "pointer-events-auto")}>
-      <div className="flex gap-2 pb-1">
-        {filterChips.map((chip) => {
-          const isActive = chip.id === activeFilter;
-
-          return (
-            <button
-              key={`${variant}-${chip.id}`}
-              type="button"
-              onClick={() => setActiveFilter(chip.id)}
-              className={cn(
-                "shrink-0 rounded-full border transition font-medium",
-                variant === "overlay" ? "px-4 py-2 text-[13px] shadow-[0_1px_3px_rgba(0,0,0,0.12)] border-transparent" : "px-3.5 py-2 text-[11px]",
-                isActive
-                  ? variant === "overlay" ? "bg-[#e8f0fe] text-[#1967d2]" : "border-rose-200 bg-rose-50 text-rose-500 shadow-[0_12px_24px_-20px_rgba(244,63,94,0.75)]"
-                  : variant === "overlay"
-                    ? "bg-white text-slate-700 hover:bg-slate-50"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
-              )}
-            >
-              {chip.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const placeTitle = coordinates ? place?.title || "Your location" : locating ? "Finding your location…" : "Location off";
+  const placeSub = coordinates ? "Live radar · nearby now" : "Turn on location to see what’s near you";
 
   return (
-    <div className={containerClasses}>
-      <div className="absolute inset-0">
+    <div ref={containerRef} className="rqr">
+      <div className="rqr-map">
         <NearbyMapCanvas
           center={mapCenter}
           userPosition={userPosition}
-          activeTechPosition={activeTechPosition}
-          technicians={orderedTechnicians}
-          selectedTechId={activeTech?.id}
-          routePath={routePath}
-          bottomPadding={mapFitBottomPadding}
-          rightPadding={mapFitRightPadding}
-          onSelect={(tech) => handleTechSelect(tech, "map")}
-          onInteract={isDraggableSheet ? handleMapInteract : undefined}
-        />
-
-        <div
-          className="pointer-events-none absolute inset-0 z-[380]"
-          style={{
-            background:
-              "radial-gradient(circle at top right, rgba(255,255,255,0.82), transparent 22%), radial-gradient(circle at bottom left, rgba(255,255,255,0.52), transparent 28%), linear-gradient(180deg, rgba(245,248,255,0.18), rgba(245,248,255,0.34))",
-          }}
+          pins={pins}
+          focus={focus}
+          topPadding={HEADER_CLEARANCE}
+          bottomPadding={bottomPadding}
+          rightPadding={isMobile ? 32 : 450}
+          onMapTap={onMapTap}
+          onUnavailable={() => setSnap("normal")}
+          ariaLabel={`Map of ${LAYERS.find((entry) => entry.id === layer)?.label.toLowerCase()} near you`}
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-[430] flex flex-col gap-3 md:inset-x-6 md:top-6">
-        <div className="flex items-start justify-between">
-          <motion.div
-            initial={reduceMotion ? undefined : { opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24 }}
-            className="pointer-events-auto flex flex-1 max-w-[340px] items-center gap-3 rounded-full bg-white px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.15)] md:max-w-md"
-          >
-            <div className="flex shrink-0 items-center justify-center text-slate-600">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-medium text-slate-700">
-                {loadingTechnicians ? "Searching..." : "Search here"}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center justify-center">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                <span className="text-[10px] font-bold">ME</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
+      <header className="rqr-hdr">
+        <span className="rqr-hdr__pin" aria-hidden="true"><MaterialSymbol name={coordinates ? "near_me" : "location_off"} /></span>
+        <button type="button" className="rqr-hdr__loc rq-press" onClick={requestLocation} aria-label={`Your location: ${placeTitle}. Tap to refresh.`}>
+          <span className="rqr-hdr__place">{placeTitle}<MaterialSymbol name="keyboard_arrow_down" /></span>
+          <span className="rqr-hdr__sub">{coordinates ? <span className="rq-h-live-dot" aria-hidden="true" /> : null}{placeSub}</span>
+        </button>
+        <span className="rqr-hdr__div" aria-hidden="true" />
+        <img className="rqr-hdr__logo" src="/images/resqnow-wordmark.png" alt="ResQNow" />
+      </header>
 
-        {filterChips.length > 1 && (
-          <motion.div
-            initial={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24, delay: 0.05 }}
-            className="pointer-events-auto w-full md:hidden"
+      <div className="rqr-legend" role="tablist" aria-label="Show on the map">
+        {LAYERS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            aria-selected={layer === entry.id}
+            className={cn("rqr-lg rq-press", layer === entry.id && "is-on")}
+            onClick={() => setLayer(entry.id)}
           >
-            {renderFilterChips("overlay")}
-          </motion.div>
-        )}
+            <MaterialSymbol name={entry.icon} className="rqr-lg__icon" />
+            {entry.label}
+            <span className="rqr-lg__n">{counts[entry.id]}</span>
+          </button>
+        ))}
       </div>
 
-      <motion.div
-        initial={reduceMotion ? undefined : { opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.22, delay: 0.03 }}
-        className="pointer-events-auto absolute right-3 z-[430] md:right-6 md:top-6"
-        style={{ bottom: isDraggableSheet ? `calc(${panelHeight}px + 16px)` : 'auto' }}
-      >
-        <Button
+      {draggable && effectiveSnap !== "full" ? (
+        <button
           type="button"
+          className="rqr-locate rq-press"
+          style={{ bottom: visibleSheet + 12 }}
           onClick={requestLocation}
-          disabled={loadingLocation || loadingTechnicians}
-          className="h-[46px] w-[46px] rounded-full bg-white p-0 text-slate-700 shadow-[0_3px_10px_rgba(0,0,0,0.2)] hover:bg-slate-50"
+          disabled={locating}
+          aria-label="Use my current location"
         >
-          {loadingLocation ? <Loader2 className="h-5 w-5 animate-spin text-[#1a73e8]" /> : <LocateFixed className="h-5 w-5 text-slate-700" />}
-        </Button>
-      </motion.div>
-
-      {locationError && (
-        <div className="absolute left-3 top-[8rem] z-[430] max-w-[230px] rounded-xl bg-white px-3 py-2 text-[13px] font-medium text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.15)] md:left-6 md:top-[6.1rem]">
-          {locationError}
-        </div>
-      )}
+          <MaterialSymbol name="my_location" className={cn(locating && "rqr-spin")} />
+        </button>
+      ) : null}
 
       <motion.section
-        ref={panelRef}
-        initial={reduceMotion ? undefined : { opacity: 0, y: 28 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, ease: "easeOut" }}
-        drag={isDraggableSheet ? "y" : false}
+        className={cn("rqr-sheet", !draggable && "is-panel")}
+        aria-label={LAYERS.find((entry) => entry.id === layer)?.label}
+        style={draggable ? { y: sheetY, top: SHEET_TOP } : undefined}
+        drag={draggable ? "y" : false}
         dragListener={false}
         dragControls={dragControls}
-        dragElastic={0.05}
+        dragConstraints={{ top: 0, bottom: offsets.peek }}
+        dragElastic={0.08}
         dragMomentum={false}
-        dragConstraints={{ top: 0, bottom: collapsedSheetOffset }}
-        onDragEnd={handleSheetDragEnd}
-        style={isDraggableSheet ? { y: sheetDragY, willChange: "transform" } : undefined}
-        className={cn(
-          "absolute z-[420] overflow-hidden bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.12)] border-t border-slate-100",
-          isPreview
-            ? "right-6 top-6 bottom-6 w-[392px] rounded-[2rem]"
-            : "inset-x-0 bottom-0 h-[75dvh] rounded-t-[1.5rem] md:inset-y-6 md:right-6 md:left-auto md:h-auto md:w-[396px] md:rounded-[2rem]",
-        )}
+        onDragEnd={onDragEnd}
+        data-snap={effectiveSnap}
       >
-        <div className="flex h-full flex-col">
-          {!isPreview && (
-            <div className="shrink-0 bg-white px-4 pb-1 pt-2 md:hidden">
-              <div
-                role="presentation"
-                onPointerDown={handleSheetDragStart}
-                className="mx-auto flex w-full touch-none items-center justify-center py-2 pb-3 cursor-grab active:cursor-grabbing"
-                style={{ touchAction: "none" }}
-              >
-                <span className="h-1.5 w-10 rounded-full bg-slate-300" />
-              </div>
-
-              {!sheetExpanded && (
-                <button
-                  type="button"
-                  onClick={handleSheetPreviewClick}
-                  className="w-full bg-white text-left transition"
-                >
-                  {activeTech && !loadingTechnicians ? (
-                    <div className="flex items-start gap-4 pb-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[1.2rem] font-medium text-slate-900">{activeTech.name}</p>
-                        <div className="mt-1 flex items-center gap-1 text-[13px]">
-                           <span className="font-semibold text-slate-700">{formatRating(activeTech.rating)}</span>
-                           <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                           <span className="text-slate-500">({activeTech.rating > 0 ? "10+" : "0"}) · {formatDistanceDetailed(activeTech.distance)}</span>
-                        </div>
-                        <p className="mt-0.5 truncate text-[13px] text-slate-500">{activeTechServiceLabel}</p>
-                      </div>
-                      
-                      <div className="shrink-0 pt-1">
-                         <div className="flex flex-col items-center gap-1.5">
-                           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_2px_6px_rgba(26,115,232,0.4)]">
-                              <Navigation className="h-5 w-5" />
-                           </div>
-                           <span className="text-[11px] font-medium text-[#1a73e8]">{formatEtaWindow(activeTech.distance).split(' ')[0]} min</span>
-                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 pb-3">
-                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                         <Navigation className="h-5 w-5" />
-                       </div>
-                       <div>
-                         <p className="text-[1.1rem] font-medium text-slate-900">Explore nearby</p>
-                         <p className="text-[13px] text-slate-500">{loadingTechnicians ? "Scanning..." : `${nearbyCount} technicians available`}</p>
-                       </div>
-                    </div>
-                  )}
-                </button>
-              )}
+        <div className="rqr-drag" onPointerDown={onHandlePointerDown} onPointerUp={onHandlePointerUp}>
+          {draggable ? (
+            <button type="button" className="rqr-grab" aria-label="Resize the panel" onKeyDown={onHandleKey}><span /></button>
+          ) : null}
+          {effectiveSnap === "peek" && peekRow && coordinates ? (
+            <PeekCard row={peekRow} />
+          ) : !detail ? (
+            <div className="rqr-head">
+              <h2 className="rqr-title pj">{titles[layer][0]}</h2>
+              <p className="rqr-sub"><span className="rq-h-live-dot" aria-hidden="true" />{coordinates && !loading && !query.isError ? titles[layer][1] : "Live radar"}</p>
             </div>
-          )}
-
-          <div
-            className={cn(
-              "flex-1 px-4 pb-5 custom-scrollbar sm:px-5",
-              sheetExpanded || !isDraggableSheet ? "overflow-y-auto pt-2" : "overflow-hidden pt-0",
-              !isPreview && "pb-[calc(env(safe-area-inset-bottom)+5.15rem)] md:pb-5",
-            )}
-          >
-            <div className="space-y-4">
-              {shouldShowBodyHeader && (
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[0.98rem] font-black tracking-tight text-slate-900">Nearby technicians</p>
-                      <p className="text-[11px] font-medium text-slate-500">
-                        {loadingTechnicians
-                          ? "Refreshing live radar..."
-                          : activeFilter === "all"
-                            ? `${nearbyCount} technicians available around you`
-                            : `${nearbyCount} technicians in this filter`}
-                      </p>
-                    </div>
-
-                    {activeFilter !== "all" ? (
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilter("all")}
-                        className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500 transition hover:bg-slate-50"
-                      >
-                        Clear
-                      </button>
-                    ) : (
-                      <div className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                        Live
-                      </div>
-                    )}
-                  </div>
-
-                  {renderFilterChips()}
-                </div>
-              )}
-
-              {!shouldShowBodyHeader && sheetExpanded && (
-                renderFilterChips()
-              )}
-
-              {loadingTechnicians && (
-                <div className="rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                      <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">Scanning live radar...</p>
-                      <p className="text-[11px] text-slate-500">Matching the closest verified technicians for you.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!loadingTechnicians && activeTech && (
-                <motion.div
-                  layout={!reduceMotion}
-                  className="bg-white pb-4"
-                >
-                  <div className="pt-2 pb-4 border-b border-slate-100">
-                    <p className="text-[1.4rem] font-medium text-slate-900">{activeTech.name}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[14px]">
-                      <span className="font-semibold text-slate-700">{formatRating(activeTech.rating)}</span>
-                      <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                      <span className="text-slate-500">({activeTech.rating > 0 ? "10+" : "0"})</span>
-                      <span className="mx-1 text-slate-400">·</span>
-                      <span className="text-slate-700">{activeTechServiceLabel}</span>
-                    </div>
-                    <p className="mt-1.5 text-[14px] text-slate-500">
-                      {getServiceHighlights(activeTech)}
-                    </p>
-                    {activeTech.aiRecommended && (
-                       <p className="mt-2 text-[12px] font-medium text-emerald-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Best Match • Verified
-                       </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-around py-4 border-b border-slate-100">
-                    <div className="flex flex-col items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => handleBookService(activeTech)}
-                        className="h-12 w-12 rounded-full bg-[#1a73e8] text-white shadow-[0_2px_6px_rgba(26,115,232,0.4)] hover:bg-blue-700 p-0"
-                      >
-                        <Navigation className="h-5 w-5" />
-                      </Button>
-                      <span className="text-[13px] font-medium text-[#1a73e8]">Directions</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 text-[#1a73e8]">
-                        <Clock3 className="h-5 w-5" />
-                      </div>
-                      <span className="text-[13px] font-medium text-[#1a73e8]">{formatEtaWindow(activeTech.distance).split(' ')[0]} min</span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 text-[#1a73e8]">
-                        <ShieldCheck className="h-5 w-5" />
-                      </div>
-                      <span className="text-[13px] font-medium text-[#1a73e8]">Trusted</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <Button
-                      type="button"
-                      onClick={() => handleBookService(activeTech)}
-                      className="h-12 w-full rounded-full bg-[#1a73e8] text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(26,115,232,0.4)] hover:opacity-95"
-                    >
-                      Request Service Now
-                    </Button>
-                  </div>
-                </motion.div>
-              )}
-
-              {!loadingTechnicians && !activeTech && (
-                <div className="rounded-[1.45rem] border border-slate-100 bg-white p-5 text-center shadow-[0_18px_40px_-32px_rgba(15,23,42,0.35)]">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                    <Wrench className="h-5 w-5" />
-                  </div>
-                  <p className="mt-4 text-base font-black tracking-tight text-slate-900">
-                    {activeFilter === "all" ? "No nearby technicians yet" : "No technicians in this filter"}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {activeFilter === "all"
-                      ? "Enable location access or refresh the radar to search again."
-                      : "Try a different filter to see more nearby options."}
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={activeFilter === "all" ? requestLocation : () => setActiveFilter("all")}
-                    className="mt-4 rounded-full bg-slate-900 px-5 text-white hover:bg-slate-800"
-                  >
-                    {activeFilter === "all" ? "Use My Location" : "Show All Technicians"}
-                  </Button>
-                </div>
-              )}
-
-              <div>
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[0.95rem] font-black tracking-tight text-slate-900">Other technicians nearby</p>
-                    <p className="text-[11px] font-medium text-slate-500">
-                      {secondaryTechnicians.length > 0
-                        ? `${secondaryTechnicians.length} additional options around you`
-                        : "No other nearby technicians right now"}
-                    </p>
-                  </div>
-
-                  {secondaryTechnicians.length > visibleSecondaryTechnicians.length && (
-                    <button
-                      type="button"
-                      onClick={() => setSheetExpanded((current) => !current)}
-                      className="text-[11px] font-extrabold text-rose-500 transition hover:text-rose-600"
-                    >
-                      {sheetExpanded ? "See less" : "See all"}
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-col">
-                  {visibleSecondaryTechnicians.map((tech, index) => {
-                    const isSelected = tech.id === activeTech?.id;
-
-                    return (
-                      <motion.button
-                        key={tech.id}
-                        type="button"
-                        onClick={() => handleTechSelect(tech, "sheet")}
-                        initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.22, delay: index * 0.04 }}
-                        className={cn(
-                          "w-full bg-white py-3 text-left transition border-b border-slate-100 last:border-0",
-                          isSelected ? "bg-slate-50" : "hover:bg-slate-50",
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[18px] font-medium text-slate-500">
-                            {getVendorInitials(tech.name)}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[15px] font-medium text-slate-900">
-                              {tech.name}
-                            </p>
-                            
-                            <div className="mt-0.5 flex items-center gap-1 text-[13px]">
-                              <span className="font-semibold text-slate-700">{formatRating(tech.rating)}</span>
-                              <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                              <span className="text-slate-500">({tech.rating > 0 ? "10+" : "0"})</span>
-                            </div>
-                            
-                            <p className="mt-0.5 truncate text-[13px] text-slate-500">
-                              {getTechnicianServiceLabel(tech)} · {formatDistanceCompact(tech.distance)}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
+          ) : null}
+        </div>
+        <div className={cn("rqr-body", effectiveSnap === "peek" && coordinates && "is-tucked")} aria-hidden={effectiveSnap === "peek" && coordinates ? true : undefined}>
+          {detailTech ? <TechnicianProfile technician={detailTech} onClose={() => settle("normal")} /> : null}
+          {detailEv ? <StationDetail station={detailEv} onClose={() => settle("normal")} /> : null}
+          {!detailTech && !detailEv ? listBody() : null}
         </div>
       </motion.section>
     </div>

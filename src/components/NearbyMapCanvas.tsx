@@ -1,55 +1,83 @@
-import { useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
-import type { MapCameraSpec, MapCircleSpec, MapMarkerSpec, MapPoint, MapPolylineSpec } from "@/lib/mapProvider/types";
+import type { MapCameraSpec, MapCircleSpec, MapMarkerSpec, MapPoint } from "@/lib/mapProvider/types";
 
 type Position = [number, number];
-type TechnicianPosition = { id: string; latitude: number; longitude: number };
-type Props<T extends TechnicianPosition> = {
+
+/** A static point of interest on the radar (technician, charger or fuel pump). */
+export type RadarPin = {
+  id: string;
+  lat: number;
+  lng: number;
+  html: string;
+  width: number;
+  height: number;
+  anchor?: "center" | "bottom";
+  zIndex?: number;
+  onClick?: () => void;
+};
+
+type Props = {
   center: Position;
   userPosition: Position | null;
-  activeTechPosition: Position | null;
-  technicians: T[];
-  selectedTechId?: string;
-  routePath: Position[];
+  pins: RadarPin[];
+  /** Points the camera keeps in view along with the customer. */
+  focus: Position[];
+  topPadding: number;
   bottomPadding: number;
   rightPadding: number;
-  onSelect: (technician: T) => void;
-  onInteract?: () => void;
+  /** A tap on the map itself, not on a pin. */
+  onMapTap?: () => void;
+  onUnavailable?: () => void;
+  ariaLabel?: string;
+  fallbackDescription?: string;
 };
-const point = ([lat, lng]: Position): MapPoint => ({ lat, lng });
-const userHtml = '<div style="width:20px;height:20px;background:#4285f4;border:3px solid white;border-radius:50%;box-shadow:0 0 8px #0005"></div>';
-const technicianHtml = (selected: boolean) => `<svg width="28" height="40" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 3px 5px #0004)">
-  <path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 36 12 36S24 21 24 12C24 5.37 18.63 0 12 0Z" fill="${selected ? "#ea4335" : "#1a73e8"}"/>
-  <circle cx="12" cy="12" r="5" fill="white"/></svg>`;
 
-export function NearbyMapCanvas<T extends TechnicianPosition>({
-  center, userPosition, activeTechPosition, technicians, selectedTechId,
-  routePath, bottomPadding, rightPadding, onSelect, onInteract,
-}: Props<T>) {
+const point = ([lat, lng]: Position): MapPoint => ({ lat, lng });
+const userHtml = '<div class="rqr-me" aria-hidden="true"></div>';
+// Mappls reports a pin tap to the map as well; a map tap this soon after a pin tap is the same tap.
+const PIN_TAP_WINDOW_MS = 350;
+
+export function NearbyMapCanvas({
+  center, userPosition, pins, focus, topPadding, bottomPadding, rightPadding,
+  onMapTap, onUnavailable, ariaLabel = "Live radar map", fallbackDescription = "You can still browse everything nearby below.",
+}: Props) {
+  const lastPinTap = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(tapTimer.current), []);
+
   const markers = useMemo<MapMarkerSpec[]>(() => [
-    ...(userPosition ? [{ id: "user", position: point(userPosition), html: userHtml, width: 20, height: 20, zIndex: 600 }] : []),
-    ...technicians.map((tech) => ({
-      id: `tech-${tech.id}`,
-      position: { lat: tech.latitude, lng: tech.longitude },
-      html: technicianHtml(tech.id === selectedTechId),
-      width: 28, height: 40, offset: [0, -20] as Position,
-      zIndex: tech.id === selectedTechId ? 400 : 150,
-      onClick: () => onSelect(tech),
+    ...(userPosition ? [{ id: "user", position: point(userPosition), html: userHtml, width: 22, height: 22, zIndex: 600 }] : []),
+    ...pins.map((pin) => ({
+      id: pin.id,
+      position: { lat: pin.lat, lng: pin.lng },
+      html: pin.html,
+      width: pin.width,
+      height: pin.height,
+      anchor: pin.anchor ?? "center",
+      zIndex: pin.zIndex ?? 150,
+      onClick: () => {
+        lastPinTap.current = Date.now();
+        pin.onClick?.();
+      },
     })),
-  ], [userPosition, technicians, selectedTechId, onSelect]);
-  const circles = useMemo<MapCircleSpec[]>(() => [
-    ...(userPosition ? [
-      { id: "user-outer", center: point(userPosition), radiusMeters: 240, fillColor: "#fb7185", fillOpacity: 0.08 },
-      { id: "user-inner", center: point(userPosition), radiusMeters: 140, fillColor: "#fb7185", fillOpacity: 0.14 },
-    ] : []),
-    ...(activeTechPosition ? [{ id: "technician-radius", center: point(activeTechPosition), radiusMeters: 180, fillColor: "#34d399", fillOpacity: 0.11 }] : []),
-  ], [userPosition, activeTechPosition]);
-  const polylines = useMemo<MapPolylineSpec[]>(() => routePath.length < 2 ? [] : [
-    { id: "route-casing", points: routePath.map(point), color: "#ffffff", width: 8, opacity: 0.72 },
-    { id: "route", points: routePath.map(point), color: "#ff4d5a", width: 4, opacity: 0.92 },
-  ], [routePath]);
-  const points = [userPosition, activeTechPosition].filter((value): value is Position => value !== null).map(point);
-  const cameraKey = JSON.stringify([points, center, bottomPadding, rightPadding]);
+  ], [userPosition, pins]);
+
+  const circles = useMemo<MapCircleSpec[]>(() => userPosition ? [
+    { id: "user-outer", center: point(userPosition), radiusMeters: 260, fillColor: "#283048", fillOpacity: 0.05 },
+    { id: "user-inner", center: point(userPosition), radiusMeters: 120, fillColor: "#283048", fillOpacity: 0.09 },
+  ] : [], [userPosition]);
+
+  const handleMapClick = useCallback(() => {
+    if (!onMapTap) return;
+    clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => {
+      if (Date.now() - lastPinTap.current > PIN_TAP_WINDOW_MS) onMapTap();
+    }, 120);
+  }, [onMapTap]);
+
+  const points = [userPosition, ...focus].filter((value): value is Position => value !== null).map(point);
+  const cameraKey = JSON.stringify([points, center, topPadding, bottomPadding, rightPadding]);
   const lastCamera = useRef({ key: "", revision: 0 });
   if (lastCamera.current.key !== cameraKey) {
     lastCamera.current = { key: cameraKey, revision: lastCamera.current.revision + 1 };
@@ -57,11 +85,21 @@ export function NearbyMapCanvas<T extends TechnicianPosition>({
   const camera: MapCameraSpec = {
     mode: "fit",
     points: points.length ? points : [point(center)],
-    padding: { top: 140, right: rightPadding, bottom: bottomPadding, left: 24 },
-    maxZoom: points.length > 1 ? 14 : 13,
+    padding: { top: topPadding, right: rightPadding, bottom: bottomPadding, left: 24 },
+    maxZoom: points.length > 1 ? 15 : 14,
     revision: lastCamera.current.revision,
   };
-  return <MapplsMapSurface ariaLabel="Nearby technicians map" className="radar-map h-full w-full"
-    markers={markers} circles={circles} polylines={polylines} camera={camera} onInteract={onInteract}
-    onUnavailable={onInteract} fallbackDescription="You can still browse nearby technicians below." />;
+  return (
+    <MapplsMapSurface
+      ariaLabel={ariaLabel}
+      className="radar-map h-full w-full"
+      markers={markers}
+      circles={circles}
+      polylines={[]}
+      camera={camera}
+      onMapClick={handleMapClick}
+      onUnavailable={onUnavailable}
+      fallbackDescription={fallbackDescription}
+    />
+  );
 }

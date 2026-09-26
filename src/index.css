@@ -2296,7 +2296,8 @@
   gap: 28px;
   max-width: 560px;
   margin: 0 auto;
-  padding: 8px 20px 28px;
+  /* Clear the floating bottom menu (66px + 14px gap) so the last card stays reachable. */
+  padding: 8px 20px calc(112px + env(safe-area-inset-bottom, 0px));
 }
 
 .rq-symbol-xs { font-size: 13px; }

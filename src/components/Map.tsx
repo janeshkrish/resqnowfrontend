@@ -49,8 +49,7 @@ const LAYERS: Array<{ id: Layer; label: string; icon: string; param: string | nu
   { id: "fuel", label: "Fuel", icon: "local_gas_station", param: "fuel" },
 ];
 
-// Phone layout: the sheet sits under the header and legend and slides between three heights.
-const SHEET_TOP = 132;
+// Phone layout: the sheet sits under the header and legend (see .rqr-sheet) and slides between three heights.
 const NAV_CLEARANCE = 92;
 const VISIBLE: Record<Exclude<Snap, "full">, number> = { peek: 104 + NAV_CLEARANCE, normal: 292 + NAV_CLEARANCE };
 const HEADER_CLEARANCE = 150;
@@ -83,9 +82,12 @@ const RadarMap = () => {
   const [radius, setRadius] = useState<Record<"ev" | "fuel", number>>({ ev: EV_SEARCH_RADIUS_METERS, fuel: FUEL_SEARCH_RADIUS_METERS });
   const [anchor, setAnchor] = useState<{ lat: number; lng: number } | null>(null);
   const [containerHeight, setContainerHeight] = useState(844);
+  const [sheetHeight, setSheetHeight] = useState(712);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const sheetRef = useRef<HTMLElement | null>(null);
   const cardRefs = useRef(new Map<string, HTMLElement>());
-  const sheetY = useMotionValue(0);
+  // Starts below the screen so the sheet rises into place when the radar opens.
+  const sheetY = useMotionValue(typeof window === "undefined" ? 800 : window.innerHeight);
   const dragControls = useDragControls();
   const tapStart = useRef<{ y: number; t: number } | null>(null);
   const draggable = isMobile;
@@ -95,12 +97,17 @@ const RadarMap = () => {
   useEffect(() => { setAnchor((current) => nextSearchAnchor(current, coordinates)); }, [coordinates]);
 
   useEffect(() => {
-    const node = containerRef.current;
-    if (!node) return;
-    const measure = () => setContainerHeight(Math.round(node.getBoundingClientRect().height) || 844);
+    const container = containerRef.current;
+    const sheet = sheetRef.current;
+    if (!container || !sheet) return;
+    const measure = () => {
+      setContainerHeight(container.offsetHeight || 844);
+      setSheetHeight(sheet.offsetHeight || 712);
+    };
     measure();
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
-    observer?.observe(node);
+    observer?.observe(container);
+    observer?.observe(sheet);
     return () => observer?.disconnect();
   }, []);
 
@@ -153,7 +160,6 @@ const RadarMap = () => {
   const fuelId = selectedId(fuelViews, "fuel");
 
   // ---------- Sheet sizes ----------
-  const sheetHeight = Math.max(0, containerHeight - SHEET_TOP);
   const offsets = useMemo(() => ({
     full: 0,
     normal: Math.max(0, sheetHeight - VISIBLE.normal),
@@ -225,6 +231,8 @@ const RadarMap = () => {
   const onMapTap = useCallback(() => {
     if (draggable) { setDetail(null); setSnap("peek"); }
   }, [draggable]);
+  // Without a map the list is all there is, so keep it open.
+  const onMapUnavailable = useCallback(() => setSnap("normal"), []);
 
   // ---------- Map ----------
   const userPosition = coordinates ? ([coordinates.lat, coordinates.lng] as [number, number]) : null;
@@ -232,8 +240,8 @@ const RadarMap = () => {
 
   const pins: RadarPin[] = useMemo(() => {
     if (layer === "tech") {
-      return technicians.map((t) => {
-        const view = techViews.find((v) => v.id === t.id)!;
+      return technicians.map((t, index) => {
+        const view = techViews[index];
         const on = t.id === techId;
         return {
           id: `tech-${t.id}`, lat: t.latitude, lng: t.longitude, anchor: "bottom" as const, zIndex: on ? 400 : 150,
@@ -243,14 +251,13 @@ const RadarMap = () => {
         };
       });
     }
-    const list = layer === "ev" ? evStations : fuelStations;
-    return list.flatMap((station) => {
+    const places = layer === "ev"
+      ? evStations.map((station, index) => ({ station, view: evViews[index], label: evViews[index].kw ? `${evViews[index].kw} kW` : "EV" }))
+      : fuelStations.map((station, index) => ({ station, view: fuelViews[index], label: fuelViews[index].prices[0]?.value ?? "Fuel" }));
+    const activeStation = layer === "ev" ? evId : fuelId;
+    return places.flatMap(({ station, view, label }) => {
       if (typeof station.latitude !== "number" || typeof station.longitude !== "number") return [];
-      const view = layer === "ev" ? evViews.find((v) => v.id === station.id)! : fuelViews.find((v) => v.id === station.id)!;
-      const on = station.id === (layer === "ev" ? evId : fuelId);
-      const label = layer === "ev"
-        ? ((view as ReturnType<typeof toEvView>).kw ? `${(view as ReturnType<typeof toEvView>).kw} kW` : "EV")
-        : ((view as ReturnType<typeof toFuelView>).prices[0]?.value ?? "Fuel");
+      const on = station.id === activeStation;
       return [{
         id: `${layer}-${station.id}`, lat: station.latitude, lng: station.longitude, zIndex: on ? 400 : 140,
         html: placePinHtml({ name: station.name, logo: view.logo, initials: view.initials, label, selected: on }),
@@ -378,7 +385,7 @@ const RadarMap = () => {
           bottomPadding={bottomPadding}
           rightPadding={isMobile ? 32 : 450}
           onMapTap={onMapTap}
-          onUnavailable={() => setSnap("normal")}
+          onUnavailable={onMapUnavailable}
           ariaLabel={`Map of ${LAYERS.find((entry) => entry.id === layer)?.label.toLowerCase()} near you`}
         />
       </div>
@@ -426,7 +433,8 @@ const RadarMap = () => {
       <motion.section
         className={cn("rqr-sheet", !draggable && "is-panel")}
         aria-label={LAYERS.find((entry) => entry.id === layer)?.label}
-        style={draggable ? { y: sheetY, top: SHEET_TOP } : undefined}
+        ref={sheetRef}
+        style={draggable ? { y: sheetY } : undefined}
         drag={draggable ? "y" : false}
         dragListener={false}
         dragControls={dragControls}

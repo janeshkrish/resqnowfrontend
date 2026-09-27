@@ -1,11 +1,5 @@
 import Map from "@/components/Map";
 
-const MapPage = () => {
-  return (
-    <div className="bg-[#eef3fb]">
-      <Map mode="page" />
-    </div>
-  );
-};
+const MapPage = () => <Map />;
 
 export default MapPage;

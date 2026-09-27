@@ -124,7 +124,7 @@ const RadarMap = () => {
   });
   // While the backend is still placing station pins, ask again a few times.
   const pinRefresh = (state: { data?: { positionsPending?: boolean }; dataUpdateCount: number }) =>
-    state.data?.positionsPending && state.dataUpdateCount < 8 ? 8_000 : false;
+    state.data?.positionsPending && state.dataUpdateCount < 12 ? 8_000 : false;
   const evQuery = useQuery({
     queryKey: ["radar", "ev-stations", anchor?.lat, anchor?.lng, radius.ev],
     queryFn: ({ signal }) => fetchEvStations(anchor!, radius.ev, signal),

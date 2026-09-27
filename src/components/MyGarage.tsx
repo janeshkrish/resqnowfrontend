@@ -19,13 +19,14 @@ export interface Vehicle {
     status?: string;
 }
 
-const MyGarage = () => {
+/** `startAdding` opens the add-vehicle steps straight away (the /my-garage/add link). */
+const MyGarage = ({ startAdding = false }: { startAdding?: boolean }) => {
     const { user } = useAuth();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Wizard State
-    const [isAdding, setIsAdding] = useState(false);
+    const [isAdding, setIsAdding] = useState(startAdding);
     const [step, setStep] = useState(1); // 1: Type, 2: Brand, 3: Model, 4: Details
 
     const [newVehicle, setNewVehicle] = useState({

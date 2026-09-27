@@ -116,8 +116,18 @@ const SettingsPage = () => {
   ]
 
   const handleTabChange = (id: string) => {
+    // On phones My Garage is its own full page.
+    if (isMobile && id === "garage") {
+      navigate("/my-garage")
+      return
+    }
     setSearchParams({ tab: id })
   }
+
+  // Old links to Settings → My Garage open the garage page on phones.
+  useEffect(() => {
+    if (isMobile && activeTab === "garage") navigate("/my-garage", { replace: true })
+  }, [isMobile, activeTab, navigate])
 
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS)
   const [settingsLoading, setSettingsLoading] = useState(true)
@@ -189,7 +199,7 @@ const SettingsPage = () => {
       case "profile":
         return <ProfileSettings />
       case "garage":
-        return <MyGarage />
+        return <MyGarage embedded />
       case "appearance":
         return (
           <div className="zomato-card space-y-4">

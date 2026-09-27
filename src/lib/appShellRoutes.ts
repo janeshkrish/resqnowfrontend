@@ -14,8 +14,14 @@ export const isServiceRequestFlowPath = (pathname: string) =>
 export const isVehicleSelectionPath = (pathname: string) =>
   /^\/request-service\/[^/]+\/?$/.test(pathname);
 
+/** My garage is a full page with its own back button (/my-garage and /my-garage/add). */
+export const isGaragePath = (pathname: string) => /^\/my-garage(\/|$)/.test(pathname);
+
 export const isTrackingExperiencePath = (pathname: string) =>
   TRACKING_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
 export const shouldHideSupportSurfaces = (pathname: string) =>
-  isLiveMapPath(pathname) || isServiceRequestFlowPath(pathname) || isTrackingExperiencePath(pathname);
+  isLiveMapPath(pathname) ||
+  isServiceRequestFlowPath(pathname) ||
+  isTrackingExperiencePath(pathname) ||
+  isGaragePath(pathname);

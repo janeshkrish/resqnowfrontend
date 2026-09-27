@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { isServiceRequestFlowPath, isVehicleSelectionPath } from "./appShellRoutes";
+import { isGaragePath, isServiceRequestFlowPath, isVehicleSelectionPath, shouldHideSupportSurfaces } from "./appShellRoutes";
+
+describe("isGaragePath", () => {
+  it("matches the garage and its add steps only", () => {
+    expect(isGaragePath("/my-garage")).toBe(true);
+    expect(isGaragePath("/my-garage/")).toBe(true);
+    expect(isGaragePath("/my-garage/add")).toBe(true);
+
+    expect(isGaragePath("/my-garages")).toBe(false);
+    expect(isGaragePath("/settings")).toBe(false);
+  });
+
+  it("hides the chat bubble in the garage, where it would cover the toast", () => {
+    expect(shouldHideSupportSurfaces("/my-garage")).toBe(true);
+    expect(shouldHideSupportSurfaces("/services")).toBe(false);
+  });
+});
 
 describe("isVehicleSelectionPath", () => {
   it("matches only the first step of a service request", () => {

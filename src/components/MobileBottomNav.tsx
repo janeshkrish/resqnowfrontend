@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useAutoHideBottomNav } from "@/hooks/useAutoHideBottomNav";
-import { isTrackingExperiencePath } from "@/lib/appShellRoutes";
+import { isGaragePath, isTrackingExperiencePath } from "@/lib/appShellRoutes";
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 
 const MobileBottomNav = () => {
@@ -57,6 +57,8 @@ const MobileBottomNav = () => {
     }, [isAuthenticated]);
 
     const isActive = (path: string) => {
+        // My garage is part of the account, so Account stays lit there.
+        if (path === "/settings" && isGaragePath(location.pathname)) return true;
         return location.pathname === path;
     };
 

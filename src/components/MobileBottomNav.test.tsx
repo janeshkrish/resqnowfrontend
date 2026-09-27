@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ isAuthenticated: false }) }));
+const auth = vi.hoisted(() => ({ isAuthenticated: false }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn() }));
 
 import MobileBottomNav from "./MobileBottomNav";
@@ -28,6 +29,17 @@ describe("MobileBottomNav", () => {
     const links = screen.getAllByRole("link");
     expect(links[2]).toHaveAccessibleName(/get help/i);
     expect(links[2]).toHaveAttribute("href", "/services");
+  });
+
+  it("keeps Account lit in My garage", () => {
+    auth.isAuthenticated = true;
+    try {
+      renderAt("/my-garage");
+      expect(screen.getByRole("link", { name: /account/i })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: /home/i })).not.toHaveAttribute("aria-current");
+    } finally {
+      auth.isAuthenticated = false;
+    }
   });
 
   it("steps aside during a service request", () => {

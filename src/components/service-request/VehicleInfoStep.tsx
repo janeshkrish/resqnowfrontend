@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { ServiceRequestFormData, VehicleType } from "./types";
@@ -185,6 +186,10 @@ const VehicleInfoStep = ({
   const [availableBrands, setAvailableBrands] = useState<VehicleBrand[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [garageVehicles, setGarageVehicles] = useState<Vehicle[]>([]);
+  const [garageChoice, setGarageChoice] = useState("");
+  const [searchParams] = useSearchParams();
+  const requestedVehicleId = searchParams.get("vehicle");
+  const requestedVehicleApplied = useRef(false);
   const [showMoreTypes, setShowMoreTypes] = useState(false);
 
   const currentVehicleType = formData.vehicleType || "car";
@@ -245,6 +250,7 @@ const VehicleInfoStep = ({
     setSelectedBrand("");
     setAvailableModels([]);
     setShowMoreTypes(false);
+    setGarageChoice("");
   };
 
   const handleBrandChange = (brandId: string) => {
@@ -253,10 +259,12 @@ const VehicleInfoStep = ({
     setAvailableModels(getBrandModels(brandId));
     emitInputChange("vehicleBrand", matchedBrand?.name || brandId, onInputChange);
     emitInputChange("vehicleModel", "", onInputChange);
+    setGarageChoice("");
   };
 
   const handleModelChange = (model: string) => {
     emitInputChange("vehicleModel", model, onInputChange);
+    setGarageChoice("");
   };
 
   const handleGarageSelect = (vehicleId: string) => {
@@ -287,7 +295,17 @@ const VehicleInfoStep = ({
     setSelectedBrand(matchedBrand?.id || "");
     setAvailableModels(matchedBrand ? getBrandModels(matchedBrand.id) : []);
     setShowMoreTypes(false);
+    setGarageChoice(vehicleId);
   };
+
+  // "Get help for this car" in My garage links here with ?vehicle=<id>: fill that vehicle in once.
+  useEffect(() => {
+    if (!requestedVehicleId || requestedVehicleApplied.current) return;
+    if (!garageVehicles.some((entry) => String(entry.id) === requestedVehicleId)) return;
+    requestedVehicleApplied.current = true;
+    handleGarageSelect(requestedVehicleId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [garageVehicles, requestedVehicleId]);
 
   return (
     <div className="animate-in fade-in-50 duration-500">
@@ -352,7 +370,7 @@ const VehicleInfoStep = ({
                 <h3 className="text-[0.95rem] font-black tracking-tight text-[#0B1F3A] md:text-[1.05rem]">Quick select from garage</h3>
               </div>
 
-              <Select onValueChange={handleGarageSelect}>
+              <Select value={garageChoice} onValueChange={handleGarageSelect}>
                 <SelectTrigger className="h-16 rounded-[1rem] border border-slate-200 bg-white px-4 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.18)] hover:border-slate-300 focus:ring-2 focus:ring-primary/15 md:h-[88px] md:rounded-[1.2rem] md:px-5">
                   <div className="flex w-full items-center gap-3 md:gap-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-primary md:h-12 md:w-12 md:rounded-2xl">

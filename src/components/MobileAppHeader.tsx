@@ -5,6 +5,7 @@ import { ArrowLeft, PhoneCall } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import HomeGlassHeader from "./home/HomeGlassHeader";
 import {
+  isGaragePath,
   isLiveMapPath,
   isServiceRequestFlowPath,
   isTrackingExperiencePath,
@@ -30,6 +31,9 @@ const MobileAppHeader = () => {
 
   // The live radar is a full-screen map with its own floating location bar.
   if (isLiveMapPage) return null;
+
+  // My garage has its own top bar with a back button.
+  if (isGaragePath(location.pathname)) return null;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border">

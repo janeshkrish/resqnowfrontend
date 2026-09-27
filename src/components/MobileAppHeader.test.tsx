@@ -39,6 +39,10 @@ describe("MobileAppHeader", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("steps aside in My garage, which has its own back button", () => {
+    expect(renderAt("/my-garage").container).toBeEmptyDOMElement();
+  });
+
   it("keeps the logo header with a back button on the later request steps", () => {
     renderAt("/request-service/towing/car");
     expect(screen.getByAltText("ResQNow Logo")).toBeInTheDocument();

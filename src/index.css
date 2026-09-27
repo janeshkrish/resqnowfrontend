@@ -3771,6 +3771,9 @@
 /* Its own layer, so map markers never rise above the header or sheet. */
 .rqr-map { position: absolute; inset: 0; z-index: 0; }
 
+/* Without a location the map is only a backdrop. */
+.rqr.is-off .rqr-map::after { content: ""; position: absolute; inset: 0; z-index: 1000; background: rgba(248, 249, 251, 0.62); pointer-events: none; }
+
 /* Soft brand wash behind the floating header so it reads on any map. */
 .rqr::before {
   content: "";
@@ -4524,7 +4527,7 @@
 .rqr-note .rq-symbol { flex-shrink: 0; color: #667085; }
 
 /* ---------- Messages ---------- */
-.rqr-msg { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 28px 0; text-align: center; }
+.rqr-msg { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 24px 0; text-align: center; }
 .rqr-msg__ic { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin-bottom: 4px; border-radius: 999px; background: #F2F4F7; color: #283048; }
 .rqr-msg__ic .rq-symbol { font-size: 30px; }
 .rqr-msg__ic.is-error { color: #B42318; }

@@ -52,6 +52,8 @@ const LAYERS: Array<{ id: Layer; label: string; icon: string; param: string | nu
 // Phone layout: the sheet sits under the header and legend (see .rqr-sheet) and slides between three heights.
 const NAV_CLEARANCE = 92;
 const VISIBLE: Record<Exclude<Snap, "full">, number> = { peek: 104 + NAV_CLEARANCE, normal: 292 + NAV_CLEARANCE };
+// A message (location off, nothing found, a failed search) replaces the list and needs a little more room.
+const MESSAGE_EXTRA = 36;
 const HEADER_CLEARANCE = 150;
 
 const layerFromParam = (value: string | null): Layer => (value === "ev" ? "ev" : value === "fuel" ? "fuel" : "tech");
@@ -159,12 +161,19 @@ const RadarMap = () => {
   const evId = selectedId(evViews, "ev");
   const fuelId = selectedId(fuelViews, "fuel");
 
+  const rows: RowView[] = layer === "tech" ? techViews.map(techRow) : layer === "ev" ? evViews.map(evRow) : fuelViews.map(fuelRow);
+  const query = layer === "tech" ? techQuery : layer === "ev" ? evQuery : fuelQuery;
+  const loading = locating || (coordinates !== null && (anchor === null || query.isPending));
+  const locationOff = !coordinates && !locating;
+  const showsMessage = locationOff || (!loading && (query.isError || rows.length === 0));
+
   // ---------- Sheet sizes ----------
+  const normalVisible = VISIBLE.normal + (showsMessage ? MESSAGE_EXTRA : 0);
   const offsets = useMemo(() => ({
     full: 0,
-    normal: Math.max(0, sheetHeight - VISIBLE.normal),
+    normal: Math.max(0, sheetHeight - normalVisible),
     peek: Math.max(0, sheetHeight - VISIBLE.peek),
-  }), [sheetHeight]);
+  }), [sheetHeight, normalVisible]);
   const effectiveSnap: Snap = !draggable ? "full" : detail ? "full" : snap;
 
   useEffect(() => {
@@ -228,9 +237,10 @@ const RadarMap = () => {
     select(key, id, false);
   };
 
+  // A map tap folds the sheet to make room for the map, unless the sheet is showing a message.
   const onMapTap = useCallback(() => {
-    if (draggable) { setDetail(null); setSnap("peek"); }
-  }, [draggable]);
+    if (draggable && !showsMessage) { setDetail(null); setSnap("peek"); }
+  }, [draggable, showsMessage]);
   // Without a map the list is all there is, so keep it open.
   const onMapUnavailable = useCallback(() => setSnap("normal"), []);
 
@@ -277,7 +287,7 @@ const RadarMap = () => {
     return s && typeof s.latitude === "number" && typeof s.longitude === "number" ? [[s.latitude, s.longitude]] : [];
   }, [layer, technicians, techId, evStations, evId, fuelStations, fuelId]);
 
-  const visibleSheet = draggable ? (effectiveSnap === "full" ? sheetHeight : VISIBLE[effectiveSnap]) : 0;
+  const visibleSheet = !draggable ? 0 : effectiveSnap === "full" ? sheetHeight : effectiveSnap === "peek" ? VISIBLE.peek : normalVisible;
   const bottomPadding = draggable ? Math.min(visibleSheet, containerHeight - 220) + 12 : 64;
 
   // ---------- Sheet content ----------
@@ -286,11 +296,8 @@ const RadarMap = () => {
     ev: evQuery.data ? String(evViews.length) : "–",
     fuel: fuelQuery.data ? String(fuelViews.length) : "–",
   };
-  const rows: RowView[] = layer === "tech" ? techViews.map(techRow) : layer === "ev" ? evViews.map(evRow) : fuelViews.map(fuelRow);
   const activeId = layer === "tech" ? techId : layer === "ev" ? evId : fuelId;
   const peekRow = rows.find((row) => row.id === activeId) ?? rows[0] ?? null;
-  const query = layer === "tech" ? techQuery : layer === "ev" ? evQuery : fuelQuery;
-  const loading = locating || (anchor !== null && query.isPending);
   const searchError = query.error instanceof EVStationsError || query.error instanceof FuelStationsError ? query.error.code : null;
   const titles: Record<Layer, [string, string]> = {
     tech: ["Technicians near you", `${techViews.length} online · updated just now`],
@@ -374,7 +381,7 @@ const RadarMap = () => {
   const placeSub = coordinates ? "Live radar · nearby now" : "Turn on location to see what’s near you";
 
   return (
-    <div ref={containerRef} className="rqr">
+    <div ref={containerRef} className={cn("rqr", locationOff && "is-off")}>
       <div className="rqr-map">
         <NearbyMapCanvas
           center={mapCenter}
@@ -450,7 +457,7 @@ const RadarMap = () => {
           ) : null}
           {effectiveSnap === "peek" && peekRow && coordinates ? (
             <PeekCard row={peekRow} />
-          ) : !detail ? (
+          ) : !detail && !showsMessage ? (
             <div className="rqr-head">
               <h2 className="rqr-title pj">{titles[layer][0]}</h2>
               <p className="rqr-sub"><span className="rq-h-live-dot" aria-hidden="true" />{coordinates && !loading && !query.isError ? titles[layer][1] : "Live radar"}</p>

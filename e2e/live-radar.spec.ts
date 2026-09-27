@@ -245,6 +245,11 @@ test.describe("Live radar without location", () => {
     const { requests } = await openRadar(page);
     await expect(page.locator(".rqr-hdr")).toContainText("Location off");
     await expect(page.getByText("See help, charging and fuel near you")).toBeVisible();
+    // The button must be tappable, not tucked behind the bottom menu.
+    await page.getByRole("button", { name: /turn on location/i }).click({ trial: true, timeout: 5_000 });
+    // Tapping the map doesn't fold the message away.
+    await page.mouse.click(30, 300);
+    await page.waitForTimeout(400);
     await expect(page.getByRole("button", { name: /turn on location/i })).toBeVisible();
     expect(requests.filter((path) => /nearby|stations/.test(path))).toEqual([]);
   });

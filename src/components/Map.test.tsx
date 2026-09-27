@@ -346,6 +346,9 @@ describe("Live radar", () => {
     harness.geo.requestLocation.mockClear();
     fireEvent.click(screen.getByRole("button", { name: /turn on location/i }));
     expect(harness.geo.requestLocation).toHaveBeenCalledTimes(1);
+    act(() => (harness.mapProps?.onMapTap as () => void)());
+    expect(screen.getByRole("region", { name: "EV charging" })).toHaveAttribute("data-snap", "normal");
+    expect(screen.queryByRole("heading", { name: "EV charging near you" })).not.toBeInTheDocument();
     expect(harness.calls).toHaveLength(0);
     expect(fetch).not.toHaveBeenCalled();
   });

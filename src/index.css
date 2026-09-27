@@ -4020,6 +4020,8 @@
 }
 
 .rqr-foot { margin: 6px 20px 0; color: #98A2B3; font-size: 11px; line-height: 15px; font-weight: 600; }
+.rqr-foot a { color: #667085; text-decoration: underline; }
+.rqr-pin-note { margin: -6px 0 0 24px; color: #98A2B3; font-size: 11.5px; line-height: 16px; font-weight: 600; }
 
 /* ---------- Logo tiles ---------- */
 .rqr-logo {

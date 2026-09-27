@@ -38,6 +38,22 @@ describe("EV charging helpers", () => {
     );
   });
 
+  it("sends an approximate OpenStreetMap pin to Google Maps by name and address", () => {
+    expect(googleMapsDirectionsUrl(station({ positionSource: "osm" }))).toBe(
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent("Tata Power EZ Charge, Race Course Road, Coimbatore")}`,
+    );
+    expect(googleMapsDirectionsUrl(station({ positionSource: "osm", name: "", address: undefined }))).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=11.0228%2C76.9648",
+    );
+  });
+
+  it("passes on whether more pins are coming and their credit", async () => {
+    apiFetch.mockResolvedValueOnce(new Response(JSON.stringify({ stations: [], radiusMeters: 5000, total: 0, located: 0, source: "mappls", positionsPending: true, positionsAttribution: "© OpenStreetMap contributors" }), { status: 200 }));
+    expect(await fetchEvStations({ lat: 11, lng: 76 })).toMatchObject({ positionsPending: true, positionsAttribution: "© OpenStreetMap contributors" });
+    apiFetch.mockResolvedValueOnce(new Response(JSON.stringify({ stations: [], total: 0, located: 0 }), { status: 200 }));
+    expect(await fetchEvStations({ lat: 11, lng: 76 })).toMatchObject({ positionsPending: false, positionsAttribution: undefined });
+  });
+
   it("keeps the search anchor until the customer moves 500 m", () => {
     const first = nextSearchAnchor(null, { lat: 11.01684, lng: 76.95583 });
     expect(first).toEqual({ lat: 11.0168, lng: 76.9558 });

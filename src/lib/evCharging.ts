@@ -41,6 +41,8 @@ export interface EVChargingStation {
   amenities?: string[];
   mapplsPlaceId?: string;
   availability?: EVAvailability;
+  /** "osm" when the pin was placed from OpenStreetMap (approximate); absent for Mappls positions. */
+  positionSource?: "osm";
 }
 
 export type EVStationsResponse = {
@@ -49,6 +51,10 @@ export type EVStationsResponse = {
   stations: EVChargingStation[];
   total: number;
   located: number;
+  /** More pins are being placed; asking again shortly returns them. */
+  positionsPending?: boolean;
+  /** Credit to show when some pins come from OpenStreetMap. */
+  positionsAttribution?: string;
 };
 
 /** Search radius for the EV layer. Mappls accepts 500 m to 10 km. */
@@ -108,6 +114,8 @@ export async function fetchEvStations(
     stations: Array.isArray(data?.stations) ? data.stations : [],
     total: Number(data?.total) || 0,
     located: Number(data?.located) || 0,
+    positionsPending: data?.positionsPending === true,
+    positionsAttribution: typeof data?.positionsAttribution === "string" ? data.positionsAttribution : undefined,
   };
 }
 
@@ -120,11 +128,19 @@ export const hasCoordinates = (station: EVChargingStation): station is EVChargin
  * coordinates; only a station Mappls could not place falls back to its
  * name and address.
  */
-export function googleMapsDirectionsUrl(station: EVChargingStation) {
+type DirectionsTarget = Pick<EVChargingStation, "name" | "address" | "latitude" | "longitude" | "positionSource">;
+
+/**
+ * Google Maps directions to a station. Exact Mappls coordinates are used as
+ * they are; an approximate OpenStreetMap pin sends the name and address
+ * instead, so Google finds the station itself.
+ */
+export function googleMapsDirectionsUrl(station: DirectionsTarget) {
   const { name, address, latitude, longitude } = station;
-  const destination = hasCoordinates(station)
-    ? `${latitude},${longitude}`
-    : [name, address].filter(Boolean).join(", ");
+  const text = [name, address].filter(Boolean).join(", ");
+  const exact = typeof latitude === "number" && Number.isFinite(latitude) && typeof longitude === "number" && Number.isFinite(longitude)
+    && (station.positionSource !== "osm" || !text);
+  const destination = exact ? `${latitude},${longitude}` : text;
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
 }
 

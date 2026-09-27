@@ -20,6 +20,8 @@ export interface FuelStation {
   /** What Mappls lists the place as: a petrol pump, a CNG station, or both. */
   stationTypes?: Array<"petrol" | "cng">;
   mapplsPlaceId?: string;
+  /** "osm" when the pin was placed from OpenStreetMap (approximate). */
+  positionSource?: "osm";
 }
 
 export type FuelStationsResponse = {
@@ -28,6 +30,8 @@ export type FuelStationsResponse = {
   stations: FuelStation[];
   total: number;
   located: number;
+  positionsPending?: boolean;
+  positionsAttribution?: string;
 };
 
 export const FUEL_SEARCH_RADIUS_METERS = 5_000;
@@ -61,5 +65,7 @@ export async function fetchFuelStations(
     stations: Array.isArray(data?.stations) ? data.stations : [],
     total: Number(data?.total) || 0,
     located: Number(data?.located) || 0,
+    positionsPending: data?.positionsPending === true,
+    positionsAttribution: typeof data?.positionsAttribution === "string" ? data.positionsAttribution : undefined,
   };
 }

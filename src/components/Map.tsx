@@ -10,6 +10,7 @@ import {
   EvCard,
   FuelCard,
   FuelDetail,
+  OsmCredit,
   PeekCard,
   PlaceRow,
   RadarMessage,
@@ -121,10 +122,14 @@ const RadarMap = () => {
     staleTime: 60_000,
     retry: 1,
   });
+  // While the backend is still placing station pins, ask again a few times.
+  const pinRefresh = (state: { data?: { positionsPending?: boolean }; dataUpdateCount: number }) =>
+    state.data?.positionsPending && state.dataUpdateCount < 8 ? 8_000 : false;
   const evQuery = useQuery({
     queryKey: ["radar", "ev-stations", anchor?.lat, anchor?.lng, radius.ev],
     queryFn: ({ signal }) => fetchEvStations(anchor!, radius.ev, signal),
     enabled: anchor !== null,
+    refetchInterval: (query) => pinRefresh(query.state),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     retry: 1,
@@ -134,6 +139,7 @@ const RadarMap = () => {
     queryKey: ["radar", "fuel-stations", anchor?.lat, anchor?.lng, radius.fuel],
     queryFn: ({ signal }) => fetchFuelStations(anchor!, radius.fuel, signal),
     enabled: anchor !== null,
+    refetchInterval: (query) => pinRefresh(query.state),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     retry: 1,
@@ -375,8 +381,8 @@ const RadarMap = () => {
           <p className="rqr-all__title"><span>{layer === "tech" ? "All technicians" : layer === "ev" ? "All charging stations" : "All fuel pumps"}</span><span>Nearest first</span></p>
           {rows.map((row) => <PlaceRow key={row.id} row={row} onSelect={() => openDetail(layer, row.id)} />)}
         </section>
-        {layer === "ev" ? <p className="rqr-foot">Station details from Mappls. Directions open in Google Maps.</p> : null}
-        {layer === "fuel" ? <p className="rqr-foot">Prices are today’s city prices for {pricesQuery.data?.location?.area || "your area"}. Directions open in Google Maps.</p> : null}
+        {layer === "ev" ? <p className="rqr-foot">Station details from Mappls. Directions open in Google Maps.{evQuery.data?.positionsAttribution ? <OsmCredit /> : null}</p> : null}
+        {layer === "fuel" ? <p className="rqr-foot">Prices are today’s city prices for {pricesQuery.data?.location?.area || "your area"}. Directions open in Google Maps.{fuelQuery.data?.positionsAttribution ? <OsmCredit /> : null}</p> : null}
       </>
     );
   };

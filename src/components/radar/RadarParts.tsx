@@ -38,6 +38,8 @@ export type StationView = Logo & {
   status: { text: string; tone: "open" | "closed" | "none" };
   km: string;
   directionsUrl: string;
+  /** The map pin comes from OpenStreetMap and may be slightly off. */
+  approximate?: boolean;
 };
 
 export type EvView = StationView & {
@@ -271,6 +273,7 @@ export function StationDetail({ station: e, onClose }: { station: EvView; onClos
         </>
       ) : null}
       {e.address ? <p className="rqr-address"><MaterialSymbol name="location_on" className="rq-symbol-sm" />{e.address}</p> : null}
+      {e.approximate ? <PinNote /> : null}
       <div className="rqr-actions">
         <a href={e.directionsUrl} target="_blank" rel="noopener noreferrer" className="rq-h-btn rqr-grow rq-press" aria-label={`Directions to ${e.name} in Google Maps`}>
           <MaterialSymbol name="directions" />Directions in Google Maps
@@ -282,6 +285,20 @@ export function StationDetail({ station: e, onClose }: { station: EvView; onClos
         {e.status.tone === "none" ? "" : "Open means the station is operating. "}The network doesn’t share whether a charger is free right now.
       </p>
     </section>
+  );
+}
+
+function PinNote() {
+  return <p className="rqr-pin-note">Map pin placed using OpenStreetMap and may be slightly off. Directions use the address.</p>;
+}
+
+/** Credit for pins placed from OpenStreetMap data. */
+export function OsmCredit() {
+  return (
+    <>
+      {" "}Map pins ©{" "}
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.
+    </>
   );
 }
 
@@ -302,6 +319,7 @@ export function FuelDetail({ station: f, area, onClose }: { station: FuelView; a
         <p className="rqr-note"><MaterialSymbol name="info" className="rq-symbol-sm" />Prices aren’t available for this city yet.</p>
       )}
       {f.address ? <p className="rqr-address"><MaterialSymbol name="location_on" className="rq-symbol-sm" />{f.address}</p> : null}
+      {f.approximate ? <PinNote /> : null}
       <div className="rqr-actions">
         <a href={f.directionsUrl} target="_blank" rel="noopener noreferrer" className="rq-h-btn rqr-grow rq-press" aria-label={`Directions to ${f.name} in Google Maps`}>
           <MaterialSymbol name="directions" />Directions in Google Maps

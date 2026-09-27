@@ -324,6 +324,27 @@ describe("Live radar", () => {
       .toHaveAttribute("href", "https://www.google.com/maps/dir/?api=1&destination=11.0001%2C76.9611");
   });
 
+  it("pins stations placed from OpenStreetMap, credits it, and still routes by address", async () => {
+    harness.responses["/api/public/fuel-stations"] = json({
+      source: "mappls", radiusMeters: 5000, total: 2, located: 1, positionsAttribution: "© OpenStreetMap contributors",
+      stations: [
+        { ...pumps[0], latitude: 11.0101, longitude: 76.9601, positionSource: "osm" },
+        { ...pumps[1], latitude: null, longitude: null },
+      ],
+    });
+    renderRadar("/map?layer=fuel");
+
+    const card = await screen.findByRole("article", { name: "Indian Oil - Sri Balaji Fuels" });
+    expect(pins().map((pin) => pin.id)).toEqual(["fuel-F1"]);
+    expect(screen.getByRole("link", { name: "OpenStreetMap contributors" })).toHaveAttribute("href", "https://www.openstreetmap.org/copyright");
+    expect(within(card).getByRole("link", { name: /directions/i })).toHaveAttribute(
+      "href",
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent("Indian Oil - Sri Balaji Fuels, Trichy Road, Coimbatore")}`,
+    );
+    fireEvent.click(within(card).getByRole("button", { name: /open details/i }));
+    expect(screen.getByText(/map pin placed using openstreetmap/i)).toBeInTheDocument();
+  });
+
   it("offers a wider search when nothing is listed nearby", async () => {
     harness.responses["/api/public/ev-stations"] = stationsOk([]);
     renderRadar("/map?layer=ev");

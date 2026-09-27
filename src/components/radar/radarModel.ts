@@ -138,6 +138,7 @@ export function toEvView(e: EVChargingStation): EvView {
     status: openStatus(e.isOpen, e.openingHours?.[0]),
     km: formatKm(typeof e.distance === "number" ? e.distance / 1000 : undefined),
     directionsUrl: googleMapsDirectionsUrl(e),
+    approximate: e.positionSource === "osm",
     kw: power ? power.replace(/\s*kW$/, "") : null,
     connectors: e.connectorTypes ?? [],
     chargingTypes: e.chargingTypes ?? [],
@@ -165,7 +166,8 @@ export function toFuelView(f: FuelStation, prices: FuelPrice[] | undefined): Fue
     area: firstSegment(f.address),
     address: f.address,
     phone: f.phone,
-    directionsUrl: googleMapsDirectionsUrl({ id: f.id, name: f.name, address: f.address, latitude: f.latitude, longitude: f.longitude }),
+    directionsUrl: googleMapsDirectionsUrl(f),
+    approximate: f.positionSource === "osm",
     prices: (prices ?? [])
       .filter((price) => fuels.includes(price.fuel))
       .map((price) => ({ label: FUEL_LABELS[price.fuel] ?? price.label, value: `₹${price.price.toFixed(2)}`, change: price.change })),

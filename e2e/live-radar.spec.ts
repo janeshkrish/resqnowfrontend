@@ -214,6 +214,37 @@ test.describe("Live radar", () => {
   });
 });
 
+test.describe("Live radar pins placed later", () => {
+  test.use({ geolocation: HOME, permissions: ["geolocation"] });
+
+  test("chargers without Mappls coordinates get pins when the backend finishes placing them", async ({ page }) => {
+    let calls = 0;
+    await openRadar(page, "/map?layer=ev", {
+      ev: () => {
+        calls += 1;
+        const placed = calls > 1;
+        return {
+          body: {
+            ...stations([
+              { ...evStations[0], latitude: null, longitude: null },
+              { ...evStations[1], latitude: placed ? 11.028 : null, longitude: placed ? 76.93 : null, positionSource: placed ? "osm" : undefined },
+            ]),
+            positionsPending: !placed,
+            positionsAttribution: placed ? "© OpenStreetMap contributors" : undefined,
+          },
+        };
+      },
+    });
+
+    await expect(card(page, "Green Plug Point")).toBeVisible();
+    await expect(page.locator(".rqr-ppin")).toHaveCount(0);
+    // The radar asks again while pins are pending.
+    await expect(page.locator('.rqr-ppin[aria-label="Green Plug Point"]')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("link", { name: "OpenStreetMap contributors" })).toBeAttached();
+    expect(calls).toBeGreaterThan(1);
+  });
+});
+
 test.describe("Live radar on a phone", () => {
   test.use({ geolocation: HOME, permissions: ["geolocation"] });
   test.beforeEach(({ isMobile }) => test.skip(!isMobile, "The draggable sheet is phone-only"));

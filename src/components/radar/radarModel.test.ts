@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { brandOf, initialsOf } from "@/lib/brands";
-import { placePinHtml, technicianPinHtml } from "./pins";
+import { placePinHtml, placePinSize, technicianPinHtml } from "./pins";
 import { etaMinutes, formatKm, normalizeTechnicians, toEvView, toFuelView, toTechnicianView } from "./radarModel";
 
 const resolve = (path: string) => `https://api.test${path}`;
@@ -74,5 +74,13 @@ describe("radar model", () => {
     expect(place).toContain("A &amp; B");
     expect(place).toContain("&lt;script&gt;");
     expect(place).toContain("is-sel");
+  });
+
+  it("shows only the logo on a pin when there is no power or price", () => {
+    const pin = placePinHtml({ name: "Charger", initials: "CH", label: "", selected: false });
+    expect(pin).toContain("rqr-ppin--icon");
+    expect(pin).not.toContain("<span>");
+    expect(placePinSize("", false)).toEqual({ width: 32, height: 32 });
+    expect(placePinSize("60 kW", false).width).toBeGreaterThan(32);
   });
 });

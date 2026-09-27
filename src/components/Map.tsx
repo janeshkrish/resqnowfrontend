@@ -271,8 +271,8 @@ const RadarMap = () => {
       });
     }
     const places = layer === "ev"
-      ? evStations.map((station, index) => ({ station, view: evViews[index], label: evViews[index].kw ? `${evViews[index].kw} kW` : "EV" }))
-      : fuelStations.map((station, index) => ({ station, view: fuelViews[index], label: fuelViews[index].prices[0]?.value ?? "Fuel" }));
+      ? evStations.map((station, index) => ({ station, view: evViews[index], label: evViews[index].kw ? `${evViews[index].kw} kW` : "" }))
+      : fuelStations.map((station, index) => ({ station, view: fuelViews[index], label: fuelViews[index].prices[0]?.value ?? "" }));
     const activeStation = layer === "ev" ? evId : fuelId;
     return places.flatMap(({ station, view, label }) => {
       if (typeof station.latitude !== "number" || typeof station.longitude !== "number") return [];

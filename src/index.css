@@ -4133,6 +4133,10 @@
 
 .rqr-ppin.is-sel { height: 38px; padding: 0 13px 0 6px; background: #283048; color: #FFFFFF; font-size: 13.5px; box-shadow: 0 12px 22px -8px rgba(40, 48, 72, 0.75); }
 .rqr-ppin.is-sel .rqr-logo--xs { width: 26px; height: 26px; border-radius: 9px; font-size: 10px; }
+/* No power or price to show: just the logo in a round pin. */
+.rqr-ppin--icon,
+.rqr-ppin--icon.is-sel { justify-content: center; padding: 0; width: 32px; }
+.rqr-ppin--icon.is-sel { width: 38px; }
 
 /* ---------- Cards ---------- */
 .rqr-carousel {

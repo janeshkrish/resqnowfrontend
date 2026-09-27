@@ -70,7 +70,7 @@ const fullStation = {
 const bareStation = {
   id: "EVA002",
   name: "Green Plug Point",
-  address: "Avinashi Road, Peelamedu",
+  address: "Brookefields Mall, Avinashi Road, Peelamedu",
   latitude: 11.004,
   longitude: 76.97,
   distance: 2300,
@@ -257,6 +257,23 @@ describe("Live radar", () => {
     );
   });
 
+  it("opens any card's details on the first tap, and a list row's too", async () => {
+    renderRadar("/map?layer=ev");
+    await screen.findByRole("article", { name: "Tata Power EZ Charge" });
+
+    const second = screen.getByRole("article", { name: "Green Plug Point" });
+    expect(second).not.toHaveClass("is-sel");
+    expect(second).toHaveTextContent("Brookefields Mall");
+    fireEvent.click(within(second).getByRole("button", { name: /open details for green plug point/i }));
+    expect(screen.getByRole("region", { name: "Green Plug Point details" })).toBeInTheDocument();
+    expect(harness.mapProps?.focus).toEqual([[11.004, 76.97]]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    const rows = screen.getAllByRole("button", { name: /EV charging point/ });
+    fireEvent.click(rows[rows.length - 1]);
+    expect(screen.getByRole("region", { name: "EV charging point details" })).toBeInTheDocument();
+  });
+
   it("does not invent charger details a station doesn't list", async () => {
     renderRadar("/map?layer=ev");
     await screen.findByRole("article", { name: "Tata Power EZ Charge" });
@@ -297,6 +314,14 @@ describe("Live radar", () => {
     expect(within(cng).getByText("₹86.50")).toBeInTheDocument();
     expect(pins()[0].html).toContain("/images/brands/indianoil.png");
     expect(screen.getByText(/today’s city prices for coimbatore/i)).toBeInTheDocument();
+
+    fireEvent.click(within(cng).getByRole("button", { name: /open details for nayara energy cng/i }));
+    const detail = screen.getByRole("region", { name: "Nayara Energy CNG details" });
+    expect(within(detail).getByText("Today’s prices")).toBeInTheDocument();
+    expect(within(detail).getByText("₹86.50")).toBeInTheDocument();
+    expect(within(detail).getByText("Ukkadam, Coimbatore")).toBeInTheDocument();
+    expect(within(detail).getByRole("link", { name: /directions to nayara energy cng in google maps/i }))
+      .toHaveAttribute("href", "https://www.google.com/maps/dir/?api=1&destination=11.0001%2C76.9611");
   });
 
   it("offers a wider search when nothing is listed nearby", async () => {

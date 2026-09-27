@@ -9,6 +9,7 @@ import {
   CardSkeletons,
   EvCard,
   FuelCard,
+  FuelDetail,
   PeekCard,
   PlaceRow,
   RadarMessage,
@@ -41,7 +42,7 @@ const WIDER_RADIUS_METERS = 10_000;
 
 type Layer = "tech" | "ev" | "fuel";
 type Snap = "peek" | "normal" | "full";
-type Detail = { kind: "tech" | "ev"; id: string } | null;
+type Detail = { kind: Layer; id: string } | null;
 
 const LAYERS: Array<{ id: Layer; label: string; icon: string; param: string | null }> = [
   { id: "tech", label: "Technicians", icon: "engineering", param: null },
@@ -227,14 +228,16 @@ const RadarMap = () => {
   const select = useCallback((key: Layer, id: string, fromMap: boolean) => {
     setSelected((current) => ({ ...current, [key]: id }));
     if (fromMap) {
+      setDetail(null);
       setSnap((current) => (current === "full" ? "normal" : current));
       requestAnimationFrame(() => cardRefs.current.get(`${key}:${id}`)?.scrollIntoView?.({ behavior: "smooth", inline: "start", block: "nearest" }));
     }
   }, []);
 
-  const onCardSelect = (key: Layer, id: string, isSelected: boolean) => {
-    if (isSelected && (key === "tech" || key === "ev")) { setDetail({ kind: key, id }); return; }
+  // A tap on a card or a list row opens its details and marks it on the map.
+  const openDetail = (key: Layer, id: string) => {
     select(key, id, false);
+    setDetail({ kind: key, id });
   };
 
   // A map tap folds the sheet to make room for the map, unless the sheet is showing a message.
@@ -306,6 +309,7 @@ const RadarMap = () => {
   };
   const detailTech = detail?.kind === "tech" ? techViews.find((t) => t.id === detail.id) : undefined;
   const detailEv = detail?.kind === "ev" ? evViews.find((e) => e.id === detail.id) : undefined;
+  const detailFuel = detail?.kind === "fuel" ? fuelViews.find((f) => f.id === detail.id) : undefined;
   const notConfigured = searchError === "ev_search_unavailable" || searchError === "fuel_search_unavailable";
 
   const listBody = () => {
@@ -358,18 +362,18 @@ const RadarMap = () => {
       <>
         <div className="rqr-carousel" role="list" aria-label={titles[layer][0]}>
           {layer === "tech" && techViews.map((t) => (
-            <TechnicianCard key={t.id} ref={(node) => { if (node) cardRefs.current.set(`tech:${t.id}`, node); }} technician={t} selected={t.id === techId} onSelect={() => onCardSelect("tech", t.id, t.id === techId)} />
+            <TechnicianCard key={t.id} ref={(node) => { if (node) cardRefs.current.set(`tech:${t.id}`, node); }} technician={t} selected={t.id === techId} onSelect={() => openDetail("tech", t.id)} />
           ))}
           {layer === "ev" && evViews.map((e) => (
-            <EvCard key={e.id} ref={(node) => { if (node) cardRefs.current.set(`ev:${e.id}`, node); }} station={e} selected={e.id === evId} onSelect={() => onCardSelect("ev", e.id, e.id === evId)} />
+            <EvCard key={e.id} ref={(node) => { if (node) cardRefs.current.set(`ev:${e.id}`, node); }} station={e} selected={e.id === evId} onSelect={() => openDetail("ev", e.id)} />
           ))}
           {layer === "fuel" && fuelViews.map((f) => (
-            <FuelCard key={f.id} ref={(node) => { if (node) cardRefs.current.set(`fuel:${f.id}`, node); }} station={f} selected={f.id === fuelId} onSelect={() => onCardSelect("fuel", f.id, f.id === fuelId)} />
+            <FuelCard key={f.id} ref={(node) => { if (node) cardRefs.current.set(`fuel:${f.id}`, node); }} station={f} selected={f.id === fuelId} onSelect={() => openDetail("fuel", f.id)} />
           ))}
         </div>
         <section className="rqr-all" aria-label="Everything nearby">
           <p className="rqr-all__title"><span>{layer === "tech" ? "All technicians" : layer === "ev" ? "All charging stations" : "All fuel pumps"}</span><span>Nearest first</span></p>
-          {rows.map((row) => <PlaceRow key={row.id} row={row} onSelect={() => { select(layer, row.id, false); settle("normal"); }} />)}
+          {rows.map((row) => <PlaceRow key={row.id} row={row} onSelect={() => openDetail(layer, row.id)} />)}
         </section>
         {layer === "ev" ? <p className="rqr-foot">Station details from Mappls. Directions open in Google Maps.</p> : null}
         {layer === "fuel" ? <p className="rqr-foot">Prices are today’s city prices for {pricesQuery.data?.location?.area || "your area"}. Directions open in Google Maps.</p> : null}
@@ -467,7 +471,8 @@ const RadarMap = () => {
         <div className={cn("rqr-body", effectiveSnap === "peek" && coordinates && "is-tucked")} aria-hidden={effectiveSnap === "peek" && coordinates ? true : undefined}>
           {detailTech ? <TechnicianProfile technician={detailTech} onClose={() => settle("normal")} /> : null}
           {detailEv ? <StationDetail station={detailEv} onClose={() => settle("normal")} /> : null}
-          {!detailTech && !detailEv ? listBody() : null}
+          {detailFuel ? <FuelDetail station={detailFuel} area={pricesQuery.data?.location?.area} onClose={() => settle("normal")} /> : null}
+          {!detailTech && !detailEv && !detailFuel ? listBody() : null}
         </div>
       </motion.section>
     </div>

@@ -41,6 +41,8 @@ export type StationView = Logo & {
 };
 
 export type EvView = StationView & {
+  /** Where the charger is, e.g. the building or mall it sits in. */
+  area?: string;
   kw: string | null;
   connectors: string[];
   chargingTypes: string[];
@@ -51,6 +53,8 @@ export type EvView = StationView & {
 
 export type FuelView = StationView & {
   area?: string;
+  address?: string;
+  phone?: string;
   prices: Array<{ label: string; value: string; change: number | null }>;
 };
 
@@ -79,7 +83,7 @@ export const TechnicianCard = forwardRef<HTMLElement, CardProps & { technician: 
   function TechnicianCard({ technician: t, selected, onSelect }, ref) {
     return (
       <article ref={ref} className={cn("rqr-card", selected && "is-sel")} aria-label={t.name}>
-        <button type="button" className="rqr-card__select" onClick={onSelect} aria-label={selected ? `Open ${t.name}'s profile` : `Show ${t.name} on the map`} />
+        <button type="button" className="rqr-card__select" onClick={onSelect} aria-label={`Open ${t.name}'s profile`} />
         <div className="rqr-card__top">
           <LogoTile logo={null} photo={t.photo} initials={t.initials} />
           <div className="rqr-card__id">
@@ -102,7 +106,7 @@ export const TechnicianCard = forwardRef<HTMLElement, CardProps & { technician: 
 export const EvCard = forwardRef<HTMLElement, CardProps & { station: EvView }>(function EvCard({ station: e, selected, onSelect }, ref) {
   return (
     <article ref={ref} className={cn("rqr-card", selected && "is-sel")} aria-label={e.name}>
-      <button type="button" className="rqr-card__select" onClick={onSelect} aria-label={selected ? `Open details for ${e.name}` : `Show ${e.name} on the map`} />
+      <button type="button" className="rqr-card__select" onClick={onSelect} aria-label={`Open details for ${e.name}`} />
       <div className="rqr-card__top">
         <LogoTile {...e} />
         <div className="rqr-card__id">
@@ -116,16 +120,33 @@ export const EvCard = forwardRef<HTMLElement, CardProps & { station: EvView }>(f
       </div>
       <div className="rqr-card__row">
         <Directions href={e.directionsUrl} name={e.name} />
-        <span className="rqr-dist"><MaterialSymbol name="near_me" className="rq-symbol-xs" />{e.km}</span>
+        <span className="rqr-dist"><MaterialSymbol name="near_me" className="rq-symbol-xs" />{[e.km, e.area].filter(Boolean).join(" · ")}</span>
       </div>
     </article>
   );
 });
 
+function PriceChip({ price: p }: { price: FuelView["prices"][number] }) {
+  return (
+    <span className="rqr-price">
+      <small>{p.label}</small>
+      <b>
+        {p.value}
+        {p.change !== null ? (
+          <span className={cn("rqr-chg", p.change > 0 ? "rqr-chg--up" : p.change < 0 ? "rqr-chg--down" : "rqr-chg--flat")}>
+            <MaterialSymbol name={p.change > 0 ? "arrow_drop_up" : p.change < 0 ? "arrow_drop_down" : "remove"} />
+            {p.change ? Math.abs(p.change).toFixed(2) : ""}
+          </span>
+        ) : null}
+      </b>
+    </span>
+  );
+}
+
 export const FuelCard = forwardRef<HTMLElement, CardProps & { station: FuelView }>(function FuelCard({ station: f, selected, onSelect }, ref) {
   return (
     <article ref={ref} className={cn("rqr-card", selected && "is-sel")} aria-label={f.name}>
-      <button type="button" className="rqr-card__select" onClick={onSelect} aria-label={`Show ${f.name} on the map`} />
+      <button type="button" className="rqr-card__select" onClick={onSelect} aria-label={`Open details for ${f.name}`} />
       <div className="rqr-card__top">
         <LogoTile {...f} />
         <div className="rqr-card__id">
@@ -134,22 +155,7 @@ export const FuelCard = forwardRef<HTMLElement, CardProps & { station: FuelView 
         </div>
       </div>
       {f.prices.length ? (
-        <div className="rqr-prices">
-          {f.prices.map((p) => (
-            <span key={p.label} className="rqr-price">
-              <small>{p.label}</small>
-              <b>
-                {p.value}
-                {p.change !== null ? (
-                  <span className={cn("rqr-chg", p.change > 0 ? "rqr-chg--up" : p.change < 0 ? "rqr-chg--down" : "rqr-chg--flat")}>
-                    <MaterialSymbol name={p.change > 0 ? "arrow_drop_up" : p.change < 0 ? "arrow_drop_down" : "remove"} />
-                    {p.change ? Math.abs(p.change).toFixed(2) : ""}
-                  </span>
-                ) : null}
-              </b>
-            </span>
-          ))}
-        </div>
+        <div className="rqr-prices">{f.prices.map((p) => <PriceChip key={p.label} price={p} />)}</div>
       ) : (
         <p className="rqr-card__sub">Prices aren’t available for this city yet</p>
       )}
@@ -271,7 +277,40 @@ export function StationDetail({ station: e, onClose }: { station: EvView; onClos
         </a>
         {e.phone ? <a href={`tel:${e.phone}`} className="rqr-icon-btn rqr-icon-btn--lg rq-press" aria-label={`Call ${e.name}`}><MaterialSymbol name="call" /></a> : null}
       </div>
-      <p className="rqr-note"><MaterialSymbol name="info" className="rq-symbol-sm" />Open means the station is operating. The network doesn’t share whether a charger is free right now.</p>
+      <p className="rqr-note">
+        <MaterialSymbol name="info" className="rq-symbol-sm" />
+        {e.status.tone === "none" ? "" : "Open means the station is operating. "}The network doesn’t share whether a charger is free right now.
+      </p>
+    </section>
+  );
+}
+
+export function FuelDetail({ station: f, area, onClose }: { station: FuelView; area?: string; onClose: () => void }) {
+  return (
+    <section className="rqr-detail" aria-label={`${f.name} details`}>
+      <DetailTop logo={<LogoTile {...f} size="lg" />} title={f.name} sub={f.sub || "Fuel pump"} onClose={onClose} />
+      <div className="rqr-pills">
+        <span className={statusClass(f.status.tone)}>{f.status.text}</span>
+        <span className="rqr-pill"><MaterialSymbol name="near_me" className="rq-symbol-xs" />{f.km} away</span>
+      </div>
+      {f.prices.length ? (
+        <>
+          <p className="rqr-sec">Today’s prices</p>
+          <div className="rqr-prices rqr-prices--lg">{f.prices.map((p) => <PriceChip key={p.label} price={p} />)}</div>
+        </>
+      ) : (
+        <p className="rqr-note"><MaterialSymbol name="info" className="rq-symbol-sm" />Prices aren’t available for this city yet.</p>
+      )}
+      {f.address ? <p className="rqr-address"><MaterialSymbol name="location_on" className="rq-symbol-sm" />{f.address}</p> : null}
+      <div className="rqr-actions">
+        <a href={f.directionsUrl} target="_blank" rel="noopener noreferrer" className="rq-h-btn rqr-grow rq-press" aria-label={`Directions to ${f.name} in Google Maps`}>
+          <MaterialSymbol name="directions" />Directions in Google Maps
+        </a>
+        {f.phone ? <a href={`tel:${f.phone}`} className="rqr-icon-btn rqr-icon-btn--lg rq-press" aria-label={`Call ${f.name}`}><MaterialSymbol name="call" /></a> : null}
+      </div>
+      {f.prices.length ? (
+        <p className="rqr-note"><MaterialSymbol name="info" className="rq-symbol-sm" />These are today’s city prices{area ? ` for ${area}` : ""}. The pump’s own price can differ slightly.</p>
+      ) : null}
     </section>
   );
 }

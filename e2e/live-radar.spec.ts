@@ -22,6 +22,8 @@ const evStations = [
     phone: "9876500000", availability: { status: "unknown" },
   },
   { id: "EVA002", name: "Green Plug Point", address: "Avinashi Road", latitude: 11.028, longitude: 76.93, distance: 2300, availability: { status: "unknown" } },
+  // Named the way Mappls names chargers, and without map coordinates.
+  { id: "EVA003", name: "ChargeZone Electric Vehicle Charging Station", brand: "chargezone", address: "JW Marriott, UB City, Vittal Mallya Road, Bengaluru", latitude: null, longitude: null, distance: 43, availability: { status: "unknown" } },
 ];
 
 const pumps = [
@@ -133,20 +135,37 @@ test.describe("Live radar", () => {
     await expect(card(page, "Arun Kumar")).toBeVisible();
   });
 
-  test("shows EV charging with brand logos, details and Google Maps directions", async ({ page }) => {
+  test("shows EV charging with brand logos, details and Google Maps directions", async ({ page, isMobile }) => {
     const { requests } = await openRadar(page);
     await page.getByRole("tab", { name: /ev charging/i }).click();
     await expect(page).toHaveURL(/\?layer=ev$/);
 
     const tata = card(page, "Tata Power EZ Charge");
     await expect(tata).toContainText("Open · 06:00-22:00");
+    // Tapping any card opens its details straight away.
+    await card(page, "Green Plug Point").getByRole("button", { name: /open details for green plug point/i }).click();
+    await expect(page.getByRole("region", { name: "Green Plug Point details" })).toBeVisible();
+    await page.getByRole("region", { name: "Green Plug Point details" }).getByRole("button", { name: "Close" }).click();
+    // So does a row in the full list (phones; larger screens list every card in the side panel).
+    if (isMobile) {
+      await page.locator(".rqr-arow", { hasText: "ChargeZone EV Charging Station" }).click();
+      await expect(page.getByRole("region", { name: "ChargeZone EV Charging Station details" })).toContainText("Availability unknown");
+      await page.getByRole("region", { name: "ChargeZone EV Charging Station details" }).getByRole("button", { name: "Close" }).click();
+    }
     await expect(tata).toContainText("CCS2");
     await imageLoaded(page, '.rqr-card img[src="/images/brands/tatapower.png"]');
     await expect(tata.getByRole("link", { name: /directions to tata power ez charge/i }))
       .toHaveAttribute("href", "https://www.google.com/maps/dir/?api=1&destination=11.0228%2C76.9648");
     await expect(page.locator(".rqr-ppin")).toHaveCount(2);
+    // Long names wrap inside the card instead of stretching it past the screen.
+    const width = page.viewportSize()!.width;
+    for (const box of await page.locator(".rqr-carousel .rqr-card").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width))) {
+      expect(box).toBeLessThanOrEqual(Math.min(width, 430));
+    }
+    await expect(card(page, "ChargeZone EV Charging Station")).toContainText("JW Marriott");
     expect(requests).toContain("/api/public/ev-stations?lat=11.0168&lng=76.9558&radius=5000");
 
+    await tata.scrollIntoViewIfNeeded();
     await tata.getByRole("button", { name: /open details for tata power ez charge/i }).click();
     const detail = page.getByRole("region", { name: "Tata Power EZ Charge details" });
     await expect(detail).toContainText("Availability unknown");
@@ -168,6 +187,12 @@ test.describe("Live radar", () => {
     await imageLoaded(page, '.rqr-card img[src="/images/brands/indianoil.png"]');
     await expect(card(page, "Nayara Energy CNG")).toContainText("₹86.50");
     await imageLoaded(page, '.rqr-card img[src="/images/brands/nayara.png"]');
+    await card(page, "Nayara Energy CNG").getByRole("button", { name: /open details for nayara energy cng/i }).click();
+    const fuelDetail = page.getByRole("region", { name: "Nayara Energy CNG details" });
+    await expect(fuelDetail).toContainText("Today’s prices");
+    await expect(fuelDetail).toContainText("₹86.50");
+    await expect(fuelDetail.getByRole("link", { name: /in google maps/i })).toHaveAttribute("href", /destination=11\.0251%2C76\.9411/);
+    await fuelDetail.getByRole("button", { name: "Close" }).click();
     await expect(page.getByText(/today’s city prices for Coimbatore/)).toBeAttached();
   });
 

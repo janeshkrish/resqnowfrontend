@@ -4145,9 +4145,12 @@
 
 .rqr-carousel::-webkit-scrollbar { display: none; }
 
+/* Cards keep a fixed width however long a place name is; the name wraps instead. */
 .rqr-card {
   position: relative;
-  flex: 0 0 min(298px, calc(100vw - 72px));
+  flex: 0 0 auto;
+  width: min(298px, calc(100vw - 72px));
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4182,24 +4185,25 @@
 .rqr-card__select:focus-visible { outline: 2px solid #283048; outline-offset: 2px; }
 .rqr-card a { position: relative; z-index: 2; }
 
+.rqr-card > * { min-width: 0; }
 .rqr-card__top { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .rqr-card__id { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex-grow: 1; min-width: 0; }
 
 .rqr-card__name {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  display: -webkit-box;
   max-width: 100%;
   margin: 0;
   overflow: hidden;
+  overflow-wrap: anywhere;
   color: #283048;
   font-size: 15px;
   line-height: 20px;
   font-weight: 800;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.rqr-card__name .rq-symbol { flex-shrink: 0; color: #283048; font-size: 17px; }
+.rqr-card__name .rq-symbol { margin-left: 4px; color: #283048; font-size: 17px; vertical-align: -3px; }
 
 .rqr-card__sub {
   max-width: 100%;
@@ -4338,6 +4342,9 @@
 .rqr-dist .rq-symbol { color: #667085; }
 
 .rqr-prices { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+.rqr-prices--lg { gap: 8px; }
+.rqr-prices--lg .rqr-price { padding: 12px; border-radius: 16px; }
+.rqr-prices--lg .rqr-price b { font-size: 18px; line-height: 22px; }
 .rqr-price { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 7px 9px; border-radius: 12px; background: #F7F8FA; }
 .rqr-price small { color: #667085; font-size: 10.5px; line-height: 13px; font-weight: 700; }
 
@@ -4569,7 +4576,7 @@
   .rqr-sheet.is-panel .rqr-head { padding-top: 20px; }
   .rqr-sheet.is-panel .rqr-body { padding-bottom: 24px; }
   .rqr-sheet.is-panel .rqr-carousel { flex-direction: column; overflow: visible; scroll-snap-type: none; }
-  .rqr-sheet.is-panel .rqr-card { flex: 0 0 auto; }
+  .rqr-sheet.is-panel .rqr-card { width: auto; }
   .rqr-sheet.is-panel .rqr-all { display: none; }
 }
 

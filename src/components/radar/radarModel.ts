@@ -120,16 +120,21 @@ const openStatus = (isOpen: boolean | undefined, hours?: string) => {
 
 const firstSegment = (address?: string) => address?.split(",")[0]?.trim() || undefined;
 
+/** Mappls names chargers in full ("… Electric Vehicle Charging Station"); "EV" keeps cards readable. */
+const shortStationName = (name: string) => name.replace(/\belectric vehicle\b/gi, "EV").replace(/\s{2,}/g, " ").trim();
+
 export function toEvView(e: EVChargingStation): EvView {
   const brand = brandOf(e.brand);
   const power = formatChargingPower(e.chargingPower);
+  const area = firstSegment(e.address);
   return {
     id: e.id,
-    name: e.name,
-    sub: [brand?.name && brand.name !== e.name ? brand.name : null, firstSegment(e.address)].filter(Boolean).join(" · ") || undefined,
+    name: shortStationName(e.name),
+    area,
+    sub: [brand?.name, area].filter(Boolean).join(" · ") || undefined,
     logo: brand?.logo ?? null,
     photo: null,
-    initials: initialsOf(e.name),
+    initials: initialsOf(brand?.name ?? e.name),
     status: openStatus(e.isOpen, e.openingHours?.[0]),
     km: formatKm(typeof e.distance === "number" ? e.distance / 1000 : undefined),
     directionsUrl: googleMapsDirectionsUrl(e),
@@ -154,9 +159,12 @@ export function toFuelView(f: FuelStation, prices: FuelPrice[] | undefined): Fue
     logo: brand?.logo ?? null,
     photo: null,
     initials: initialsOf(brand?.name ?? f.name),
+    sub: [brand?.name, firstSegment(f.address)].filter(Boolean).join(" · ") || undefined,
     status: openStatus(f.isOpen, f.openingHours?.[0]),
     km: formatKm(typeof f.distance === "number" ? f.distance / 1000 : undefined),
     area: firstSegment(f.address),
+    address: f.address,
+    phone: f.phone,
     directionsUrl: googleMapsDirectionsUrl({ id: f.id, name: f.name, address: f.address, latitude: f.latitude, longitude: f.longitude }),
     prices: (prices ?? [])
       .filter((price) => fuels.includes(price.fuel))
@@ -170,11 +178,12 @@ export const techRow = (t: TechnicianView): RowView => ({
 });
 
 export const evRow = (e: EvView): RowView => ({
-  id: e.id, name: e.name, meta: [e.status.text, e.connectors.slice(0, 2).join(", ")].filter(Boolean).join(" · "),
+  id: e.id, name: e.name,
+  meta: [e.area, e.status.tone === "none" ? null : e.status.text, e.connectors.slice(0, 2).join(", ")].filter(Boolean).join(" · ") || e.status.text,
   value: e.kw ? `${e.kw} kW` : "EV", valueSub: e.km, logo: e.logo, photo: null, initials: e.initials,
 });
 
 export const fuelRow = (f: FuelView): RowView => ({
-  id: f.id, name: f.name, meta: [f.status.text, f.area].filter(Boolean).join(" · "),
+  id: f.id, name: f.name, meta: [f.area, f.status.tone === "none" ? null : f.status.text].filter(Boolean).join(" · ") || f.status.text,
   value: f.prices[0]?.value ?? "—", valueSub: f.km, logo: f.logo, photo: null, initials: f.initials,
 });

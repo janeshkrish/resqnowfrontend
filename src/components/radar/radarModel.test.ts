@@ -44,6 +44,11 @@ describe("radar model", () => {
     expect(toFuelView({ ...base, brand: "shell" }, undefined)).toMatchObject({ prices: [], logo: "/images/brands/shell.png", km: "1.5 km" });
   });
 
+  it("shortens Mappls' long charger names and shows where the charger is", () => {
+    const view = toEvView({ id: "e", name: "Tata Power Electric Vehicle Charging Station", brand: "tatapower", latitude: null, longitude: null, address: "JW Marriott Hotel UB City, Vittal Mallya Road, Bengaluru" });
+    expect(view).toMatchObject({ name: "Tata Power EV Charging Station", area: "JW Marriott Hotel UB City", sub: "Tata Power EZ Charge · JW Marriott Hotel UB City", initials: "TP" });
+  });
+
   it("marks an EV station's hours as unknown rather than open", () => {
     const view = toEvView({ id: "e", name: "Plug Point", latitude: null, longitude: null, address: "MG Road, Bengaluru" });
     expect(view.status).toEqual({ text: "Hours not listed", tone: "none" });

@@ -1,9 +1,7 @@
-import { Button } from "../ui/button";
-import { Label } from "../ui/label";
-import { Input } from "../ui/input";
 import { LocationSelection, ServiceRequestFormData } from "./types";
-import { MapPin, Loader2, Navigation } from "lucide-react";
 import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { cn } from "@/lib/utils";
 import MapplsPlaceInput from "./MapplsPlaceInput";
 import TowingEstimateCard from "./TowingEstimateCard";
 import { fetchRoute, reverseGeocode, routePolylineFromMetadata } from "@/lib/geo";
@@ -14,7 +12,8 @@ import type { MapCameraSpec, MapMarkerSpec, MapPolylineSpec, MapPoint } from "@/
 interface LocationStepProps {
   formData: ServiceRequestFormData;
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
-  currentLocation: string;
+  /** Kept for callers; the address field shows the detected location itself. */
+  currentLocation?: string;
   isGettingLocation: boolean;
   onGetCurrentLocation: () => void;
   onLocationSelect?: (lat: number, lng: number, address?: string, placeId?: string | null) => void;
@@ -25,6 +24,8 @@ interface LocationStepProps {
   isEstimatingTowing?: boolean;
   towingEstimateError?: string | null;
   towingEstimateWarning?: string | null;
+  /** SOS: the pin turns red. */
+  emergency?: boolean;
 }
 
 const normalizeAddressValue = (value: unknown): string => {
@@ -47,8 +48,10 @@ const normalizePlaceSelection = (place: LocationSelection): LocationSelection =>
   };
 };
 
-const PICKUP_MARKER_HTML = '<div style="width:32px;height:32px;border:3px solid white;border-radius:9999px;background:#059669;color:white;display:grid;place-items:center;font:800 11px/1 sans-serif;box-shadow:0 4px 12px rgba(15,23,42,.3)">P</div>';
-const DROP_MARKER_HTML = '<div style="width:32px;height:32px;border:3px solid white;border-radius:9999px;background:#e11d48;color:white;display:grid;place-items:center;font:800 11px/1 sans-serif;box-shadow:0 4px 12px rgba(15,23,42,.3)">D</div>';
+// Pick up is a navy dot, the drop a red square, as in the rest of the request form.
+const PICKUP_MARKER_HTML = '<div style="width:22px;height:22px;box-sizing:border-box;border:4px solid white;border-radius:9999px;background:#283048;box-shadow:0 3px 10px rgba(40,48,72,.45)"></div>';
+const SOS_MARKER_HTML = '<div style="width:22px;height:22px;box-sizing:border-box;border:4px solid white;border-radius:9999px;background:#B01F2A;box-shadow:0 3px 10px rgba(176,31,42,.5)"></div>';
+const DROP_MARKER_HTML = '<div style="width:22px;height:22px;box-sizing:border-box;border:4px solid white;border-radius:6px;background:#B01F2A;box-shadow:0 3px 10px rgba(176,31,42,.45)"></div>';
 
 const isUsableSearchCoordinate = (lat: number, lng: number) =>
   Number.isFinite(lat)
@@ -62,7 +65,6 @@ const isUsableSearchCoordinate = (lat: number, lng: number) =>
 const LocationStep = ({
   formData,
   onInputChange,
-  currentLocation,
   isGettingLocation,
   onGetCurrentLocation,
   onLocationSelect,
@@ -72,7 +74,8 @@ const LocationStep = ({
   towingEstimate,
   isEstimatingTowing,
   towingEstimateError,
-  towingEstimateWarning
+  towingEstimateWarning,
+  emergency = false
 }: LocationStepProps) => {
 
   const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(
@@ -138,10 +141,6 @@ const LocationStep = ({
       }
     } as React.ChangeEvent<HTMLInputElement>;
     onInputChange(inputEvent);
-  };
-
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    emitTextChange(e.target.name, e.target.value);
   };
 
   const handlePickupPlaceSelect = (place: LocationSelection) => {
@@ -237,7 +236,7 @@ const LocationStep = ({
       nextMarkers.push({
         id: "pickup",
         position: markerPosition,
-        html: PICKUP_MARKER_HTML,
+        html: emergency ? SOS_MARKER_HTML : PICKUP_MARKER_HTML,
         anchor: "center",
         draggable: true,
         onDragEnd: ({ lat, lng }) => void handleMarkerDragEnd(lat, lng, "pickup"),
@@ -256,6 +255,7 @@ const LocationStep = ({
     return nextMarkers;
   }, [
     dropPosition,
+    emergency,
     handleMarkerDragEnd,
     markerPosition,
     requiresDropLocation,
@@ -266,7 +266,7 @@ const LocationStep = ({
       ? [{
           id: "towing-route",
           points: routePoints,
-          color: "#0f172a",
+          color: "#283048",
           width: 4,
           opacity: 0.8,
         }]
@@ -305,168 +305,117 @@ const LocationStep = ({
   }, [activePin, handleMarkerDragEnd, requiresDropLocation]);
 
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-500">
-      <div className="mb-4 px-1">
-        <h3 className="text-2xl font-black tracking-tight text-foreground mb-2">
-          {requiresDropLocation ? "Towing Route" : "Service Location"}
-        </h3>
-        <p className="text-sm font-medium text-muted-foreground/80">
-          {requiresDropLocation ? "Choose pickup and drop points for a verified towing fare." : "Pinpoint your exact location for fastest arrival."}
-        </p>
+    <div className="rqf-location">
+      <div className={cn("rqf-map", requiresDropLocation && "tow")}>
+        <MapplsMapSurface
+          ariaLabel="Service request location map"
+          className="h-full min-h-0 w-full"
+          markers={markers}
+          polylines={polylines}
+          circles={[]}
+          camera={camera}
+          onMapClick={handleMapClick}
+          fallbackDescription="You can still use your current location or search for the address."
+        />
+        <span className="rqf-map-hint" aria-hidden="true">
+          <MaterialSymbol name="pan_tool" />
+          {requiresDropLocation ? `Tap the map to move the ${activePin === "pickup" ? "pick up" : "drop"} pin` : "Drag the pin to the exact spot"}
+        </span>
+        {requiresDropLocation ? (
+          <div className="rqf-pin-toggle" role="radiogroup" aria-label="Which pin the map moves">
+            <button type="button" role="radio" aria-checked={activePin === "pickup"} className={cn(activePin === "pickup" && "is-on")} onClick={() => setActivePin("pickup")}>Pick up</button>
+            <button type="button" role="radio" aria-checked={activePin === "drop"} className={cn(activePin === "drop" && "is-on")} onClick={() => setActivePin("drop")}>Drop</button>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          className="rqf-locate rq-press"
+          aria-label={isGettingLocation ? "Finding your location" : "Use my current location"}
+          onClick={onGetCurrentLocation}
+          disabled={isGettingLocation}
+        >
+          <MaterialSymbol name={isGettingLocation ? "progress_activity" : "my_location"} className={isGettingLocation ? "rqf-spin" : undefined} />
+        </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-5">
-        {/* Modern Map Container */}
-        <div className="flex-[1.2] bg-card dark:bg-slate-900 rounded-[1.5rem] overflow-hidden border border-border shadow-sm relative shadow-sm">
-          <div className="h-[250px] md:h-[400px] w-full relative z-0">
-            <MapplsMapSurface
-              ariaLabel="Service request location map"
-              className="h-full min-h-0 w-full"
-              markers={markers}
-              polylines={polylines}
-              circles={[]}
-              camera={camera}
-              onMapClick={handleMapClick}
-              fallbackDescription="You can still use Auto Detect or search for your address."
-            />
-
-            {/* Premium Floating Badge */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] text-[10px] font-bold tracking-widest uppercase text-white z-[400] pointer-events-none flex items-center gap-2 border border-white/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              {requiresDropLocation ? "Drag pins to refine route" : "Drag to refine location"}
-            </div>
-            {requiresDropLocation && (
-              <div className="absolute bottom-3 left-1/2 z-[400] flex -translate-x-1/2 rounded-full border border-white/70 bg-white/95 p-1 shadow-lg backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => setActivePin("pickup")}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
-                    activePin === "pickup" ? "bg-emerald-600 text-white" : "text-slate-600"
-                  }`}
-                >
-                  Pickup
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePin("drop")}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
-                    activePin === "drop" ? "bg-rose-600 text-white" : "text-slate-600"
-                  }`}
-                >
-                  Drop
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Address & Details Unified Container */}
-        <div className="flex-1 space-y-5">
-          <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] border border-border shadow-sm overflow-hidden flex flex-col">
-
-            {/* Action Bar */}
-            <div className="p-4 border-b border-border bg-muted/50 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <MapPin className="h-4 w-4 text-slate-400" />
-                <Label className="text-[11px] uppercase font-bold tracking-widest text-muted-foreground/80">
-                  {requiresDropLocation ? "Route Details" : "Address Details"}
-                </Label>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 rounded-full border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors shadow-none text-xs font-bold px-3"
-                onClick={onGetCurrentLocation}
-                disabled={isGettingLocation}
-              >
-                {isGettingLocation ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
-                {isGettingLocation ? "Locating" : "Auto Detect"}
-              </Button>
-            </div>
-
-            {/* GPS Reference (if available) */}
-            {currentLocation && (
-              <div className="px-4 py-3 bg-red-50/50 border-b border-red-100/50">
-                <div className="flex gap-2 items-start">
-                  <div className="mt-0.5 text-red-600">🎯</div>
-                  <p className="text-[11px] font-semibold text-red-900 leading-tight pr-2">
-                    {currentLocation}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3 p-4 border-b border-border">
-              <div className="space-y-2">
-                <Label htmlFor="location" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Pickup Location</Label>
+      <div className="rqf-sec">
+        {requiresDropLocation ? (
+          <div className="rqf-route">
+            <div className="rqf-route-row">
+              <span className="rqf-dot" aria-hidden="true" />
+              <div className="rqf-route-field">
+                <label htmlFor="location" className="rqf-loc-lbl">Pick up from</label>
                 <MapplsPlaceInput
                   id="location"
                   name="location"
                   value={normalizeAddressValue(formData.location)}
-                  placeholder="Search pickup address..."
+                  placeholder={isGettingLocation ? "Finding you…" : "Search where the vehicle is"}
                   locationBias={searchLocationBias}
                   onTextChange={emitTextChange}
                   onPlaceSelect={handlePickupPlaceSelect}
                 />
               </div>
-              {requiresDropLocation && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="dropLocation" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Drop Location</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setActivePin("drop")}
-                      className="h-7 gap-1 rounded-full px-2 text-[11px] font-bold text-slate-500"
-                    >
-                      <Navigation className="h-3 w-3" />
-                      Map pin
-                    </Button>
-                  </div>
-                  <MapplsPlaceInput
-                    id="dropLocation"
-                    name="dropLocation"
-                    value={normalizeAddressValue(formData.dropLocation)}
-                    placeholder="Search garage, home, or service center..."
-                    iconTone="drop"
-                    locationBias={searchLocationBias}
-                    onTextChange={emitTextChange}
-                    onPlaceSelect={handleDropPlaceSelect}
-                  />
-                </div>
-              )}
-              <p className="text-[11px] text-slate-400 font-medium mt-1">
-                Include landmarks (e.g., "Opposite to City Mall")
-              </p>
             </div>
-
-            {/* Additional Details */}
-            <div className="p-4 bg-muted/30">
-              <div className="flex items-center gap-2.5 mb-2">
-                <Label htmlFor="details" className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Extra Note (Optional)</Label>
+            <span className="rqf-route-line" aria-hidden="true" />
+            <div className="rqf-route-row">
+              <span className="rqf-square" aria-hidden="true" />
+              <div className="rqf-route-field">
+                <label htmlFor="dropLocation" className="rqf-loc-lbl">Take it to</label>
+                <MapplsPlaceInput
+                  id="dropLocation"
+                  name="dropLocation"
+                  value={normalizeAddressValue(formData.dropLocation)}
+                  placeholder="Search a garage, service centre or home"
+                  iconTone="drop"
+                  locationBias={searchLocationBias}
+                  onTextChange={emitTextChange}
+                  onPlaceSelect={handleDropPlaceSelect}
+                />
               </div>
-              <Input
-                id="details"
-                name="details"
-                placeholder="Gate code, parking spot..."
-                value={formData.details}
-                onChange={handleTextareaChange}
-                className="h-10 text-sm border-0 focus-visible:ring-0 px-0 rounded-none bg-transparent placeholder:text-slate-300 font-semibold text-muted-foreground shadow-none"
+            </div>
+          </div>
+        ) : (
+          <div className="rqf-loc">
+            <span className={cn("rqf-dot", emergency && "sos")} aria-hidden="true" />
+            <div className="rqf-route-field">
+              <label htmlFor="location" className="rqf-loc-lbl">Help comes to</label>
+              <MapplsPlaceInput
+                id="location"
+                name="location"
+                value={normalizeAddressValue(formData.location)}
+                placeholder={isGettingLocation ? "Finding you…" : "Search your area or street"}
+                locationBias={searchLocationBias}
+                onTextChange={emitTextChange}
+                onPlaceSelect={handlePickupPlaceSelect}
               />
             </div>
-
           </div>
-          {requiresDropLocation && (
-            <TowingEstimateCard
-              estimate={towingEstimate}
-              loading={isEstimatingTowing}
-              error={towingEstimateError}
-              warning={towingEstimateWarning}
-            />
-          )}
+        )}
+      </div>
+
+      {requiresDropLocation ? (
+        <div className="rqf-sec">
+          <TowingEstimateCard
+            estimate={towingEstimate}
+            loading={isEstimatingTowing}
+            error={towingEstimateError}
+            warning={towingEstimateWarning}
+          />
         </div>
+      ) : null}
+
+      <div className="rqf-sec">
+        <p className="rqf-lbl"><label htmlFor="landmark">Landmark or exact spot</label><small>Optional</small></p>
+        <input
+          id="landmark"
+          name="landmark"
+          className="rqf-input"
+          type="text"
+          value={String(formData.landmark || "")}
+          onChange={(event) => emitTextChange("landmark", event.target.value.slice(0, 120))}
+          placeholder="e.g. near the bus stop, basement B2"
+          autoComplete="off"
+        />
       </div>
     </div>
   );

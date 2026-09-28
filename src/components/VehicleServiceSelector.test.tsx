@@ -42,7 +42,7 @@ describe("VehicleServiceSelector", () => {
 
     expect(screen.getByText("Towing Services")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /which vehicle\s*needs help\?/i })).toBeInTheDocument();
-    expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
+    expect(screen.getByText("Then 3 quick steps")).toBeInTheDocument();
 
     const expected: Array<[RegExp, string]> = [
       [/^car:/i, "/images/vehicles/car.webp"],

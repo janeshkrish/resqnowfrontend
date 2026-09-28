@@ -11,6 +11,8 @@ import {
 import { format } from "date-fns";
 import { TechnicianServiceRequest } from "@/hooks/useRealtimeTechnicianRequests";
 import { normalizeTechnicianStatus, formatTechnicianStatus } from "@/utils/technicianStatus";
+import { JobDetailsList } from "@/components/technician/JobDetails";
+import { readJobDetails } from "@/lib/technicianJobDetails";
 
 interface LiveRequestTrackerProps {
   request: TechnicianServiceRequest;
@@ -60,6 +62,7 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
   const nextAction = getNextAction();
   const routeDistanceKm = Number(request.routeDistanceKm ?? request.route_distance_km);
   const dropAddress = request.dropLocation?.address || request.drop_address || null;
+  const details = readJobDetails(request);
 
   return (
     <Card className="border-2 border-primary/20">
@@ -71,7 +74,7 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
               {request.service_type}
             </CardTitle>
             <CardDescription>
-              {request.vehicle_type} {request.vehicle_model && `• ${request.vehicle_model}`}
+              {details?.vehicleLine ? `${request.vehicle_type} • ${details.vehicleLine}` : <>{request.vehicle_type} {request.vehicle_model && `• ${request.vehicle_model}`}</>}
             </CardDescription>
           </div>
           <Badge className={
@@ -196,8 +199,12 @@ const LiveRequestTracker: React.FC<LiveRequestTrackerProps> = ({ request, onStat
           </div>
         </div>
 
-        {/* Problem Description */}
-        {request.description && (
+        {/* What the customer told us; older requests only have a description. */}
+        {details ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <JobDetailsList details={details} />
+          </div>
+        ) : request.description && (
           <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
             <h4 className="font-medium flex items-center gap-2 text-amber-700 dark:text-amber-400 mb-2">
               <AlertCircle className="h-4 w-4" />

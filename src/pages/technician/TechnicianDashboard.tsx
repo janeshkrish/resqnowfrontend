@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from "react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { Button } from "@/components/ui/button";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
+import { JobDetailsList } from "@/components/technician/JobDetails";
+import { readJobDetails } from "@/lib/technicianJobDetails";
 import { toast } from "sonner";
 import { Loader2, MapPin, DollarSign, Navigation, PhoneCall, User, Car, Briefcase, CreditCard, Star } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -534,6 +536,7 @@ const TechnicianDashboard = () => {
           address: String((dropLocation as any)?.address || offerData?.dropAddress || offerData?.drop_address || "").trim() || null,
         },
         vehicleCategory: String(offerData?.vehicleCategory || offerData?.vehicle_category || "").trim() || null,
+        details: readJobDetails(offerData),
         amount: offerData?.technicianEstimatedEarning != null && !Number.isNaN(Number(offerData?.technicianEstimatedEarning))
           ? Number(offerData.technicianEstimatedEarning)
           : offerData?.estimatedEarnings != null && !Number.isNaN(Number(offerData?.estimatedEarnings))
@@ -968,6 +971,7 @@ const TechnicianDashboard = () => {
     const handledKey = `${routeAction}:${normalizedJobId}`;
     if (handledRouteJobRef.current === handledKey) return;
     handledRouteJobRef.current = handledKey;
+    let finished = false;
 
     const hydrateIncomingJobFromDeepLink = async () => {
       const offerRes = await apiFetch(
@@ -999,6 +1003,7 @@ const TechnicianDashboard = () => {
         },
         distance: Number.isFinite(parsedDistance) ? parsedDistance : 0,
         amount: Number.isFinite(parsedAmount) ? parsedAmount : 0,
+        details: readJobDetails(offerRequest),
       };
       (fallbackJob as any).eta = offerRequest?.eta ?? null;
 
@@ -1119,13 +1124,22 @@ const TechnicianDashboard = () => {
       }
     };
 
-    syncRouteState().catch((error) => {
-      if (cancelled || !isMountedRef.current) return;
-      console.error("Failed to sync dashboard route job state", error);
-      toast.error("Unable to restore accepted job automatically.");
-    });
+    syncRouteState()
+      .catch((error) => {
+        if (cancelled || !isMountedRef.current) return;
+        console.error("Failed to sync dashboard route job state", error);
+        toast.error("Unable to restore accepted job automatically.");
+      })
+      .finally(() => {
+        finished = true;
+      });
     return () => {
       cancelled = true;
+      // A re-render cut the offer lookup short: let the next run show it. Accept and
+      // reject links keep their guard so the action is never sent twice.
+      if (!finished && !routeAction && handledRouteJobRef.current === handledKey) {
+        handledRouteJobRef.current = null;
+      }
     };
   }, [
     technician?.id,
@@ -1598,6 +1612,7 @@ const TechnicianDashboard = () => {
     .replace(/[^\d+]/g, "");
   const activeJobStatus = normalizeTechnicianStatus(activeJob?.status);
   const activeJobIsTowing = isTowingJob(activeJob);
+  const activeJobDetails = readJobDetails(activeJob);
   const activeJobRouteDistance = activeJob?.routeDistanceKm ?? activeJob?.route_distance_km ?? null;
   const activeJobEstimatedDuration = activeJob?.estimatedDuration ?? activeJob?.estimated_duration ?? null;
   const activeJobTowingAction = activeJobIsTowing
@@ -1979,6 +1994,9 @@ const TechnicianDashboard = () => {
                     {activeJob.address}
                   </p>
                 </div>
+                {activeJobDetails ? (
+                  <JobDetailsList details={activeJobDetails} className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60" />
+                ) : null}
                 {activeJobIsTowing && (
                   <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tow Route</p>

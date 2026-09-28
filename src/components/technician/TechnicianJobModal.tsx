@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { SlideButton } from "@/components/ui/slide-button";
 import { MapPin, Zap, Bike, Car, Truck, Flame, AlertTriangle, User, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { TechnicianJobDetails } from "@/lib/technicianJobDetails";
+import { JobDetailsList } from "./JobDetails";
 
 export interface JobRequest {
     id: string; // Job ID / Service Request ID
@@ -30,6 +32,8 @@ export interface JobRequest {
     routeDistanceKm?: number | null;
     estimatedDuration?: number | null;
     vehicleCategory?: string | null;
+    /** What the customer told us in the request form. */
+    details?: TechnicianJobDetails | null;
 }
 
 interface TechnicianJobModalProps {
@@ -106,7 +110,8 @@ export function TechnicianJobModal({
             ? Math.max(5, Math.round(distanceKm * 2 + 6))
             : null;
     const serviceLabel = String(job.serviceType || "Service").replace(/-/g, " ");
-    const vehicleLabel = String(job.vehicleType || "Vehicle").replace(/-/g, " ");
+    const details = job.details ?? null;
+    const vehicleLabel = details?.vehicleLine || String(job.vehicleType || "Vehicle").replace(/-/g, " ");
     const customerLabel = String(job.customerName || "Customer");
 
     return (
@@ -114,7 +119,7 @@ export function TechnicianJobModal({
             <DialogContent
                 className={cn(
                     "fixed top-auto bottom-0 left-0 right-0 w-full !max-w-full sm:!max-w-lg sm:left-1/2 sm:-translate-x-1/2",
-                    "p-0 !m-0 overflow-hidden border-t-0 bg-white dark:bg-zinc-950",
+                    "p-0 !m-0 max-h-[94dvh] overflow-y-auto overflow-x-hidden border-t-0 bg-white dark:bg-zinc-950",
                     "rounded-t-[32px] rounded-b-none shadow-[0_-24px_60px_rgba(0,0,0,0.45)]",
                     "data-[state=closed]:slide-out-to-bottom-full data-[state=open]:slide-in-from-bottom-full duration-500",
                     "transform-none sm:transform",
@@ -130,8 +135,13 @@ export function TechnicianJobModal({
                     </div>
                     <div className="relative z-10">
                         <div className="flex items-center justify-between">
-                            <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em]">
-                                {isUnavailable ? "Offer Closed" : "New Job"}
+                            <span className="flex items-center gap-2">
+                                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em]">
+                                    {isUnavailable ? "Offer Closed" : "New Job"}
+                                </span>
+                                {details?.urgent ? (
+                                    <span className="rounded-full bg-red-500 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em]">Urgent</span>
+                                ) : null}
                             </span>
                             <div className="flex items-center gap-2 text-[11px] font-bold text-white/80">
                                 <Clock className="h-3.5 w-3.5" />
@@ -141,7 +151,7 @@ export function TechnicianJobModal({
 
                         <div className="mt-6 flex items-start justify-between gap-4">
                             <div>
-                                <p className="text-sm font-semibold text-white/70">{vehicleLabel}</p>
+                                <p className="text-sm font-semibold text-white/70 capitalize">{vehicleLabel}</p>
                                 <h2 className="text-3xl font-black capitalize tracking-tight">{serviceLabel}</h2>
                             </div>
                             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 shadow-lg">
@@ -195,7 +205,7 @@ export function TechnicianJobModal({
                                 Priority
                             </div>
                             <p className="mt-2 text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                Respond now
+                                {details?.urgent ? "Urgent" : "Respond now"}
                             </p>
                         </div>
                     </div>
@@ -226,11 +236,13 @@ export function TechnicianJobModal({
                         </div>
                     )}
 
-                    {job.vehicleCategory && (
+                    {details ? (
+                        <JobDetailsList details={details} className="mt-4 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60" />
+                    ) : job.vehicleCategory ? (
                         <div className="mt-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-200">
                             Vehicle category: {String(job.vehicleCategory).replace(/_/g, " ")}
                         </div>
-                    )}
+                    ) : null}
 
                     {isUnavailable && (
                         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">

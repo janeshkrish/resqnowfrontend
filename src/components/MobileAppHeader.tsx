@@ -8,6 +8,7 @@ import {
   isGaragePath,
   isLiveMapPath,
   isServiceRequestFlowPath,
+  isServiceRequestFormPath,
   isTrackingExperiencePath,
   isVehicleSelectionPath,
 } from "@/lib/appShellRoutes";
@@ -28,6 +29,9 @@ const MobileAppHeader = () => {
 
   // Vehicle selection is full screen and brings its own back button.
   if (isVehicleSelectionPath(location.pathname)) return null;
+
+  // So is the request form after it (back, title, steps and "Call us" in its own top bar).
+  if (isServiceRequestFormPath(location.pathname)) return null;
 
   // The live radar is a full-screen map with its own floating location bar.
   if (isLiveMapPage) return null;

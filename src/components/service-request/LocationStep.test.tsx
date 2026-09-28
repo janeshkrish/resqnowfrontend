@@ -118,7 +118,7 @@ describe("service request Mappls location step", () => {
     render(<LocationHarness onInputChange={onInputChange} onLocationSelect={onLocationSelect} />);
 
     expect(screen.getByRole("application", { name: "Service request location map" })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "Pickup Location" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Help comes to" }), {
       target: { value: "RS Puram" },
     });
     fireEvent.click(await screen.findByRole("option", { name: /RS Puram, Coimbatore/i }));
@@ -158,6 +158,37 @@ describe("service request Mappls location step", () => {
     await waitFor(() => expect(onLocationSelect).toHaveBeenCalledWith(11.04, 76.99));
   });
 
+  it("doesn't search an address filled in from the customer's location, only what they type", async () => {
+    const onInputChange = vi.fn();
+    render(
+      <LocationHarness
+        initialData={{ ...formData, location: "21, Race Course Road, Coimbatore" }}
+        onInputChange={onInputChange}
+        onLocationSelect={vi.fn()}
+      />,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(searchMapplsPlaces).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Landmark or exact spot")).toBeInTheDocument();
+  });
+
+  it("labels the towing route as pick up and drop", () => {
+    render(
+      <LocationStep
+        formData={{ ...formData, dropLocation: "" }}
+        onInputChange={vi.fn()}
+        isGettingLocation={false}
+        onGetCurrentLocation={vi.fn()}
+        requiresDropLocation
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "Pick up from" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Take it to" })).toBeInTheDocument();
+    expect(screen.getByText("Set pick up and drop to see the fare")).toBeInTheDocument();
+  });
+
   it("does not bias Mappls search to the display fallback before coordinates are acquired", async () => {
     const onInputChange = vi.fn();
     render(
@@ -173,7 +204,7 @@ describe("service request Mappls location step", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Pickup Location" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Help comes to" }), {
       target: { value: "Coimbatore" },
     });
 

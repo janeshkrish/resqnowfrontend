@@ -37,6 +37,19 @@ export interface TechnicianServiceRequest {
   estimatedEarnings?: number | null;
   amount?: number | null;
   pricingBreakdown?: Record<string, any> | null;
+  // From the request form (see components/technician/JobDetails).
+  vehicle_brand?: string | null;
+  vehicle_subtype?: string | null;
+  tow_truck_type?: string | null;
+  request_details_json?: unknown;
+  vehicleLine?: string | null;
+  problem?: string[];
+  answers?: unknown[];
+  landmark?: string | null;
+  plate?: string | null;
+  customerNote?: string | null;
+  urgent?: boolean;
+  attachments?: unknown[];
 }
 
 interface UseRealtimeTechnicianRequestsOptions {
@@ -156,6 +169,18 @@ export const useRealtimeTechnicianRequests = (
         estimatedEarnings: raw.estimatedEarnings ?? raw.technicianEstimatedEarning ?? raw.technician_estimated_earning ?? null,
         amount: raw.technicianEstimatedEarning ?? raw.estimatedEarnings ?? raw.amount ?? raw.priceAmount ?? null,
         pricingBreakdown: raw.pricingBreakdown || raw.pricing_breakdown || null,
+        vehicle_brand: raw.vehicleBrand ?? raw.vehicle_brand ?? null,
+        vehicle_subtype: raw.vehicleSubtype ?? raw.vehicle_subtype ?? null,
+        tow_truck_type: raw.towTruckType ?? raw.tow_truck_type ?? null,
+        request_details_json: raw.request_details_json ?? null,
+        vehicleLine: raw.vehicleLine ?? null,
+        problem: Array.isArray(raw.problem) ? raw.problem : undefined,
+        answers: Array.isArray(raw.answers) ? raw.answers : undefined,
+        landmark: raw.landmark ?? null,
+        plate: raw.plate ?? null,
+        customerNote: raw.customerNote ?? null,
+        urgent: Boolean(raw.urgent),
+        attachments: Array.isArray(raw.attachments) ? raw.attachments : undefined,
       };
 
       setRequests(prev => {

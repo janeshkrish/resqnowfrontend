@@ -17,7 +17,14 @@ type UnifiedRequestFlowOptions = {
   createInitialFormData: (techId: string | null) => ServiceRequestFormData;
   validateStep1: (formData: ServiceRequestFormData) => boolean;
   buildVehicleModel: (formData: ServiceRequestFormData) => string;
+  /** When given, its result is the whole description (empty lets the server write one from the answers). */
   buildDescription?: (formData: ServiceRequestFormData, serviceId?: string) => string;
+  /** More fields for POST /api/service-requests (vehicle_brand, vehicle_subtype, details). */
+  buildRequestExtras?: (formData: ServiceRequestFormData) => Record<string, unknown>;
+  /** More fields for the towing fare preview (vehicleSubtype, canRoll), and the key that changes when they do. */
+  buildEstimateExtras?: (formData: ServiceRequestFormData) => Record<string, string | null | undefined>;
+  /** Runs after the request is created, before moving to tracking (e.g. saving the vehicle to My garage). */
+  onSubmitted?: (formData: ServiceRequestFormData) => Promise<unknown> | void;
   successTitle?: string;
   successDescription?: string;
   allowDirectTechnician?: boolean;
@@ -61,12 +68,15 @@ const buildTowingEstimateInputKey = ({
   formData,
   serviceId,
   vehicleType,
+  extras,
 }: {
   formData: ServiceRequestFormData;
   serviceId?: string;
   vehicleType: string;
+  extras?: Record<string, string | null | undefined>;
 }) =>
   [
+    ...Object.keys(extras || {}).sort().map((key) => `${key}=${String(extras?.[key] ?? "").trim().toLowerCase()}`),
     String(serviceId || "").trim().toLowerCase(),
     String(vehicleType || "").trim().toLowerCase(),
     normalizeAddressValue(formData.location).toLowerCase(),
@@ -118,6 +128,9 @@ export function useUnifiedServiceRequestFlow({
   validateStep1,
   buildVehicleModel,
   buildDescription,
+  buildRequestExtras,
+  buildEstimateExtras,
+  onSubmitted,
   successTitle = "Request Broadcasted!",
   successDescription = "Searching for nearby technicians...",
   allowDirectTechnician = false
@@ -167,6 +180,7 @@ export function useUnifiedServiceRequestFlow({
   const [isDetectingGoogleLocation, setIsDetectingGoogleLocation] = useState(false);
   const googleAutoDetectAttemptedRef = useRef(false);
   const buildVehicleModelRef = useRef(buildVehicleModel);
+  const buildEstimateExtrasRef = useRef(buildEstimateExtras);
   const activeTowingEstimateInputKeyRef = useRef<string | null>(null);
   const settledTowingEstimateInputKeyRef = useRef<string | null>(null);
   const requiresDropLocation = isTowingServiceId(serviceId);
@@ -174,6 +188,13 @@ export function useUnifiedServiceRequestFlow({
   useEffect(() => {
     buildVehicleModelRef.current = buildVehicleModel;
   }, [buildVehicleModel]);
+
+  useEffect(() => {
+    buildEstimateExtrasRef.current = buildEstimateExtras;
+  }, [buildEstimateExtras]);
+
+  const estimateExtras = buildEstimateExtras?.(formData);
+  const estimateExtrasKey = JSON.stringify(estimateExtras ?? {});
 
   const {
     coordinates,
@@ -281,13 +302,16 @@ export function useUnifiedServiceRequestFlow({
     );
   }, []);
 
+  // Find the customer straight away (help comes to them; fuel prices and nearby pumps need it too).
   useEffect(() => {
-    if (!requiresDropLocation || googleAutoDetectAttemptedRef.current) return;
-    const hasPickupCoordinates = hasFiniteCoordinate(formData.locationLat) && hasFiniteCoordinate(formData.locationLng);
+    if (googleAutoDetectAttemptedRef.current) return;
+    const hasPickupCoordinates = hasFiniteCoordinate(formData.locationLat) && hasFiniteCoordinate(formData.locationLng)
+      && !(Number(formData.locationLat) === 0 && Number(formData.locationLng) === 0);
     if (normalizeAddressValue(formData.location) || hasPickupCoordinates) return;
     googleAutoDetectAttemptedRef.current = true;
-    detectCurrentPickupWithGoogle();
-  }, [detectCurrentPickupWithGoogle, formData.location, formData.locationLat, formData.locationLng, requiresDropLocation]);
+    if (requiresDropLocation) detectCurrentPickupWithGoogle();
+    else requestLocation();
+  }, [detectCurrentPickupWithGoogle, formData.location, formData.locationLat, formData.locationLng, requestLocation, requiresDropLocation]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -380,7 +404,7 @@ export function useUnifiedServiceRequestFlow({
       const dropAddress = normalizeAddressValue(formData.dropLocation);
       const pickupCoordinatesReady = hasFiniteCoordinate(formData.locationLat) && hasFiniteCoordinate(formData.locationLng);
       const dropCoordinatesReady = hasFiniteCoordinate(formData.dropLat) && hasFiniteCoordinate(formData.dropLng);
-      const currentEstimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType });
+      const currentEstimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType, extras: estimateExtras });
       const towingPreviewSatisfied =
         Boolean(towingEstimate && !towingEstimateError && towingEstimateInputKey === currentEstimateInputKey) ||
         Boolean(towingEstimateWarning && towingEstimateWarningInputKey === currentEstimateInputKey);
@@ -394,13 +418,13 @@ export function useUnifiedServiceRequestFlow({
       );
     }
     if (currentStep === 3) {
+      // Email is optional (the receipt goes to the account email); a typed one must look right.
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const email = String(formData.email || "").trim();
       return !!(
-        formData.name &&
-        formData.phone &&
-        formData.phone.length === 10 &&
-        formData.email &&
-        emailRegex.test(formData.email)
+        String(formData.name || "").trim() &&
+        /^\d{10}$/.test(String(formData.phone || "")) &&
+        (!email || emailRegex.test(email))
       );
     }
     return false;
@@ -416,10 +440,9 @@ export function useUnifiedServiceRequestFlow({
     setIsSubmitting(true);
 
     try {
-      const description =
-        buildDescription?.(formData, serviceId) ||
-        formData.details ||
-        `Request for ${serviceId}`;
+      const description = buildDescription
+        ? buildDescription(formData, serviceId)
+        : formData.details || `Request for ${serviceId}`;
       const pickupAddress = normalizeAddressValue(formData.location);
       const dropAddress = normalizeAddressValue(formData.dropLocation);
       const pickupLat = normalizeCoordinateValue(formData.locationLat);
@@ -432,13 +455,14 @@ export function useUnifiedServiceRequestFlow({
         vehicle_type: vehicleType,
         vehicle_model: buildVehicleModel(formData),
         address: pickupAddress,
-        description,
+        description: description || null,
         contact_phone: formData.phone,
-        contact_email: formData.email,
-        contact_name: formData.name,
+        contact_email: String(formData.email || "").trim() || null,
+        contact_name: String(formData.name || "").trim(),
         technician_id: allowDirectTechnician ? (techId || formData.selectedTechnicianId || null) : null,
         location_lat: pickupLat,
-        location_lng: pickupLng
+        location_lng: pickupLng,
+        ...(buildRequestExtras?.(formData) ?? {})
       };
 
       if (requiresDropLocation) {
@@ -476,6 +500,14 @@ export function useUnifiedServiceRequestFlow({
 
       const data = await res.json();
       localStorage.removeItem(storageKey);
+
+      if (onSubmitted) {
+        try {
+          await onSubmitted(formData);
+        } catch {
+          // The request is already out; a failed extra (like saving to My garage) doesn't stop it.
+        }
+      }
 
       if (user && !user.phone && formData.phone && updateProfile) {
         updateProfile({ phone: formData.phone }).catch(() => {
@@ -612,7 +644,8 @@ export function useUnifiedServiceRequestFlow({
 
     let cancelled = false;
     const controller = new AbortController();
-    const estimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType });
+    const extras = buildEstimateExtrasRef.current?.(formData);
+    const estimateInputKey = buildTowingEstimateInputKey({ formData, serviceId, vehicleType, extras });
     if (
       activeTowingEstimateInputKeyRef.current === estimateInputKey ||
       settledTowingEstimateInputKeyRef.current === estimateInputKey
@@ -642,7 +675,8 @@ export function useUnifiedServiceRequestFlow({
             dropLat,
             dropLng,
             paymentMode: "upi",
-            timeOfDay: new Date().toISOString()
+            timeOfDay: new Date().toISOString(),
+            ...(extras ?? {})
           }),
           signal: controller.signal
         } as RequestInit);
@@ -715,6 +749,7 @@ export function useUnifiedServiceRequestFlow({
     formData.vehicleType,
     formData.vehicleSubtype,
     formData.vehicleModel,
+    estimateExtrasKey,
     requiresDropLocation,
     serviceId,
     vehicleType

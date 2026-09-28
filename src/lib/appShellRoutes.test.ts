@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isGaragePath, isServiceRequestFlowPath, isVehicleSelectionPath, shouldHideSupportSurfaces } from "./appShellRoutes";
+import {
+  isGaragePath,
+  isServiceRequestFlowPath,
+  isServiceRequestFormPath,
+  isVehicleSelectionPath,
+  shouldHideSupportSurfaces,
+} from "./appShellRoutes";
 
 describe("isGaragePath", () => {
   it("matches the garage and its add steps only", () => {
@@ -30,5 +36,18 @@ describe("isVehicleSelectionPath", () => {
 
   it("stays inside the service request flow", () => {
     expect(isServiceRequestFlowPath("/request-service/towing")).toBe(true);
+  });
+});
+
+describe("isServiceRequestFormPath", () => {
+  it("matches the form for each vehicle type, not the type picker or tracking", () => {
+    expect(isServiceRequestFormPath("/request-service/towing/car")).toBe(true);
+    expect(isServiceRequestFormPath("/request-service/emergency/bike/")).toBe(true);
+    expect(isServiceRequestFormPath("/request-service/ev-charging/ev")).toBe(true);
+    expect(isServiceRequestFormPath("/request-service/fuel/commercial")).toBe(true);
+
+    expect(isServiceRequestFormPath("/request-service/towing")).toBe(false);
+    expect(isServiceRequestFormPath("/request-service/towing/truck")).toBe(false);
+    expect(isServiceRequestFormPath("/request-service-tracking/42")).toBe(false);
   });
 });

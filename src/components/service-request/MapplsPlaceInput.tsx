@@ -44,6 +44,8 @@ export default function MapplsPlaceInput({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestRevisionRef = useRef(0);
   const selectedValueRef = useRef<string | null>(null);
+  // Only what the customer types is searched; an address filled in from their location isn't.
+  const typedRef = useRef(false);
   const [results, setResults] = useState<MapplsPlaceSearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,7 +122,7 @@ export default function MapplsPlaceInput({
     setResults([]);
     setActiveIndex(-1);
     setError(null);
-    if (disabled || query.length < 2) {
+    if (disabled || query.length < 2 || !typedRef.current) {
       setIsLoading(false);
       setIsOpen(false);
       return;
@@ -146,6 +148,7 @@ export default function MapplsPlaceInput({
   }, []);
 
   const selectResult = (result: MapplsPlaceSearchResult) => {
+    typedRef.current = false;
     selectedValueRef.current = result.address;
     requestRevisionRef.current += 1;
     onTextChange(name, result.address);
@@ -204,6 +207,7 @@ export default function MapplsPlaceInput({
         value={value}
         disabled={disabled}
         onChange={(event) => {
+          typedRef.current = true;
           selectedValueRef.current = null;
           requestRevisionRef.current += 1;
           setResults([]);

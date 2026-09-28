@@ -67,8 +67,8 @@ const VEHICLE_OPTIONS: VehicleOption[] = [
   },
 ];
 
-// Vehicle type, then Vehicle Details, Location and Contact Info.
-const FLOW_STEP_COUNT = 4;
+// After the vehicle type, the request form's own three steps: Vehicle & problem, Location, Confirm.
+const FORM_STEP_COUNT = 3;
 const AUTO_ADVANCE_MS = 300;
 
 const VehicleServiceSelector = () => {
@@ -136,10 +136,10 @@ const VehicleServiceSelector = () => {
             <span className="rq-symbol" aria-hidden="true">arrow_back</span>
           </button>
           <p className="rq-vs-steps">
-            Step 1 of {FLOW_STEP_COUNT}
+            Then {FORM_STEP_COUNT} quick steps
             <span className="rq-vs-step-bar" aria-hidden="true">
-              {Array.from({ length: FLOW_STEP_COUNT }, (_, index) => (
-                <span key={index} className={cn(index === 0 && "is-done")} />
+              {Array.from({ length: FORM_STEP_COUNT }, (_, index) => (
+                <span key={index} />
               ))}
             </span>
           </p>

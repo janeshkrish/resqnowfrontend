@@ -42,6 +42,8 @@ import {
 } from '@/utils/technicianStatus';
 import { useTechnicianActiveJob } from '@/hooks/useTechnicianActiveJob';
 import { getTowingAction } from '@/lib/towingActionState';
+import { JobDetailsList } from '@/components/technician/JobDetails';
+import { readJobDetails } from '@/lib/technicianJobDetails';
 import {
   getTechnicianActiveJobPath,
   selectMatchingActiveJobNavigationState,
@@ -794,7 +796,8 @@ const ActiveJob = () => {
   const displayDue = jobDue != null && jobDue > 0 ? jobDue : dues;
   const displayUser = toOptionalString(job.customerName ?? job.contact_name ?? job.user?.name) || 'Not Available';
   const displayService = toOptionalString(job.serviceType ?? job.service_type ?? job.service?.type);
-  const displayVehicle = buildVehicleDetails(job);
+  const jobDetails = readJobDetails(job);
+  const displayVehicle = jobDetails?.vehicleLine || buildVehicleDetails(job);
   const hasServiceOrVehicle = Boolean(displayService || displayVehicle);
   const displayPhoneText = toOptionalString(job.phoneNumber ?? job.contact_phone ?? job.user?.phone);
   const dialablePhone = toOptionalPhone(displayPhoneText);
@@ -1069,7 +1072,12 @@ const ActiveJob = () => {
               </div>
             </div>
 
-            {hasServiceOrVehicle && (
+            {jobDetails ? (
+              <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 dark:bg-slate-900/60">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Service Notes</p>
+                <JobDetailsList details={jobDetails} />
+              </div>
+            ) : hasServiceOrVehicle && (
               <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Service Notes</p>
                 <p className="mt-1 text-sm font-semibold text-slate-700">

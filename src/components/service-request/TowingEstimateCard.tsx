@@ -1,4 +1,6 @@
-import { AlertCircle, Clock, Gauge, Loader2, ShieldCheck, Zap } from "lucide-react";
+import { useState } from "react";
+
+import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { cn } from "@/lib/utils";
 
 type TowingEstimateCardProps = {
@@ -6,127 +8,90 @@ type TowingEstimateCardProps = {
   loading?: boolean;
   error?: string | null;
   warning?: string | null;
+  /** Shown before pick up and drop are both set. */
+  emptyText?: string;
 };
 
-const money = (value: unknown) => {
+const rupees = (value: unknown) => {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return "INR 0";
-  return `INR ${Math.round(parsed).toLocaleString("en-IN")}`;
+  return Number.isFinite(parsed) ? `₹${Math.round(parsed).toLocaleString("en-IN")}` : "—";
 };
 
-const numberText = (value: unknown, suffix = "") => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return "--";
-  return `${parsed.toFixed(parsed >= 10 ? 1 : 2)}${suffix}`;
+const SIZE_LABELS: Record<string, string> = {
+  hatchback: "Hatchback", sedan: "Sedan", suv: "SUV", luxury_car: "Luxury car", scooter: "Scooter",
+  bike: "Bike", truck: "Truck", ev: "EV", car: "Car",
 };
 
-function SkeletonEstimate() {
-  return (
-    <div className="space-y-3">
-      {[0, 1, 2, 3].map((item) => (
-        <div key={item} className="h-4 rounded-full bg-slate-200/80" />
-      ))}
-      <div className="h-10 rounded-xl bg-slate-200/80" />
-    </div>
-  );
-}
+const TRUCK_LABELS: Record<string, string> = {
+  flatbed: "Flatbed truck", "wheel-lift": "Wheel-lift truck", "heavy-duty-wrecker": "Heavy recovery truck",
+};
 
-export default function TowingEstimateCard({ estimate, loading, error, warning }: TowingEstimateCardProps) {
+/** The towing fare from the server's quote, with the breakdown one tap away. */
+export default function TowingEstimateCard({ estimate, loading, error, warning, emptyText = "Set pick up and drop to see the fare" }: TowingEstimateCardProps) {
+  const [open, setOpen] = useState(false);
   const quote = estimate?.quote || estimate;
-  const breakdown = quote?.pricing_breakdown || estimate?.pricingBreakdown || {};
-  const distanceKm = quote?.distance_km ?? estimate?.distanceKm ?? breakdown.distance_km;
-  const duration = quote?.estimated_duration ?? estimate?.estimatedDuration ?? breakdown.estimated_duration_minutes;
-  const finalPrice = quote?.final_estimated_price ?? estimate?.finalEstimatedPrice ?? breakdown.final_estimated_price;
-  const showSkeleton = loading && !quote && !error && !warning;
+  const breakdown = quote?.pricing_breakdown || estimate?.pricingBreakdown || null;
+  const distanceKm = Number(quote?.distance_km ?? estimate?.distanceKm ?? breakdown?.distance_km);
+  const total = quote?.final_estimated_price ?? estimate?.finalEstimatedPrice ?? breakdown?.final_estimated_price;
+  const truck = TRUCK_LABELS[String(breakdown?.tow_truck_type || quote?.tow_truck_type || "")] ?? null;
+
+  if (error || warning) {
+    return (
+      <div className={cn("rqf-callout", error ? "red" : "amber")} role={error ? "alert" : "note"}>
+        <MaterialSymbol name={error ? "error" : "info"} />
+        <p>{error || warning}</p>
+      </div>
+    );
+  }
+
+  if (!quote || total == null) {
+    return (
+      <div className="rqf-fare is-empty" aria-live="polite">
+        <MaterialSymbol name={loading ? "progress_activity" : "receipt_long"} className={loading ? "rqf-spin" : undefined} />
+        {loading ? "Working out the fare…" : emptyText}
+      </div>
+    );
+  }
+
+  const included = Number(breakdown?.included_km || 0);
+  const extraKm = Number.isFinite(distanceKm) ? Math.max(0, distanceKm - included) : 0;
+  const size = SIZE_LABELS[String(breakdown?.vehicle_category || "")] ?? null;
+  const multiplier = Number(breakdown?.vehicle_multiplier || 1);
+  const subtotal = Number(breakdown?.subtotal_before_factors || 0);
+  const rows: Array<[string, string, string?]> = [];
+  if (breakdown) {
+    rows.push([included ? `Towing (first ${included} km)` : "Towing", rupees(breakdown.base_towing_charge)]);
+    if (Number(breakdown.distance_charge) > 0) rows.push([`Extra ${extraKm.toFixed(1)} km × ₹${Number(breakdown.per_km_rate || 0)}`, rupees(breakdown.distance_charge)]);
+    if (Number(breakdown.night_charge) > 0) rows.push(["Night charge", rupees(breakdown.night_charge)]);
+    if (multiplier !== 1 && subtotal > 0) rows.push([`${size ?? "Vehicle"} size ×${multiplier.toFixed(2)}`, `+${rupees(subtotal * (multiplier - 1))}`, "size"]);
+    if (Number(breakdown.surge_multiplier || 1) > 1) rows.push(["Busy time", `×${Number(breakdown.surge_multiplier).toFixed(2)}`]);
+    if (Number(breakdown.tax_amount) > 0) rows.push(["Taxes", rupees(breakdown.tax_amount)]);
+    if (Number(breakdown.platform_fee) > 0) rows.push(["Platform fee", rupees(breakdown.platform_fee)]);
+    if (Number(breakdown.payment_fee) > 0) rows.push(["UPI payment fee", rupees(breakdown.payment_fee)]);
+  }
 
   return (
-    <>
-      {(loading || error || warning || quote) && (
-        <div
-          className={cn(
-            "rounded-2xl border bg-white p-4 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)]",
-            error ? "border-rose-200" : warning ? "border-amber-200" : "border-slate-200"
-          )}
-        >
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                Verified towing estimate
-              </div>
-              <h4 className="mt-1 text-lg font-black tracking-tight text-slate-950">Live fare preview</h4>
-            </div>
-            {loading && <Loader2 className="h-5 w-5 animate-spin text-slate-500" />}
-          </div>
-
-          {showSkeleton ? (
-            <SkeletonEstimate />
-          ) : error ? (
-            <div className="flex gap-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          ) : warning ? (
-            <div className="flex gap-3 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{warning}</span>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                    <Gauge className="h-4 w-4" />
-                    Distance
-                  </div>
-                  <div className="mt-1 text-xl font-black text-slate-950">{numberText(distanceKm, " km")}</div>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                    <Clock className="h-4 w-4" />
-                    Route ETA
-                  </div>
-                  <div className="mt-1 text-xl font-black text-slate-950">{Math.round(Number(duration || 0)) || "--"} min</div>
-                </div>
-              </div>
-
-              <div className="space-y-2 text-sm">
-                <FareRow label="Base towing charge" value={money(breakdown.base_towing_charge)} />
-                <FareRow label="Distance charge" value={money(breakdown.distance_charge)} />
-                <FareRow label="Night charge" value={money(breakdown.night_charge)} />
-                <FareRow label="Surge multiplier" value={`${Number(breakdown.surge_multiplier || 1).toFixed(2)}x`} />
-                <FareRow label="Taxes" value={money(breakdown.tax_amount)} />
-                <FareRow label="Platform fee" value={money(breakdown.platform_fee)} />
-                <FareRow label="Payment fee" value={money(breakdown.payment_fee)} />
-              </div>
-
-              <div className="rounded-2xl bg-slate-950 p-4 text-white">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">
-                      <Zap className="h-4 w-4" />
-                      Estimated total
-                    </div>
-                    <div className="mt-1 text-2xl font-black">{money(finalPrice)}</div>
-                  </div>
-                  <div className="text-right text-[11px] font-semibold leading-tight text-slate-300">
-                    Rechecked at booking
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+    <div className="rqf-fare" aria-live="polite">
+      <div className="rqf-fare-top">
+        <MaterialSymbol name="receipt_long" />
+        <span className="rqf-fare-id">
+          <small>Fare estimate{Number.isFinite(distanceKm) ? ` · ${distanceKm.toFixed(1)} km` : ""}{truck ? ` · ${truck}` : ""}</small>
+          <b>{rupees(total)}</b>
+        </span>
+        {rows.length ? (
+          <button type="button" className="rqf-change rq-press" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+            {open ? "Hide" : "Details"}
+          </button>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="rqf-fare-rows">
+          {rows.map(([label, value, tone]) => (
+            <div key={label} className={cn("rqf-fare-row", tone)}><span>{label}</span><b>{value}</b></div>
+          ))}
+          <p className="rqf-fare-note">Checked again when you book. Pay after the drop.</p>
         </div>
-      )}
-    </>
-  );
-}
-
-function FareRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-bold text-slate-900">{value}</span>
+      ) : null}
     </div>
   );
 }

@@ -43,9 +43,9 @@ describe("MobileAppHeader", () => {
     expect(renderAt("/my-garage").container).toBeEmptyDOMElement();
   });
 
-  it("keeps the logo header with a back button on the later request steps", () => {
+  it("steps aside on the request form, which has its own back button, title and steps", () => {
     renderAt("/request-service/towing/car");
-    expect(screen.getByAltText("ResQNow Logo")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /go back/i })).toBeInTheDocument();
+    expect(screen.queryByAltText("ResQNow Logo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /go back/i })).not.toBeInTheDocument();
   });
 });

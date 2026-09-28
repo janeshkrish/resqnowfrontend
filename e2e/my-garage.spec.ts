@@ -142,13 +142,21 @@ test("adds a vehicle from the home screen's Add vehicle link", async ({ page }) 
 });
 
 test("Get help opens the request form with the vehicle filled in", async ({ page }) => {
+  await page.context().grantPermissions(["geolocation"]);
+  await page.context().setGeolocation({ latitude: 11.0168, longitude: 76.9558 });
   await openGarage(page, "/my-garage");
   await page.getByRole("article", { name: "Tata Nexon" }).getByRole("button", { name: "Get help for this car" }).click();
 
   await expect(page).toHaveURL(/\/request-service\/emergency\/car\?vehicle=1$/);
-  // The garage quick-select shows the vehicle, and the model box is filled in.
-  await expect(page.getByRole("combobox").filter({ hasText: "Nexon • KA 01 AB 1234" })).toBeVisible();
-  await expect(page.getByRole("combobox").filter({ hasText: /^Nexon$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Emergency help" })).toBeVisible();
+  // SOS asks about people first; the car is already picked on the last step.
+  await page.getByRole("radio", { name: "No one is hurt" }).click();
+  await page.locator(".rqf-cta").click();
+  await expect(page.getByText("Car · Step 2 of 3")).toBeVisible();
+  await expect(page.getByLabel("Help comes to")).not.toHaveValue("");
+  await page.locator(".rqf-cta").click();
+  await expect(page.getByRole("radio", { name: /Tata Nexon/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Tata Nexon · Small SUV")).toBeVisible();
 });
 
 test("Settings → My Garage opens the garage", async ({ page, isMobile }) => {

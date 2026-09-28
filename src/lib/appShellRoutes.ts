@@ -14,6 +14,10 @@ export const isServiceRequestFlowPath = (pathname: string) =>
 export const isVehicleSelectionPath = (pathname: string) =>
   /^\/request-service\/[^/]+\/?$/.test(pathname);
 
+/** The request form after the vehicle type (/request-service/towing/car): full screen with its own top bar. */
+export const isServiceRequestFormPath = (pathname: string) =>
+  /^\/request-service\/[^/]+\/(car|bike|commercial|ev)\/?$/.test(pathname);
+
 /** My garage is a full page with its own back button (/my-garage and /my-garage/add). */
 export const isGaragePath = (pathname: string) => /^\/my-garage(\/|$)/.test(pathname);
 

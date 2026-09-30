@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "../lib/api";
-import { requestForToken, subscribeToForegroundMessages } from "../lib/firebase";
+import { requestForToken, showSystemNotification, subscribeToForegroundMessages } from "../lib/firebase";
+import {
+  announceClosedJobOffer,
+  announcePushedJobOffer,
+  classifyJobPush,
+  offerRequestId,
+} from "@/lib/jobOfferEvents";
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from "@capacitor/push-notifications";
 import { Capacitor } from "@capacitor/core";
 import { navigateWithinApp } from "@/lib/appNavigation";
@@ -54,6 +60,29 @@ function buildForegroundMessage(payload: any) {
     `📍 ${serviceEmoji} ${serviceType} • ${locationDistance}\n👤 Customer: ${customerName}\n💰 ₹${priceAmount}`;
 
   return { title, body, deepLinkPath, jobId };
+}
+
+/**
+ * Hands a job push that arrived with the app open to the offer card (lib/jobOfferEvents).
+ * True when nothing else should show for it. In the Android app an offer no card claimed
+ * (say the technician is on a customer page) opens the job link, as the alarm would; the
+ * web app falls back to its toast and notification.
+ */
+function routeJobPush(data: unknown, isNativeApp: boolean) {
+  const payload = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const kind = classifyJobPush(payload);
+  if (kind === "closed") {
+    announceClosedJobOffer(offerRequestId(payload));
+    return true;
+  }
+  // A direct assignment reaches the dashboard as the socket's job:assigned.
+  if (kind === "assigned") return isNativeApp;
+  if (kind !== "offer") return false;
+  if (announcePushedJobOffer(payload)) return true;
+  if (!isNativeApp) return false;
+  const requestId = offerRequestId(payload);
+  navigateWithinApp(requestId ? `/job/${encodeURIComponent(requestId)}` : "/technician/dashboard", { replace: false });
+  return true;
 }
 
 export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFcmOptions) => {
@@ -124,11 +153,9 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
           // 4. Foreground notifications
           const onPush = PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
             if (cancelled) return;
-            const payloadType = String((notification as any)?.data?.type || "").trim().toUpperCase();
-            if (payloadType === "EMERGENCY_JOB" || payloadType === "JOB_REVOKED") {
-              // Native Android full-screen alert flow handles emergency/revocation UI.
-              return;
-            }
+            // Job alerts that land while the app is on screen come here instead of ringing the
+            // full-screen alarm (MyFirebaseMessagingService), so they open the offer card.
+            if (routeJobPush(notification?.data, true)) return;
             const message = buildForegroundMessage(notification);
             toast(message.title, {
               description: message.body.replace(/\n/g, " "),
@@ -221,29 +248,24 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
     const attachWebListener = async () => {
       try {
         unsubscribe = await subscribeToForegroundMessages((payload) => {
+          // With the page on screen a job offer opens the offer card; the service worker
+          // notifies only for a page in the background or closed.
+          if (routeJobPush(payload?.data, false)) return;
           const message = buildForegroundMessage(payload);
 
           toast(message.title, {
             description: message.body.replace(/\n/g, " "),
           });
 
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            const options: any = {
-              body: message.body,
-              icon: "/icons/icon-192x192.png",
-              badge: "/icons/icon-192x192.png",
-              requireInteraction: true,
-              vibrate: [200, 100, 200],
-              tag: message.jobId ? `job-${message.jobId}` : `job-${Date.now()}`,
-              data: { deepLinkPath: message.deepLinkPath },
-            };
-            const notification = new Notification(message.title, options);
-            notification.onclick = function () {
-              window.focus();
-              navigateWithinApp(message.deepLinkPath, { replace: true });
-              if (typeof notification.close === "function") notification.close();
-            };
-          }
+          void showSystemNotification(message.title, {
+            body: message.body,
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/icon-192x192.png",
+            requireInteraction: true,
+            vibrate: [200, 100, 200],
+            tag: message.jobId ? `job-${message.jobId}` : `job-${Date.now()}`,
+            data: { deepLinkPath: message.deepLinkPath },
+          });
         });
       } catch (err) {
         console.warn("Foreground web listener error: ", err);

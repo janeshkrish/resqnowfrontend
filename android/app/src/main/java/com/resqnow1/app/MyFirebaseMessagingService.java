@@ -46,6 +46,11 @@ public class MyFirebaseMessagingService extends MessagingService {
         }
 
         if (isEmergencyPayload(remoteMessage)) {
+            // With the app on screen the in-app card shows the offer: from the socket, or from
+            // this push, which super.onMessageReceived passed to the web layer (useFCM).
+            if (MainActivity.isOnScreen()) {
+                return;
+            }
             launchEmergencyForegroundAlert(remoteMessage);
             return;
         }

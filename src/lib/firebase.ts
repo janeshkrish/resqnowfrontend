@@ -7,6 +7,7 @@ import {
   type MessagePayload,
   type Messaging,
 } from "firebase/messaging";
+import { navigateWithinApp } from "@/lib/appNavigation";
 
 const FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
 const FCM_SW_PATH = "/firebase-messaging-sw.js";
@@ -89,6 +90,39 @@ export async function requestForToken() {
   } catch (error) {
     console.error("[FCM] Failed to get token:", error);
     return null;
+  }
+}
+
+/**
+ * Shows a system notification through the messaging service worker, whose click handler
+ * opens `data.deepLinkPath`. Android Chrome has no `new Notification()`, so that is only
+ * the fallback.
+ */
+export async function showSystemNotification(
+  title: string,
+  options: NotificationOptions & { vibrate?: number[]; data?: { deepLinkPath?: string } }
+) {
+  if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return false;
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration(FCM_SW_SCOPE);
+    if (registration) {
+      await registration.showNotification(title, options);
+      return true;
+    }
+  } catch {
+    // Fall through to the page notification.
+  }
+  try {
+    const notification = new Notification(title, options);
+    notification.onclick = () => {
+      window.focus();
+      const path = options.data?.deepLinkPath;
+      if (path) navigateWithinApp(path, { replace: true });
+      notification.close();
+    };
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
 import { JobDetailsList } from "@/components/technician/JobDetails";
 import { readJobDetails } from "@/lib/technicianJobDetails";
+import { fetchTechnicianOffer } from "@/lib/technicianJobOffer";
+import { offerRequestId, onClosedJobOffer, onPushedJobOffer } from "@/lib/jobOfferEvents";
+import { JOB_ALERT_SOUND_URL } from "@/lib/jobAlertSound";
+import JobAlertsBanner from "@/components/technician/JobAlertsBanner";
 import { toast } from "sonner";
 import { Loader2, MapPin, DollarSign, Navigation, PhoneCall, User, Car, Briefcase, CreditCard, Star } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -120,6 +124,8 @@ const TechnicianDashboard = () => {
 
   const playAlertSound = () => {
     if (!audioRef.current) return;
+    // Off screen, the phone's own alert rings instead (see lib/jobAlertSound).
+    if (document.visibilityState !== "visible") return;
     audioRef.current.currentTime = 0;
     audioRef.current.play().catch((error) => {
       console.error("Siren play failed", error);
@@ -273,11 +279,16 @@ const TechnicianDashboard = () => {
 
   useEffect(() => {
     // Initialize audio ref once
-    audioRef.current = new Audio("https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3");
+    audioRef.current = new Audio(JOB_ALERT_SOUND_URL);
     audioRef.current.loop = true;
     audioRef.current.volume = 1.0;
+    const stopWhenHidden = () => {
+      if (document.visibilityState !== "visible") stopAlertSound();
+    };
+    document.addEventListener("visibilitychange", stopWhenHidden);
 
     return () => {
+      document.removeEventListener("visibilitychange", stopWhenHidden);
       if (audioRef.current) {
         stopAlertSound();
         audioRef.current = null;
@@ -481,12 +492,8 @@ const TechnicianDashboard = () => {
         return;
       }
 
-      // Native Android uses system-level full-screen alerts from FCM.
-      // Skipping in-app socket modal here avoids duplicate cards/alerts.
-      if (isNativePlatform) {
-        return;
-      }
-
+      // The Android app shows this card too. Its full-screen alarm rings only while the app
+      // is off screen (MyFirebaseMessagingService), so the two never show at once.
       if (acceptedJobIdRef.current && acceptedJobIdRef.current === requestId) {
         return;
       }
@@ -843,6 +850,42 @@ const TechnicianDashboard = () => {
     };
   }, [technician?.id, refreshActiveJob, clearAcceptedJobId]); // Close socket effect
 
+  // An offer pushed while the app is open (lib/jobOfferEvents), for when the socket missed it.
+  useEffect(() => {
+    if (!technician?.id) return;
+    const isShowing = (requestId: string) => String(incomingJobRef.current?.id || "") === requestId;
+    const stopOffers = onPushedJobOffer((offer) => {
+      const requestId = offerRequestId(offer);
+      if (!requestId) return false;
+      void (async () => {
+        if (isShowing(requestId) || acceptedJobIdRef.current === requestId) return;
+        const isBusy =
+          activeJobIdRef.current &&
+          !["pending", "completed", "closed", "cancelled", "rejected"].includes(activeJobStatusRef.current);
+        if (isBusy) return;
+        const pushed = await fetchTechnicianOffer(requestId).catch(() => null);
+        if (!pushed?.available || !pushed.job || !isMountedRef.current || isShowing(requestId)) return;
+        setCancelledJob(null);
+        setIncomingJob(pushed.job);
+        setIncomingJobUnavailable(false);
+        setShowJobModal(true);
+        playAlertSound();
+      })();
+      return true;
+    });
+    const stopClosed = onClosedJobOffer((requestId) => {
+      if (!isShowing(requestId)) return;
+      stopAlertSound();
+      setIncomingJobUnavailable(true);
+      setShowJobModal(true);
+      toast.warning(JOB_TAKEN_MESSAGE);
+    });
+    return () => {
+      stopOffers();
+      stopClosed();
+    };
+  }, [technician?.id]);
+
   useEffect(() => {
     const trackedJobId = String(activeJob?.id || acceptedJobId || "").trim();
     if (!trackedJobId || cancelledJob || activeJob) return;
@@ -980,6 +1023,8 @@ const TechnicianDashboard = () => {
       );
       const offerData = (await readJsonSafely<any>(offerRes)) || {};
       if (cancelled || !isMountedRef.current) return;
+      // Shown now: a later re-render must not show it again over a closed or answered card.
+      finished = true;
 
       const offerRequest = offerData?.request || {};
       const location = offerRequest?.location || {};
@@ -1793,6 +1838,7 @@ const TechnicianDashboard = () => {
   return (
     <div className="min-h-screen bg-[#f3f4f6] pb-24 md:pb-8 selection:bg-primary/20 relative">
       <div className="mx-auto max-w-7xl space-y-5 px-4 pb-24 pt-4 md:px-6 md:pt-6">
+        <JobAlertsBanner />
         {showIdleDashboard ? (
           <TechnicianDashboardOverview
             showTowingManagement={isTowingOperator}

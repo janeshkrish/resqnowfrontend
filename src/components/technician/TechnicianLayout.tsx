@@ -2,6 +2,7 @@
 import React from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import TechnicianHeader from "./TechnicianHeader";
+import JobNotificationModal from "./JobNotificationModal";
 
 const TechnicianLayout = () => {
   const location = useLocation();
@@ -10,6 +11,7 @@ const TechnicianLayout = () => {
   return (
     <div className="flex flex-col min-h-screen">
       {!isDashboardRoute ? <TechnicianHeader /> : null}
+      <JobNotificationModal />
       <main className="flex-grow">
         <Outlet />
       </main>

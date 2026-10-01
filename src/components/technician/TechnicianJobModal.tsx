@@ -2,13 +2,15 @@ import React, { useEffect, useRef, useState } from "react";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { SlideButton } from "@/components/ui/slide-button";
-import { MapPin, Zap, Bike, Car, Truck, Flame, AlertTriangle, User, Clock } from "lucide-react";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import SlideToSend from "@/components/request-form/SlideToSend";
 import { cn } from "@/lib/utils";
 import type { TechnicianJobDetails } from "@/lib/technicianJobDetails";
-import { JobDetailsList } from "./JobDetails";
+import { formatKm, formatMinutes, formatRupees, vehicleImageFor } from "@/lib/technicianJobCard";
+import { JobKeyStrip, JobLocationBox, JobSays } from "./JobCardParts";
 
 export interface JobRequest {
     id: string; // Job ID / Service Request ID
@@ -32,6 +34,9 @@ export interface JobRequest {
     routeDistanceKm?: number | null;
     estimatedDuration?: number | null;
     vehicleCategory?: string | null;
+    /** The technician's way to the customer, as dispatch measured it. Null when it wasn't sent. */
+    pickupDistanceKm?: number | null;
+    etaMinutes?: number | null;
     /** What the customer told us in the request form. */
     details?: TechnicianJobDetails | null;
 }
@@ -47,6 +52,8 @@ interface TechnicianJobModalProps {
     onDismissUnavailable?: (jobId: string) => void;
 }
 
+const OFFER_SECONDS = 30;
+
 export function TechnicianJobModal({
     job,
     isOpen,
@@ -57,13 +64,13 @@ export function TechnicianJobModal({
     onReject,
     onDismissUnavailable,
 }: TechnicianJobModalProps) {
-    const [timeLeft, setTimeLeft] = useState(30);
+    const [timeLeft, setTimeLeft] = useState(OFFER_SECONDS);
     const timeoutHandledRef = useRef(false);
 
     useEffect(() => {
         if (isOpen && !isUnavailable) {
             timeoutHandledRef.current = false;
-            setTimeLeft(30);
+            setTimeLeft(OFFER_SECONDS);
             const timer = setInterval(() => {
                 setTimeLeft((prev) => {
                     if (prev <= 1) {
@@ -87,202 +94,112 @@ export function TechnicianJobModal({
 
     if (!job) return null;
 
-    const getVehicleIcon = (type: string) => {
-        switch (String(type || "").toLowerCase()) {
-            case "bike":
-                return <Bike className="w-8 h-8 text-white" />;
-            case "car":
-                return <Car className="w-8 h-8 text-white" />;
-            case "commercial":
-                return <Truck className="w-8 h-8 text-white" />;
-            default:
-                return <Zap className="w-8 h-8 text-white" />;
-        }
-    };
-
-    const payoutText = Number(job.amount || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
-    const distanceKm = Number(job.routeDistanceKm || job.distance || 0);
-    const distanceText = Number.isFinite(distanceKm) ? distanceKm.toFixed(1) : "--";
-    const etaRaw = job.estimatedDuration ?? (job.eta != null && job.eta !== "" ? Number(job.eta) : null);
-    const etaMinutes = Number.isFinite(etaRaw)
-        ? Math.max(1, Math.round(etaRaw))
-        : Number.isFinite(distanceKm)
-            ? Math.max(5, Math.round(distanceKm * 2 + 6))
-            : null;
-    const serviceLabel = String(job.serviceType || "Service").replace(/-/g, " ");
     const details = job.details ?? null;
+    const serviceLabel = String(job.serviceType || "Service").replace(/-/g, " ");
     const vehicleLabel = details?.vehicleLine || String(job.vehicleType || "Vehicle").replace(/-/g, " ");
-    const customerLabel = String(job.customerName || "Customer");
+    const isTowing = Boolean(job.isTowing);
+    // For a tow, `distance` and `estimatedDuration` are the trip to the drop point, so the way
+    // to the pickup comes only from what dispatch measured for this technician.
+    const pickupKm = job.pickupDistanceKm ?? (!isTowing && job.distance > 0 ? job.distance : null);
+    const dropAddress = String(job.dropLocation?.address || "").trim();
+    const dropParts = [
+        job.routeDistanceKm ? formatKm(Number(job.routeDistanceKm)) : null,
+        job.estimatedDuration ? formatMinutes(Number(job.estimatedDuration)) : null,
+    ].filter(Boolean);
+    const kicker = isUnavailable
+        ? "Offer closed"
+        : ["New request", details?.towTruckLabel ? `${details.towTruckLabel} needed` : null].filter(Boolean).join(" · ");
+
+    const dismiss = () => {
+        if (isUnavailable && onDismissUnavailable) onDismissUnavailable(job.id);
+        else onReject(job.id);
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={() => { }}>
             <DialogContent
                 className={cn(
-                    "fixed top-auto bottom-0 left-0 right-0 w-full !max-w-full sm:!max-w-lg sm:left-1/2 sm:-translate-x-1/2",
-                    "p-0 !m-0 max-h-[94dvh] overflow-y-auto overflow-x-hidden border-t-0 bg-white dark:bg-zinc-950",
-                    "rounded-t-[32px] rounded-b-none shadow-[0_-24px_60px_rgba(0,0,0,0.45)]",
+                    "tj tj-sheet fixed top-auto bottom-0 left-0 right-0 w-full !max-w-full sm:!max-w-lg sm:left-1/2 sm:-translate-x-1/2",
+                    // A bottom sheet on a phone; on a wide screen the whole card sits in the middle.
+                    "sm:top-1/2 sm:bottom-auto",
+                    "gap-0 p-0 !m-0 border-0 shadow-[0_-24px_60px_rgba(0,0,0,0.45)]",
                     "data-[state=closed]:slide-out-to-bottom-full data-[state=open]:slide-in-from-bottom-full duration-500",
                     "transform-none sm:transform",
-                    "z-[200]"
+                    "z-[200] [&>button]:hidden"
                 )}
                 autoFocus={false}
                 onPointerDownOutside={(e) => e.preventDefault()}
             >
-                <div className="relative overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-900 to-[#5b1a1a] px-6 pt-6 pb-5 text-white">
-                    <div className="absolute inset-0 opacity-25">
-                        <div className="absolute -top-20 -right-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
-                        <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-[#ff6b3d]/20 blur-3xl" />
-                    </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-2">
-                                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em]">
-                                    {isUnavailable ? "Offer Closed" : "New Job"}
-                                </span>
-                                {details?.urgent ? (
-                                    <span className="rounded-full bg-red-500 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em]">Urgent</span>
-                                ) : null}
-                            </span>
-                            <div className="flex items-center gap-2 text-[11px] font-bold text-white/80">
-                                <Clock className="h-3.5 w-3.5" />
-                                {isUnavailable ? "Expired" : `${timeLeft}s left`}
-                            </div>
-                        </div>
-
-                        <div className="mt-6 flex items-start justify-between gap-4">
-                            <div>
-                                <p className="text-sm font-semibold text-white/70 capitalize">{vehicleLabel}</p>
-                                <h2 className="text-3xl font-black capitalize tracking-tight">{serviceLabel}</h2>
-                            </div>
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 shadow-lg">
-                                {getVehicleIcon(job.vehicleType)}
-                            </div>
-                        </div>
-
-                        <div className="mt-5 grid grid-cols-3 gap-3">
-                            <div className="rounded-2xl bg-white/10 px-3 py-2">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">Payout</p>
-                                <p className="text-lg font-black">₹ {payoutText}</p>
-                            </div>
-                            <div className="rounded-2xl bg-white/10 px-3 py-2">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">Distance</p>
-                                <p className="text-lg font-black">{distanceText} km</p>
-                            </div>
-                            <div className="rounded-2xl bg-white/10 px-3 py-2">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">ETA</p>
-                                <p className="text-lg font-black">{etaMinutes ?? "--"} min</p>
-                            </div>
+                <span className="tj-grab" aria-hidden="true" />
+                <div className="tj-body">
+                    <div className="tj-head">
+                        <span className="tj-thumb is-big">
+                            <img src={vehicleImageFor(job.vehicleType)} alt="" draggable={false} />
+                        </span>
+                        <div className="tj-head-id">
+                            <p className="tj-kicker">{kicker}</p>
+                            <DialogTitle className="tj-title">{serviceLabel}</DialogTitle>
+                            <p className="tj-veh">{vehicleLabel}</p>
                         </div>
                     </div>
+                    <DialogDescription className="sr-only">
+                        New service request from {job.customerName || "a customer"}. Slide to accept or reject it.
+                    </DialogDescription>
 
-                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/10">
-                        <div
-                            className="h-full bg-gradient-to-r from-[#ff4d4d] via-[#ff6b3d] to-[#ffd166] transition-all duration-1000 ease-linear"
-                            style={{ width: `${isUnavailable ? 100 : (timeLeft / 30) * 100}%` }}
-                        />
-                    </div>
-                </div>
-
-                <div
-                    className={cn(
-                        "relative -mt-4 rounded-t-[28px] bg-white dark:bg-zinc-950 px-6 pb-6 pt-5 shadow-[0_-10px_24px_rgba(0,0,0,0.12)]",
-                        isUnavailable && "opacity-85"
-                    )}
-                >
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/40">
-                            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                                <User className="h-3.5 w-3.5 text-zinc-400" />
-                                Customer
-                            </div>
-                            <p className="mt-2 text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-1">
-                                {customerLabel}
-                            </p>
-                        </div>
-                        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/40">
-                            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                                <Flame className="h-3.5 w-3.5 text-orange-500" />
-                                Priority
-                            </div>
-                            <p className="mt-2 text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                {details?.urgent ? "Urgent" : "Respond now"}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mt-4 flex items-start gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10">
-                            <MapPin className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Pickup</p>
-                            <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2">
-                                {job.location.address}
-                            </p>
-                        </div>
-                    </div>
-
-                    {job.dropLocation?.address && (
-                        <div className="mt-3 flex items-start gap-3 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800">
-                                <MapPin className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Drop</p>
-                                <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-2">
-                                    {job.dropLocation.address}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {details ? (
-                        <JobDetailsList details={details} className="mt-4 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60" />
-                    ) : job.vehicleCategory ? (
-                        <div className="mt-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-semibold text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-200">
-                            Vehicle category: {String(job.vehicleCategory).replace(/_/g, " ")}
-                        </div>
+                    {details?.urgent && !isUnavailable ? (
+                        <p className="tj-urgent" role="alert">
+                            <MaterialSymbol name="warning" />
+                            Urgent · {details.urgentReason}
+                        </p>
                     ) : null}
 
-                    {isUnavailable && (
-                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
-                            <div className="flex items-start gap-2">
-                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                                <p className="text-sm font-semibold">{unavailableMessage}</p>
-                            </div>
-                        </div>
-                    )}
+                    <JobKeyStrip
+                        earn={formatRupees(Number.isFinite(Number(job.amount)) && Number(job.amount) > 0 ? Number(job.amount) : null)}
+                        distance={formatKm(pickupKm)}
+                        eta={formatMinutes(job.etaMinutes ?? null)}
+                    />
 
-                    <div className="mt-5 space-y-4">
-                        <SlideButton
-                            onSlideComplete={() => onAccept(job.id)}
-                            text={
-                                isUnavailable
-                                    ? "Job No Longer Available"
-                                    : isProcessing
-                                        ? "Accepting..."
-                                        : "Slide to Accept"
-                            }
-                            isSubmitting={isProcessing}
-                            disabled={isProcessing || isUnavailable}
-                            className="shadow-[0_12px_30px_rgba(239,68,68,0.35)] !bg-gradient-to-r !from-[#ff4d4d] !to-[#ff7a3d]"
-                        />
-                        <Button
-                            variant="ghost"
-                            className="w-full rounded-xl border border-transparent text-zinc-500 hover:border-red-100 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 font-bold h-12 text-base"
-                            onClick={() => {
-                                if (isUnavailable) {
-                                    if (onDismissUnavailable) onDismissUnavailable(job.id);
-                                    else onReject(job.id);
-                                    return;
-                                }
-                                onReject(job.id);
-                            }}
-                            disabled={isProcessing}
-                        >
-                            {isUnavailable ? "Dismiss Alert" : "Reject Offer"}
-                        </Button>
-                    </div>
+                    <JobLocationBox
+                        label={isTowing ? "Pickup location" : "Customer location"}
+                        address={job.location?.address || "Location not available"}
+                        landmark={details?.landmark}
+                        drop={dropAddress ? { label: ["Drop", ...dropParts].join(" · "), address: dropAddress } : null}
+                    />
+
+                    {details ? <JobSays details={details} /> : null}
+
+                    {isUnavailable ? (
+                        <p className="tj-closed" role="status">
+                            <MaterialSymbol name="info" />
+                            {unavailableMessage}
+                        </p>
+                    ) : null}
+                </div>
+
+                <div className="tj-foot">
+                    {isUnavailable ? (
+                        <button type="button" className="tj-ghost rq-press" onClick={dismiss}>
+                            Dismiss
+                        </button>
+                    ) : (
+                        <>
+                            <div className="tj-time" role="timer" aria-label={`${timeLeft} seconds left to accept`}>
+                                <div className="tj-bar" aria-hidden="true"><i style={{ width: `${(timeLeft / OFFER_SECONDS) * 100}%` }} /></div>
+                                <b>{timeLeft} sec</b>
+                            </div>
+                            <SlideToSend
+                                text="Slide to accept"
+                                busyText="Accepting…"
+                                busy={isProcessing}
+                                urgent={Boolean(details?.urgent)}
+                                onSend={() => onAccept(job.id)}
+                            />
+                            <button type="button" className="tj-ghost rq-press" onClick={() => onReject(job.id)} disabled={isProcessing}>
+                                <MaterialSymbol name="close" />
+                                Reject
+                            </button>
+                        </>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>

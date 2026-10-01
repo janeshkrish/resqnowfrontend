@@ -1,54 +1,70 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Trophy, CheckCircle, Wallet } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import React, { useEffect, useRef, useState } from 'react';
+import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
+import { formatRupees } from '@/lib/technicianJobCard';
 
 interface TechnicianJobCompletionProps {
     amount: number;
     onClose: () => void;
 }
 
+const OUTRO_SECONDS = 5;
+const CHEERS = [
+    'Another driver is back on the road because of you.',
+    'Quick, careful work like this earns you 5-star ratings.',
+    'Every job you finish builds your name on ResQNow.',
+    'That customer will remember who showed up for them.',
+];
+
+/** The job-complete outro: a short well done, then back to the dashboard by itself. */
 const TechnicianJobCompletion = ({ amount, onClose }: TechnicianJobCompletionProps) => {
+    const { technician } = useTechnicianAuth();
+    const [secondsLeft, setSecondsLeft] = useState(OUTRO_SECONDS);
+    // A new line each time, fixed for as long as this outro is on screen.
+    const [cheer] = useState(() => CHEERS[Math.floor(Math.random() * CHEERS.length)]);
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
+    useEffect(() => {
+        const timer = window.setInterval(() => setSecondsLeft((left) => Math.max(0, left - 1)), 1000);
+        return () => window.clearInterval(timer);
+    }, []);
+
+    useEffect(() => {
+        if (secondsLeft === 0) onCloseRef.current();
+    }, [secondsLeft]);
+
+    const firstName = String(technician?.name || '').trim().split(/\s+/)[0];
+    const earned = Number(amount);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-            <motion.div
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 w-full max-w-sm text-center relative border border-slate-700 shadow-2xl"
-            >
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2">
-                    <motion.div
-                        initial={{ y: -50, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.3, type: "spring" }}
-                        className="bg-amber-400 p-4 rounded-full shadow-lg border-4 border-slate-900"
-                    >
-                        <Trophy className="w-10 h-10 text-foreground fill-slate-900" />
-                    </motion.div>
-                </div>
-
-                <div className="mt-8">
-                    <h2 className="text-3xl font-bold text-white mb-2">Great Job!</h2>
-                    <p className="text-slate-400 text-sm mb-6">
-                        You've successfully completed another mission. Thanks for your hard work and cooperation!
-                    </p>
-
-                    <div className="bg-card dark:bg-slate-900/5 rounded-2xl p-6 border border-white/10 mb-8 backdrop-blur-md">
-                        <p className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-1">Total Earnings</p>
-                        <div className="flex items-center justify-center gap-2 text-green-400">
-                            <Wallet className="w-6 h-6" />
-                            <span className="text-4xl font-bold">₹{amount}</span>
-                        </div>
+        <div className="tj tj-outro" role="dialog" aria-modal="true" aria-labelledby="tj-outro-title">
+            <div className="tj-outro-main">
+                <svg className="tj-tick" viewBox="0 0 104 104" aria-hidden="true">
+                    <circle cx="52" cy="52" r="52" />
+                    <path d="M31 54L46 68L74 38" />
+                </svg>
+                <h2 id="tj-outro-title" className="tj-outro-title">
+                    {firstName ? `Well done, ${firstName}!` : 'Well done!'}
+                </h2>
+                <p className="tj-outro-text">{cheer}</p>
+                {Number.isFinite(earned) && earned > 0 ? (
+                    <div className="tj-outro-earn">
+                        <small>You earned on this job</small>
+                        <b>{formatRupees(earned)}</b>
                     </div>
-
-                    <Button
-                        onClick={onClose}
-                        className="w-full bg-amber-400 hover:bg-amber-500 text-foreground font-bold h-12 rounded-xl"
-                    >
-                        Back to Dashboard
-                    </Button>
+                ) : null}
+            </div>
+            <div className="tj-outro-foot">
+                <p className="tj-outro-next" role="status">
+                    Going to your dashboard in {secondsLeft} {secondsLeft === 1 ? 'second' : 'seconds'}
+                </p>
+                <div className="tj-bar" aria-hidden="true">
+                    <i style={{ width: `${(secondsLeft / OUTRO_SECONDS) * 100}%` }} />
                 </div>
-            </motion.div>
+                <button type="button" className="tj-cta is-dark rq-press" onClick={onClose}>
+                    Go to dashboard
+                </button>
+            </div>
         </div>
     );
 };

@@ -8,13 +8,15 @@ import { cn } from "@/lib/utils";
  * Keyboard users press Enter or Space on the knob instead.
  */
 export default function SlideToSend({
-  text, onSend, busy = false, urgent = false,
+  text, onSend, busy = false, urgent = false, busyText = "Sending…",
 }: {
   text: string;
   /** Return false when the request can't go yet; the knob slides back. */
   onSend: () => boolean | void;
   busy?: boolean;
   urgent?: boolean;
+  /** Shown while busy; the technician's accept slide says "Accepting…". */
+  busyText?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLButtonElement>(null);
@@ -40,7 +42,7 @@ export default function SlideToSend({
 
   return (
     <div ref={trackRef} className={cn("rqf-slide", urgent && "sos", busy && "is-busy")}>
-      <span className="rqf-slide-t" aria-hidden="true">{busy ? "Sending…" : text}</span>
+      <span className="rqf-slide-t" aria-hidden="true">{busy ? busyText : text}</span>
       <span className="rqf-slide-fill" aria-hidden="true" style={{ width: offset ? offset + 48 : 0 }} />
       <button
         ref={knobRef}

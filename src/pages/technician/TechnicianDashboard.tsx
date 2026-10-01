@@ -1,15 +1,17 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { Button } from "@/components/ui/button";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
-import { JobDetailsList } from "@/components/technician/JobDetails";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { JobKeyStrip, JobLocationBox, JobSays, JobVehicleRow } from "@/components/technician/JobCardParts";
+import { formatKm, formatMinutes, formatRupees, sentenceCase } from "@/lib/technicianJobCard";
 import { readJobDetails } from "@/lib/technicianJobDetails";
-import { fetchTechnicianOffer } from "@/lib/technicianJobOffer";
+import { fetchTechnicianOffer, readOfferNumber } from "@/lib/technicianJobOffer";
 import { offerRequestId, onClosedJobOffer, onPushedJobOffer } from "@/lib/jobOfferEvents";
 import { JOB_ALERT_SOUND_URL } from "@/lib/jobAlertSound";
 import JobAlertsBanner from "@/components/technician/JobAlertsBanner";
 import { toast } from "sonner";
-import { Loader2, MapPin, DollarSign, Navigation, PhoneCall, User, Car, Briefcase, CreditCard, Star } from "lucide-react";
+import { Loader2, DollarSign, Briefcase, CreditCard, Star } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
@@ -20,6 +22,9 @@ import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl, readJsonSa
 import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
 import TechnicianDashboardOverview from "@/components/technician/dashboard/TechnicianDashboardOverview";
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
+import { useRoadRouteEstimate } from "@/hooks/useRoadRouteEstimate";
+import { resolveActiveJobNavigationTarget } from "@/lib/activeJobNavigation";
+import { defaultNavigationVehicleMode } from "@/lib/navigation/technicianNavigation";
 import { useTechnicianTowingManagement } from "@/hooks/useTechnicianTowingManagement";
 import {
   formatTechnicianStatus,
@@ -79,6 +84,16 @@ const TechnicianDashboard = () => {
   const isTowingOperator = isTowingTechnicianRole(technicianSnapshot);
   const towingManagement = useTechnicianTowingManagement(isTowingOperator);
   const { activeJob, setActiveJob, refreshActiveJob } = useTechnicianActiveJob(technician?.id, 15000);
+  // Where the job takes the technician now: the customer, or the drop once a tow is loaded.
+  const activeJobRouteTarget = useMemo(
+    () => resolveActiveJobNavigationTarget(activeJob, activeJob?.status),
+    [activeJob],
+  );
+  const activeJobRoadRoute = useRoadRouteEstimate(
+    currentLocation,
+    activeJobRouteTarget,
+    defaultNavigationVehicleMode(technician?.vehicle_types),
+  );
   const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
   const JOB_TAKEN_MESSAGE = "This job has already been taken by another technician.";
 
@@ -535,6 +550,8 @@ const TechnicianDashboard = () => {
           address: String(offerData?.address || offerLocation?.address || "Location not available")
         },
         distance: parseFloat(String(offerData?.routeDistanceKm ?? offerData?.distance ?? 0)) || 0,
+        pickupDistanceKm: readOfferNumber(offerData?.distance ?? offerData?.locationDistance),
+        etaMinutes: readOfferNumber(offerData?.eta),
         routeDistanceKm: Number(offerData?.routeDistanceKm ?? offerData?.route_distance_km ?? 0) || null,
         estimatedDuration: Number(offerData?.estimatedDuration ?? offerData?.estimated_duration ?? 0) || null,
         dropLocation: {
@@ -1047,6 +1064,11 @@ const TechnicianDashboard = () => {
           address: String(location?.address || offerRequest?.address || "Location not available"),
         },
         distance: Number.isFinite(parsedDistance) ? parsedDistance : 0,
+        pickupDistanceKm: readOfferNumber(offerRequest?.distance ?? offerRequest?.locationDistance),
+        etaMinutes: readOfferNumber(offerRequest?.eta),
+        dropLocation: offerRequest?.dropLocation ?? null,
+        routeDistanceKm: Number(offerRequest?.routeDistanceKm ?? offerRequest?.route_distance_km ?? 0) || null,
+        estimatedDuration: Number(offerRequest?.estimatedDuration ?? offerRequest?.estimated_duration ?? 0) || null,
         amount: Number.isFinite(parsedAmount) ? parsedAmount : 0,
         details: readJobDetails(offerRequest),
       };
@@ -1623,28 +1645,6 @@ const TechnicianDashboard = () => {
     navigate(activeJobNavigation.path, { state: activeJobNavigation.state });
   };
 
-  // Calculate Distance and ETA
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const jobLat = Number(activeJob?.location?.lat ?? activeJob?.location_lat);
-  const jobLng = Number(activeJob?.location?.lng ?? activeJob?.location_lng);
-
-  const jobDistance = currentLocation && Number.isFinite(jobLat) && Number.isFinite(jobLng) && (jobLat !== 0 || jobLng !== 0)
-    ? calculateDistance(currentLocation.lat, currentLocation.lng, jobLat, jobLng)
-    : (activeJob?.distance != null ? Number(activeJob.distance) : null);
-
-  // Assume avg speed 30km/h for city driving
-  // Assume avg speed 30km/h for city driving
-  const etaMinutes = jobDistance !== null ? Math.ceil((jobDistance / 30) * 60) : null;
   const activeAmountDisplay = activeJob && (activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge) != null
     ? (Number.isNaN(Number(activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge))
       ? null
@@ -1664,6 +1664,12 @@ const TechnicianDashboard = () => {
     ? getTowingAction(activeJobStatus, activeJob?.payment_status ?? activeJob?.paymentStatus)
     : null;
   const activeJobDropAddress = activeJob?.dropAddress ?? activeJob?.drop_address ?? activeJob?.dropLocation?.address ?? null;
+  // The booked tow trip, pickup to drop, sits with the drop address.
+  const activeJobDropLabel = [
+    "Drop",
+    Number(activeJobRouteDistance) > 0 ? formatKm(Number(activeJobRouteDistance)) : null,
+    Number(activeJobEstimatedDuration) > 0 ? formatMinutes(Number(activeJobEstimatedDuration)) : null,
+  ].filter(Boolean).join(" · ");
   const visibleCancelledJob =
     activeJob && isCancelledStatus(activeJob?.status)
       ? buildCancelledJobDetails(activeJob, activeJob)
@@ -1997,10 +2003,10 @@ const TechnicianDashboard = () => {
 
         {/* ACTIVE JOB HERO CARD */}
         {showActiveJobCard ? (
-          <div className="relative mx-auto mb-4 max-w-3xl overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/50 dark:bg-slate-900">
+          <div className="tj relative mx-auto mb-4 max-w-3xl overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/50 dark:bg-slate-900">
 
             {/* Live Map Header */}
-            <div className="h-[220px] w-full relative bg-muted/50">
+            <div className="tj-map" style={{ height: 220 }}>
               <TechnicianJobMap
                 techLocation={currentLocation}
                 jobLocation={activeJob?.location && activeJob.location.lat != null && activeJob.location.lng != null ? { lat: Number(activeJob.location.lat), lng: Number(activeJob.location.lng) } : null}
@@ -2009,178 +2015,140 @@ const TechnicianDashboard = () => {
                 showRoute={true}
               />
 
-              {/* Floating Status Badge */}
-              <div className="absolute top-4 left-4 z-[400]">
-                <div className="bg-card dark:bg-slate-900/95 backdrop-blur-sm px-4 py-2 rounded-2xl shadow-lg border border-border flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-red-600 animate-ping" />
-                  <span className="text-xs font-black tracking-widest text-foreground uppercase">
-                    {formatTechnicianStatus(activeJob.status)}
-                  </span>
+              <div className="tj-banner">
+                <span className="tj-live" aria-hidden="true" />
+                <div>
+                  <small>Active job</small>
+                  <b>{sentenceCase(formatTechnicianStatus(activeJob.status))}</b>
                 </div>
-              </div>
-
-              <div className="absolute top-4 right-4 z-[400] bg-zinc-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-lg flex flex-col items-center">
-                <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mb-0.5">Pmt</span>
-                <span className="text-sm font-black text-white leading-none tracking-tight">
-                  ₹{activeAmountDisplay != null ? activeAmountDisplay.toFixed(0) : "---"}
-                </span>
               </div>
             </div>
 
-            <div className="p-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-black text-foreground mb-1 leading-tight tracking-tight">
-                  {activeJob.service_type?.replace(/-/g, " ")}
-                </h2>
-                <div className="flex items-start gap-2 text-muted-foreground/80 mt-2">
-                  <div className="mt-0.5 bg-muted/50 p-1 rounded-full text-slate-400">
-                    <MapPin className="w-3.5 h-3.5" />
-                  </div>
-                  <p className="text-sm font-medium leading-snug line-clamp-2">
-                    {activeJob.address}
+            <div className="tj-card is-flat">
+              <div className="tj-body" style={{ paddingTop: 16 }}>
+                <div className="tj-stage">
+                  <h2 className="tj-title">{activeJob.service_type?.replace(/-/g, " ")}</h2>
+                </div>
+
+                {activeJobDetails?.urgent ? (
+                  <p className="tj-urgent" role="alert">
+                    <MaterialSymbol name="warning" />
+                    Urgent · {activeJobDetails.urgentReason}
                   </p>
-                </div>
-                {activeJobDetails ? (
-                  <JobDetailsList details={activeJobDetails} className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60" />
                 ) : null}
-                {activeJobIsTowing && (
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tow Route</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">Pickup: {activeJob.address || activeJob.location?.address || "Pickup location"}</p>
-                    {activeJobDropAddress && (
-                      <p className="mt-1 text-sm font-semibold text-foreground">Drop: {activeJobDropAddress}</p>
-                    )}
-                    <p className="mt-2 text-xs font-bold text-slate-500">
-                      {[
-                        activeJobRouteDistance != null ? `${Number(activeJobRouteDistance).toFixed(1)} km` : null,
-                        activeJobEstimatedDuration != null ? `${Math.round(Number(activeJobEstimatedDuration))} min` : null,
-                        activeJob.vehicleCategory ? String(activeJob.vehicleCategory).replace(/_/g, " ") : null,
-                        `Status: ${formatTechnicianStatus(activeJobStatus)}`,
-                      ].filter(Boolean).join(" / ")}
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-muted rounded-2xl p-3 border border-border flex items-center gap-3">
-                  <div className="w-10 h-10 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
-                    <Navigation className="w-4 h-4 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Dist</p>
-                    <p className="text-sm font-black text-foreground leading-none">{activeJobRouteDistance != null ? Number(activeJobRouteDistance).toFixed(1) : jobDistance !== null ? jobDistance.toFixed(1) : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">km</span></p>
-                  </div>
-                </div>
-                <div className="bg-muted rounded-2xl p-3 border border-border flex items-center gap-3">
-                  <div className="w-10 h-10 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
-                    <span className="text-xs font-black text-indigo-600">ETA</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Time</p>
-                    <p className="text-sm font-black text-foreground leading-none">{activeJobEstimatedDuration != null ? Math.round(Number(activeJobEstimatedDuration)) : etaMinutes !== null ? etaMinutes : "--"} <span className="text-[10px] text-muted-foreground/80 font-semibold">min</span></p>
-                  </div>
-                </div>
-              </div>
+                <JobKeyStrip
+                  earn={formatRupees(activeAmountDisplay)}
+                  distance={formatKm(activeJobRoadRoute.distanceKm)}
+                  eta={formatMinutes(activeJobRoadRoute.durationMinutes)}
+                />
 
-              <div className="grid grid-cols-2 gap-3 mb-6 border-t border-border pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-muted/50 rounded-full flex items-center justify-center text-muted-foreground/80 border border-border">
-                    <User className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Client</p>
-                    <p className="font-bold text-foreground text-sm truncate">{activeJob.contact_name || "Guest"}</p>
-                  </div>
+                <JobLocationBox
+                  label={activeJobIsTowing ? "Pickup location" : "Customer location"}
+                  address={activeJob.address || activeJob.location?.address || "Location not available"}
+                  landmark={activeJobDetails?.landmark}
+                  drop={activeJobIsTowing && activeJobDropAddress ? { label: activeJobDropLabel, address: String(activeJobDropAddress) } : null}
+                />
+
+                {activeJobDetails?.vehicleLine || activeJob.vehicle_model || activeJob.vehicle_type || activeJobDetails?.plate ? (
+                  <JobVehicleRow
+                    vehicleType={activeJob.vehicle_type}
+                    name={activeJobDetails?.vehicleLine || activeJob.vehicle_model || activeJob.vehicle_type || "Vehicle"}
+                    sub={activeJobDetails?.towTruckLabel ? `${activeJobDetails.towTruckLabel} needed` : null}
+                    plate={activeJobDetails?.plate}
+                  />
+                ) : null}
+
+                <div className="tj-line">
+                  <span>Customer</span>
+                  <b>{activeJob.contact_name || "Guest"}</b>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-muted/50 rounded-full flex items-center justify-center text-muted-foreground/80 border border-border">
-                    <Car className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Vehicle</p>
-                    <p className="font-bold text-foreground text-sm truncate">{activeJob.vehicle_model || activeJob.vehicle_type}</p>
-                  </div>
-                </div>
+
+                {activeJobDetails ? <JobSays details={activeJobDetails} /> : null}
               </div>
 
               {/* Action Buttons with Bottom Sheet flow feel */}
-              <div className="space-y-3">
+              <div className="tj-foot">
                 {activeJob.status !== 'pending' && activeJob.status !== 'paid' && (
-                  <div className="flex gap-2">
+                  <div className={`tj-pair ${activeJobDialablePhone ? "" : "is-single"}`}>
                     {activeJobDialablePhone && (
-                      <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" asChild>
-                        <a href={`tel:${activeJobDialablePhone}`}><PhoneCall className="w-4 h-4 mr-2" /> <span className="font-bold">Call</span></a>
-                      </Button>
+                      <a href={`tel:${activeJobDialablePhone}`} className="tj-act">
+                        <MaterialSymbol name="call" />
+                        Call
+                      </a>
                     )}
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl bg-card dark:bg-slate-900 border-border text-muted-foreground shadow-sm active:scale-95" onClick={openNavigation}>
-                      <Navigation className="w-4 h-4 mr-2" /> <span className="font-bold">Nav</span>
-                    </Button>
+                    <button type="button" className="tj-act is-dark" onClick={openNavigation}>
+                      <MaterialSymbol name="navigation" />
+                      Navigate
+                    </button>
                   </div>
                 )}
 
                 {activeJob.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <Button
+                  <div className="tj-pair">
+                    <button
+                      type="button"
                       disabled={isJobActionLoading}
                       onClick={() => handleRejectJob(activeJob.id)}
-                      variant="outline"
-                      className="h-14 px-4 rounded-2xl border-red-200 text-red-600 bg-red-50 hover:bg-red-100 active:scale-95"
+                      className="tj-act"
                     >
-                      X
-                    </Button>
-                    <Button
+                      <MaterialSymbol name="close" />
+                      Reject
+                    </button>
+                    <button
+                      type="button"
                       disabled={isJobActionLoading}
                       onClick={() => handleAcceptJob(activeJob.id)}
-                      className="flex-1 h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide"
+                      className="tj-cta"
                     >
-                      {isJobActionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "ACCEPT JOB"}
-                    </Button>
+                      {isJobActionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Accept job"}
+                    </button>
                   </div>
                 )}
 
                 {activeJobIsTowing && activeJobTowingAction && (
-                  <Button className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange(activeJobTowingAction.status)}>
-                    {activeJobTowingAction.label}
-                  </Button>
+                  <button type="button" className="tj-cta" onClick={() => handleStatusChange(activeJobTowingAction.status)}>
+                    {sentenceCase(activeJobTowingAction.label)}
+                  </button>
                 )}
 
                 {activeJobIsTowing && activeJobStatus === 'payment_pending' && !isPaidPaymentStatus(activeJob?.payment_status ?? activeJob?.paymentStatus) && (
-                  <div className="w-full h-14 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-3">
-                    <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                    <span className="font-bold text-orange-700">Waiting for payment...</span>
+                  <div className="tj-wait" role="status">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Waiting for payment...
                   </div>
                 )}
 
                 {!activeJobIsTowing && (activeJobStatus === 'accepted' || activeJobStatus === 'assigned') && (
-                  <Button className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('en-route')}>
-                    START JOURNEY
-                  </Button>
+                  <button type="button" className="tj-cta" onClick={() => handleStatusChange('en-route')}>
+                    Start journey
+                  </button>
                 )}
 
                 {!activeJobIsTowing && activeJobStatus === 'en-route' && (
-                  <Button className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('in-progress')}>
-                    ARRIVED
-                  </Button>
+                  <button type="button" className="tj-cta" onClick={() => handleStatusChange('in-progress')}>
+                    Arrived
+                  </button>
                 )}
 
                 {!activeJobIsTowing && activeJobStatus === 'in-progress' && (
-                  <Button className="w-full h-14 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-xl shadow-zinc-900/20 active:scale-95 text-lg font-black tracking-wide" onClick={() => handleStatusChange('completed')}>
-                    COMPLETE WORK
-                  </Button>
+                  <button type="button" className="tj-cta is-dark" onClick={() => handleStatusChange('completed')}>
+                    Complete work
+                  </button>
                 )}
 
                 {!activeJobIsTowing && activeJobStatus === 'payment_pending' && (
-                  <div className="w-full h-14 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-3">
-                    <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                    <span className="font-bold text-orange-700">Waiting for payment...</span>
+                  <div className="tj-wait" role="status">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Waiting for payment...
                   </div>
                 )}
 
                 {!activeJobIsTowing && activeJobStatus === 'paid' && (
-                  <Button className="w-full h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/20 active:scale-95 text-lg font-black tracking-wide flex items-center justify-center gap-2" onClick={() => handleStatusChange('completed')}>
-                    <DollarSign className="w-5 h-5" /> FINISH JOB
-                  </Button>
+                  <button type="button" className="tj-cta" onClick={() => handleStatusChange('completed')}>
+                    <MaterialSymbol name="check_circle" />
+                    Finish job
+                  </button>
                 )}
               </div>
             </div>

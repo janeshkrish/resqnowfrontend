@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toJobRequest } from "./technicianJobOffer";
+import { readOfferNumber, toJobRequest } from "./technicianJobOffer";
 
 describe("the offer card's job", () => {
   it("reads a socket offer", () => {
@@ -57,6 +57,22 @@ describe("the offer card's job", () => {
       amount: 450,
       dropLocation: { lat: null, lng: null, address: null },
     });
+  });
+
+  it("keeps the way to the customer as dispatch measured it", () => {
+    expect(readOfferNumber("2.4 km")).toBe(2.4);
+    expect(readOfferNumber("~8 mins")).toBe(8);
+    expect(readOfferNumber(3.1)).toBe(3.1);
+    // No number sent: the card shows a dash rather than an estimate of its own.
+    expect(readOfferNumber("Nearby")).toBeNull();
+    expect(readOfferNumber("")).toBeNull();
+    expect(readOfferNumber(undefined)).toBeNull();
+    expect(readOfferNumber(0)).toBeNull();
+
+    // For a tow the trip to the drop is routeDistanceKm; the way to the pickup stays separate.
+    const tow = toJobRequest({ requestId: "6103", isTowing: true, distance: "2.4 km", eta: "11 mins", routeDistanceKm: 4.2, estimatedDuration: 14 });
+    expect(tow).toMatchObject({ pickupDistanceKm: 2.4, etaMinutes: 11, routeDistanceKm: 4.2, estimatedDuration: 14 });
+    expect(toJobRequest({ id: 6104, locationDistance: "Nearby" })).toMatchObject({ pickupDistanceKm: null, etaMinutes: null });
   });
 
   it("has no job without a request id", () => {

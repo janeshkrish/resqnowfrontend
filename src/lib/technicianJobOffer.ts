@@ -8,6 +8,17 @@ const money = (value: unknown) =>
   value != null && value !== "" && Number.isFinite(Number(value)) ? Number(value) : null;
 
 /**
+ * The number in what dispatch sends for the way to the customer: "2.4 km", "~8 mins", or a
+ * plain number. Null for "Nearby" or nothing, so the card shows a dash, never a guess.
+ */
+export function readOfferNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : null;
+  const match = /\d+(?:\.\d+)?/.exec(String(value ?? ""));
+  const found = match ? Number(match[0]) : NaN;
+  return Number.isFinite(found) && found > 0 ? found : null;
+}
+
+/**
  * The offer card's job, from a socket offer (resqnowbackend dispatchQueueService) or the
  * `request` of GET /api/service-requests/:id/technician-offer.
  */
@@ -28,6 +39,8 @@ export function toJobRequest(raw: Row | null | undefined): JobRequest | null {
       address: String(raw.address || location.address || "Location not available"),
     },
     distance: parseFloat(String(raw.routeDistanceKm ?? raw.distance ?? raw.locationDistance ?? 0)) || 0,
+    pickupDistanceKm: readOfferNumber(raw.distance ?? raw.locationDistance),
+    etaMinutes: readOfferNumber(raw.eta),
     routeDistanceKm: Number(raw.routeDistanceKm ?? raw.route_distance_km ?? 0) || null,
     estimatedDuration: Number(raw.estimatedDuration ?? raw.estimated_duration ?? 0) || null,
     dropLocation: {

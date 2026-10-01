@@ -1,4 +1,6 @@
-import { expect, test, type Locator, type Page, type WebSocketRoute } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+import { TECHNICIAN, fakeSocketServer, slideToAccept, stripValue } from "./fixtures/technicianPortal";
 
 // A job offer as resqnowbackend/services/dispatchQueueService.js sends it on the socket.
 const offer = {
@@ -31,48 +33,6 @@ const offerPush = {
   deepLinkPath: "/job/6101",
 };
 
-// Speaks just enough Engine.IO v4 / Socket.IO v5 to stand in for the backend's socket
-// server: every socket that joins `technician_<id>` gets what is sent to that room.
-async function fakeSocketServer(page: Page) {
-  const members = new Map<WebSocketRoute, Set<string>>();
-  await page.routeWebSocket(/\/socket\.io\//, (ws) => {
-    const rooms = new Set<string>();
-    members.set(ws, rooms);
-    ws.send(`0${JSON.stringify({ sid: `e2e-${members.size}`, upgrades: [], pingInterval: 25000, pingTimeout: 20000, maxPayload: 1e6 })}`);
-    ws.onClose(() => members.delete(ws));
-    ws.onMessage((message) => {
-      const text = String(message);
-      if (text === "2") return ws.send("3");
-      if (text.startsWith("40")) return ws.send(`40${JSON.stringify({ sid: `e2e-socket-${members.size}` })}`);
-      const match = /^42(\d*)(\[.*\])$/.exec(text);
-      if (!match) return;
-      const [event, arg] = JSON.parse(match[2]);
-      if (event === "join_technician_room") {
-        rooms.add(`technician_${arg}`);
-        if (match[1]) ws.send(`43${match[1]}${JSON.stringify([{ ok: true }])}`);
-      }
-    });
-  });
-  const inRoom = () => [...members].filter(([, rooms]) => rooms.has("technician_7")).map(([ws]) => ws);
-  return {
-    /**
-     * Waits until the page's sockets have settled in the technician's room: the app's socket,
-     * plus the dashboard's own one there. The app reconnects once the profile has loaded.
-     */
-    joined: async (sockets = 1) => {
-      let steadySince = 0;
-      await expect
-        .poll(() => {
-          if (inRoom().length !== sockets || members.size !== sockets) return (steadySince = 0, false);
-          steadySince ||= Date.now();
-          return Date.now() - steadySince >= 1000;
-        }, { intervals: [100] })
-        .toBe(true);
-    },
-    send: (event: string, data: unknown) => inRoom().forEach((ws) => ws.send(`42${JSON.stringify([event, data])}`)),
-  };
-}
-
 type Call = { method: string; path: string; body: unknown };
 
 async function signInTechnician(page: Page, options: { onJob?: boolean } = {}) {
@@ -91,11 +51,7 @@ async function signInTechnician(page: Page, options: { onJob?: boolean } = {}) {
     if (request.method() !== "GET") calls.push({ method: request.method(), path, body: request.postDataJSON() });
 
     if (path === "/api/technicians/me") {
-      return reply(200, {
-        id: 7, name: "Arun Kumar", email: "arun@example.test", phone: "9876500000", status: "approved",
-        verification_status: "verified", is_active: true, is_available: true, service_type: "mechanic",
-        specialties: ["flat-tyre"], vehicle_types: ["car", "bike"],
-      });
+      return reply(200, TECHNICIAN);
     }
     if (path === "/api/technicians/me/active-job" || path === "/api/technician/active-job/7") {
       if (accepted) return reply(200, { id: "6101", requestId: "6101", status: "accepted", serviceType: "flat-tyre", customerName: "Asha", address: offer.address, amount: 350 });
@@ -103,7 +59,8 @@ async function signInTechnician(page: Page, options: { onJob?: boolean } = {}) {
       return reply(200, null);
     }
     if (path === "/api/service-requests/6101/technician-offer") {
-      return reply(200, { available: true, request: { ...offer, status: "pending", offer_status: "pending" } });
+      // The offer lookup measures the distance itself and carries no travel time (routes/service_requests.js).
+      return reply(200, { available: true, request: { ...offer, eta: undefined, distance: 2.4, locationDistance: "2.4 km", status: "pending", offer_status: "pending" } });
     }
     if (path === "/api/jobs/accept") {
       accepted = true;
@@ -192,31 +149,6 @@ async function pushReady(page: Page, pageContent: Locator) {
     .toBeGreaterThan(0);
 }
 
-async function slideToAccept(card: Locator) {
-  const handle = card.locator(".cursor-grab").first();
-  const track = card.getByText("Slide to Accept").locator("xpath=ancestor::div[contains(@class,'rounded-full')][1]");
-  // On a phone the card is a bottom sheet: let it finish sliding in, then bring the control up.
-  await handle.scrollIntoViewIfNeeded();
-  let from = await handle.boundingBox();
-  await expect
-    .poll(async () => {
-      const now = await handle.boundingBox();
-      const settled = Boolean(now && from && now.x === from.x && now.y === from.y);
-      from = now;
-      return settled;
-    }, { intervals: [150] })
-    .toBe(true);
-  const to = await track.boundingBox();
-  if (!from || !to) throw new Error("slide control not found");
-  const page = card.page();
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-  await page.mouse.down();
-  for (let step = 1; step <= 12; step++) {
-    await page.mouse.move(from.x + from.width / 2 + ((to.width - from.width) * step) / 12, from.y + from.height / 2);
-  }
-  await page.mouse.up();
-}
-
 test.describe("web app", () => {
   test("dashboard: a new request pops up the request card, and sliding accepts it", async ({ page }) => {
     const socket = await fakeSocketServer(page);
@@ -230,9 +162,14 @@ test.describe("web app", () => {
 
     const card = page.getByRole("dialog");
     await expect(card).toBeVisible();
-    await expect(card).toContainText(/flat tyre/i);
-    await expect(card).toContainText("Asha");
-    await expect(card.getByTestId("job-details")).toContainText("Landmark:Opposite the petrol bunk");
+    await expect(card.getByRole("heading", { name: /flat tyre/i })).toBeVisible();
+    // Every figure on the card is the offer's own: nothing is filled in by the page.
+    await expect(stripValue(card, "You earn")).toHaveText("₹350");
+    await expect(stripValue(card, "Distance")).toHaveText("2.4 km");
+    await expect(stripValue(card, "Reach in")).toHaveText("8 min");
+    await expect(card.getByTestId("job-location")).toContainText("21, Race Course Road, Coimbatore");
+    await expect(card.getByTestId("job-location")).toContainText("Opposite the petrol bunk");
+    await expect(card.getByRole("timer")).toContainText("sec");
     await expect(page.getByRole("dialog")).toHaveCount(1);
 
     await slideToAccept(card);
@@ -253,12 +190,12 @@ test.describe("web app", () => {
     const card = page.getByRole("dialog");
     await expect(card).toBeVisible();
     await expect(card).toContainText(/flat tyre/i);
-    await expect(card).toContainText("350");
+    await expect(stripValue(card, "You earn")).toHaveText("₹350");
     await expect(page.getByRole("dialog")).toHaveCount(1);
     if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-job-alert-history.png` });
 
     // Rejecting hands the job to the next technician straight away.
-    await card.getByRole("button", { name: "Reject Offer" }).click();
+    await card.getByRole("button", { name: "Reject" }).click();
     await expect(card).toBeHidden();
     await expect.poll(() => calls).toContainEqual({
       method: "PATCH",
@@ -279,9 +216,9 @@ test.describe("web app", () => {
     await expect(card).toBeVisible();
 
     socket.send("job:revoked", { requestId: "6101" });
-    await expect(card).toContainText("Offer Closed");
+    await expect(card).toContainText("Offer closed");
     await expect(card).toContainText("This job has already been taken by another technician.");
-    await card.getByRole("button", { name: "Dismiss Alert" }).click();
+    await card.getByRole("button", { name: "Dismiss" }).click();
     await expect(card).toBeHidden();
     expect(errors).toEqual([]);
   });
@@ -353,7 +290,9 @@ test.describe("Android app", () => {
     const card = page.getByRole("dialog");
     await expect(card).toBeVisible();
     await expect(card).toContainText(/flat tyre/i);
-    await expect(card.getByTestId("job-details")).toContainText("Landmark:Opposite the petrol bunk");
+    await expect(card.getByTestId("job-location")).toContainText("Opposite the petrol bunk");
+    // The lookup carries no travel time, so the card shows a dash instead of inventing one.
+    await expect(stripValue(card, "Reach in")).toHaveText("—");
 
     // The same offer pushed again, or closed by a push, does not stack up cards.
     await page.evaluate((data) => (window as unknown as { __android: { push(d: unknown): void } }).__android.push(data), offerPush);

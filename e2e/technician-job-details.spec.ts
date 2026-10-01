@@ -70,10 +70,11 @@ test("a job offer shows the vehicle, what the customer said, the truck and their
   await expect(offer.getByText("Maruti Suzuki Swift · Hatchback")).toBeVisible();
   const details = offer.getByTestId("job-details");
   await expect(details.getByRole("list", { name: "Customer says" })).toHaveText(/Accident\s*Won’t move/);
-  await expect(details).toContainText("Truck:Flatbed");
-  await expect(details).toContainText("Landmark:Opposite the petrol bunk");
-  await expect(details).toContainText("Number plate:TN 37 AB 1234");
-  await expect(details).toContainText("Customer note:Front bumper is hanging");
+  // The truck sits on the card's top line, the landmark with the address, the note with the answers.
+  await expect(offer).toContainText("New request · Flatbed needed");
+  await expect(offer.getByTestId("job-location")).toContainText("21, Race Course Road, Coimbatore");
+  await expect(offer.getByTestId("job-location")).toContainText("Opposite the petrol bunk");
+  await expect(details).toContainText("“Front bumper is hanging”");
   const photo = details.getByRole("link", { name: "Open photo 1 from the customer" });
   await expect(photo).toHaveAttribute("href", "http://api.e2e.test/api/upload/files/1727-bumper.jpg");
   await expect.poll(() => photo.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -101,10 +102,11 @@ test("the active job shows the same details, with urgent jobs flagged", async ({
 
   await page.goto("/technician/active-job/5502");
   const details = page.getByTestId("job-details");
-  await expect(details.getByRole("alert")).toHaveText("Urgent · Someone is stuck inside the vehicle");
+  await expect(page.getByRole("alert")).toContainText("Urgent · Someone is stuck inside the vehicle");
   await expect(details.getByRole("list", { name: "Customer says" })).toHaveText(/Someone inside\s*Locked inside/);
-  await expect(details).toContainText("Number plate:TN 37 AB 1234");
-  await expect(details).not.toContainText("Truck:");
+  // The plate sits with the vehicle, and a lockout asks for no truck.
+  await expect(page.getByTestId("job-vehicle")).toContainText("TN 37 AB 1234");
+  await expect(page.getByTestId("job-vehicle")).not.toContainText("needed");
   await expect(page.getByText("Maruti Suzuki Swift · Hatchback").first()).toBeVisible();
   if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-tech-active.png`, fullPage: true });
 });

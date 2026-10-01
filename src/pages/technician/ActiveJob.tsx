@@ -1,21 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import {
-  Bike,
-  Car,
-  CheckCircle,
-  Clock3,
-  CreditCard,
-  Loader2,
-  MapPin,
-  Navigation,
-  PhoneCall,
-  Truck,
-  User,
-  Wallet,
-  XCircle,
-} from 'lucide-react';
+import { Bike, Car, Loader2, Truck } from 'lucide-react';
 import { useSocket } from '@/contexts/SocketContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { toast } from 'sonner';
@@ -42,7 +27,9 @@ import {
 } from '@/utils/technicianStatus';
 import { useTechnicianActiveJob } from '@/hooks/useTechnicianActiveJob';
 import { getTowingAction } from '@/lib/towingActionState';
-import { JobDetailsList } from '@/components/technician/JobDetails';
+import MaterialSymbol from '@/components/home/MaterialSymbol';
+import { JobKeyStrip, JobLocationBox, JobSays, JobVehicleRow } from '@/components/technician/JobCardParts';
+import { formatKm, formatMinutes, formatRupees, sentenceCase } from '@/lib/technicianJobCard';
 import { readJobDetails } from '@/lib/technicianJobDetails';
 import {
   getTechnicianActiveJobPath,
@@ -102,14 +89,6 @@ const buildVehicleDetails = (job: any) => {
   const vehicleType = toOptionalString(job?.vehicle?.type ?? job?.vehicle_type);
   const vehicleModel = toOptionalString(job?.vehicle?.model ?? job?.vehicle_model);
   return [vehicleType, vehicleModel].filter(Boolean).join(' ').trim() || null;
-};
-
-const formatMoney = (value: number | null, maximumFractionDigits = 0) => {
-  if (!Number.isFinite(Number(value))) return 'Rs --';
-  return `Rs ${new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits,
-  }).format(Number(value))}`;
 };
 
 const isPaidPaymentStatus = (value: unknown) =>
@@ -253,14 +232,15 @@ const ActiveJob = () => {
 
   // 1. Keep local status in sync with active job status
   useEffect(() => {
-    if (!job && !cancelledJob && hasResolvedActiveJob) {
+    // The job clears as soon as it is paid: the well-done screen leaves for the dashboard itself.
+    if (!job && !cancelledJob && hasResolvedActiveJob && !showCompletionModal) {
       navigate('/technician/dashboard');
       return;
     }
     if (job?.status) {
       setStatus(normalizeTechnicianStatus(job.status));
     }
-  }, [cancelledJob, hasResolvedActiveJob, job, job?.status, navigate]);
+  }, [cancelledJob, hasResolvedActiveJob, job, job?.status, navigate, showCompletionModal]);
 
   useEffect(() => {
     if (
@@ -790,7 +770,17 @@ const ActiveJob = () => {
     );
   }
 
-  if (!job) return <div className="p-8 text-center">Loading job details...</div>;
+  const completionOutro = showCompletionModal ? (
+    <TechnicianJobCompletion
+      amount={lastEarned}
+      onClose={() => {
+        setShowCompletionModal(false);
+        navigate('/technician/dashboard', { replace: true });
+      }}
+    />
+  ) : null;
+
+  if (!job) return completionOutro ?? <div className="p-8 text-center">Loading job details...</div>;
 
   const jobDue = toOptionalNumber(job.dueAmount ?? job.due_amount);
   const displayDue = jobDue != null && jobDue > 0 ? jobDue : dues;
@@ -798,7 +788,6 @@ const ActiveJob = () => {
   const displayService = toOptionalString(job.serviceType ?? job.service_type ?? job.service?.type);
   const jobDetails = readJobDetails(job);
   const displayVehicle = jobDetails?.vehicleLine || buildVehicleDetails(job);
-  const hasServiceOrVehicle = Boolean(displayService || displayVehicle);
   const displayPhoneText = toOptionalString(job.phoneNumber ?? job.contact_phone ?? job.user?.phone);
   const dialablePhone = toOptionalPhone(displayPhoneText);
   const displayAmount = toOptionalNumber(job.amount ?? job.service_charge ?? job.serviceCharge);
@@ -846,7 +835,6 @@ const ActiveJob = () => {
   };
   const routeDistanceKm = routeState.status === 'ready' ? routeState.distanceKm : null;
   const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
-  const actionGridClass = dialablePhone ? 'grid-cols-2' : 'grid-cols-1';
 
   if (isNavigationActive) {
     return (
@@ -867,75 +855,99 @@ const ActiveJob = () => {
     );
   }
 
+  const serviceTitle = (displayService || 'Active Job').replace(/-/g, ' ');
+  const canOpenNavigation = status !== 'accepted' && status !== 'assigned';
+  const dropLabel = [
+    'Drop',
+    Number.isFinite(bookedRouteDistanceKm) ? formatKm(bookedRouteDistanceKm) : null,
+    Number.isFinite(bookedEstimatedDuration) ? formatMinutes(bookedEstimatedDuration) : null,
+  ].filter(Boolean).join(' · ');
+
   return (
-    <div className="min-h-screen bg-[#f3f4f6] pb-8">
-      <div className="mx-auto max-w-md px-4 py-4">
-        <div className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/60">
-          <div className={`relative w-full bg-muted/40 ${isNavigationActive ? 'h-[calc(100dvh-2rem)] min-h-[560px] max-h-[760px]' : 'h-[240px]'}`}>
-            <ActiveJobMap
-              technicianLocation={hasUsableCurrentLocation && currentLocation ? currentLocation : undefined}
-              customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
-              destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
-              navigationDestination={navigationTarget || undefined}
-              heading={currentLocation?.heading}
-              speedKmh={currentLocation?.speedKmh}
-              vehicleMode={vehicleMode}
-              onRouteStateChange={handleRouteStateChange}
+    <div className="tj tj-page">
+      <div className="tj-page-inner">
+        <div className="tj-map">
+          <ActiveJobMap
+            technicianLocation={hasUsableCurrentLocation && currentLocation ? currentLocation : undefined}
+            customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
+            destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
+            navigationDestination={navigationTarget || undefined}
+            heading={currentLocation?.heading}
+            speedKmh={currentLocation?.speedKmh}
+            vehicleMode={vehicleMode}
+            onRouteStateChange={handleRouteStateChange}
+          />
+
+          <div className="tj-banner">
+            <span className="tj-live" aria-hidden="true" />
+            <div>
+              <small>{sentenceCase(formatTechnicianStatus(status))}</small>
+              {routeState.status === 'ready' && etaMinutes !== null && Number.isFinite(routeDistanceKm) ? (
+                <b>{formatMinutes(etaMinutes)} · {formatKm(routeDistanceKm)}</b>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <section className="tj-card" aria-label="Active job">
+          <span className="tj-grab" aria-hidden="true" />
+          <div className="tj-body">
+            <div className="tj-stage">
+              <h1 className="tj-title">{serviceTitle}</h1>
+              <span className="tj-status">{sentenceCase(formatTechnicianStatus(status))}</span>
+            </div>
+
+            {jobDetails?.urgent ? (
+              <p className="tj-urgent" role="alert">
+                <MaterialSymbol name="warning" />
+                Urgent · {jobDetails.urgentReason}
+              </p>
+            ) : null}
+
+            <JobKeyStrip
+              earn={formatRupees(displayAmount)}
+              distance={formatKm(routeDistanceKm)}
+              eta={formatMinutes(etaMinutes)}
             />
 
-            {!isNavigationActive && <div className="absolute left-4 top-4 z-[400]">
-              <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/95 px-4 py-2 shadow-lg backdrop-blur-sm">
-                <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-pulse" />
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">
-                  {formatTechnicianStatus(status)}
-                </span>
-              </div>
-            </div>}
+            <JobLocationBox
+              label={isTowingActiveJob ? 'Pickup location' : 'Customer location'}
+              address={jobAddress}
+              landmark={jobDetails?.landmark}
+              drop={dropAddress ? { label: dropLabel, address: dropAddress } : null}
+            />
 
-            {!isNavigationActive && <div className="absolute right-4 top-4 z-[400] flex flex-col gap-2">
-              <div className="rounded-2xl bg-zinc-900/90 px-3 py-2 shadow-lg backdrop-blur-md">
-                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-400">Payout</p>
-                <p className="mt-1 text-lg font-black text-white">{formatMoney(displayAmount, 0)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={displayDue > 0 ? handlePayDues : undefined}
-                disabled={displayDue <= 0}
-                className={`rounded-2xl border px-3 py-2 text-left shadow-lg backdrop-blur-sm ${
-                  displayDue > 0
-                    ? 'border-red-200 bg-red-50/95 text-red-700'
-                    : 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
-                }`}
-              >
-                <p className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                  Platform Due
+            {displayVehicle || jobDetails?.plate ? (
+              <JobVehicleRow
+                vehicleType={job.vehicle?.type ?? job.vehicle_type}
+                name={displayVehicle || 'Vehicle'}
+                sub={jobDetails?.towTruckLabel ? `${jobDetails.towTruckLabel} needed` : null}
+                plate={jobDetails?.plate}
+              />
+            ) : null}
+
+            <div className="tj-line">
+              <span>Customer</span>
+              <b>{displayUser}</b>
+            </div>
+
+            {jobDetails ? <JobSays details={jobDetails} /> : null}
+
+            <div className="tj-route">
+              <div className="tj-route-top">
+                <p>
+                  {!hasUsableCurrentLocation
+                    ? 'Acquiring accurate location…'
+                    : routeState.status === 'ready'
+                    ? 'Road route ready'
+                    : routeState.message || 'Calculating road route…'}
                 </p>
-                <p className="mt-1 text-sm font-black">{formatMoney(displayDue, 0)}</p>
-              </button>
-            </div>}
-          </div>
-
-          <div className="space-y-5 p-5">
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Navigation vehicle</p>
-                  <p className="mt-1 text-sm font-bold text-slate-700">
-                    {!hasUsableCurrentLocation
-                      ? 'Acquiring accurate location…'
-                      : routeState.status === 'ready'
-                      ? 'Road route ready'
-                      : routeState.message || 'Calculating road route…'}
-                  </p>
-                  {locationError && !hasUsableCurrentLocation && (
-                    <p className="mt-1 text-xs font-semibold text-amber-700">{locationError}</p>
-                  )}
-                </div>
-                {routeState.status === 'ready' && (
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">READY</span>
-                )}
+                {routeState.status === 'ready' && <span className="tj-ready">READY</span>}
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Navigation vehicle">
+              {locationError && !hasUsableCurrentLocation && (
+                <p className="tj-warn">{locationError}</p>
+              )}
+              <div className="tj-modes" role="radiogroup" aria-label="Navigation vehicle">
                 {([
                   ['two-wheeler', 'Bike', Bike],
                   ['car', 'Car', Car],
@@ -946,275 +958,128 @@ const ActiveJob = () => {
                     type="button"
                     role="radio"
                     aria-checked={vehicleMode === mode}
-                    className={`flex min-h-16 flex-col items-center justify-center rounded-2xl border px-2 py-2 text-xs font-extrabold transition ${
-                      vehicleMode === mode
-                        ? 'border-rose-600 bg-rose-50 text-rose-700 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-500'
-                    }`}
+                    className="tj-mode"
                     onClick={() => {
                       vehicleSelectionTouchedRef.current = true;
                       setVehicleMode(mode);
                     }}
                   >
-                    <Icon className="mb-1 h-5 w-5" />
+                    <Icon />
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                Routing as {navigationVehicleLabels[vehicleMode]}
-              </p>
+              <p className="tj-note">Routing as {navigationVehicleLabels[vehicleMode]}</p>
             </div>
 
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-foreground">
-                {displayService || 'Active Job'}
-              </h1>
-              <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
-                <div className="mt-0.5 rounded-full bg-muted p-1 text-slate-500">
-                  <MapPin className="h-3.5 w-3.5" />
-                </div>
-                <p className="leading-snug">{jobAddress}</p>
-              </div>
-              {isTowingActiveJob && (
-                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Towing job</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">Pickup</p>
-                  <p className="text-sm font-bold text-foreground">{jobAddress}</p>
-                  {dropAddress && <p className="mt-1 text-sm font-bold text-foreground">{dropAddress}</p>}
-                  <p className="mt-2 text-xs font-semibold text-slate-500">
-                    {[
-                      Number.isFinite(bookedRouteDistanceKm) ? `${bookedRouteDistanceKm.toFixed(1)} km` : null,
-                      Number.isFinite(bookedEstimatedDuration) ? `${Math.round(bookedEstimatedDuration)} min` : null,
-                      displayVehicle,
-                      `Status: ${formatTechnicianStatus(status)}`,
-                    ].filter(Boolean).join(' / ')}
-                  </p>
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              className={`tj-line ${displayDue > 0 ? 'is-due' : ''}`}
+              onClick={displayDue > 0 ? handlePayDues : undefined}
+              disabled={displayDue <= 0}
+            >
+              <span>{displayDue > 0 ? 'Platform due · tap to pay' : 'Platform due'}</span>
+              <b>{formatRupees(displayDue)}</b>
+            </button>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-border bg-muted p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-red-600 shadow-sm">
-                    <Wallet className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Earnings</p>
-                    <p className="text-sm font-black text-foreground">{formatMoney(displayAmount, 0)}</p>
-                  </div>
-                </div>
-              </div>
+            {!['payment_pending', 'completed', 'paid', 'closed'].includes(status) && (
+              <button type="button" className="tj-ghost is-danger" onClick={() => updateStatus('cancelled')}>
+                <MaterialSymbol name="close" />
+                Cancel Job
+              </button>
+            )}
+          </div>
 
-              <div className="rounded-2xl border border-border bg-muted p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-indigo-600 shadow-sm">
-                    <Clock3 className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">ETA</p>
-                    <p className="text-sm font-black text-foreground">
-                      {etaMinutes !== null ? `${etaMinutes} min` : '--'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          <div className="tj-foot is-sticky">
+            {dialablePhone || canOpenNavigation ? (
+              <div className={`tj-pair ${dialablePhone && canOpenNavigation ? '' : 'is-single'}`}>
+                {dialablePhone ? (
+                  <a href={`tel:${dialablePhone}`} aria-label="Call customer" className="tj-act">
+                    <MaterialSymbol name="call" />
+                    Call
+                  </a>
+                ) : null}
 
-              <div className="rounded-2xl border border-border bg-muted p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-red-500 shadow-sm">
-                    <CreditCard className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Platform Due</p>
-                    <p className={`text-sm font-black ${displayDue > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {formatMoney(displayDue, 0)}
-                    </p>
-                  </div>
-                </div>
+                {canOpenNavigation && (
+                  <button
+                    type="button"
+                    className="tj-act is-dark"
+                    onClick={() => void openNavigation()}
+                    disabled={!navigationStartReady}
+                  >
+                    <MaterialSymbol name="navigation" />
+                    Open navigation
+                  </button>
+                )}
               </div>
+            ) : null}
 
-              <div className="rounded-2xl border border-border bg-muted p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-slate-600 shadow-sm">
-                    <Navigation className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Distance</p>
-                    <p className="text-sm font-black text-foreground">
-                      {Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : '--'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {isTowingActiveJob && towingAction && (
+              <button
+                type="button"
+                className="tj-cta"
+                onClick={() => void handleTowingAction()}
+                disabled={isLoading || (towingStartsNavigation && !navigationStartReady)}
+              >
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : TowingActionIcon ? <TowingActionIcon className="h-5 w-5" /> : null}
+                {sentenceCase(towingAction.label)}
+              </button>
+            )}
 
-            <div className="grid grid-cols-2 gap-3 border-t border-border pt-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Customer</p>
-                  <p className="truncate text-sm font-bold text-foreground">{displayUser}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-                  <Car className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Vehicle</p>
-                  <p className="truncate text-sm font-bold text-foreground">{displayVehicle || 'Not Available'}</p>
-                </div>
-              </div>
-            </div>
-
-            {jobDetails ? (
-              <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 dark:bg-slate-900/60">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Service Notes</p>
-                <JobDetailsList details={jobDetails} />
-              </div>
-            ) : hasServiceOrVehicle && (
-              <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Service Notes</p>
-                <p className="mt-1 text-sm font-semibold text-slate-700">
-                  {displayService || 'Not Available'}
-                  {displayVehicle ? ` - ${displayVehicle}` : ''}
-                </p>
+            {isTowingActiveJob && status === 'payment_pending' && !isPaidPaymentStatus(job.payment_status ?? job.paymentStatus) && (
+              <div className="tj-wait" role="status">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Waiting for customer payment...
               </div>
             )}
 
-            <div className={`grid gap-3 ${actionGridClass}`}>
-              {dialablePhone ? (
-                <Button
-                  variant="outline"
-                  className="h-12 rounded-xl border-border bg-card text-muted-foreground shadow-sm"
-                  asChild
-                >
-                  <a href={`tel:${dialablePhone}`} aria-label="Call customer">
-                    <PhoneCall className="mr-2 h-4 w-4" />
-                    <span className="font-bold">Call</span>
-                  </a>
-                </Button>
-              ) : null}
+            {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
+              <button
+                type="button"
+                className="tj-cta"
+                onClick={() => void openNavigation()}
+                disabled={isLoading || !navigationStartReady}
+              >
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MaterialSymbol name="navigation" />}
+                Start navigation
+              </button>
+            )}
 
-              {status !== 'accepted' && status !== 'assigned' && (
-                <Button
-                  variant="outline"
-                  className="h-12 rounded-xl border-border bg-card text-muted-foreground shadow-sm"
-                  onClick={() => void openNavigation()}
-                  disabled={!navigationStartReady}
-                >
-                  <Navigation className="mr-2 h-4 w-4" />
-                  <span className="font-bold">Open navigation</span>
-                </Button>
-              )}
-            </div>
+            {!isTowingActiveJob && status === 'en-route' && (
+              <button type="button" className="tj-cta" onClick={() => updateStatus('arrived')} disabled={isLoading}>
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MaterialSymbol name="location_on" />}
+                I&apos;ve arrived
+              </button>
+            )}
 
-            <div className="space-y-3">
-              {isTowingActiveJob && towingAction && (
-                <Button
-                  className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
-                  onClick={() => void handleTowingAction()}
-                  disabled={isLoading || (towingStartsNavigation && !navigationStartReady)}
-                >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : TowingActionIcon ? <TowingActionIcon className="mr-2 h-5 w-5" /> : null}
-                  {towingAction.label}
-                </Button>
-              )}
+            {!isTowingActiveJob && status === 'arrived' && (
+              <button type="button" className="tj-cta is-dark" onClick={() => updateStatus('completed')} disabled={isLoading}>
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MaterialSymbol name="check_circle" />}
+                Complete work
+              </button>
+            )}
 
-              {isTowingActiveJob && status === 'payment_pending' && !isPaidPaymentStatus(job.payment_status ?? job.paymentStatus) && (
-                <div className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                  <span className="font-bold text-orange-700">Waiting for customer payment...</span>
-                </div>
-              )}
+            {!isTowingActiveJob && status === 'payment_pending' && (
+              <div className="tj-wait" role="status">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Waiting for customer payment...
+              </div>
+            )}
 
-              {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
-                <Button
-                  className="h-14 w-full rounded-2xl bg-red-600 text-lg font-black tracking-wide text-white shadow-xl shadow-red-600/20 hover:bg-red-700"
-                  onClick={() => void openNavigation()}
-                  disabled={isLoading || !navigationStartReady}
-                >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Navigation className="mr-2 h-5 w-5" />}
-                  START NAVIGATION
-                </Button>
-              )}
-
-              {!isTowingActiveJob && status === 'en-route' && (
-                <Button
-                  className="h-14 w-full rounded-2xl bg-indigo-600 text-lg font-black tracking-wide text-white shadow-xl shadow-indigo-600/20 hover:bg-indigo-700"
-                  onClick={() => updateStatus('arrived')}
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <MapPin className="mr-2 h-5 w-5" />}
-                  I&apos;VE ARRIVED
-                </Button>
-              )}
-
-              {!isTowingActiveJob && status === 'arrived' && (
-                <Button
-                  className="h-14 w-full rounded-2xl bg-zinc-900 text-lg font-black tracking-wide text-white shadow-xl shadow-zinc-900/20 hover:bg-zinc-800"
-                  onClick={() => updateStatus('completed')}
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle className="mr-2 h-5 w-5" />}
-                  COMPLETE WORK
-                </Button>
-              )}
-
-              {!isTowingActiveJob && status === 'payment_pending' && (
-                <div className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                  <span className="font-bold text-orange-700">Waiting for customer payment...</span>
-                </div>
-              )}
-
-              {showActionFallback && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900" role="alert">
-                  <p className="text-sm font-bold">Something looks off with this job.</p>
-                  <p className="mt-1 text-xs text-amber-800">
-                    The current status cannot be advanced safely. Contact support so we can unblock it.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-3 h-11 w-full rounded-xl border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
-                    asChild
-                  >
-                    <a href="tel:+919566510080">
-                      <PhoneCall className="mr-2 h-4 w-4" />
-                      Call Support
-                    </a>
-                  </Button>
-                </div>
-              )}
-
-              {!['payment_pending', 'completed', 'paid', 'closed'].includes(status) && (
-                <Button
-                  variant="outline"
-                  className="h-11 w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={() => updateStatus('cancelled')}
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Cancel Job
-                </Button>
-              )}
-            </div>
+            {showActionFallback && (
+              <div className="tj-alert" role="alert">
+                <p>Something looks off with this job.</p>
+                <p>The current status cannot be advanced safely. Contact support so we can unblock it.</p>
+                <a href="tel:+919566510080" className="tj-ghost">
+                  <MaterialSymbol name="support_agent" />
+                  Call Support
+                </a>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
       </div>
-      {showCompletionModal && (
-        <TechnicianJobCompletion
-          amount={lastEarned}
-          onClose={() => {
-            setShowCompletionModal(false);
-            navigate('/technician/dashboard', { replace: true });
-          }}
-        />
-      )}
+      {completionOutro}
     </div>
   );
 };

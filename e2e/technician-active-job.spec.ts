@@ -217,3 +217,61 @@ test.describe("the dashboard's job card", () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe("a position too rough to navigate by", () => {
+  test.use({ geolocation: { ...HOME, accuracy: 800 }, permissions: ["geolocation"] });
+
+  test("the page says why it is waiting, and offers no route or navigation", async ({ page }) => {
+    const { errors } = await openActiveJob(page, lockout);
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+
+    await expect(page.locator(".tj-banner-hint")).toHaveText(
+      "Your location is only accurate to about 800 m. Move outdoors or turn on precise location.",
+    );
+    // No figure is made up from a position that could be a kilometre off.
+    await expect(stripValue(card, "Distance")).toHaveText("—");
+    await expect(stripValue(card, "Reach in")).toHaveText("—");
+    await expect(card.getByRole("button", { name: "Start navigation" })).toBeDisabled();
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-active-job-waiting.png` });
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("a technician standing still", () => {
+  test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+
+  test("keeps the route: a browser sends no new position until it moves", async ({ page }) => {
+    test.setTimeout(90_000);
+    const { errors } = await openActiveJob(page, lockout);
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+    await expect(stripValue(card, "Distance")).toHaveText("3.4 km");
+
+    // Past the 30 seconds after which a position is too old to trust.
+    await page.waitForTimeout(40_000);
+    await expect(stripValue(card, "Distance")).toHaveText("3.4 km");
+    await expect(stripValue(card, "Reach in")).toHaveText("9 min");
+    await expect(page.locator(".tj-banner-hint")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Start navigation" })).toBeEnabled();
+    expect(errors).toEqual([]);
+  });
+
+  test("but a position that stops arriving while moving is treated as lost", async ({ page, context }) => {
+    test.setTimeout(90_000);
+    const { errors } = await openActiveJob(page, lockout);
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+    await expect(stripValue(card, "Distance")).toHaveText("3.4 km");
+
+    // About 60 m in 6 seconds: riding. Then nothing more, as in a tunnel.
+    await page.waitForTimeout(6_000);
+    await context.setGeolocation({ latitude: HOME.latitude - 0.00054, longitude: HOME.longitude, accuracy: 20 });
+    await page.waitForTimeout(40_000);
+
+    await expect(page.locator(".tj-banner-hint")).toHaveText("Finding your location…");
+    await expect(stripValue(card, "Distance")).toHaveText("—");
+    await expect(card.getByRole("button", { name: "Start navigation" })).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+});

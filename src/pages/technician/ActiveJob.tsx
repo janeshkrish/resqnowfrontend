@@ -42,6 +42,7 @@ import {
   startJourneyAndNavigate,
 } from '@/lib/activeJobNavigation';
 import {
+  MAX_NAVIGATION_ACCURACY_METERS,
   defaultNavigationVehicleMode,
   isPlausibleLocationSample,
   isUsableLocationFix,
@@ -93,6 +94,11 @@ const buildVehicleDetails = (job: any) => {
 
 const isPaidPaymentStatus = (value: unknown) =>
   ['paid', 'completed'].includes(String(value || '').trim().toLowerCase());
+
+// How often a browser's unchanged position is re-checked, and the speed below which
+// the technician counts as standing still.
+const WEB_POSITION_REFRESH_MS = 10_000;
+const STANDING_STILL_MAX_KMH = 5;
 
 const ActiveJob = () => {
   const location = useLocation();
@@ -366,6 +372,8 @@ const ActiveJob = () => {
     if (!activeRequestId) return;
 
     let watchId: string | number | null = null;
+    let webRefreshTimer: number | null = null;
+    let webWatchHealthy = true;
     let cancelled = false;
     let permissionNotified = false;
 
@@ -533,9 +541,11 @@ const ActiveJob = () => {
       }
       watchId = navigator.geolocation.watchPosition(
         (position) => {
+          webWatchHealthy = true;
           applyLocationUpdate(position);
         },
         (err) => {
+          webWatchHealthy = false;
           console.error('Geolocation error:', err);
           setLocationError(
             err.code === err.PERMISSION_DENIED
@@ -545,6 +555,20 @@ const ActiveJob = () => {
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
+      // A browser reports a position only when it changes. A technician standing still
+      // sends nothing new, and the last fix would age out and take the route with it.
+      // While the watch is healthy and the last fix was not moving, that fix is still
+      // where they are: this page's copy is kept current. Nothing is sent to live tracking.
+      webRefreshTimer = window.setInterval(() => {
+        const lastFix = previousLocationRef.current;
+        if (cancelled || !webWatchHealthy || !lastFix) return;
+        if (Date.now() - lastFix.timestamp < WEB_POSITION_REFRESH_MS) return;
+        // Updates that stop while moving mean the signal was lost: let that fix expire.
+        if (Number(lastFix.speedKmh ?? 0) > STANDING_STILL_MAX_KMH) return;
+        const confirmedAt = Date.now();
+        setCurrentLocation((current) => (current ? { ...current, timestamp: confirmedAt } : current));
+        setLocationNow(confirmedAt);
+      }, WEB_POSITION_REFRESH_MS);
     };
 
     // Android app with the flag on: the native live tracking service is the single
@@ -659,6 +683,7 @@ const ActiveJob = () => {
       } else if (typeof watchId === 'number') {
         navigator.geolocation.clearWatch(watchId);
       }
+      if (webRefreshTimer != null) window.clearInterval(webRefreshTimer);
     };
   }, [activeRequestId, technician?.id, token, trackingEnded]);
 
@@ -833,6 +858,12 @@ const ActiveJob = () => {
     }
     await updateStatus(towingAction.status);
   };
+  const locationAccuracy = Number(currentLocation?.accuracy);
+  const locationWait = hasUsableCurrentLocation
+    ? null
+    : currentLocation && locationAccuracy > MAX_NAVIGATION_ACCURACY_METERS
+      ? `Your location is only accurate to about ${Math.round(locationAccuracy)} m. Move outdoors or turn on precise location.`
+      : locationError || 'Finding your location…';
   const routeDistanceKm = routeState.status === 'ready' ? routeState.distanceKm : null;
   const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
 
@@ -885,6 +916,7 @@ const ActiveJob = () => {
               {routeState.status === 'ready' && etaMinutes !== null && Number.isFinite(routeDistanceKm) ? (
                 <b>{formatMinutes(etaMinutes)} · {formatKm(routeDistanceKm)}</b>
               ) : null}
+              {locationWait ? <span className="tj-banner-hint" role="status">{locationWait}</span> : null}
             </div>
           </div>
         </div>
@@ -944,9 +976,6 @@ const ActiveJob = () => {
                 </p>
                 {routeState.status === 'ready' && <span className="tj-ready">READY</span>}
               </div>
-              {locationError && !hasUsableCurrentLocation && (
-                <p className="tj-warn">{locationError}</p>
-              )}
               <div className="tj-modes" role="radiogroup" aria-label="Navigation vehicle">
                 {([
                   ['two-wheeler', 'Bike', Bike],

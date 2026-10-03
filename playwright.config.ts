@@ -31,6 +31,9 @@ export default defineConfig({
     env: {
       VITE_FRONTEND_ONLY: "false",
       VITE_API_URL: "http://api.e2e.test",
+      // As in a build whose settings do not mention it: the tests see the app's own
+      // default, whatever the developer's local .env says.
+      VITE_NATIVE_BACKGROUND_TRACKING: "",
     },
   },
 });

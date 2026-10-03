@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-import { TECHNICIAN, fakeSocketServer, stripValue } from "./fixtures/technicianPortal";
+import { TECHNICIAN, fakeSocketServer, openInAndroidApp, stripValue } from "./fixtures/technicianPortal";
 
 const fakeMappls = readFileSync(new URL("./fixtures/fakeMapplsSdk.js", import.meta.url), "utf8");
 const HOME = { latitude: 11.0168, longitude: 76.9558 };
@@ -561,5 +561,135 @@ test.describe("the navigation screen", () => {
       await expect(navigation).toHaveCount(0);
       expect(errors).toEqual([]);
     });
+  });
+});
+
+test.describe("handing over to Google Maps", () => {
+  test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+  const statusCalls = (calls: Call[]) =>
+    calls.filter((call) => call.path.endsWith("/technician-status")).map((call) => (call.body as { status: string }).status);
+  // Google Maps itself is not part of the test: the page that would open is answered here.
+  const stubGoogleMaps = (context: BrowserContext) =>
+    context.route(/^https:\/\/www\.google\.com\/maps\//, (route) => route.fulfill({ contentType: "text/html", body: "<title>Google Maps</title>" }));
+
+  test("the navigation screen opens Google Maps to the customer, and the job stays open to come back to", async ({ page, context }) => {
+    await stubGoogleMaps(context);
+    const { calls, errors } = await openActiveJob(page, { ...lockout, urgent: false });
+    await page.goto("/technician/active-job/7201");
+    await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Start navigation" }).click();
+    const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+
+    // Turn-by-turn from wherever the phone is, to the customer's own coordinates, by two-wheeler.
+    const link = navigation.getByRole("link", { name: "Open in Google Maps" });
+    await expect(link).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/dir/?api=1&destination=11.0092%2C76.9605&travelmode=two-wheeler&dir_action=navigate",
+    );
+    // In the browser the customer stops seeing the technician move once this page is in the background.
+    await expect(navigation.getByText("Live tracking pauses while Google Maps is open")).toBeVisible();
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-google-maps.png` });
+
+    const [maps] = await Promise.all([context.waitForEvent("page"), link.click()]);
+    await maps.waitForLoadState();
+    expect(maps.url()).toBe("https://www.google.com/maps/dir/?api=1&destination=11.0092%2C76.9605&travelmode=two-wheeler&dir_action=navigate");
+    await maps.close();
+
+    // Back in the app: still navigating this job, and the arrived step is where it was.
+    await expect(navigation.getByTestId("navigation-destination")).toContainText("Brookefields Mall parking");
+    await navigation.getByRole("button", { name: "I've arrived" }).click();
+    await expect.poll(() => statusCalls(calls)).toEqual(["en-route", "arrived"]);
+    expect(errors).toEqual([]);
+  });
+
+  test("a loaded tow is sent to the drop point", async ({ page }) => {
+    const { errors } = await openActiveJob(page, { ...towing, status: "enroute_drop", jobStatus: "enroute_drop" }, undefined, 0);
+    await page.goto("/technician/active-job/7202");
+    await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Open navigation" }).click();
+    const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+
+    await expect(navigation.getByRole("link", { name: "Open in Google Maps" })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/dir/?api=1&destination=11.0351%2C76.9712&travelmode=two-wheeler&dir_action=navigate",
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test("when our own route cannot be worked out mid-journey, Google Maps is offered in its place", async ({ page }) => {
+    const { state, calls, errors } = await openActiveJob(page, { ...towing, status: "enroute_drop", jobStatus: "enroute_drop" }, undefined, 0);
+    state.routeDown = true;
+    await page.goto("/technician/active-job/7202");
+    const card = page.getByRole("region", { name: "Active job" });
+
+    await expect(page.getByText("Road route unavailable")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open in Google Maps" })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/dir/?api=1&destination=11.0351%2C76.9712&travelmode=two-wheeler&dir_action=navigate",
+    );
+    // The job can still be moved on from the card.
+    await card.getByRole("button", { name: "Reached drop location" }).click();
+    await expect.poll(() => statusCalls(calls)).toEqual(["arrived_drop"]);
+    expect(errors).toEqual([]);
+  });
+
+  test("it is not offered before the journey has been started in the app", async ({ page }) => {
+    const { state, errors } = await openActiveJob(page, { ...lockout, urgent: false });
+    state.routeDown = true;
+    await page.goto("/technician/active-job/7201");
+
+    await expect(page.getByText("Road route unavailable")).toBeVisible();
+    // Starting the journey is what tells the customer the technician is on the way.
+    await expect(page.getByRole("link", { name: "Open in Google Maps" })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("in the Android app", () => {
+  type AndroidBridge = {
+    calls: Array<{ plugin: string; method: string; options: Record<string, unknown> }>;
+    emit(plugin: string, eventName: string, data: unknown): void;
+    listening(plugin: string, eventName: string): number;
+  };
+  const android = <T>(page: Page, read: (bridge: AndroidBridge) => T) =>
+    page.evaluate((source) => new Function("bridge", `return (${source})(bridge)`)((window as unknown as { __android: AndroidBridge }).__android) as T, read.toString());
+  /** A position from the phone's own tracking service, as it reaches the page while the app is open. */
+  const nativeFix = (page: Page, sequenceId: number, point = HOME) =>
+    page.evaluate(({ at, id }) => {
+      (window as unknown as { __android: AndroidBridge }).__android.emit("TechnicianTracking", "location", {
+        jobId: "7201", latitude: at.latitude, longitude: at.longitude, accuracy: 12, speed: 0, heading: 0,
+        timestamp: Date.now(), sequenceId: id,
+      });
+    }, { at: point, id: sequenceId });
+
+  test("the phone's own tracking service shares the position, so it carries on behind Google Maps", async ({ page }) => {
+    await openInAndroidApp(page);
+    const { errors } = await openActiveJob(page, { ...lockout, urgent: false });
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+
+    // The page hands this job to the tracking service, which posts positions itself
+    // whenever the app is not on screen.
+    await expect.poll(() => android(page, (bridge) => bridge.calls.filter((call) => call.plugin === "TechnicianTracking" && call.method === "start").length)).toBe(1);
+    const started = await android(page, (bridge) => bridge.calls.find((call) => call.plugin === "TechnicianTracking" && call.method === "start")?.options);
+    expect(started).toMatchObject({
+      jobId: "7201",
+      technicianId: "7",
+      endpointUrl: "http://api.e2e.test/api/technicians/me/location",
+      token: "e2e-technician-token",
+    });
+
+    await expect.poll(() => android(page, (bridge) => bridge.listening("TechnicianTracking", "location"))).toBeGreaterThan(0);
+    await nativeFix(page, 1);
+    await expect(stripValue(card, "Distance")).toHaveText("3.4 km");
+    await card.getByRole("button", { name: "Start navigation" }).click();
+    const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+
+    await expect(navigation.getByRole("link", { name: "Open in Google Maps" })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/dir/?api=1&destination=11.0092%2C76.9605&travelmode=two-wheeler&dir_action=navigate",
+    );
+    // Nothing pauses here, so there is nothing to warn the technician about.
+    await expect(navigation.getByText("Live tracking pauses while Google Maps is open")).toHaveCount(0);
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-android.png` });
+    expect(errors).toEqual([]);
   });
 });

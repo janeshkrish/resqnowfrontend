@@ -31,18 +31,28 @@ describe("native background tracking flag", () => {
     vi.unstubAllEnvs();
   });
 
-  it("is off unless the build flag is exactly true", () => {
-    // Passing undefined would fall back to the real build flag from .env.
-    expect(isNativeBackgroundTrackingEnabled("")).toBe(false);
-    expect(isNativeBackgroundTrackingEnabled("false")).toBe(false);
+  it("is on in the Android app unless a build switches it off", () => {
+    // A build whose settings say nothing must still track behind another app.
+    expect(isNativeBackgroundTrackingEnabled("")).toBe(true);
+    expect(isNativeBackgroundTrackingEnabled(null)).toBe(true);
     expect(isNativeBackgroundTrackingEnabled(" TRUE ")).toBe(true);
+    // The one way to turn it off.
+    expect(isNativeBackgroundTrackingEnabled("false")).toBe(false);
+    expect(isNativeBackgroundTrackingEnabled(" False ")).toBe(false);
+  });
+
+  it("is on when the build does not set the flag at all", () => {
+    vi.stubEnv("VITE_NATIVE_BACKGROUND_TRACKING", "");
+    expect(isNativeBackgroundTrackingEnabled()).toBe(true);
   });
 
   it("only applies to the Android app, never the web app or iOS", () => {
     capacitor.platform = "web";
     expect(isNativeBackgroundTrackingEnabled("true")).toBe(false);
+    expect(isNativeBackgroundTrackingEnabled("")).toBe(false);
     capacitor.platform = "ios";
     expect(isNativeBackgroundTrackingEnabled("true")).toBe(false);
+    expect(isNativeBackgroundTrackingEnabled("")).toBe(false);
   });
 
   it("does not touch the native bridge on logout when the feature is off", async () => {
@@ -55,7 +65,7 @@ describe("native background tracking flag", () => {
   });
 
   it("stops the native service on logout and tolerates it not running", async () => {
-    vi.stubEnv("VITE_NATIVE_BACKGROUND_TRACKING", "true");
+    vi.stubEnv("VITE_NATIVE_BACKGROUND_TRACKING", "");
     capacitor.plugin.stop.mockRejectedValueOnce(new Error("not running"));
 
     await expect(stopNativeBackgroundTracking("logout")).resolves.toBeUndefined();

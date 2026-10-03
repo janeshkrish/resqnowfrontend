@@ -51,6 +51,65 @@ export async function fakeSocketServer(page: Page) {
   };
 }
 
+/**
+ * Stands in for the Android app's native side: Capacitor's bridge, with the push
+ * notification, app, splash screen, location and JobAlerts plugins.
+ */
+export async function openInAndroidApp(page: Page, jobAlerts = { notificationsEnabled: true, fullScreenAllowed: true, ignoringBatteryOptimizations: true }) {
+  await page.addInitScript((status) => {
+    const plugins: Record<string, string[]> = {
+      App: ["addListener", "removeListener", "removeAllListeners", "getLaunchUrl", "getState", "getInfo"],
+      SplashScreen: ["show", "hide"],
+      PushNotifications: ["requestPermissions", "checkPermissions", "register", "unregister", "addListener", "removeListener", "removeAllListeners", "getDeliveredNotifications", "createChannel"],
+      Geolocation: ["getCurrentPosition", "watchPosition", "clearWatch", "checkPermissions", "requestPermissions"],
+      JobAlerts: ["getStatus", "openSettings"],
+      TechnicianTracking: ["start", "stop", "addListener", "removeListener"],
+    };
+    const callbacks = new Set(["addListener", "watchPosition"]);
+    const listeners: Record<string, Array<(data: unknown) => void>> = {};
+    const calls: Array<{ plugin: string; method: string; options: unknown }> = [];
+    let nextId = 1;
+    const answers: Record<string, unknown> = {
+      "PushNotifications.requestPermissions": { receive: "granted" },
+      "PushNotifications.checkPermissions": { receive: "granted" },
+      "Geolocation.checkPermissions": { location: "granted", coarseLocation: "granted" },
+      "Geolocation.requestPermissions": { location: "granted", coarseLocation: "granted" },
+      "Geolocation.getCurrentPosition": { coords: { latitude: 11.01, longitude: 76.95, accuracy: 10 }, timestamp: Date.now() },
+      "App.getState": { isActive: true },
+      "JobAlerts.getStatus": status,
+    };
+    Object.assign(window, {
+      androidBridge: { postMessage() {} },
+      Capacitor: {
+        PluginHeaders: Object.entries(plugins).map(([name, methods]) => ({
+          name,
+          methods: methods.map((method) => ({ name: method, rtype: callbacks.has(method) ? "callback" : "promise" })),
+        })),
+        nativePromise: async (plugin: string, method: string, options: unknown) => {
+          calls.push({ plugin, method, options });
+          return answers[`${plugin}.${method}`] ?? {};
+        },
+        nativeCallback: (plugin: string, method: string, options: { eventName?: string }, callback: (data: unknown) => void) => {
+          calls.push({ plugin, method, options });
+          if (method === "addListener") (listeners[`${plugin}.${options?.eventName}`] ??= []).push(callback);
+          return String(nextId++);
+        },
+      },
+      __android: {
+        calls,
+        /** A push that reached MyFirebaseMessagingService with the app on screen. */
+        push: (data: Record<string, string>) =>
+          (listeners["PushNotifications.pushNotificationReceived"] || []).forEach((cb) => cb({ id: "push-1", data })),
+        pushListeners: () => (listeners["PushNotifications.pushNotificationReceived"] || []).length,
+        /** An event from a native plugin, e.g. a position from the live tracking service. */
+        emit: (plugin: string, eventName: string, data: unknown) =>
+          (listeners[`${plugin}.${eventName}`] || []).forEach((cb) => cb(data)),
+        listening: (plugin: string, eventName: string) => (listeners[`${plugin}.${eventName}`] || []).length,
+      },
+    });
+  }, jobAlerts);
+}
+
 /** Drags the accept slide's knob to the end, the way a thumb does. */
 export async function slideToAccept(card: Locator) {
   const knob = card.getByRole("button", { name: "Slide to accept" });

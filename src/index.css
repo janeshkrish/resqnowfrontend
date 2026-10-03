@@ -6340,6 +6340,10 @@ button.tj-line { width: 100%; background: var(--tj-surface); cursor: pointer; te
 .tj-nav .tj-mark { padding: 6px 12px; font-size: 13px; line-height: 18px; }
 .tj-nav .tj-pair { grid-template-columns: minmax(104px, 0.55fr) minmax(0, 1.45fr); }
 .tj-nav .tj-pair.is-single { grid-template-columns: minmax(0, 1fr); }
+.tj-nav .tj-pair.is-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tj-nav .tj-pair.is-even.is-single { grid-template-columns: minmax(0, 1fr); }
+.tj-nav .tj-pair.is-even .tj-act { min-height: 48px; gap: 6px; padding: 0 8px; font-size: 15.5px; white-space: nowrap; }
+.tj-nav-note { margin: -4px 2px 0; color: var(--tj-sub); font-size: 12.5px; line-height: 17px; font-weight: 700; }
 .tj-nav .tj-cta, .tj-nav .tj-act { min-height: 56px; }
 @media (max-height: 700px) {
   .tj-nav { gap: 8px; margin-bottom: 8px; }
@@ -6347,6 +6351,7 @@ button.tj-line { width: 100%; background: var(--tj-surface); cursor: pointer; te
   .tj-nav .tj-addr { -webkit-line-clamp: 1; }
   .tj-nav .tj-mark { padding: 4px 12px; }
   .tj-nav .tj-cta, .tj-nav .tj-act { min-height: 50px; }
+  .tj-nav .tj-pair.is-even .tj-act { min-height: 44px; }
   .tj-nav-reached { padding: 7px 12px; }
 }
 .tj-nav-reached { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 14px; background: #ECFDF3; color: #05603A; font-size: 15px; line-height: 20px; font-weight: 800; }

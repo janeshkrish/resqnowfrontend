@@ -50,11 +50,16 @@ const getPlugin = () => {
   return plugin;
 };
 
-/** Build-time flag, Android app only. The web app keeps its foreground watcher. */
+/**
+ * On in the Android app, where the tracking service keeps sharing the technician's
+ * position while the app is behind another one (Google Maps, a phone call) or the screen
+ * is off. A build can switch it off with VITE_NATIVE_BACKGROUND_TRACKING=false; a build
+ * that says nothing gets it. The web app and iOS keep the foreground watcher.
+ */
 export function isNativeBackgroundTrackingEnabled(
   value: unknown = import.meta.env.VITE_NATIVE_BACKGROUND_TRACKING,
 ) {
-  if (String(value || "").trim().toLowerCase() !== "true") return false;
+  if (String(value ?? "").trim().toLowerCase() === "false") return false;
   return Capacitor.getPlatform?.() === "android";
 }
 

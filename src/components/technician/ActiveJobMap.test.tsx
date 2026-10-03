@@ -217,6 +217,24 @@ describe("ActiveJobMap", () => {
     expect(fetchRoute).toHaveBeenCalledTimes(1);
   });
 
+  it("offers Google Maps in place of a route it cannot work out, when given the link", async () => {
+    const href = "https://www.google.com/maps/dir/?api=1&destination=12.98%2C77.6&travelmode=driving&dir_action=navigate";
+    fetchRoute.mockRejectedValue(new Error("Route provider failed."));
+    const view = render(
+      <ActiveJobMap technicianLocation={START} navigationDestination={DESTINATION} externalNavigationUrl={href} />,
+    );
+
+    expect(await screen.findByText("Road route unavailable")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "Open in Google Maps" });
+    expect(link).toHaveAttribute("href", href);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("button", { name: /retry route/i })).toBeInTheDocument();
+
+    // Before the journey has started the page gives no link, and none is shown.
+    view.rerender(<ActiveJobMap technicianLocation={START} navigationDestination={DESTINATION} />);
+    expect(screen.queryByRole("link", { name: "Open in Google Maps" })).not.toBeInTheDocument();
+  });
+
   it("still reports an error when there was never a route to keep", async () => {
     fetchRoute.mockRejectedValueOnce(new Error("Route provider failed."));
     render(

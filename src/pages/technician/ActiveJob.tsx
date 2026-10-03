@@ -38,6 +38,7 @@ import {
 } from '@/lib/technicianActiveJobRoute';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+import { googleMapsNavigationUrl } from '@/lib/navigation/externalNavigation';
 import {
   resolveActiveJobNavigationTarget,
   startJourneyAndNavigate,
@@ -96,6 +97,9 @@ const buildVehicleDetails = (job: any) => {
 
 const isPaidPaymentStatus = (value: unknown) =>
   ['paid', 'completed'].includes(String(value || '').trim().toLowerCase());
+
+// The statuses in which the technician is on the road to a destination.
+const TRAVELLING_STATUSES = ['en-route', 'en_route_pickup', 'enroute_drop'];
 
 // What the GPS code says while a fix is merely poor. Anything else it reports (location
 // off, permission, signed out) needs the technician to act, so it is shown as it is.
@@ -894,6 +898,16 @@ const ActiveJob = () => {
         : locationError || 'Finding your location…');
   const routeDistanceKm = routeState.status === 'ready' ? routeState.distanceKm : null;
   const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
+  // Google Maps for those who prefer it, once the journey has been started here: starting
+  // it is what tells the customer the technician is on the way.
+  const googleMapsUrl = TRAVELLING_STATUSES.includes(status)
+    ? googleMapsNavigationUrl(navigationTarget, vehicleMode)
+    : null;
+  // Only the Android app with its tracking service keeps sending positions from behind
+  // another app. Anywhere else the customer's map stops moving until the technician is back.
+  const backgroundTrackingNote = isNativeBackgroundTrackingEnabled()
+    ? null
+    : 'Live tracking pauses while Google Maps is open';
 
   if (isNavigationActive) {
     // A loaded tow is heading for the drop point; everything else for the customer.
@@ -924,8 +938,10 @@ const ActiveJob = () => {
           speedKmh={heldLocation ? null : currentLocation?.speedKmh}
           positionNote={positionNote}
           vehicleMode={vehicleMode}
+          externalNavigationUrl={googleMapsUrl}
           navigationPanel={
             <NavigationJobPanel
+              googleMaps={googleMapsUrl ? { href: googleMapsUrl, note: backgroundTrackingNote } : null}
               stopLabel={isDropLeg ? 'Drop location' : isTowingActiveJob ? 'Pickup location' : 'Customer location'}
               address={isDropLeg ? dropAddress || 'Drop location' : jobAddress}
               landmark={isDropLeg ? null : jobDetails?.landmark}
@@ -963,6 +979,7 @@ const ActiveJob = () => {
             speedKmh={heldLocation ? null : currentLocation?.speedKmh}
             positionNote={positionNote}
             vehicleMode={vehicleMode}
+            externalNavigationUrl={googleMapsUrl}
             onRouteStateChange={handleRouteStateChange}
           />
 

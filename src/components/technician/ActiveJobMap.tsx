@@ -3,6 +3,7 @@ import {
   ArrowUp,
   CornerUpLeft,
   CornerUpRight,
+  ExternalLink,
   LocateFixed,
   Navigation,
   RefreshCw,
@@ -59,6 +60,8 @@ interface ActiveJobMapProps {
   positionNote?: string | null;
   /** The job's own details and actions, shown above the figures while navigating. */
   navigationPanel?: React.ReactNode;
+  /** Google Maps to the same destination, offered when our own road route cannot be had. */
+  externalNavigationUrl?: string | null;
   onRouteStateChange?: (state: ActiveJobRouteState) => void;
   onExitNavigation?: () => void;
 }
@@ -136,6 +139,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   vehicleMode = "car",
   positionNote = null,
   navigationPanel,
+  externalNavigationUrl = null,
   onRouteStateChange,
   onExitNavigation,
 }) => {
@@ -525,6 +529,14 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Retry route
                 </Button>
+                {externalNavigationUrl && (
+                  <Button asChild className="mt-2 rounded-xl">
+                    <a href={externalNavigationUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open in Google Maps
+                    </a>
+                  </Button>
+                )}
                 {navigationMode && (
                   <Button type="button" variant="ghost" className="mt-2 rounded-xl" onClick={onExitNavigation}>
                     Exit navigation

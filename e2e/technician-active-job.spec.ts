@@ -9,6 +9,10 @@ test.use({ geolocation: HOME, permissions: ["geolocation"] });
 
 type Job = Record<string, unknown>;
 type Call = { method: string; path: string; body: unknown };
+type LiveEtaAnswer = {
+  requestId: string; etaSeconds: number; distanceMeters: number; trafficAware: boolean; provider: string;
+  destinationLat: number; destinationLng: number;
+};
 
 // What GET /api/technicians/me/active-job returns (resqnowbackend buildActiveJobResponse).
 const lockout: Job = {
@@ -36,7 +40,9 @@ const towing: Job = {
 
 /** Answers the API from one live job, and from the route the backend would calculate. */
 async function openActiveJob(page: Page, job: Job, route = { distanceKm: 3.4, durationMinutes: 9 }, dues = 15) {
-  const state = { job: { ...job } as Job | null, routeDown: false };
+  const state = { job: { ...job } as Job | null, routeDown: false, eta: null as LiveEtaAnswer | null };
+  /** Every time the page asked the backend for its ETA, and for which request. */
+  const etaRequests: string[] = [];
   const calls: Call[] = [];
   /** Every road route the page asked for: its points and how much detail it wanted. */
   const routes: Array<{ points: string; overview: string | null }> = [];
@@ -53,6 +59,23 @@ async function openActiveJob(page: Page, job: Job, route = { distanceKm: 3.4, du
     if (path === "/api/technicians/me") return reply(200, TECHNICIAN);
     if (path === "/api/technicians/me/active-job" || path === "/api/technician/active-job/7") return reply(200, state.job);
     if (path === "/api/technicians/me/dues") return reply(200, { total: dues });
+    if (path === "/api/technicians/me/active-job/eta") {
+      etaRequests.push(String(new URL(request.url()).searchParams.get("requestId")));
+      const serverTime = new Date().toISOString();
+      if (!state.eta) return reply(200, { eta: null, reason: "disabled", serverTime });
+      // As buildEtaLocationFields() sends it (resqnowbackend/services/trafficEtaService.js).
+      const eta = { ...state.eta, calculatedAt: serverTime };
+      return reply(200, {
+        eta,
+        distanceKm: eta.distanceMeters / 1000,
+        durationMinutes: eta.etaSeconds / 60,
+        etaText: `${Math.ceil(eta.etaSeconds / 60)} min`,
+        etaSource: eta.provider,
+        trafficAware: eta.trafficAware,
+        etaCalculatedAt: serverTime,
+        serverTime,
+      });
+    }
     if (path === "/api/public/route") {
       const query = new URL(request.url()).searchParams;
       routes.push({ points: String(query.get("points")), overview: query.get("overview") });
@@ -70,7 +93,7 @@ async function openActiveJob(page: Page, job: Job, route = { distanceKm: 3.4, du
     if (path === "/api/technicians/requests" || path === "/api/technicians/me/notifications") return reply(200, []);
     return reply(404, {});
   });
-  return { state, calls, routes, errors };
+  return { state, calls, routes, etaRequests, errors };
 }
 
 test("the active job card shows the job's own earnings, route, address, vehicle and answers", async ({ page }) => {
@@ -335,7 +358,8 @@ test.describe("navigation through a weak signal", () => {
     // The guidance and the figures stay: nothing covers the map.
     await expect(navigation.getByText("Acquiring accurate location…")).toHaveCount(0);
     await expect(navigation.getByText("Remaining")).toBeVisible();
-    await expect(navigation.getByText("ETA")).toBeVisible();
+    await expect(navigation.getByTestId("navigation-eta")).toContainText(/\d+ min/);
+    await expect(navigation.getByTestId("navigation-eta")).toContainText("Arrive");
     await expect(navigation.getByRole("button", { name: "Exit navigation" })).toBeVisible();
     if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-weak-gps.png` });
 
@@ -690,6 +714,83 @@ test.describe("in the Android app", () => {
     // Nothing pauses here, so there is nothing to warn the technician about.
     await expect(navigation.getByText("Live tracking pauses while Google Maps is open")).toHaveCount(0);
     if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-android.png` });
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("time to reach, and when", () => {
+  test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"], timezoneId: "Asia/Kolkata" });
+  const onTheWay = { ...lockout, urgent: false, status: "en-route", jobStatus: "en-route" };
+  /** The clock time so many minutes from now, in India, the way the app writes it. */
+  const clockIn = (minutes: number) => {
+    const india = new Date(Date.now() + minutes * 60_000 + 5.5 * 3_600_000);
+    const hours = india.getUTCHours();
+    return `${hours % 12 || 12}:${String(india.getUTCMinutes()).padStart(2, "0")} ${hours < 12 ? "am" : "pm"}`;
+  };
+  /** The test may cross a minute between the page reading the clock and the check. */
+  const arriveIn = (minutes: number) => new RegExp(`Arrive (${clockIn(minutes - 1)}|${clockIn(minutes)}|${clockIn(minutes + 1)})`);
+
+  test("with live traffic from the backend, the card and navigation show that ETA and the arrival time", async ({ page }) => {
+    const { state, etaRequests, errors } = await openActiveJob(page, onTheWay);
+    // 21 minutes in traffic, where the empty road route says 9.
+    state.eta = { requestId: "7201", etaSeconds: 21 * 60, distanceMeters: 3900, trafficAware: true, provider: "mappls", destinationLat: 11.0092, destinationLng: 76.9605 };
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+
+    await expect(stripValue(card, "Reach in")).toHaveText("21 min");
+    await expect(page.locator(".tj-banner")).toContainText("21 min · 3.4 km");
+    await expect(page.locator(".tj-banner-arrive")).toHaveText(arriveIn(21));
+    await expect(page.locator(".tj-banner-arrive")).toContainText("live traffic");
+    // Asked for this technician's own job.
+    expect(etaRequests[0]).toBe("7201");
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-active-job-arrival.png` });
+
+    await card.getByRole("button", { name: "Open navigation" }).click();
+    const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+    const eta = navigation.getByTestId("navigation-eta");
+    await expect(eta).toContainText("21 min");
+    await expect(eta).toContainText(arriveIn(21));
+    await expect(eta).toContainText("Live traffic");
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-arrival-time.png` });
+    expect(errors).toEqual([]);
+  });
+
+  test("without a backend ETA, the app's own road estimate is shown with an arrival time, and no traffic is claimed", async ({ page }) => {
+    const { errors } = await openActiveJob(page, onTheWay);
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+
+    await expect(stripValue(card, "Reach in")).toHaveText("9 min");
+    await expect(page.locator(".tj-banner-arrive")).toHaveText(arriveIn(9));
+    await expect(page.locator(".tj-banner-arrive")).not.toContainText("traffic");
+
+    await card.getByRole("button", { name: "Open navigation" }).click();
+    const eta = page.getByRole("region", { name: "Turn-by-turn navigation" }).getByTestId("navigation-eta");
+    await expect(eta).toContainText("9 min");
+    await expect(eta).toContainText(arriveIn(9));
+    await expect(eta).not.toContainText("traffic");
+    expect(errors).toEqual([]);
+  });
+
+  test("a road-only ETA from the backend is used, but not called live traffic", async ({ page }) => {
+    const { state, errors } = await openActiveJob(page, onTheWay);
+    state.eta = { requestId: "7201", etaSeconds: 14 * 60, distanceMeters: 3600, trafficAware: false, provider: "osrm", destinationLat: 11.0092, destinationLng: 76.9605 };
+    await page.goto("/technician/active-job/7201");
+    const card = page.getByRole("region", { name: "Active job" });
+
+    await expect(stripValue(card, "Reach in")).toHaveText("14 min");
+    await expect(page.locator(".tj-banner-arrive")).toHaveText(arriveIn(14));
+    await expect(page.locator(".tj-banner-arrive")).not.toContainText("traffic");
+    expect(errors).toEqual([]);
+  });
+
+  test("the backend is not asked once the technician has arrived", async ({ page }) => {
+    const { etaRequests, errors } = await openActiveJob(page, { ...onTheWay, status: "arrived", jobStatus: "arrived" });
+    await page.goto("/technician/active-job/7201");
+    await expect(page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Complete work" })).toBeVisible();
+    await page.waitForTimeout(1_500);
+
+    expect(etaRequests).toEqual([]);
     expect(errors).toEqual([]);
   });
 });

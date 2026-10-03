@@ -6321,6 +6321,7 @@ button.tj-line { width: 100%; background: var(--tj-surface); cursor: pointer; te
 .tj-banner small { display: block; color: #C7CCD8; font-size: 12.5px; line-height: 16px; font-weight: 700; }
 .tj-banner b { display: block; font-size: 19px; line-height: 25px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .tj-banner-hint { display: block; margin-top: 2px; color: #FDE68A; font-size: 13px; line-height: 18px; font-weight: 700; }
+.tj-banner-arrive { display: block; margin-top: 1px; color: #C7CCD8; font-size: 13px; line-height: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 /* The navigation screen's job panel. It sits on the map's own light card in both themes. */
 .tj-nav,
 .dark .tj.tj-nav {

@@ -23,6 +23,7 @@ import {
   getNavigationProgress,
   type ManeuverKind,
 } from "@/lib/navigation/routeNavigation";
+import { formatArrivalMinutes } from "@/lib/technicianArrival";
 import {
   isValidNavigationPoint,
   navigationVehicleLabels,
@@ -62,6 +63,11 @@ interface ActiveJobMapProps {
   navigationPanel?: React.ReactNode;
   /** Google Maps to the same destination, offered when our own road route cannot be had. */
   externalNavigationUrl?: string | null;
+  /**
+   * When the technician is due, from the page: the backend's ETA when there is one. Without
+   * it the navigation screen shows the minutes left along its own route, as before.
+   */
+  arrival?: { minutes: number; clockText: string; trafficAware: boolean } | null;
   onRouteStateChange?: (state: ActiveJobRouteState) => void;
   onExitNavigation?: () => void;
 }
@@ -140,6 +146,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   positionNote = null,
   navigationPanel,
   externalNavigationUrl = null,
+  arrival = null,
   onRouteStateChange,
   onExitNavigation,
 }) => {
@@ -594,9 +601,16 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
           >
             {navigationPanel}
             <div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 text-center">
-              <div>
-                <p className="text-lg font-black text-slate-950">{progress.remainingEtaMinutes} min</p>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">ETA</p>
+              <div data-testid="navigation-eta">
+                <p className="text-lg font-black text-slate-950">
+                  {arrival ? formatArrivalMinutes(arrival.minutes) : `${progress.remainingEtaMinutes} min`}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  {arrival ? `Arrive ${arrival.clockText}` : "ETA"}
+                </p>
+                {arrival?.trafficAware && (
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">Live traffic</p>
+                )}
               </div>
               <div>
                 <p className="text-lg font-black text-slate-950">{formatDistance(progress.remainingDistanceMeters)}</p>

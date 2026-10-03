@@ -39,6 +39,8 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { googleMapsNavigationUrl } from '@/lib/navigation/externalNavigation';
+import { formatArrivalMinutes, resolveArrival } from '@/lib/technicianArrival';
+import { useTechnicianLiveEta } from '@/hooks/useTechnicianLiveEta';
 import {
   resolveActiveJobNavigationTarget,
   startJourneyAndNavigate,
@@ -98,6 +100,9 @@ const buildVehicleDetails = (job: any) => {
 const isPaidPaymentStatus = (value: unknown) =>
   ['paid', 'completed'].includes(String(value || '').trim().toLowerCase());
 
+// The statuses in which the backend keeps an ETA for the job (trafficEtaService.js).
+const ETA_STATUSES = ['assigned', 'accepted', 'en-route', 'en_route_pickup', 'vehicle_loaded', 'enroute_drop'];
+
 // The statuses in which the technician is on the road to a destination.
 const TRAVELLING_STATUSES = ['en-route', 'en_route_pickup', 'enroute_drop'];
 
@@ -125,6 +130,10 @@ const ActiveJob = () => {
   const { token, technician } = useTechnicianAuth();
 
   const { activeJob, dues, setDues, refreshActiveJob, refreshDues } = useTechnicianActiveJob(technician?.id, 15000);
+  const trafficArrival = useTechnicianLiveEta({
+    requestId: activeJob?.requestId ?? activeJob?.id,
+    enabled: Boolean(activeJob) && ETA_STATUSES.includes(normalizeTechnicianStatus(activeJob?.status)),
+  });
   const stateJob = selectMatchingActiveJobNavigationState(state?.job, routeRequestId);
   const shouldAutoOpenNavigationRef = useRef(Boolean(state?.openNavigation));
   const [status, setStatus] = useState(normalizeTechnicianStatus(stateJob?.status || 'accepted'));
@@ -900,6 +909,16 @@ const ActiveJob = () => {
   const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
   // Google Maps for those who prefer it, once the journey has been started here: starting
   // it is what tells the customer the technician is on the way.
+  // Minutes left and the clock time: the backend's ETA while it is current (with live
+  // traffic when it has it), otherwise this page's own road route.
+  const arrival = resolveArrival({
+    traffic: trafficArrival,
+    requestId: activeRequestId,
+    destination: navigationTarget,
+    routeMinutes: etaMinutes,
+    now: locationNow,
+  });
+  const reachMinutes = arrival?.minutes ?? etaMinutes;
   const googleMapsUrl = TRAVELLING_STATUSES.includes(status)
     ? googleMapsNavigationUrl(navigationTarget, vehicleMode)
     : null;
@@ -939,6 +958,7 @@ const ActiveJob = () => {
           positionNote={positionNote}
           vehicleMode={vehicleMode}
           externalNavigationUrl={googleMapsUrl}
+          arrival={arrival}
           navigationPanel={
             <NavigationJobPanel
               googleMaps={googleMapsUrl ? { href: googleMapsUrl, note: backgroundTrackingNote } : null}
@@ -988,9 +1008,15 @@ const ActiveJob = () => {
             <div>
               <small>{sentenceCase(formatTechnicianStatus(status))}</small>
               {routeState.status === 'ready' && etaMinutes !== null && Number.isFinite(routeDistanceKm) ? (
-                <b>{formatMinutes(etaMinutes)} · {formatKm(routeDistanceKm)}</b>
+                <b>{formatArrivalMinutes(Number(reachMinutes))} · {formatKm(routeDistanceKm)}</b>
               ) : null}
-              {locationWait ? <span className="tj-banner-hint" role="status">{locationWait}</span> : null}
+              {locationWait ? (
+                <span className="tj-banner-hint" role="status">{locationWait}</span>
+              ) : arrival ? (
+                <span className="tj-banner-arrive">
+                  Arrive {arrival.clockText}{arrival.trafficAware ? ' · live traffic' : ''}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1013,7 +1039,7 @@ const ActiveJob = () => {
             <JobKeyStrip
               earn={formatRupees(displayAmount)}
               distance={formatKm(routeDistanceKm)}
-              eta={formatMinutes(etaMinutes)}
+              eta={reachMinutes == null ? formatMinutes(null) : formatArrivalMinutes(reachMinutes)}
             />
 
             <JobLocationBox

@@ -292,6 +292,39 @@ describe("ActiveJobMap", () => {
     expect(screen.getByText("Remaining")).toBeInTheDocument();
   });
 
+  it("shows the arrival it is given: minutes, the clock time, and live traffic only when it is", async () => {
+    const view = render(
+      <ActiveJobMap
+        technicianLocation={START}
+        navigationDestination={DESTINATION}
+        navigationMode
+        arrival={{ minutes: 21, clockText: "4:51 pm", trafficAware: true }}
+      />,
+    );
+    const eta = await screen.findByTestId("navigation-eta");
+    expect(eta).toHaveTextContent("21 min");
+    expect(eta).toHaveTextContent("Arrive 4:51 pm");
+    expect(eta).toHaveTextContent("Live traffic");
+
+    // A road-only estimate: the same figures, without the claim.
+    view.rerender(
+      <ActiveJobMap
+        technicianLocation={START}
+        navigationDestination={DESTINATION}
+        navigationMode
+        arrival={{ minutes: 65, clockText: "5:35 pm", trafficAware: false }}
+      />,
+    );
+    expect(eta).toHaveTextContent("1 hr 5 min");
+    expect(eta).toHaveTextContent("Arrive 5:35 pm");
+    expect(eta).not.toHaveTextContent(/traffic/i);
+
+    // Not given one: the minutes left along its own route, as before.
+    view.rerender(<ActiveJobMap technicianLocation={START} navigationDestination={DESTINATION} navigationMode />);
+    expect(eta).toHaveTextContent("8 min");
+    expect(eta).toHaveTextContent("ETA");
+  });
+
   it("renders same-page route navigation metrics and exits without changing status", async () => {
     const onExitNavigation = vi.fn();
 

@@ -36,7 +36,7 @@ const towing: Job = {
 
 /** Answers the API from one live job, and from the route the backend would calculate. */
 async function openActiveJob(page: Page, job: Job, route = { distanceKm: 3.4, durationMinutes: 9 }, dues = 15) {
-  const state = { job: { ...job } as Job | null };
+  const state = { job: { ...job } as Job | null, routeDown: false };
   const calls: Call[] = [];
   /** Every road route the page asked for: its points and how much detail it wanted. */
   const routes: Array<{ points: string; overview: string | null }> = [];
@@ -56,6 +56,7 @@ async function openActiveJob(page: Page, job: Job, route = { distanceKm: 3.4, du
     if (path === "/api/public/route") {
       const query = new URL(request.url()).searchParams;
       routes.push({ points: String(query.get("points")), overview: query.get("overview") });
+      if (state.routeDown) return reply(502, { error: "Route provider failed.", code: "route_failed" });
       return reply(200, { ...route, polyline: [[11.0168, 76.9558], [11.0141, 76.9571], [11.0117, 76.9589], [11.0092, 76.9605]] });
     }
     if (path === "/api/technicians/me/location") return reply(200, { success: true });
@@ -257,7 +258,7 @@ test.describe("a technician standing still", () => {
     expect(errors).toEqual([]);
   });
 
-  test("but a position that stops arriving while moving is treated as lost", async ({ page, context }) => {
+  test("a position that stops arriving while moving is flagged, and the last route stays", async ({ page, context }) => {
     test.setTimeout(90_000);
     const { errors } = await openActiveJob(page, lockout);
     await page.goto("/technician/active-job/7201");
@@ -269,9 +270,69 @@ test.describe("a technician standing still", () => {
     await context.setGeolocation({ latitude: HOME.latitude - 0.00054, longitude: HOME.longitude, accuracy: 20 });
     await page.waitForTimeout(40_000);
 
-    await expect(page.locator(".tj-banner-hint")).toHaveText("Finding your location…");
-    await expect(stripValue(card, "Distance")).toHaveText("—");
+    await expect(page.locator(".tj-banner-hint")).toHaveText("Weak GPS signal · showing your last position");
+    await expect(stripValue(card, "Distance")).toHaveText("3.4 km");
+    await expect(stripValue(card, "Reach in")).toHaveText("9 min");
+    // Starting to navigate still needs a live position.
     await expect(card.getByRole("button", { name: "Start navigation" })).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("navigation through a weak signal", () => {
+  test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+  const job = { ...lockout, urgent: false, answers: [], problem: ["Key locked in"] };
+
+  async function startNavigation(page: Page) {
+    await page.goto("/technician/active-job/7201");
+    await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Start navigation" }).click();
+    const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+    await expect(navigation.getByText("Remaining")).toBeVisible();
+    return navigation;
+  }
+
+  test("a rough GPS reading keeps the route on screen, with a note", async ({ page, context }) => {
+    const { errors } = await openActiveJob(page, job);
+    const navigation = await startNavigation(page);
+
+    // Between tall buildings: the phone still answers, but only to within 800 m.
+    await context.setGeolocation({ ...HOME, accuracy: 800 });
+    await expect(navigation.getByRole("status")).toHaveText("Weak GPS signal · showing your last position");
+    // The guidance and the figures stay: nothing covers the map.
+    await expect(navigation.getByText("Acquiring accurate location…")).toHaveCount(0);
+    await expect(navigation.getByText("Remaining")).toBeVisible();
+    await expect(navigation.getByText("ETA")).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Exit navigation" })).toBeVisible();
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-weak-gps.png` });
+
+    // The signal comes back: the note goes.
+    await context.setGeolocation({ ...HOME, accuracy: 15 });
+    await expect(navigation.getByRole("status")).toHaveCount(0);
+    await expect(navigation.getByText("Remaining")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("a failed route update keeps the last route, with a note", async ({ page, context }) => {
+    const { state, routes, errors } = await openActiveJob(page, job);
+    const navigation = await startNavigation(page);
+    const asked = routes.length;
+
+    // No network for the route service; the technician rides on about 60 m.
+    state.routeDown = true;
+    await page.waitForTimeout(4_500);
+    await context.setGeolocation({ latitude: HOME.latitude - 0.00054, longitude: HOME.longitude + 0.00026, accuracy: 20 });
+    await expect.poll(() => routes.length).toBeGreaterThan(asked);
+    await expect(navigation.getByRole("status")).toHaveText("Weak network · showing the last route");
+    await expect(navigation.getByText("Road route unavailable")).toHaveCount(0);
+    await expect(navigation.getByText("Remaining")).toBeVisible();
+    if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-weak-network.png` });
+
+    // Back in coverage: the next update succeeds and the note goes.
+    state.routeDown = false;
+    await page.waitForTimeout(4_500);
+    await context.setGeolocation({ latitude: HOME.latitude - 0.00108, longitude: HOME.longitude + 0.00052, accuracy: 20 });
+    await expect(navigation.getByRole("status")).toHaveCount(0);
+    await expect(navigation.getByText("Remaining")).toBeVisible();
     expect(errors).toEqual([]);
   });
 });

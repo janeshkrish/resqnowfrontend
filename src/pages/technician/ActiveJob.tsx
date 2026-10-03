@@ -95,6 +95,16 @@ const buildVehicleDetails = (job: any) => {
 const isPaidPaymentStatus = (value: unknown) =>
   ['paid', 'completed'].includes(String(value || '').trim().toLowerCase());
 
+// What the GPS code says while a fix is merely poor. Anything else it reports (location
+// off, permission, signed out) needs the technician to act, so it is shown as it is.
+const GPS_QUALITY_MESSAGES = new Set([
+  'Waiting for a valid GPS position.',
+  'Ignoring an unstable GPS jump while accuracy settles.',
+  'Improving GPS accuracy before navigation can start.',
+  'Unable to read the current GPS position.',
+  'Unable to acquire an accurate GPS position.',
+]);
+
 // How often a browser's unchanged position is re-checked, and the speed below which
 // the technician counts as standing still.
 const WEB_POSITION_REFRESH_MS = 10_000;
@@ -132,6 +142,8 @@ const ActiveJob = () => {
   const celebratedCompletionJobIdRef = useRef<string | null>(null);
   const jobSnapshotRef = useRef<any | null>(stateJob);
   const previousLocationRef = useRef<TechnicianLocationFix | null>(null);
+  // The last fix good enough to navigate by: shown, labelled, while the signal is weak.
+  const lastUsableLocationRef = useRef<TechnicianLocationFix | null>(null);
   const vehicleSelectionTouchedRef = useRef(false);
   const locationSocketRef = useRef(socket);
   const trackingSequenceRef = useRef(0);
@@ -371,6 +383,8 @@ const ActiveJob = () => {
   useEffect(() => {
     if (!activeRequestId) return;
 
+    // A last known position belongs to the job it was read on.
+    lastUsableLocationRef.current = null;
     let watchId: string | number | null = null;
     let webRefreshTimer: number | null = null;
     let webWatchHealthy = true;
@@ -442,6 +456,7 @@ const ActiveJob = () => {
       const smoothedPoint = smoothNavigationPoint(previousLocationRef.current, rawFix);
       const nextFix: TechnicianLocationFix = { ...rawFix, ...smoothedPoint, ...motion };
       previousLocationRef.current = nextFix;
+      if (isUsableLocationFix(nextFix)) lastUsableLocationRef.current = nextFix;
       setCurrentLocation(nextFix);
       setLocationNow(Date.now());
       setLocationError(
@@ -858,12 +873,23 @@ const ActiveJob = () => {
     }
     await updateStatus(towingAction.status);
   };
+  // With no live fix, the map keeps the last good position and the route drawn from it.
+  const heldLocation = hasUsableCurrentLocation ? null : lastUsableLocationRef.current;
+  const mapTechnicianLocation = hasUsableCurrentLocation && currentLocation
+    ? currentLocation
+    : heldLocation ?? undefined;
+  const positionNote = !heldLocation
+    ? null
+    : locationError && !GPS_QUALITY_MESSAGES.has(locationError)
+      ? locationError
+      : 'Weak GPS signal · showing your last position';
   const locationAccuracy = Number(currentLocation?.accuracy);
   const locationWait = hasUsableCurrentLocation
     ? null
-    : currentLocation && locationAccuracy > MAX_NAVIGATION_ACCURACY_METERS
-      ? `Your location is only accurate to about ${Math.round(locationAccuracy)} m. Move outdoors or turn on precise location.`
-      : locationError || 'Finding your location…';
+    : positionNote
+      ?? (currentLocation && locationAccuracy > MAX_NAVIGATION_ACCURACY_METERS
+        ? `Your location is only accurate to about ${Math.round(locationAccuracy)} m. Move outdoors or turn on precise location.`
+        : locationError || 'Finding your location…');
   const routeDistanceKm = routeState.status === 'ready' ? routeState.distanceKm : null;
   const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
 
@@ -871,13 +897,14 @@ const ActiveJob = () => {
     return (
       <div className="fixed inset-0 z-[1000] bg-slate-100">
         <ActiveJobMap
-          technicianLocation={hasUsableCurrentLocation && currentLocation ? currentLocation : undefined}
+          technicianLocation={mapTechnicianLocation}
           customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
           destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
           navigationMode
           navigationDestination={navigationTarget || undefined}
-          heading={currentLocation?.heading}
-          speedKmh={currentLocation?.speedKmh}
+          heading={(heldLocation ?? currentLocation)?.heading}
+          speedKmh={heldLocation ? null : currentLocation?.speedKmh}
+          positionNote={positionNote}
           vehicleMode={vehicleMode}
           onRouteStateChange={handleRouteStateChange}
           onExitNavigation={() => setIsNavigationActive(false)}
@@ -899,12 +926,13 @@ const ActiveJob = () => {
       <div className="tj-page-inner">
         <div className="tj-map">
           <ActiveJobMap
-            technicianLocation={hasUsableCurrentLocation && currentLocation ? currentLocation : undefined}
+            technicianLocation={mapTechnicianLocation}
             customerLocation={hasCustomerLocation ? { lat: customerLat, lng: customerLng } : undefined}
             destinationLocation={hasDropLocation ? { lat: dropLat, lng: dropLng } : undefined}
             navigationDestination={navigationTarget || undefined}
-            heading={currentLocation?.heading}
-            speedKmh={currentLocation?.speedKmh}
+            heading={(heldLocation ?? currentLocation)?.heading}
+            speedKmh={heldLocation ? null : currentLocation?.speedKmh}
+            positionNote={positionNote}
             vehicleMode={vehicleMode}
             onRouteStateChange={handleRouteStateChange}
           />

@@ -6,6 +6,7 @@ import {
   LocateFixed,
   Navigation,
   RefreshCw,
+  TriangleAlert,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,11 @@ interface ActiveJobMapProps {
   heading?: number | null;
   speedKmh?: number | null;
   vehicleMode?: NavigationVehicleMode;
+  /**
+   * Set while `technicianLocation` is the last known position rather than a live fix.
+   * The route already on screen stays, and this note says why nothing is moving.
+   */
+  positionNote?: string | null;
   onRouteStateChange?: (state: ActiveJobRouteState) => void;
   onExitNavigation?: () => void;
 }
@@ -119,6 +125,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   heading,
   speedKmh,
   vehicleMode = "car",
+  positionNote = null,
   onRouteStateChange,
   onExitNavigation,
 }) => {
@@ -128,6 +135,8 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   const [routeStatus, setRouteStatus] = useState<ActiveJobRouteStatus>("idle");
   const [routeMessage, setRouteMessage] = useState<string>();
   const [retryRevision, setRetryRevision] = useState(0);
+  // A route update failed while a route was already on screen: that route is kept.
+  const [routeUpdateFailed, setRouteUpdateFailed] = useState(false);
   const [following, setFollowing] = useState(true);
   const [cameraRevision, setCameraRevision] = useState(0);
   const lastRouteOriginRef = useRef<MapPoint | null>(null);
@@ -149,6 +158,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   const validNavigationDestination = isValidNavigationPoint(navigationDestination)
     ? navigationDestination
     : undefined;
+  const hasPositionNote = Boolean(positionNote);
 
   const progress = useMemo(() => {
     if (!navigationMode || !validTechnicianLocation || routePath.length < 3) return null;
@@ -206,6 +216,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       setRoutePath([]);
       setRouteDistanceKm(null);
       setRouteDurationMinutes(null);
+      setRouteUpdateFailed(false);
     }
 
     const previousOrigin = lastRouteOriginRef.current;
@@ -216,6 +227,8 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     const needsNavigationRoute =
       navigationMode && (Boolean(progress?.offRoute) || moved >= routeRequestDistanceMeters);
     if (!needsInitialRoute && !needsNavigationRoute) return;
+    // The position is the last known one: a new route from it would say nothing new.
+    if (hasPositionNote && !needsInitialRoute) return;
 
     const now = Date.now();
     if (
@@ -227,6 +240,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     }
 
     const requestSequence = ++requestSequenceRef.current;
+    const hasRouteToKeep = !contextChanged && routePath.length >= 3;
     lastRouteOriginRef.current = validTechnicianLocation;
     lastRouteRequestAtRef.current = now;
     setRouteMessage(undefined);
@@ -256,11 +270,19 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         setRoutePath(coordinates);
         setRouteDistanceKm(distance);
         setRouteDurationMinutes(duration);
+        setRouteUpdateFailed(false);
         setRouteStatus("ready");
       })
       .catch((error: unknown) => {
         if (!mountedRef.current || requestSequence !== requestSequenceRef.current) return;
         console.error("Route Fetch Error:", error);
+        if (hasRouteToKeep) {
+          // A dead zone must not blank the screen: the route already shown is still
+          // the way there. The next update is tried again as the technician moves on.
+          setRouteUpdateFailed(true);
+          setRouteStatus("ready");
+          return;
+        }
         setRoutePath([]);
         setRouteDistanceKm(null);
         setRouteDurationMinutes(null);
@@ -268,6 +290,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         setRouteStatus("error");
       });
   }, [
+    hasPositionNote,
     navigationMode,
     progress?.offRoute,
     retryRevision,
@@ -464,9 +487,14 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
                 ResQNow · In {formatDistance(progress.distanceToManeuverMeters)}
               </p>
               <p className="truncate text-lg font-black">{progress.instruction}</p>
-              {routeStatus === "rerouting" && (
+              {positionNote || routeUpdateFailed ? (
+                <p role="status" className="mt-1 flex items-start gap-1.5 rounded-xl bg-amber-100 px-2.5 py-1.5 text-xs font-extrabold leading-4 text-amber-900">
+                  <TriangleAlert aria-hidden="true" className="mt-px h-4 w-4 shrink-0" />
+                  <span>{positionNote || "Weak network · showing the last route"}</span>
+                </p>
+              ) : routeStatus === "rerouting" ? (
                 <p className="text-xs font-bold text-amber-600">Updating route…</p>
-              )}
+              ) : null}
             </div>
           </div>
 

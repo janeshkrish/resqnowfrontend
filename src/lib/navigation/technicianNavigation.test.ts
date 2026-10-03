@@ -4,6 +4,7 @@ import {
   defaultNavigationVehicleMode,
   isPlausibleLocationSample,
   isUsableLocationFix,
+  isWithinArrivalRange,
   normalizeNavigationVehicleMode,
   resolveNavigationMotion,
   smoothNavigationPoint,
@@ -112,5 +113,35 @@ describe("technician navigation safety", () => {
     });
     expect(smoothed.lat).toBeGreaterThan(previous.lat);
     expect(smoothed.lat).toBeLessThan(12.9717);
+  });
+});
+
+describe("being close enough to mark arrival", () => {
+  const customer = { lat: 11.0092, lng: 76.9605 };
+  // Metres north of the customer.
+  const north = (metres: number) => ({ lat: customer.lat + metres / 111_320, lng: customer.lng });
+
+  it("is true within 80 m of the destination, and not before", () => {
+    expect(isWithinArrivalRange(north(40), customer)).toBe(true);
+    expect(isWithinArrivalRange(north(79), customer)).toBe(true);
+    expect(isWithinArrivalRange(north(120), customer)).toBe(false);
+    expect(isWithinArrivalRange(north(1_500), customer)).toBe(false);
+  });
+
+  it("is true at the end of the road route when the pin is a little way in", () => {
+    // The road ends at the gate, 150 m from the customer's pin inside the compound.
+    expect(isWithinArrivalRange(north(150), customer, 20)).toBe(true);
+    // Still 400 m of road to go.
+    expect(isWithinArrivalRange(north(150), customer, 400)).toBe(false);
+  });
+
+  it("is not fooled by a short stretch of route left while far from the destination", () => {
+    expect(isWithinArrivalRange(north(900), customer, 20)).toBe(false);
+  });
+
+  it("needs both a position and a destination", () => {
+    expect(isWithinArrivalRange(null, customer, 10)).toBe(false);
+    expect(isWithinArrivalRange(north(10), undefined, 10)).toBe(false);
+    expect(isWithinArrivalRange({ lat: 0, lng: 0 }, customer, 10)).toBe(false);
   });
 });

@@ -29,6 +29,7 @@ import { useTechnicianActiveJob } from '@/hooks/useTechnicianActiveJob';
 import { getTowingAction } from '@/lib/towingActionState';
 import MaterialSymbol from '@/components/home/MaterialSymbol';
 import { JobKeyStrip, JobLocationBox, JobSays, JobVehicleRow } from '@/components/technician/JobCardParts';
+import { NavigationJobPanel, type NavigationArriveAction } from '@/components/technician/NavigationJobPanel';
 import { formatKm, formatMinutes, formatRupees, sentenceCase } from '@/lib/technicianJobCard';
 import { readJobDetails } from '@/lib/technicianJobDetails';
 import {
@@ -46,6 +47,7 @@ import {
   defaultNavigationVehicleMode,
   isPlausibleLocationSample,
   isUsableLocationFix,
+  isWithinArrivalRange,
   isValidNavigationPoint,
   navigationVehicleLabels,
   resolveNavigationMotion,
@@ -894,6 +896,22 @@ const ActiveJob = () => {
   const etaMinutes = routeState.status === 'ready' ? routeState.durationMinutes : null;
 
   if (isNavigationActive) {
+    // A loaded tow is heading for the drop point; everything else for the customer.
+    const isDropLeg = Boolean(
+      navigationTarget && hasDropLocation && navigationTarget.lat === dropLat && navigationTarget.lng === dropLng,
+    );
+    const stopName = isDropLeg ? 'drop point' : isTowingActiveJob ? 'pickup point' : 'customer';
+    // The same step the job card offers at this status, when that step is an arrival.
+    const arriveAction: NavigationArriveAction | null = !isTowingActiveJob && status === 'en-route'
+      ? { label: "I've arrived", onClick: () => void updateStatus('arrived') }
+      : isTowingActiveJob && towingAction && ['arrived_pickup', 'arrived_drop'].includes(towingAction.status)
+        ? { label: sentenceCase(towingAction.label), onClick: () => void handleTowingAction() }
+        : null;
+    const nearDestination = isWithinArrivalRange(
+      mapTechnicianLocation,
+      navigationTarget,
+      routeDistanceKm == null ? null : routeDistanceKm * 1000,
+    );
     return (
       <div className="fixed inset-0 z-[1000] bg-slate-100">
         <ActiveJobMap
@@ -906,6 +924,17 @@ const ActiveJob = () => {
           speedKmh={heldLocation ? null : currentLocation?.speedKmh}
           positionNote={positionNote}
           vehicleMode={vehicleMode}
+          navigationPanel={
+            <NavigationJobPanel
+              stopLabel={isDropLeg ? 'Drop location' : isTowingActiveJob ? 'Pickup location' : 'Customer location'}
+              address={isDropLeg ? dropAddress || 'Drop location' : jobAddress}
+              landmark={isDropLeg ? null : jobDetails?.landmark}
+              phone={dialablePhone}
+              arrive={arriveAction}
+              reachedText={nearDestination ? `You've reached the ${stopName}` : null}
+              busy={isLoading}
+            />
+          }
           onRouteStateChange={handleRouteStateChange}
           onExitNavigation={() => setIsNavigationActive(false)}
         />

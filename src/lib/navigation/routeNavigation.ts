@@ -155,9 +155,10 @@ function etaMinutes(
 ) {
   const estimate =
     routeDurationMinutes && totalMeters > 0
-      ? routeDurationMinutes * (remainingMeters / totalMeters)
+      ? routeDurationMinutes * Math.min(1, remainingMeters / totalMeters)
       : remainingMeters / 500;
-  return Math.max(1, Math.ceil(estimate));
+  // Rounding noise must not add a minute: at the start of a 9 min route, 9.0000001 is 9.
+  return Math.max(1, Math.ceil(estimate - 0.01));
 }
 
 export function getNavigationProgress({

@@ -51,4 +51,17 @@ describe("route navigation", () => {
     expect(result?.remainingDistanceMeters).toBeCloseTo(3_000, -1);
     expect(result?.remainingEtaMinutes).toBe(12);
   });
+
+  it("does not add a minute for rounding noise at the start of the route", () => {
+    // Snapping to the first point can leave the remaining share a hair above all of it.
+    for (const minutes of [8, 9, 12]) {
+      const result = getNavigationProgress({
+        current: { lat: route[0][0], lng: route[0][1] },
+        route,
+        routeDistanceKm: 2.4,
+        routeDurationMinutes: minutes,
+      });
+      expect(result?.remainingEtaMinutes).toBe(minutes);
+    }
+  });
 });

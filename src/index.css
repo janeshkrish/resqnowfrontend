@@ -6321,6 +6321,40 @@ button.tj-line { width: 100%; background: var(--tj-surface); cursor: pointer; te
 .tj-banner small { display: block; color: #C7CCD8; font-size: 12.5px; line-height: 16px; font-weight: 700; }
 .tj-banner b { display: block; font-size: 19px; line-height: 25px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .tj-banner-hint { display: block; margin-top: 2px; color: #FDE68A; font-size: 13px; line-height: 18px; font-weight: 700; }
+/* The navigation screen's job panel. It sits on the map's own light card in both themes. */
+.tj-nav,
+.dark .tj.tj-nav {
+  --tj-surface: #FFFFFF;
+  --tj-ink: #283048;
+  --tj-sub: #475467;
+  --tj-faint: #667085;
+  --tj-line: #E4E7EC;
+  --tj-fill: #F2F4F7;
+  --tj-dark: #283048;
+  --tj-mark: #FEF0C7;
+  --tj-mark-ink: #7A2E0E;
+}
+.tj-nav { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.tj-nav .tj-stop { padding: 8px 12px; }
+.tj-nav .tj-addr { font-size: 15px; line-height: 20px; -webkit-line-clamp: 2; }
+.tj-nav .tj-mark { padding: 6px 12px; font-size: 13px; line-height: 18px; }
+.tj-nav .tj-pair { grid-template-columns: minmax(104px, 0.55fr) minmax(0, 1.45fr); }
+.tj-nav .tj-pair.is-single { grid-template-columns: minmax(0, 1fr); }
+.tj-nav .tj-cta, .tj-nav .tj-act { min-height: 56px; }
+@media (max-height: 700px) {
+  .tj-nav { gap: 8px; margin-bottom: 8px; }
+  .tj-nav .tj-stop { padding: 6px 12px; }
+  .tj-nav .tj-addr { -webkit-line-clamp: 1; }
+  .tj-nav .tj-mark { padding: 4px 12px; }
+  .tj-nav .tj-cta, .tj-nav .tj-act { min-height: 50px; }
+  .tj-nav-reached { padding: 7px 12px; }
+}
+.tj-nav-reached { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 14px; background: #ECFDF3; color: #05603A; font-size: 15px; line-height: 20px; font-weight: 800; }
+.tj-cta.is-near { animation: tjNear 1.4s ease-in-out infinite; }
+@keyframes tjNear { 0%, 100% { box-shadow: 0 0 0 0 rgba(176, 31, 42, 0.5); } 50% { box-shadow: 0 0 0 9px rgba(176, 31, 42, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .tj-cta.is-near { animation: none; }
+}
 .tj-live { width: 10px; height: 10px; flex-shrink: 0; border-radius: 999px; background: var(--tj-ok); box-shadow: 0 0 0 4px rgba(18, 183, 106, 0.22); }
 .tj-card { position: relative; z-index: 401; margin-top: -22px; border-radius: 28px 28px 0 0; background: var(--tj-surface); box-shadow: 0 -14px 30px -20px rgba(40, 48, 72, 0.45); }
 .tj-card.is-flat { z-index: auto; margin-top: 0; border-radius: 0; box-shadow: none; }

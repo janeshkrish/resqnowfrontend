@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 import { TECHNICIAN, fakeSocketServer, stripValue } from "./fixtures/technicianPortal";
 
@@ -271,13 +271,47 @@ test.describe("a technician standing still", () => {
     await page.waitForTimeout(40_000);
 
     await expect(page.locator(".tj-banner-hint")).toHaveText("Weak GPS signal · showing your last position");
-    await expect(stripValue(card, "Distance")).toHaveText("3.4 km");
+    // What was left from the last position, about 60 m into the 3.4 km route.
+    await expect(stripValue(card, "Distance")).toHaveText("3.3 km");
     await expect(stripValue(card, "Reach in")).toHaveText("9 min");
     // Starting to navigate still needs a live position.
     await expect(card.getByRole("button", { name: "Start navigation" })).toBeDisabled();
     expect(errors).toEqual([]);
   });
 });
+
+/** Points along the first stretch of the test route, by metres from its start. */
+const ON_ROUTE: Record<number, { latitude: number; longitude: number }> = {
+  30: { latitude: 11.016556, longitude: 76.955918 },
+  60: { latitude: 11.016312, longitude: 76.956035 },
+  120: { latitude: 11.015824, longitude: 76.95627 },
+  180: { latitude: 11.015336, longitude: 76.956505 },
+};
+/**
+ * A side street heading east from 60 m along the route, a position every 70 m. The first is
+ * still within the route's tolerance; from the second on the technician is off it.
+ */
+const SIDE_STREET = [76.956676, 76.957317, 76.957958, 76.958599, 76.95924, 76.959881]
+  .map((longitude) => ({ latitude: 11.016312, longitude }));
+
+/** One position from the phone, then the moment it takes to reach the page. */
+async function ride(context: BrowserContext, point: { latitude: number; longitude: number }, pauseMs = 1_200) {
+  await context.setGeolocation({ ...point, accuracy: 20 });
+  await new Promise((resolve) => setTimeout(resolve, pauseMs));
+}
+
+function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const rad = Math.PI / 180;
+  const h = Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 +
+    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lng - a.lng) * rad) / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+/** Where a route request started, from its `points` parameter. */
+const routeOrigin = (points: string) => {
+  const [lat, lng] = points.split(";")[0].split(",").map(Number);
+  return { lat, lng };
+};
 
 test.describe("navigation through a weak signal", () => {
   test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
@@ -317,22 +351,215 @@ test.describe("navigation through a weak signal", () => {
     const navigation = await startNavigation(page);
     const asked = routes.length;
 
-    // No network for the route service; the technician rides on about 60 m.
+    // No network for the route service, just as the technician leaves the route.
     state.routeDown = true;
     await page.waitForTimeout(4_500);
-    await context.setGeolocation({ latitude: HOME.latitude - 0.00054, longitude: HOME.longitude + 0.00026, accuracy: 20 });
+    await ride(context, ON_ROUTE[60]);
+    for (const point of SIDE_STREET.slice(0, 3)) await ride(context, point);
     await expect.poll(() => routes.length).toBeGreaterThan(asked);
     await expect(navigation.getByRole("status")).toHaveText("Weak network · showing the last route");
     await expect(navigation.getByText("Road route unavailable")).toHaveCount(0);
     await expect(navigation.getByText("Remaining")).toBeVisible();
     if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-weak-network.png` });
 
-    // Back in coverage: the next update succeeds and the note goes.
+    // Back in coverage, still off the route: the next update succeeds and the note goes.
     state.routeDown = false;
     await page.waitForTimeout(4_500);
-    await context.setGeolocation({ latitude: HOME.latitude - 0.00108, longitude: HOME.longitude + 0.00052, accuracy: 20 });
+    for (const point of SIDE_STREET.slice(3, 5)) await ride(context, point);
     await expect(navigation.getByRole("status")).toHaveCount(0);
     await expect(navigation.getByText("Remaining")).toBeVisible();
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe("re-routing", () => {
+  test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+  const job = { ...lockout, urgent: false, answers: [], problem: ["Key locked in"] };
+
+  async function startNavigation(page: Page) {
+    await page.goto("/technician/active-job/7201");
+    await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Start navigation" }).click();
+    const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+    await expect(navigation.getByText("Remaining")).toBeVisible();
+    // Long enough that the first request is not held back by the minimum gap between requests.
+    await page.waitForTimeout(4_500);
+    return navigation;
+  }
+  const remaining = (navigation: ReturnType<Page["getByRole"]>) =>
+    navigation.getByText("Remaining").locator("xpath=preceding-sibling::p").innerText();
+
+  test("riding along the route asks for no new route, and the figures count down", async ({ page, context }) => {
+    const { routes, errors } = await openActiveJob(page, job);
+    const navigation = await startNavigation(page);
+    const asked = routes.length;
+    const atStart = await remaining(navigation);
+
+    // 180 m along the route, a position every few seconds, as a phone sends them.
+    for (const metres of [60, 120, 180]) await ride(context, ON_ROUTE[metres], 4_500);
+
+    expect(routes.length).toBe(asked);
+    const now = await remaining(navigation);
+    expect(now).not.toBe(atStart);
+    expect(parseFloat(now)).toBeLessThan(parseFloat(atStart));
+
+    // Leaving navigation, the job card shows what is left, not the distance at the start.
+    await navigation.getByRole("button", { name: "Exit navigation" }).click();
+    await expect(stripValue(page.getByRole("region", { name: "Active job" }), "Distance")).toHaveText(now);
+    expect(errors).toEqual([]);
+  });
+
+  test("leaving the route asks for one new route, from where the technician is", async ({ page, context }) => {
+    const { routes, errors } = await openActiveJob(page, job);
+    await startNavigation(page);
+    const asked = routes.length;
+
+    await ride(context, ON_ROUTE[60]);
+    await ride(context, SIDE_STREET[0]);
+    // One reading off the route could be GPS noise: no request yet.
+    await ride(context, SIDE_STREET[1], 2_000);
+    expect(routes.length).toBe(asked);
+
+    // A second one confirms it.
+    await ride(context, SIDE_STREET[2]);
+    await expect.poll(() => routes.length).toBe(asked + 1);
+    const origin = routeOrigin(routes[asked].points);
+    expect(metresBetween(origin, { lat: HOME.latitude, lng: HOME.longitude })).toBeGreaterThan(150);
+
+    // Nothing more while the new route is being followed from there.
+    await page.waitForTimeout(3_000);
+    expect(routes.length).toBe(asked + 1);
+    expect(errors).toEqual([]);
+  });
+
+  test("turning back the way they came asks for a new route", async ({ page, context }) => {
+    const { routes, errors } = await openActiveJob(page, job);
+    await startNavigation(page);
+    const asked = routes.length;
+
+    for (const metres of [60, 120, 180]) await ride(context, ON_ROUTE[metres]);
+    expect(routes.length).toBe(asked);
+
+    // Riding back towards the start: still on the route's road, but going the wrong way.
+    for (const metres of [120, 60, 30]) await ride(context, ON_ROUTE[metres]);
+    await expect.poll(() => routes.length).toBe(asked + 1);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("the navigation screen", () => {
+  const statusCalls = (calls: Call[]) =>
+    calls.filter((call) => call.path.endsWith("/technician-status")).map((call) => (call.body as { status: string }).status);
+
+  test.describe("on the way to the customer", () => {
+    test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+
+    test("shows where to go, and lets the technician call and mark arrived without leaving it", async ({ page }) => {
+      const { calls, errors } = await openActiveJob(page, { ...lockout, urgent: false });
+      await page.goto("/technician/active-job/7201");
+      const card = page.getByRole("region", { name: "Active job" });
+      await card.getByRole("button", { name: "Start navigation" }).click();
+      const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+
+      // The customer's own address and landmark, from the request.
+      const destination = navigation.getByTestId("navigation-destination");
+      await expect(destination).toContainText("Customer location");
+      await expect(destination).toContainText("Brookefields Mall parking, Krishnasamy Road, Coimbatore");
+      await expect(destination).toContainText("Basement 2, pillar C14");
+      await expect(navigation.getByRole("link", { name: "Call customer" })).toHaveAttribute("href", "tel:9876543210");
+      // Still 3.4 km away: no prompt to mark arrived yet.
+      await expect(navigation.getByTestId("navigation-arrival-prompt")).toHaveCount(0);
+      if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-panel.png` });
+
+      await navigation.getByRole("button", { name: "I've arrived" }).click();
+      await expect.poll(() => statusCalls(calls)).toEqual(["en-route", "arrived"]);
+      // Arriving ends navigation: the job card takes over with the next step.
+      await expect(navigation).toHaveCount(0);
+      await expect(card.getByRole("button", { name: "Complete work" })).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+  });
+
+  test.describe("close to the customer", () => {
+    // 150 m before the end of the route.
+    test.use({ geolocation: { latitude: 11.010343, longitude: 76.959768, accuracy: 20 }, permissions: ["geolocation"] });
+
+    test("prompts the technician to mark arrived once they are there", async ({ page, context }) => {
+      // A route whose length matches its line, so metres on screen are metres on the road.
+      const { calls, errors } = await openActiveJob(page, { ...lockout, urgent: false }, { distanceKm: 0.99, durationMinutes: 4 });
+      await page.goto("/technician/active-job/7201");
+      await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Start navigation" }).click();
+      const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+      await expect(navigation.getByRole("button", { name: "I've arrived" })).toBeVisible();
+      await expect(navigation.getByTestId("navigation-arrival-prompt")).toHaveCount(0);
+
+      // The last stretch: 40 m, then 30 m from the customer.
+      await ride(context, { latitude: 11.009505, longitude: 76.960305 });
+      await ride(context, { latitude: 11.009429, longitude: 76.960354 });
+      await expect(navigation.getByTestId("navigation-arrival-prompt")).toHaveText("You've reached the customer");
+      if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-arrival.png` });
+
+      await navigation.getByRole("button", { name: "I've arrived" }).click();
+      await expect.poll(() => statusCalls(calls)).toEqual(["en-route", "arrived"]);
+      await expect(navigation).toHaveCount(0);
+      expect(errors).toEqual([]);
+    });
+  });
+
+  test.describe("on a small phone", () => {
+    test.use({ viewport: { width: 360, height: 640 }, geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+
+    test("the technician's own position stays in view above the panel", async ({ page }) => {
+      const { errors } = await openActiveJob(page, { ...lockout, urgent: false });
+      await page.goto("/technician/active-job/7201");
+      await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Start navigation" }).click();
+      const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+      await expect(navigation.getByRole("button", { name: "I've arrived" })).toBeVisible();
+
+      // The follow view keeps the technician at the centre of the map. That centre has to
+      // sit in what is left of the screen, between the instruction and the panel.
+      const layout = async () => {
+        const map = await navigation.locator("[data-fake-map]").boundingBox();
+        const instruction = await navigation.getByTestId("navigation-instruction").boundingBox();
+        const footer = await navigation.getByTestId("navigation-footer").boundingBox();
+        if (!map || !instruction || !footer) return null;
+        const centre = map.y + map.height / 2;
+        const visibleTop = instruction.y + instruction.height;
+        return {
+          belowInstruction: centre - visibleTop,
+          abovePanel: footer.y - centre,
+          offCentre: Math.abs(centre - (visibleTop + footer.y) / 2),
+        };
+      };
+      // Room for the technician's marker and its pulse on both sides.
+      await expect.poll(async () => (await layout())?.abovePanel ?? -1).toBeGreaterThan(40);
+      const placed = await layout();
+      expect(placed?.belowInstruction).toBeGreaterThan(40);
+      expect(placed?.offCentre).toBeLessThan(4);
+      if (process.env.REQUEST_SHOTS_DIR) await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-navigation-small-phone.png` });
+      expect(errors).toEqual([]);
+    });
+  });
+
+  test.describe("towing to the drop point", () => {
+    test.use({ geolocation: { ...HOME, accuracy: 20 }, permissions: ["geolocation"] });
+
+    test("shows the drop address and the tow's own arrived step", async ({ page }) => {
+      const { calls, errors } = await openActiveJob(page, { ...towing, status: "enroute_drop", jobStatus: "enroute_drop" }, undefined, 0);
+      await page.goto("/technician/active-job/7202");
+      await page.getByRole("region", { name: "Active job" }).getByRole("button", { name: "Open navigation" }).click();
+      const navigation = page.getByRole("region", { name: "Turn-by-turn navigation" });
+
+      const destination = navigation.getByTestId("navigation-destination");
+      await expect(destination).toContainText("Drop location");
+      await expect(destination).toContainText("Ganapathy workshop, Sathy Road");
+      // The pickup's landmark is not where the tow is going now.
+      await expect(destination).not.toContainText("Opposite the petrol bunk");
+      await expect(navigation.getByRole("link", { name: "Call customer" })).toHaveAttribute("href", "tel:9876501234");
+
+      await navigation.getByRole("button", { name: "Reached drop location" }).click();
+      await expect.poll(() => statusCalls(calls)).toEqual(["arrived_drop"]);
+      await expect(navigation).toHaveCount(0);
+      expect(errors).toEqual([]);
+    });
   });
 });

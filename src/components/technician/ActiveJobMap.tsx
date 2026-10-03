@@ -57,11 +57,20 @@ interface ActiveJobMapProps {
    * The route already on screen stays, and this note says why nothing is moving.
    */
   positionNote?: string | null;
+  /** The job's own details and actions, shown above the figures while navigating. */
+  navigationPanel?: React.ReactNode;
   onRouteStateChange?: (state: ActiveJobRouteState) => void;
   onExitNavigation?: () => void;
 }
 
-const routeRequestDistanceMeters = 35;
+// While navigating, a new route is asked for only when the technician has left the one
+// on screen: off it by more than its tolerance, or riding back along it the wrong way.
+// Two position updates in a row must say so, so one noisy reading cannot trigger it.
+const offCourseConfirmFixes = 2;
+// Remaining distance grown by this much over the best so far means going the wrong way.
+const wrongWayMeters = 150;
+// A new route from (nearly) the same spot as the last one would be the same route.
+const minimumRerouteMoveMeters = 35;
 const minimumRouteRequestIntervalMs = 4_000;
 
 function distanceMeters(a: MapPoint, b: MapPoint) {
@@ -126,6 +135,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   speedKmh,
   vehicleMode = "car",
   positionNote = null,
+  navigationPanel,
   onRouteStateChange,
   onExitNavigation,
 }) => {
@@ -144,6 +154,15 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   const routeContextRef = useRef("");
   const requestSequenceRef = useRef(0);
   const mountedRef = useRef(true);
+  const instructionRef = useRef<HTMLDivElement | null>(null);
+  const footerRef = useRef<HTMLDivElement | null>(null);
+  // How far the map is extended upwards so that its centre, where the follow view keeps
+  // the technician, sits midway between the instruction and the bottom panel.
+  const [mapLift, setMapLift] = useState(0);
+  // Off-course tracking for the route on screen, one count per position update.
+  const offCourseFixesRef = useRef(0);
+  const closestRemainingMetersRef = useRef(Number.POSITIVE_INFINITY);
+  const countedLocationRef = useRef<MapPoint | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -160,8 +179,9 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
     : undefined;
   const hasPositionNote = Boolean(positionNote);
 
-  const progress = useMemo(() => {
-    if (!navigationMode || !validTechnicianLocation || routePath.length < 3) return null;
+  // Where the technician is along the route on screen, navigating or not.
+  const routeProgress = useMemo(() => {
+    if (!validTechnicianLocation || routePath.length < 3) return null;
     return getNavigationProgress({
       current: validTechnicianLocation,
       destination: validNavigationDestination,
@@ -170,22 +190,37 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       routeDurationMinutes: routeDurationMinutes ?? undefined,
     });
   }, [
-    navigationMode,
     routeDurationMinutes,
     routeDistanceKm,
     routePath,
     validNavigationDestination,
     validTechnicianLocation,
   ]);
+  const progress = navigationMode ? routeProgress : null;
+
+  // The page shows what is left of the route from where the technician is now, so the
+  // figures count down without asking the route service again.
+  const remainingDistanceKm = routeProgress
+    ? Math.round(routeProgress.remainingDistanceMeters / 10) / 100
+    : routeDistanceKm;
+  const remainingDurationMinutes = routeProgress
+    ? routeProgress.remainingEtaMinutes
+    : routeDurationMinutes;
 
   useEffect(() => {
     onRouteStateChange?.({
       status: routeStatus,
-      distanceKm: routeDistanceKm,
-      durationMinutes: routeDurationMinutes,
+      distanceKm: remainingDistanceKm,
+      durationMinutes: remainingDurationMinutes,
       ...(routeMessage ? { message: routeMessage } : {}),
     });
-  }, [onRouteStateChange, routeDistanceKm, routeDurationMinutes, routeMessage, routeStatus]);
+  }, [onRouteStateChange, remainingDistanceKm, remainingDurationMinutes, routeMessage, routeStatus]);
+
+  // A new route starts a fresh count.
+  useEffect(() => {
+    offCourseFixesRef.current = 0;
+    closestRemainingMetersRef.current = Number.POSITIVE_INFINITY;
+  }, [routePath]);
 
   useEffect(() => {
     if (!validTechnicianLocation) {
@@ -219,16 +254,33 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       setRouteUpdateFailed(false);
     }
 
+    const needsInitialRoute = contextChanged || routePath.length < 3;
+    // The position is the last known one: a new route from it would say nothing new.
+    if (hasPositionNote && !needsInitialRoute) return;
+
+    if (progress && countedLocationRef.current !== validTechnicianLocation) {
+      countedLocationRef.current = validTechnicianLocation;
+      // Only a reading on the route says how far along it the technician is.
+      if (!progress.offRoute) {
+        closestRemainingMetersRef.current = Math.min(
+          closestRemainingMetersRef.current,
+          progress.remainingDistanceMeters,
+        );
+      }
+      const wrongWay =
+        !progress.offRoute &&
+        progress.remainingDistanceMeters - closestRemainingMetersRef.current > wrongWayMeters;
+      offCourseFixesRef.current = progress.offRoute || wrongWay ? offCourseFixesRef.current + 1 : 0;
+    }
     const previousOrigin = lastRouteOriginRef.current;
     const moved = previousOrigin
       ? distanceMeters(previousOrigin, validTechnicianLocation)
       : Number.POSITIVE_INFINITY;
-    const needsInitialRoute = contextChanged || routePath.length < 3;
     const needsNavigationRoute =
-      navigationMode && (Boolean(progress?.offRoute) || moved >= routeRequestDistanceMeters);
+      navigationMode &&
+      offCourseFixesRef.current >= offCourseConfirmFixes &&
+      moved >= minimumRerouteMoveMeters;
     if (!needsInitialRoute && !needsNavigationRoute) return;
-    // The position is the last known one: a new route from it would say nothing new.
-    if (hasPositionNote && !needsInitialRoute) return;
 
     const now = Date.now();
     if (
@@ -241,6 +293,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
 
     const requestSequence = ++requestSequenceRef.current;
     const hasRouteToKeep = !contextChanged && routePath.length >= 3;
+    offCourseFixesRef.current = 0;
     lastRouteOriginRef.current = validTechnicianLocation;
     lastRouteRequestAtRef.current = now;
     setRouteMessage(undefined);
@@ -292,7 +345,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
   }, [
     hasPositionNote,
     navigationMode,
-    progress?.offRoute,
+    progress,
     retryRevision,
     routePath.length,
     validNavigationDestination,
@@ -310,6 +363,26 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       setCameraRevision((revision) => revision + 1);
     }
   }, [following, navigationMode, validTechnicianLocation]);
+
+  const hasGuidance = navigationMode && Boolean(progress);
+  useEffect(() => {
+    if (!hasGuidance) {
+      setMapLift(0);
+      return;
+    }
+    const measure = () => {
+      const footerHeight = footerRef.current?.offsetHeight ?? 0;
+      const instructionHeight = instructionRef.current?.offsetHeight ?? 0;
+      setMapLift(Math.max(0, Math.round(footerHeight - instructionHeight)));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    // The panel grows and shrinks with the job's details and the arrival prompt.
+    const observer = new ResizeObserver(measure);
+    if (footerRef.current) observer.observe(footerRef.current);
+    if (instructionRef.current) observer.observe(instructionRef.current);
+    return () => observer.disconnect();
+  }, [hasGuidance]);
 
   const markerHeading = heading ?? progress?.maneuver.bearing ?? 0;
   const markers = useMemo<MapMarkerSpec[]>(() => {
@@ -429,15 +502,17 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         ? { role: "region", "aria-label": "Turn-by-turn navigation" }
         : {})}
     >
-      <MapplsMapSurface
-        ariaLabel={navigationMode ? "Active route navigation map" : "Active job map"}
-        markers={markers}
-        polylines={polylines}
-        circles={[]}
-        camera={camera}
-        className="h-full w-full"
-        onInteract={navigationMode ? () => setFollowing(false) : undefined}
-      />
+      <div className="absolute inset-x-0 bottom-0" style={{ top: -mapLift }}>
+        <MapplsMapSurface
+          ariaLabel={navigationMode ? "Active route navigation map" : "Active job map"}
+          markers={markers}
+          polylines={polylines}
+          circles={[]}
+          camera={camera}
+          className="h-full w-full"
+          onInteract={navigationMode ? () => setFollowing(false) : undefined}
+        />
+      </div>
 
       {showRouteInterruption && (
         <div className="absolute inset-0 z-30 grid place-items-center bg-slate-950/35 p-5 backdrop-blur-[2px]">
@@ -476,6 +551,8 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       {navigationMode && progress && (
         <>
           <div
+            ref={instructionRef}
+            data-testid="navigation-instruction"
             aria-live="polite"
             className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-center gap-4 rounded-2xl border border-white/70 bg-white/95 p-4 text-slate-950 shadow-xl backdrop-blur"
           >
@@ -498,7 +575,12 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
             </div>
           </div>
 
-          <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
+          <div
+            ref={footerRef}
+            data-testid="navigation-footer"
+            className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur"
+          >
+            {navigationPanel}
             <div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 text-center">
               <div>
                 <p className="text-lg font-black text-slate-950">{progress.remainingEtaMinutes} min</p>

@@ -29,6 +29,32 @@ export function isValidNavigationPoint(point: GeoPoint | null | undefined) {
   return !(point.lat === 0 && point.lng === 0);
 }
 
+/** How close counts as being there, and how far the pin may sit from the end of the road. */
+export const ARRIVAL_PROMPT_METERS = 80;
+const ARRIVAL_ROUTE_END_MAX_METERS = 300;
+
+/**
+ * True when the technician is close enough to be asked to mark arrival: within range of
+ * the destination itself, or at the end of the road route with the destination nearby
+ * (a route ends on the road outside; the customer's pin is often a little way in).
+ */
+export function isWithinArrivalRange(
+  position: GeoPoint | null | undefined,
+  destination: GeoPoint | null | undefined,
+  remainingRouteMeters?: number | null,
+) {
+  if (!position || !destination) return false;
+  if (!isValidNavigationPoint(position) || !isValidNavigationPoint(destination)) return false;
+  const straightLine = distanceMeters(position, destination);
+  if (straightLine <= ARRIVAL_PROMPT_METERS) return true;
+  return (
+    typeof remainingRouteMeters === "number" &&
+    Number.isFinite(remainingRouteMeters) &&
+    remainingRouteMeters <= ARRIVAL_PROMPT_METERS &&
+    straightLine <= ARRIVAL_ROUTE_END_MAX_METERS
+  );
+}
+
 export function isUsableLocationFix(
   fix: TechnicianLocationFix | null | undefined,
   now = Date.now(),

@@ -133,6 +133,8 @@ const fix = (overrides: Record<string, unknown> = {}) => {
 };
 
 const isPhone = () => test.info().project.name === "phone";
+const technicianMarker = (page: Page) => page.locator('[data-tracking-marker="technician"]');
+const placeLabel = (page: Page, kind: "customer" | "drop") => page.locator(`[data-tracking-place="${kind}"] .tracking-place-marker__label`);
 const card = (page: Page) => page.getByTestId("tracking-card");
 const sheet = (page: Page) => page.getByTestId("tracking-sheet");
 const cancelButton = (page: Page) => page.getByRole("button", { name: "Cancel request" });
@@ -187,6 +189,8 @@ test.describe("technician on the way", () => {
     // Before the backend has sent an ETA nothing is guessed.
     await expect(card(page).locator(".lt-say")).toHaveText("Arun is on the way");
     await expect(page.getByTestId("tracking-big")).toHaveText("On the way");
+    await expect(technicianMarker(page).locator(".tracking-tech-marker__badge")).toBeVisible();
+    await expect(technicianMarker(page).locator(".tracking-tech-marker__eta")).toHaveCount(0);
 
     await expect.poll(async () => { socket.send("tracking:location:v1", fix()); return page.getByTestId("tracking-big").textContent(); }).toBe("5 min");
     await expect(card(page).locator(".lt-side")).toHaveText(/^Arrives by \d{1,2}:\d{2} (am|pm)$/);
@@ -208,6 +212,25 @@ test.describe("technician on the way", () => {
     const steps = card(page).getByRole("list", { name: "Progress" }).getByRole("listitem");
     await expect(steps).toHaveText(["Found", "On the way", "At vehicle", "Done"]);
     await expect(steps.nth(1)).toHaveAttribute("aria-current", "step");
+
+    // On the map: the technician's bike in a disc with the minutes over it, and the customer's own spot.
+    const marker = technicianMarker(page);
+    await expect(marker.locator(".tracking-tech-marker__eta")).toHaveText("5 min");
+    await expect(marker.locator(".tracking-tech-marker__badge .rq-symbol")).toHaveText("two_wheeler");
+    await expect(marker).not.toHaveClass(/is-stale/);
+    await expect(placeLabel(page, "customer")).toHaveText("You");
+    await expect(page.locator(".tracking-live-map")).not.toContainText("Technician");
+    // The disc is a 44px circle whose middle is the map point: 18px below the middle of the marker's box.
+    const box = (await marker.boundingBox())!;
+    const disc = (await marker.locator(".tracking-tech-marker__badge").boundingBox())!;
+    expect(Math.round(disc.width)).toBe(44);
+    expect(Math.round(disc.height)).toBe(44);
+    expect(Math.round(disc.x + disc.width / 2 - (box.x + box.width / 2))).toBe(0);
+    expect(Math.round(disc.y + disc.height / 2 - (box.y + box.height / 2))).toBe(18);
+    const spot = (await page.locator('[data-tracking-place="customer"]').boundingBox())!;
+    const dot = (await page.locator('[data-tracking-place="customer"] .tracking-place-marker__dot').boundingBox())!;
+    expect(Math.round(dot.x + dot.width / 2 - (spot.x + spot.width / 2))).toBe(0);
+    expect(Math.round(dot.y + dot.height / 2 - (spot.y + spot.height / 2))).toBe(18);
     await shot(page, "on-the-way");
 
     await openDetails(page);
@@ -233,6 +256,7 @@ test.describe("technician on the way", () => {
 
     const notice = card(page).getByRole("status");
     await expect(notice).toContainText("Location is delayed. Showing where Arun was last seen.");
+    await expect(technicianMarker(page)).toHaveClass(/is-stale/);
     await shot(page, "delayed");
     const before = seen.fetches;
     await notice.getByRole("button", { name: "Refresh" }).click();
@@ -493,6 +517,160 @@ test.describe("after the work", () => {
   });
 });
 
+test.describe("the map", () => {
+  type MapCalls = {
+    fits: Array<{ bounds?: [[number, number], [number, number]]; jump?: { center: [number, number]; zoom: number } }>;
+    eases: Array<{ center: [number, number]; zoom: number }>;
+  };
+  /** Everything the camera has been told to do, as the stand-in map recorded it. */
+  const mapCalls = (page: Page) => page.evaluate(() => {
+    const calls = (window as unknown as { __fakeMappls: MapCalls }).__fakeMappls;
+    return { fits: calls.fits, eases: calls.eases };
+  });
+  /** The frames drawn around two points: [[west, south], [east, north]]. */
+  const frames = async (page: Page) => (await mapCalls(page)).fits.flatMap((call) => (call.bounds ? [call.bounds] : []));
+  const followMoves = async (page: Page) => (await mapCalls(page)).eases;
+  // Arun starts at 11.0268, 76.9458 and the customer is at 11.0168, 76.9558.
+  const BOTH_ENDS = [[76.9458, CUSTOMER_SPOT.lat], [CUSTOMER_SPOT.lng, 11.0268]];
+  const assignTechnician = (world: Awaited<ReturnType<typeof openTracking>>) => {
+    world.state.request = request({ status: "accepted" });
+    world.socket.send("job:status_update", { requestId: "5502", status: "accepted" });
+  };
+
+  test("frames the technician and the customer together as the page opens", async ({ page }) => {
+    await openTracking(page);
+    await expect.poll(async () => (await frames(page)).at(-1)).toEqual(BOTH_ENDS);
+  });
+
+  test("frames both when a technician is assigned after the page was opened", async ({ page }) => {
+    const world = await openTracking(page, request({ status: "pending", technician: null }));
+    // Still searching: the map is centred on the customer alone.
+    await expect.poll(async () => (await mapCalls(page)).fits.at(-1)?.jump?.center).toEqual([CUSTOMER_SPOT.lng, CUSTOMER_SPOT.lat]);
+    expect(await frames(page)).toEqual([]);
+
+    assignTechnician(world);
+
+    await expect(technicianMarker(page)).toBeVisible();
+    await expect.poll(async () => (await frames(page)).at(-1)).toEqual(BOTH_ENDS);
+    // Once is enough: the technician moving does not draw the frame again.
+    const drawn = (await frames(page)).length;
+    world.socket.send("tracking:location:v1", fix());
+    await expect(technicianMarker(page).locator(".tracking-tech-marker__eta")).toHaveText("5 min");
+    expect((await frames(page)).length).toBe(drawn);
+  });
+
+  test("glides the technician between positions and turns the pointer the way they travel", async ({ page }) => {
+    const { socket, seen } = await openTracking(page);
+    const left = () => page.evaluate(() => document.querySelector('[data-tracking-marker="technician"]')?.getBoundingClientRect().left ?? null);
+    socket.send("tracking:location:v1", fix({ sequenceId: 30 }));
+    // Wait for the marker to come to rest on that position.
+    let last: number | null = null;
+    await expect.poll(async () => { const now = await left(); const still = now !== null && now === last; last = now; return still; }, { intervals: [250] }).toBe(true);
+    const from = last!;
+
+    // 300 metres due east: 0.0027 degrees, which the stand-in map draws as 16.2px.
+    socket.send("tracking:location:v1", fix({ lng: 76.9481 + 0.0027, sequenceId: 31, heading: 90, speed: 12 }));
+    const seenAt = await page.evaluate(async () => {
+      const positions: number[] = [];
+      const started = performance.now();
+      while (performance.now() - started < 2200) {
+        const marker = document.querySelector('[data-tracking-marker="technician"]');
+        if (marker) positions.push(marker.getBoundingClientRect().left);
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      return positions;
+    });
+
+    const to = from + 16.2;
+    expect(Math.abs(seenAt.at(-1)! - to)).toBeLessThan(1);
+    // Not one jump: the marker was drawn at several places on the way.
+    const onTheWay = new Set(seenAt.filter((x) => x > from + 0.5 && x < to - 0.5).map((x) => x.toFixed(1)));
+    expect(onTheWay.size).toBeGreaterThanOrEqual(4);
+    // Never backwards, and never past where the technician really is.
+    expect(seenAt.every((x, index) => index === 0 || x >= seenAt[index - 1] - 0.05)).toBe(true);
+    expect(Math.max(...seenAt)).toBeLessThan(to + 1);
+
+    await expect(technicianMarker(page)).toHaveClass(/has-heading/);
+    const pointsTo = await technicianMarker(page).locator(".tracking-tech-marker__vehicle").evaluate((el) => {
+      const [a, b] = getComputedStyle(el).transform.replace("matrix(", "").replace(")", "").split(",").map(Number);
+      return Math.round((Math.atan2(b, a) * 180) / Math.PI);
+    });
+    expect(pointsTo).toBeGreaterThanOrEqual(80);
+    expect(pointsTo).toBeLessThanOrEqual(100);
+    expect(seen.errors).toEqual([]);
+  });
+
+  test.describe("on a phone", () => {
+    test.beforeEach(() => { test.skip(!isPhone(), "The map beside the card on a wide screen is not moved by the card."); });
+
+    test("leaves the map where the customer put it, until they tap Recentre", async ({ page }) => {
+      const world = await openTracking(page, request({ status: "pending", technician: null }));
+      await showing(page);
+      // The customer touches the map: the card makes room and the map is theirs.
+      await page.mouse.click(40, 200);
+      await expect(sheet(page)).toHaveAttribute("data-size", "collapsed");
+
+      assignTechnician(world);
+      await expect(technicianMarker(page)).toBeVisible();
+      await page.waitForTimeout(1000);
+      expect(await frames(page)).toEqual([]);
+      expect(await followMoves(page)).toEqual([]);
+
+      await page.locator(".lt-mini").getByRole("button", { name: "Show the full card" }).click();
+      await expect(sheet(page)).toHaveAttribute("data-size", "half");
+      await showing(page);
+      expect(await frames(page)).toEqual([]);
+
+      await page.getByTestId("live-tracking-recenter").click();
+      await expect.poll(async () => (await frames(page)).at(-1)).toEqual(BOTH_ENDS);
+    });
+
+    test("follows the technician in map view, stops when the customer touches the map, and resumes on Recentre", async ({ page }) => {
+      const { socket, seen } = await openTracking(page);
+      let step = 0;
+      /** The technician moves about 130 metres east. */
+      const drive = async () => {
+        step += 1;
+        const lng = 76.9481 + step * 0.0012;
+        socket.send("tracking:location:v1", fix({ lng, sequenceId: 40 + step, heading: 90, speed: 12 }));
+        await page.waitForTimeout(1500);
+        return lng;
+      };
+      await drive();
+      await showing(page);
+      expect(await followMoves(page)).toEqual([]);
+
+      // The card is dragged down to the strip: the map now keeps the technician in the middle.
+      await dragHandle(page, 150);
+      await expect(sheet(page)).toHaveAttribute("data-size", "collapsed");
+      await expect.poll(async () => (await followMoves(page)).length).toBeGreaterThan(0);
+      const second = await drive();
+      const third = await drive();
+      const followed = await followMoves(page);
+      expect(followed.at(-1)!.zoom).toBe(15);
+      expect(Math.abs(followed.at(-1)!.center[0] - third)).toBeLessThan(0.0002);
+      expect(followed.some((move) => Math.abs(move.center[0] - second) < 0.0006)).toBe(true);
+
+      // The customer touches the map: following stops, and the map is not pulled anywhere else.
+      const framesBefore = (await frames(page)).length;
+      await page.mouse.click(40, 200);
+      const movesAtTouch = (await followMoves(page)).length;
+      await drive();
+      await drive();
+      expect((await followMoves(page)).length).toBe(movesAtTouch);
+      expect((await frames(page)).length).toBe(framesBefore);
+      await expect(sheet(page)).toHaveAttribute("data-size", "collapsed");
+
+      // Recentre hands the map back: it follows the technician again.
+      await page.getByTestId("live-tracking-recenter").click();
+      await expect.poll(async () => (await followMoves(page)).length).toBeGreaterThan(movesAtTouch);
+      const resumed = await drive();
+      await expect.poll(async () => Math.abs((await followMoves(page)).at(-1)!.center[0] - resumed)).toBeLessThan(0.0002);
+      expect(seen.errors).toEqual([]);
+    });
+  });
+});
+
 test("towing shows the pickup, the drop and the tow's own steps", async ({ page }) => {
   const { socket } = await openTracking(page, request({
     status: "enroute_drop", isTowing: true, service_type: "towing", vehicle_type: "car", vehicle_model: "Maruti Suzuki Swift",
@@ -508,6 +686,10 @@ test("towing shows the pickup, the drop and the tow's own steps", async ({ page 
   await expect(card(page).locator(".lt-sub")).toHaveText("1.7 km away · Ganapathy workshop, Sathy Road");
   await expect(card(page).getByRole("list", { name: "Progress" }).getByRole("listitem")).toHaveText(["Found", "To pickup", "Towing", "Done"]);
   await expect(page.getByTestId("tracking-request")).toContainText("₹902");
+  await expect(technicianMarker(page).locator(".tracking-tech-marker__badge .rq-symbol")).toHaveText("auto_towing");
+  await expect(technicianMarker(page).locator(".tracking-tech-marker__eta")).toHaveText("6 min");
+  await expect(placeLabel(page, "customer")).toHaveText("Pickup");
+  await expect(placeLabel(page, "drop")).toHaveText("Drop");
   await shot(page, "towing");
 
   await openDetails(page);

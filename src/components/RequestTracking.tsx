@@ -939,6 +939,11 @@ const RequestTracking = () => {
   const headline = trackingHeadline(headlineInput);
   const stripHeadline = trackingStripHeadline({ ...headlineInput, freshness: effectiveTrackingFreshness });
   const steps = trackingSteps(phase, isTowingRequest);
+  // The technician's marker carries the same minutes as the card, on a tow as well.
+  const mapEta =
+    liveEta && (phase === "accepted" || phase === "way" || phase === "towing")
+      ? formatEtaDuration(liveEta.etaSeconds)
+      : eta;
 
   // The live chip is about the technician's position, so it shows only while that matters.
   const followsTechnician = Boolean(technician) && ["accepted", "way", "loaded", "towing"].includes(phase);
@@ -1156,13 +1161,15 @@ const RequestTracking = () => {
             routePolyline={trackingRoutePolyline}
             routeDestination={liveTrackingDestination}
             trackingSessionId={request.id}
-            eta={eta}
+            eta={mapEta}
             variant="fullscreen"
             status={status}
             distanceLabel={mapDistanceLabel}
             mapMode={trackingMapModeFromSheetSnap(sheet.snap)}
             onInteract={() => sheet.snapTo("collapsed")}
             showRoutePath={shouldShowLiveRoute}
+            technicianVehicle={isTowingRequest ? "tow" : "bike"}
+            userLabel={isTowingRequest ? "Pickup" : "You"}
             showStatusOverlay={false}
             className="h-full w-full"
           />
@@ -1276,10 +1283,12 @@ const RequestTracking = () => {
               routePolyline={trackingRoutePolyline}
               routeDestination={liveTrackingDestination}
               trackingSessionId={request.id}
-              eta={eta}
+              eta={mapEta}
               status={status}
               distanceLabel={mapDistanceLabel}
               showRoutePath={shouldShowLiveRoute}
+            technicianVehicle={isTowingRequest ? "tow" : "bike"}
+            userLabel={isTowingRequest ? "Pickup" : "You"}
               className="w-full mb-0"
             />
           </CardContent>

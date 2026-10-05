@@ -46,9 +46,16 @@ interface LiveTrackingMapProps {
   showRoutePath?: boolean;
   showStatusOverlay?: boolean;
   trackingSessionId?: string | number | null;
+  /** What the technician arrives on; picks the picture inside their marker. */
+  technicianVehicle?: "bike" | "tow";
+  /** The word over the customer's own spot, e.g. "You", or "Pickup" on a tow. */
+  userLabel?: string;
+  dropLabel?: string;
 }
 
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
+// The markers carry their own soft pulse, so no discs are drawn under them.
+const NO_CIRCLES: MapCircleSpec[] = [];
 const ROUTE_REFRESH_MIN_DISTANCE_METERS = 25;
 const ROUTE_REFRESH_MIN_INTERVAL_MS = 5_000;
 
@@ -107,33 +114,37 @@ const buildRouteCurve = (
   ];
 };
 
-const destinationMarkerHtml = `
-  <div class="mappls-marker-shell tracking-destination-marker">
-    <span class="tracking-destination-marker__ripple tracking-destination-marker__ripple--outer"></span>
-    <span class="tracking-destination-marker__ripple tracking-destination-marker__ripple--inner"></span>
-    <span class="tracking-destination-marker__pin">
-      <span class="tracking-destination-marker__pin-core"></span>
-    </span>
+// Marker pictures. Each sits in the same box, with the same anchor and offset, as the
+// markers it replaces, so nothing about where Mappls puts a marker changes: the map
+// point is 18px below the middle of the box.
+
+/** A place on the map: the customer's spot (a dot) or the drop (a square), with one word over it. */
+const createPlaceMarkerHtml = (label: string, kind: "customer" | "drop") => `
+  <div class="mappls-marker-shell tracking-place-marker${kind === "drop" ? " is-drop" : ""}" data-tracking-place="${kind}">
+    ${label ? `<span class="tracking-place-marker__label">${escapeHtml(label)}</span>` : ""}
+    ${kind === "customer" ? '<span class="tracking-place-marker__pulse"></span>' : ""}
+    <span class="tracking-place-marker__dot"></span>
   </div>
 `;
 
-const createTechnicianMarkerHtml = (etaLabel: string) => `
-  <div class="mappls-marker-shell tracking-tech-marker" data-tracking-marker="technician" style="--tracking-heading:0deg">
-    <div class="tracking-tech-marker__bubble">
-      <span class="tracking-tech-marker__badge"></span>
-      <div class="tracking-tech-marker__copy">
-        <span>${escapeHtml(etaLabel || "Live")}</span>
-        <small>Technician</small>
-      </div>
-    </div>
+const TECHNICIAN_GLYPH = { bike: "two_wheeler", tow: "auto_towing" } as const;
+
+/** Only a real figure ("5 min", "1 hr 5 min") is worth a chip on the marker. */
+const etaChipText = (etaLabel: string) => (/\d/.test(etaLabel) ? etaLabel : "");
+
+/**
+ * The technician: their vehicle in a white disc, a pointer on its rim that turns with
+ * their direction of travel, and the minutes left above it while there is a figure.
+ */
+const createTechnicianMarkerHtml = (
+  etaLabel: string,
+  { vehicle = "bike", hasHeading = false, stale = false }: { vehicle?: "bike" | "tow"; hasHeading?: boolean; stale?: boolean } = {},
+) => `
+  <div class="mappls-marker-shell tracking-tech-marker${hasHeading ? " has-heading" : ""}${stale ? " is-stale" : ""}" data-tracking-marker="technician">
+    ${etaChipText(etaLabel) ? `<span class="tracking-tech-marker__eta">${escapeHtml(etaChipText(etaLabel))}</span>` : ""}
     <span class="tracking-tech-marker__pulse"></span>
-    <span class="tracking-tech-marker__pin">
-      <span class="tracking-tech-marker__vehicle" aria-hidden="true">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 3L20 20L12 16.5L4 20L12 3Z" fill="white"/>
-        </svg>
-      </span>
-    </span>
+    <span class="tracking-tech-marker__vehicle" aria-hidden="true"><i></i></span>
+    <span class="tracking-tech-marker__badge"><span class="rq-symbol" aria-hidden="true">${TECHNICIAN_GLYPH[vehicle]}</span></span>
   </div>
 `;
 
@@ -236,6 +247,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   showRoutePath = true,
   showStatusOverlay = true,
   trackingSessionId,
+  technicianVehicle = "bike",
+  userLabel = "You",
+  dropLabel = "Drop",
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
   const playbackTarget = useMemo<TrackingPlaybackPoint | null>(() => {
@@ -411,13 +425,18 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   ]);
 
   const etaLabel = normalizeEtaLabel(eta) || "Live";
+  // An old position is shown for what it is: the marker goes grey with an amber ring.
+  const markerFreshness = trackingFreshness ?? playback.freshness;
+  const technicianIsStale =
+    markerFreshness === "DELAYED" || markerFreshness === "RECONNECTING" || markerFreshness === "OFFLINE";
+  const technicianHasHeading = playback.bearing != null && Number.isFinite(playback.bearing);
   const markers = useMemo<MapMarkerSpec[]>(() => {
     const next: MapMarkerSpec[] = [];
     if (userLocation) {
       next.push({
         id: "customer",
         position: userLocation,
-        html: destinationMarkerHtml,
+        html: createPlaceMarkerHtml(userLabel, "customer"),
         anchor: "center",
         zIndex: 640,
         width: 86,
@@ -429,7 +448,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       next.push({
         id: "destination",
         position: dropLocation,
-        html: destinationMarkerHtml,
+        html: createPlaceMarkerHtml(dropLabel, "drop"),
         anchor: "center",
         zIndex: 620,
         width: 86,
@@ -441,7 +460,11 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       next.push({
         id: "technician",
         position: displayedTechLocation,
-        html: createTechnicianMarkerHtml(etaLabel),
+        html: createTechnicianMarkerHtml(etaLabel, {
+          vehicle: technicianVehicle,
+          hasHeading: technicianHasHeading,
+          stale: technicianIsStale,
+        }),
         heading: playback.bearing,
         anchor: "center",
         zIndex: 720,
@@ -451,42 +474,19 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       });
     }
     return next;
-  }, [displayedTechLocation, dropLocation, etaLabel, playback.bearing, playback.isRepositioning, userLocation]);
-
-  const circles = useMemo<MapCircleSpec[]>(() => {
-    const next: MapCircleSpec[] = [];
-    if (userLocation) {
-      next.push(
-        {
-          id: "customer-radius-outer",
-          center: userLocation,
-          radiusMeters: 230,
-          fillColor: "#60a5fa",
-          fillOpacity: 0.08,
-        },
-        {
-          id: "customer-radius-inner",
-          center: userLocation,
-          radiusMeters: 120,
-          fillColor: "#3b82f6",
-          fillOpacity: 0.12,
-        },
-      );
-    }
-    // The accuracy halo is deliberately authoritative rather than animated:
-    // recreating a Mappls circle every animation frame would compete with the
-    // marker animation without improving the customer's perception of motion.
-    if (techLocation && !playback.isRepositioning) {
-      next.push({
-        id: "technician-radius",
-        center: techLocation,
-        radiusMeters: 170,
-        fillColor: "#ef4444",
-        fillOpacity: 0.08,
-      });
-    }
-    return next;
-  }, [playback.isRepositioning, techLocation, userLocation]);
+  }, [
+    displayedTechLocation,
+    dropLabel,
+    dropLocation,
+    etaLabel,
+    playback.bearing,
+    playback.isRepositioning,
+    technicianHasHeading,
+    technicianIsStale,
+    technicianVehicle,
+    userLabel,
+    userLocation,
+  ]);
 
   const visibleRoute = routePath.length > 1 ? routePath : routeFallback;
   const polylines = useMemo<MapPolylineSpec[]>(() => {
@@ -516,11 +516,33 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       : [techLocation, userLocation, dropLocation].filter(Boolean) as MapPoint[],
     [activeRouteDestination, dropLocation, techLocation, userLocation],
   );
+  // What the frame is drawn for: whether a technician is on the map, and the place they are
+  // heading to. It does not change as the technician moves, so the frame stays still then.
+  const place = (point: MapPoint | null | undefined) => (point ? `${point.lat},${point.lng}` : "-");
+  const frameSubject = [
+    techLocation ? "technician" : "-",
+    place(activeRouteDestination),
+    place(userLocation),
+    place(dropLocation),
+  ].join("|");
+  const framedSubjectRef = useRef<string | null>(null);
   useEffect(() => {
-    if (initialCameraPointsRef.current || cameraPoints.length === 0) return;
+    if (cameraPoints.length === 0) return;
+    if (!initialCameraPointsRef.current) {
+      initialCameraPointsRef.current = cameraPoints;
+      framedSubjectRef.current = frameSubject;
+      setInitialCameraRevision((revision) => revision + 1);
+      return;
+    }
+    if (framedSubjectRef.current === frameSubject) return;
+    framedSubjectRef.current = frameSubject;
+    // A technician was assigned after the page opened, or a tow turned towards the drop:
+    // both ends go on screen again. Not if the customer has moved the map themselves;
+    // Recentre does it for them then.
+    if (!autoFrame) return;
     initialCameraPointsRef.current = cameraPoints;
     setInitialCameraRevision((revision) => revision + 1);
-  }, [cameraPoints]);
+  }, [autoFrame, cameraPoints, frameSubject]);
 
   useEffect(() => {
     if (
@@ -562,30 +584,32 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           ? 300
           : 136
       : 72;
+  // The camera the map was last given while it was placing itself.
+  const selfPlacedCameraRef = useRef<MapCameraSpec | null>(null);
   const camera = useMemo<MapCameraSpec>(() => {
-    if (
-      autoFrame &&
-      variant === "fullscreen" &&
-      mapMode === "map" &&
-      followCenter
-    ) {
-      return {
-        mode: "follow",
-        center: followCenter,
-        zoom: 15,
-        bearing: 0,
-        pitch: 0,
-        revision: followCameraRevision,
-      };
-    }
+    // Once the customer has moved the map it is theirs. The map keeps the camera it
+    // already has, so it is not pulled back to the overview, until they tap Recentre.
+    if (!autoFrame && selfPlacedCameraRef.current) return selfPlacedCameraRef.current;
     const points = initialCameraPointsRef.current ?? cameraPoints;
-    return {
-      mode: "fit",
-      points: points.length ? points : [FALLBACK_CENTER],
-      padding: { top: topPadding, right: 24, bottom: bottomPadding, left: 24 },
-      maxZoom: points.length > 1 ? 15 : points.length === 1 ? 14 : 5,
-      revision: initialCameraRevision,
-    };
+    const next: MapCameraSpec =
+      autoFrame && variant === "fullscreen" && mapMode === "map" && followCenter
+        ? {
+            mode: "follow",
+            center: followCenter,
+            zoom: 15,
+            bearing: 0,
+            pitch: 0,
+            revision: followCameraRevision,
+          }
+        : {
+            mode: "fit",
+            points: points.length ? points : [FALLBACK_CENTER],
+            padding: { top: topPadding, right: 24, bottom: bottomPadding, left: 24 },
+            maxZoom: points.length > 1 ? 15 : points.length === 1 ? 14 : 5,
+            revision: initialCameraRevision,
+          };
+    selfPlacedCameraRef.current = next;
+    return next;
   }, [
     autoFrame,
     bottomPadding,
@@ -620,7 +644,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       ariaLabel="Live service tracking map"
       markers={markers}
       polylines={polylines}
-      circles={circles}
+      circles={NO_CIRCLES}
       camera={camera}
       cameraDiagnostics={{ autoFrame, mapMode }}
       advancedTracking={advancedTracking}

@@ -4,7 +4,7 @@
 const CENTER = { lat: 11.0168, lng: 76.9558 };
 const PX_PER_DEGREE = 6000;
 
-const state = (window.__fakeMappls = window.__fakeMappls || { fits: [], markers: 0 });
+const state = (window.__fakeMappls = window.__fakeMappls || { fits: [], eases: [], markers: 0 });
 
 function place(el, position, anchor, width, height) {
   const left = `calc(50% + ${(position.lng - CENTER.lng) * PX_PER_DEGREE}px - ${width / 2}px)`;
@@ -34,7 +34,7 @@ function createMap({ id }) {
     remove: () => { root.innerHTML = ""; },
     fitBounds: (bounds, options) => { state.fits.push({ bounds, options }); },
     jumpTo: (options) => { state.fits.push({ jump: options }); },
-    easeTo: () => {},
+    easeTo: (options) => { state.eases.push(options); },
     flyTo: () => {},
     setCenter: () => {},
     setZoom: () => {},

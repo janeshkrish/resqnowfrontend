@@ -221,12 +221,17 @@ test.describe("technician on the way", () => {
     await expect(placeLabel(page, "customer")).toHaveText("You");
     await expect(page.locator(".tracking-live-map")).not.toContainText("Technician");
     // The disc is a 44px circle whose middle is the map point: 18px below the middle of the marker's box.
-    const box = (await marker.boundingBox())!;
-    const disc = (await marker.locator(".tracking-tech-marker__badge").boundingBox())!;
-    expect(Math.round(disc.width)).toBe(44);
-    expect(Math.round(disc.height)).toBe(44);
-    expect(Math.round(disc.x + disc.width / 2 - (box.x + box.width / 2))).toBe(0);
-    expect(Math.round(disc.y + disc.height / 2 - (box.y + box.height / 2))).toBe(18);
+    const placed = await marker.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const disc = el.querySelector(".tracking-tech-marker__badge")!.getBoundingClientRect();
+      return {
+        width: Math.round(disc.width),
+        height: Math.round(disc.height),
+        right: Math.round(disc.x + disc.width / 2 - (box.x + box.width / 2)),
+        down: Math.round(disc.y + disc.height / 2 - (box.y + box.height / 2)),
+      };
+    });
+    expect(placed).toEqual({ width: 44, height: 44, right: 0, down: 18 });
     const spot = (await page.locator('[data-tracking-place="customer"]').boundingBox())!;
     const dot = (await page.locator('[data-tracking-place="customer"] .tracking-place-marker__dot').boundingBox())!;
     expect(Math.round(dot.x + dot.width / 2 - (spot.x + spot.width / 2))).toBe(0);
@@ -562,11 +567,13 @@ test.describe("the map", () => {
   test("glides the technician between positions and turns the pointer the way they travel", async ({ page }) => {
     const { socket, seen } = await openTracking(page);
     const left = () => page.evaluate(() => document.querySelector('[data-tracking-marker="technician"]')?.getBoundingClientRect().left ?? null);
+    await expect(technicianMarker(page)).toBeVisible();
+    const opened = (await left())!;
     socket.send("tracking:location:v1", fix({ sequenceId: 30 }));
-    // Wait for the marker to come to rest on that position.
-    let last: number | null = null;
-    await expect.poll(async () => { const now = await left(); const still = now !== null && now === last; last = now; return still; }, { intervals: [250] }).toBe(true);
-    const from = last!;
+    // Wait for the marker to come to rest on that position: 0.0023 degrees east of where the
+    // page first drew it, which the stand-in map draws as 13.8px.
+    await expect.poll(async () => Math.abs((await left())! - (opened + 13.8)), { intervals: [100] }).toBeLessThan(0.3);
+    const from = (await left())!;
 
     // 300 metres due east: 0.0027 degrees, which the stand-in map draws as 16.2px.
     socket.send("tracking:location:v1", fix({ lng: 76.9481 + 0.0027, sequenceId: 31, heading: 90, speed: 12 }));

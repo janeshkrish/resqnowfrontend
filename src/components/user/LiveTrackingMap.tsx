@@ -36,7 +36,8 @@ interface LiveTrackingMapProps {
   dropLocation?: { lat: number; lng: number } | null;
   eta?: string;
   className?: string;
-  variant?: "card" | "fullscreen";
+  /** "mini" is the small show-only map on the home card: just the map, filling what holds it. */
+  variant?: "card" | "fullscreen" | "mini";
   status?: string;
   distanceLabel?: string;
   mapMode?: TrackingMapMode;
@@ -51,6 +52,8 @@ interface LiveTrackingMapProps {
   /** The word over the customer's own spot, e.g. "You", or "Pickup" on a tow. */
   userLabel?: string;
   dropLabel?: string;
+  /** The map could not be drawn. */
+  onUnavailable?: () => void;
 }
 
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
@@ -250,6 +253,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   technicianVehicle = "bike",
   userLabel = "You",
   dropLabel = "Drop",
+  onUnavailable,
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
   const playbackTarget = useMemo<TrackingPlaybackPoint | null>(() => {
@@ -575,7 +579,8 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     variant,
   ]);
 
-  const topPadding = variant === "fullscreen" ? 180 : 48;
+  // The small map is short and wide: just enough room around the two ends for their markers.
+  const topPadding = variant === "fullscreen" ? 180 : variant === "mini" ? 22 : 48;
   const bottomPadding =
     variant === "fullscreen"
       ? mapMode === "sheet"
@@ -583,7 +588,10 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         : mapMode === "balanced"
           ? 300
           : 136
-      : 72;
+      : variant === "mini"
+        ? 18
+        : 72;
+  const sidePadding = variant === "mini" ? 28 : 24;
   // The camera the map was last given while it was placing itself.
   const selfPlacedCameraRef = useRef<MapCameraSpec | null>(null);
   const camera = useMemo<MapCameraSpec>(() => {
@@ -604,7 +612,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         : {
             mode: "fit",
             points: points.length ? points : [FALLBACK_CENTER],
-            padding: { top: topPadding, right: 24, bottom: bottomPadding, left: 24 },
+            padding: { top: topPadding, right: sidePadding, bottom: bottomPadding, left: sidePadding },
             maxZoom: points.length > 1 ? 15 : points.length === 1 ? 14 : 5,
             revision: initialCameraRevision,
           };
@@ -618,6 +626,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     followCenter,
     initialCameraRevision,
     mapMode,
+    sidePadding,
     topPadding,
     variant,
   ]);
@@ -648,8 +657,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       camera={camera}
       cameraDiagnostics={{ autoFrame, mapMode }}
       advancedTracking={advancedTracking}
-      className="tracking-live-map h-full w-full"
+      className={cn("tracking-live-map h-full w-full", variant === "mini" && "min-h-0")}
       onInteract={variant === "fullscreen" ? handleInteract : undefined}
+      onUnavailable={onUnavailable}
     />
   );
 
@@ -714,6 +724,10 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         </div>
       </div>
     );
+  }
+
+  if (variant === "mini") {
+    return <div className={cn("relative h-full w-full overflow-hidden", className)}>{map}</div>;
   }
 
   return (

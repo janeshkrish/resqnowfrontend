@@ -15,7 +15,9 @@ type CapturedSurfaceProps = {
   polylines: MapPolylineSpec[];
   circles: MapCircleSpec[];
   camera?: MapCameraSpec;
+  className?: string;
   onInteract?: () => void;
+  onUnavailable?: () => void;
   advancedTracking?: {
     enabled: boolean;
     technician: {
@@ -136,6 +138,70 @@ describe("LiveTrackingMap", () => {
     );
 
     expect(surfaceCapture.props?.camera?.revision).toBe(initialRevision);
+  });
+
+  describe("the small map on the home card", () => {
+    const mini = {
+      variant: "mini" as const,
+      techLocation: { lat: 12.97, lng: 77.59 },
+      userLocation: { lat: 12.98, lng: 77.6 },
+      routeDestination: { lat: 12.98, lng: 77.6 },
+    };
+
+    it("is only the map: no card frame, no recentre button, and it is never told it was touched", () => {
+      const { container } = render(<LiveTrackingMap {...mini} className="h-full w-full" />);
+
+      expect(screen.getByTestId("mappls-surface")).toBeInTheDocument();
+      expect(screen.queryByTestId("live-tracking-recenter")).not.toBeInTheDocument();
+      expect(container.querySelector(".shadow-lg")).toBeNull();
+      expect(surfaceCapture.props?.onInteract).toBeUndefined();
+      // The surface is normally at least 240px tall; the card's map is shorter.
+      expect(surfaceCapture.props?.className).toContain("min-h-0");
+    });
+
+    it("frames both ends with room for their markers in a short map", () => {
+      render(<LiveTrackingMap {...mini} />);
+
+      const camera = surfaceCapture.props?.camera;
+      expect(camera?.mode).toBe("fit");
+      expect(camera?.mode === "fit" && camera.points).toEqual([mini.techLocation, mini.userLocation]);
+      expect(camera?.mode === "fit" && camera.padding).toEqual({ top: 22, right: 28, bottom: 18, left: 28 });
+    });
+
+    it("never follows the technician, however the card around it is drawn", () => {
+      render(<LiveTrackingMap {...mini} mapMode="map" />);
+
+      expect(surfaceCapture.props?.camera?.mode).toBe("fit");
+    });
+
+    it("leaves out the minutes and the word when asked to, for the small space", () => {
+      render(<LiveTrackingMap {...mini} userLabel="" />);
+
+      const html = (id: string) => String(surfaceCapture.props?.markers.find((marker) => marker.id === id)?.html ?? "");
+      expect(html("technician")).not.toContain("tracking-tech-marker__eta");
+      expect(html("customer")).not.toContain("tracking-place-marker__label");
+      expect(html("customer")).toContain("tracking-place-marker__dot");
+    });
+
+    it("says when the map cannot be drawn, so the card can show its drawing instead", () => {
+      const onUnavailable = vi.fn();
+      render(<LiveTrackingMap {...mini} onUnavailable={onUnavailable} />);
+
+      act(() => surfaceCapture.props?.onUnavailable?.());
+      expect(onUnavailable).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the other sizes as they were", () => {
+      const { unmount } = render(<LiveTrackingMap {...mini} variant="card" />);
+      const card = surfaceCapture.props?.camera;
+      expect(card?.mode === "fit" && card.padding).toEqual({ top: 48, right: 24, bottom: 72, left: 24 });
+      expect(surfaceCapture.props?.className).not.toContain("min-h-0");
+      unmount();
+
+      render(<LiveTrackingMap {...mini} variant="fullscreen" />);
+      const full = surfaceCapture.props?.camera;
+      expect(full?.mode === "fit" && full.padding).toEqual({ top: 180, right: 24, bottom: 300, left: 24 });
+    });
   });
 
   describe("framing both ends of the trip", () => {

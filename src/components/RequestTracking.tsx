@@ -1,70 +1,48 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  animate,
-  motion,
-  useMotionValue,
-  useTransform,
-  useReducedMotion,
-  useDragControls,
-} from "framer-motion";
-import {
-  ArrowLeft,
-  Phone,
-  Star,
-  RefreshCw,
-  ShieldCheck,
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  CreditCard,
-  MapPin,
-  MessageSquare,
-  RadioTower,
-  Wifi,
-  WifiOff,
-  Clock3,
-  CircleDot,
-  ReceiptText,
-  AlertCircle,
-  Wrench,
-  FileText,
-  UserCheck,
-  Truck,
-  Banknote,
-  ShieldAlert,
-} from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 
-import ClientJobCompletion from "./ClientJobCompletion";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
 import { toast } from "@/components/ui/sonner";
 import { useRealtimeServiceRequest } from "@/hooks/useRealtimeServiceRequest";
 import { apiFetch } from "@/lib/api";
 import { PaymentSummaryDialog } from "@/components/payments/PaymentSummaryDialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
 import LiveTrackingMap from "@/components/user/LiveTrackingMap";
-import AmountCard from "@/components/user/AmountCard";
-import MobileTrackingSummaryDock from "@/components/user/MobileTrackingSummaryDock";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import {
+  TrackingCard,
+  TrackingDetails,
+  TrackingStrip,
+  type TrackingBill,
+  type TrackingCardProps,
+  type TrackingLiveChip,
+} from "@/components/user/tracking/TrackingCard";
+import { TrackingCancelDialog, TrackingHelpDialog } from "@/components/user/tracking/TrackingDialogs";
+import { useTrackingSheet } from "@/components/user/tracking/useTrackingSheet";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { routePolylineFromMetadata } from "@/lib/geo";
+import {
+  canCustomerCancel,
+  canResizeTrackingSheet,
+  firstName,
+  formatTrackingMoney,
+  freshnessText,
+  isCancelClosed,
+  staleLocationNotice,
+  technicianInitials,
+  trackingHeadline,
+  trackingPhase,
+  trackingSteps,
+  trackingStripHeadline,
+  vehicleArt,
+} from "@/lib/customerTracking";
 import { distanceMeters, etaBasisLabel, formatEtaDuration, usableLiveEta } from "@/lib/liveEta";
+import { formatClockTime } from "@/lib/technicianArrival";
 import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
-import type { TrackingFreshness } from "@/lib/liveTrackingPlayback";
 import {
   resolveServiceRequestPaymentDetails,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
@@ -86,21 +64,6 @@ const buildMapLocation = (latValue: unknown, lngValue: unknown): MapLocation | n
   const lng = normalizeMapCoordinate(lngValue);
   return lat === null || lng === null ? null : { lat, lng };
 };
-
-const TRACKING_FRESHNESS_LABELS: Record<TrackingFreshness, string> = {
-  LIVE: "Live",
-  UPDATING: "Updating",
-  DELAYED: "Location delayed",
-  RECONNECTING: "Reconnecting",
-  OFFLINE: "Location offline",
-};
-
-const trackingFreshnessBadgeClass = (freshness: TrackingFreshness) =>
-  freshness === "LIVE"
-    ? "bg-emerald-500/90"
-    : freshness === "DELAYED" || freshness === "RECONNECTING"
-      ? "bg-amber-500/90"
-      : "bg-slate-500/90";
 
 const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   pending: {
@@ -173,34 +136,6 @@ const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   }
 };
 
-const JOURNEY_STAGES = [
-  "Request placed",
-  "Technician assigned",
-  "On the way",
-  "Service started",
-  "Completed"
-];
-
-type TrackingSheetMode = "map" | "sheet";
-
-const TRACKING_PANEL_HEIGHT_VH = 82;
-const TRACKING_PAYMENT_PANEL_HEIGHT_VH = 86;
-const TRACKING_COLLAPSED_PEEK = 84;
-const TRACKING_PAYMENT_COLLAPSED_PEEK = 84;
-
-const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
-const formatCompactTime = (value?: string | null) => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-
-  return new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(parsed);
-};
-
 const formatDisplayLabel = (value: string | null | undefined) =>
   String(value || "")
     .trim()
@@ -209,24 +144,6 @@ const formatDisplayLabel = (value: string | null | undefined) =>
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
-
-const getTrackingSheetOffsets = (
-  panelHeight: number,
-  viewportHeight: number,
-  showPayment: boolean,
-): Record<TrackingSheetMode, number> => {
-  const peekHeight = showPayment ? TRACKING_PAYMENT_COLLAPSED_PEEK : TRACKING_COLLAPSED_PEEK;
-  const expandedVisibleHeight = clampNumber(
-    Math.round(viewportHeight * (showPayment ? 0.83 : 0.76)),
-    showPayment ? 470 : 410,
-    panelHeight,
-  );
-
-  return {
-    map: Math.max(0, panelHeight - peekHeight),
-    sheet: Math.max(0, panelHeight - expandedVisibleHeight),
-  };
-};
 
 const normalizeRequestStatus = (value: unknown) => {
   const raw = String(value || "").trim().toLowerCase();
@@ -300,18 +217,13 @@ const RequestTracking = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"online" | "cash">("online");
   const [paymentQuote, setPaymentQuote] = useState<PaymentQuoteResponse | null>(null);
   const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
-  const [isMobileCancellationOpen, setIsMobileCancellationOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isFetchingQuote, setIsFetchingQuote] = useState(false);
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [couponMessage, setCouponMessage] = useState<CouponMessageState | null>(null);
   const [finalAmount, setFinalAmount] = useState<number | null>(null);
-  const [panelHeight, setPanelHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const [sheetSnapState, setSheetSnapState] = useState<"expanded" | "half" | "collapsed">("half");
-  const panelRef = useRef<HTMLElement | null>(null);
-  const sheetY = useMotionValue(0);
-  const dragControls = useDragControls();
   const reduceMotion = useReducedMotion();
 
   const isMobile = useIsMobile();
@@ -488,14 +400,6 @@ const RequestTracking = () => {
     // Deliberately excluding appliedCouponCode to avoid repeated dialog refetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPaymentSummary, request?.id, selectedBackendPaymentMode]);
-
-  const formatElapsedTime = () => {
-    const secs = elapsedSeconds;
-    if (secs < 60) return `${secs}s`;
-    const mins = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${mins}m ${s}s`;
-  };
 
   const handleOnlinePaymentClick = () => {
     setSelectedPaymentMethod("online");
@@ -822,7 +726,6 @@ const RequestTracking = () => {
   }, [liveEta, liveTrackingDestination, status, technicianMapLocation]);
   const eta = liveTrackingMetrics.eta;
   const distanceLabel = liveTrackingMetrics.distanceLabel;
-  const etaBasis = liveTrackingMetrics.etaBasis;
   const shouldShowLiveRoute = Boolean(liveTrackingDestination);
   const routeDistanceKm = Number(request?.routeDistanceKm ?? request?.route_distance_km);
   const routeSummaryVisible = isTowingRequest && Boolean(request?.drop_address || request?.dropLocation?.address || Number.isFinite(routeDistanceKm));
@@ -854,24 +757,6 @@ const RequestTracking = () => {
       ? `${routeDistanceKm.toFixed(1)} km towing route`
       : distanceLabel || undefined;
 
-  const stageIndex = (() => {
-    if (status === "pending") return 0;
-    if (status === "assigned" || status === "accepted") return 1;
-    if (status === "en-route" || status === "en_route_pickup") return 2;
-    if (
-      status === "arrived" ||
-      status === "in-progress" ||
-      status === "arrived_pickup" ||
-      status === "vehicle_loaded" ||
-      status === "enroute_drop" ||
-      status === "arrived_drop" ||
-      status === "service_completed"
-    ) return 3;
-    if (status === "payment_pending" || status === "completed" || status === "paid" || status === "closed") return 4;
-    return 0;
-  })();
-
-  const stageProgress = Math.round((stageIndex / (JOURNEY_STAGES.length - 1)) * 100);
   const quoteBreakdown = paymentQuote?.breakdown;
   const quoteCoupon = paymentQuote?.coupon;
   const requestPaymentDetails = useMemo(
@@ -948,13 +833,6 @@ const RequestTracking = () => {
     Number.isFinite(remainingCouponUses) && remainingCouponUses >= 0
       ? `${remainingCouponUses} eligible use${remainingCouponUses === 1 ? "" : "s"} remaining.`
       : null;
-  const MOBILE_MAP_DOCK_HEIGHT = showPayment && !paymentCompleted ? 392 : 336;
-  const EXPANDED_Y = Math.max(56, Math.round(viewportHeight * 0.10));
-  const HALF_Y = Math.max(EXPANDED_Y + 150, Math.round(viewportHeight * 0.46));
-  const COLLAPSED_Y = Math.max(
-    HALF_Y + 92,
-    Math.max(EXPANDED_Y + 242, viewportHeight - MOBILE_MAP_DOCK_HEIGHT),
-  );
   const technicianMotionProps = {
     technicianSpeed: technician?.speed,
     technicianHeading: technician?.heading,
@@ -991,277 +869,194 @@ const RequestTracking = () => {
     }
   };
 
-  const mapHeight = useTransform(sheetY, (y) => Math.max(160, (y as number) + 32)); // Smooth overlap under sheet's rounded corners
+  const phase = trackingPhase({ status, paymentDue: showPayment, paymentCompleted });
+  const canResize = canResizeTrackingSheet(phase);
+  const sheet = useTrackingSheet({
+    enabled: isMobile,
+    viewportHeight,
+    canResize,
+    reduceMotion: Boolean(reduceMotion),
+  });
 
+  // A customer may cancel only until the technician sets off; the server holds the same rule.
+  const canCancel = canCustomerCancel(status) && !paymentCompleted;
   useEffect(() => {
-    const updateHeight = () => {
-      setViewportHeight(window.innerHeight);
-    };
-    updateHeight();
-    window.addEventListener("resize", updateHeight);
-    return () => window.removeEventListener("resize", updateHeight);
-  }, []);
+    if (!canCancel) setIsCancelOpen(false);
+  }, [canCancel]);
 
-  const [hasAnimatedIn, setHasAnimatedIn] = useState(false);
-  
-  useEffect(() => {
-    if (!isMobile || viewportHeight <= 0) return;
-
-    if (!hasAnimatedIn) {
-      sheetY.set(viewportHeight); // Start off screen
-      animate(sheetY, HALF_Y, { type: "spring", stiffness: 350, damping: 32 }).then(() => {
-        setHasAnimatedIn(true);
-        setSheetSnapState("half");
+  const cancelRequest = async (reason: string) => {
+    try {
+      const res = await apiFetch(`/api/service-requests/${requestId}/cancel`, {
+        method: "PATCH",
+        body: JSON.stringify({ reason }),
       });
-    }
-  }, [isMobile, viewportHeight, sheetY, EXPANDED_Y, HALF_Y, hasAnimatedIn]);
-
-  const snapTo = (target: "expanded" | "half" | "collapsed") => {
-    let targetY = HALF_Y;
-    if (target === "expanded") targetY = EXPANDED_Y;
-    if (target === "collapsed") targetY = COLLAPSED_Y;
-
-    setSheetSnapState(target);
-    animate(sheetY, targetY, {
-      type: "spring",
-      stiffness: 380,
-      damping: 34,
-    });
-  };
-
-  const handleDragEnd = (_: any, info: any) => {
-    const currentY = sheetY.get();
-    const velocity = info.velocity.y;
-
-    let nextSnap: "expanded" | "half" | "collapsed" = "half";
-    let targetY = HALF_Y;
-
-    if (velocity < -350) {
-      // Swiping up
-      nextSnap = "half";
-      targetY = HALF_Y;
-    } else if (velocity > 350) {
-      // Swiping down
-      if (currentY < HALF_Y - 30) {
-        nextSnap = "half";
-        targetY = HALF_Y;
-      } else {
-        nextSnap = "collapsed";
-        targetY = COLLAPSED_Y;
+      if (res.ok) {
+        refresh();
+        setIsCancelOpen(false);
+        toast.success("Request cancelled");
+        return;
       }
-    } else {
-      const distances = [
-        { snap: "half" as const, y: HALF_Y, dist: Math.abs(currentY - HALF_Y) },
-        { snap: "collapsed" as const, y: COLLAPSED_Y, dist: Math.abs(currentY - COLLAPSED_Y) },
-      ];
-      const closest = distances.reduce((prev, curr) => (prev.dist < curr.dist ? prev : curr));
-      nextSnap = closest.snap;
-      targetY = closest.y;
+      if (res.status === 409) {
+        // The technician set off before this tap reached the server.
+        const body = await res.json().catch(() => ({}));
+        refresh();
+        setIsCancelOpen(false);
+        toast.error(body?.error || "This request can no longer be cancelled.");
+        return;
+      }
+      toast.error("Unable to cancel request");
+    } catch {
+      toast.error("Error cancelling request");
     }
-
-    setSheetSnapState(nextSnap);
-    animate(sheetY, targetY, {
-      type: "spring",
-      stiffness: 380,
-      damping: 34,
-    });
   };
 
+  const goHome = () => navigate("/");
+  const requestExtras = request as (typeof request & { price_locked?: boolean; vehicle_name?: string }) | null;
   const serviceLocationLabel = request?.address?.trim() || "Location is being updated";
-  const serviceTypeLabel = [formatDisplayLabel(request?.vehicle_type), formatDisplayLabel(requestServiceType)]
-    .filter(Boolean)
-    .join(" ");
-  const paymentMethodLabel = paymentCompleted
-    ? selectedBackendPaymentMode === "cash"
-      ? "Cash collected"
-      : "Paid online"
-    : selectedBackendPaymentMode === "cash"
-      ? "Cash on service"
-      : "Online payment";
-  const trackingSummary = useMemo(() => {
-    if (isTowingRequest && (status === "en_route_pickup" || status === "accepted" || status === "assigned")) {
-      return {
-        eyebrow: "Tow partner heading to pickup",
-        value: eta || "Live",
-        detail: [distanceLabel || serviceLocationLabel, etaBasis].filter(Boolean).join(" · "),
-      };
-    }
+  const dropAddress = request?.dropLocation?.address || request?.drop_address || null;
+  const technicianFirst = firstName(technician?.name);
+  const money = (amount: number, whole = false) => formatTrackingMoney(amount, currency, { whole });
+  const amountDue = Number(amountDueLabel);
+  const amountLabel = Number.isFinite(amountDue) && amountDue > 0 ? money(amountDue) : null;
+  const sentAt = Number.isFinite(Date.parse(String(request?.created_at ?? "")))
+    ? formatClockTime(Date.parse(String(request?.created_at)))
+    : null;
 
-    if (isTowingRequest && (status === "vehicle_loaded" || status === "enroute_drop")) {
-      return {
-        eyebrow: "Towing route active",
-        value: Number.isFinite(routeDistanceKm) ? `${routeDistanceKm.toFixed(1)} km` : "In transit",
-        detail: request?.dropLocation?.address || request?.drop_address || "Moving toward drop location",
-      };
-    }
-
-    if (isTowingRequest && (status === "arrived_drop" || status === "service_completed")) {
-      return {
-        eyebrow: "Tow reached drop location",
-        value: status === "service_completed" ? "Complete" : "Arrived",
-        detail: showPayment ? "Payment is pending" : "Final confirmation is next",
-      };
-    }
-
-    if (status === "en-route") {
-      return {
-        eyebrow: "Technician arriving in",
-        value: eta || "Live",
-        detail: [distanceLabel || "Live location active", etaBasis].filter(Boolean).join(" · "),
-      };
-    }
-
-    if (status === "arrived") {
-      return {
-        eyebrow: "Technician has arrived",
-        value: "On site",
-        detail: serviceLocationLabel,
-      };
-    }
-
-    if (status === "in-progress") {
-      return {
-        eyebrow: "Service is in progress",
-        value: elapsedSeconds > 0 ? formatElapsedTime() : "Live",
-        detail: "Work has started",
-      };
-    }
-
-    if (showPayment && !paymentCompleted) {
-      return {
-        eyebrow: "Payment pending",
-        value: `${currency} ${amountDueLabel}`,
-        detail: "Complete payment to close the request",
-      };
-    }
-
-    if (status === "pending") {
-      return {
-        eyebrow: "Finding a nearby technician",
-        value: "Matching",
-        detail: "We are checking nearby partners for you",
-      };
-    }
-
-    return {
-      eyebrow: statusMeta.title,
-      value: status === "completed" || status === "paid" ? "Closed" : "Live",
-      detail: statusMeta.subtitle,
-    };
-  }, [
-    amountDueLabel,
-    currency,
-    distanceLabel,
+  const headlineInput = {
+    phase,
+    isTowing: isTowingRequest,
+    technicianName: technician?.name,
+    requestId: String(request?.id ?? requestId),
+    createdAt: request?.created_at,
+    startedAt: request?.started_at,
     elapsedSeconds,
-    etaBasis,
-    isTowingRequest,
-    paymentCompleted,
-    request?.dropLocation?.address,
-    request?.drop_address,
-    routeDistanceKm,
-    serviceLocationLabel,
-    showPayment,
-    status,
-    statusMeta.subtitle,
-    statusMeta.title,
-    eta,
-  ]);
-  const collapsedPreviewLabel = technician
-    ? `${technician.name}${eta ? ` | ${eta}` : ""}`
-    : status === "pending"
-      ? "Matching nearby technicians"
-      : statusMeta.title;
-  const trackingSteps = [
-    {
-      label: "Placed",
-      caption: formatCompactTime(request?.created_at) || "Created",
-      complete: stageIndex >= 0,
-      active: stageIndex === 0,
-      icon: <FileText className="h-4 w-4" />,
-    },
-    {
-      label: "Assigned",
-      caption: technician ? "Matched" : "Pending",
-      complete: stageIndex >= 1,
-      active: stageIndex === 1,
-      icon: <UserCheck className="h-4 w-4" />,
-    },
-    {
-      label: "On the way",
-      caption: eta || "Waiting",
-      complete: stageIndex >= 2,
-      active: stageIndex === 2,
-      icon: <Truck className="h-4 w-4" />,
-    },
-    {
-      label: "Service",
-      caption: formatCompactTime(request?.started_at) || "Pending",
-      complete: stageIndex >= 3,
-      active: stageIndex === 3,
-      icon: <Wrench className="h-4 w-4" />,
-    },
-    {
-      label: "Completed",
-      caption: paymentCompleted ? "Paid" : formatCompactTime(request?.completed_at) || "Pending",
-      complete: stageIndex >= 4,
-      active: stageIndex === 4,
-      icon: <CheckCircle2 className="h-4 w-4" />,
-    },
-  ];
-  const compactTrackingSummary = {
-    eyebrow: trackingSummary.eyebrow,
-    value: trackingSummary.value,
-    detail: trackingSummary.detail,
-    journeyLabel:
-      isTowingRequest && isTowingDropLeg
-        ? "Towing to drop location"
-        : trackingSteps[stageIndex]?.label || "Journey progress",
+    liveEta,
+    distanceLabel,
+    amountLabel,
+    dropAddress,
+    fallback: statusMeta,
   };
-  const compactTechnician = technician
+  const headline = trackingHeadline(headlineInput);
+  const stripHeadline = trackingStripHeadline({ ...headlineInput, freshness: effectiveTrackingFreshness });
+  const steps = trackingSteps(phase, isTowingRequest);
+
+  // The live chip is about the technician's position, so it shows only while that matters.
+  const followsTechnician = Boolean(technician) && ["accepted", "way", "loaded", "towing"].includes(phase);
+  const liveChip: TrackingLiveChip | null = followsTechnician
     ? {
-        name: technician.name || "Technician",
-        avatarUrl: technician.avatar_url,
-        phone: technician.phone,
-        ratingLabel: technicianRatingLabel,
-        completedJobs: Number.isFinite(technicianJobs) ? technicianJobs : 0,
+        text: freshnessText(effectiveTrackingFreshness),
+        tone:
+          effectiveTrackingFreshness === "LIVE"
+            ? "ok"
+            : effectiveTrackingFreshness === "DELAYED" || effectiveTrackingFreshness === "RECONNECTING"
+              ? "warn"
+              : "off",
       }
     : null;
-  const mobileTimeline = [
-    {
-      label: "Accepted",
-      caption: formatCompactTime(request?.created_at) || (technician ? "Matched" : "Matching"),
-      complete: stageIndex >= 1,
-      active: stageIndex <= 1,
-    },
-    {
-      label: "On the way",
-      caption: eta || (stageIndex < 2 ? "Waiting" : "Live route"),
-      complete: stageIndex >= 3,
-      active: stageIndex === 2,
-    },
-    {
-      label: "Arrived",
-      caption: status === "arrived" ? "Now" : stageIndex >= 3 ? "On site" : "Next",
-      complete: stageIndex >= 3,
-      active: status === "arrived",
-    },
-  ];
-  const mobileServiceSummary = (() => {
-    const total = Number(summaryPaymentDetails.finalAmount ?? summaryPaymentDetails.totalAmount);
-    if (!Number.isFinite(total) || total <= 0) return null;
+  const staleNotice =
+    technician && (phase === "way" || phase === "towing")
+      ? staleLocationNotice(effectiveTrackingFreshness, technician.name)
+      : null;
 
-    return {
-      title: serviceTypeLabel || "Service request",
-      detail: request?.vehicle_model || request?.vehicle_name || request?.vehicle_type || "Request details",
-      amountLabel: `${currency} ${total.toFixed(2)}`,
-      guaranteeLabel: request?.price_locked ? "Price locked" : null,
-    };
-  })();
-  const canCancelRequest = status !== "cancelled" && status !== "completed" && !paymentCompleted;
-  const isMapFocus = sheetSnapState === "collapsed";
-  const isDetailsFocus = sheetSnapState === "expanded";
-  const showExpandedPaymentBar =
-    showPayment && !paymentCompleted && sheetSnapState !== "collapsed";
+  const technicianView = technician
+    ? {
+        name: technician.name || "Technician",
+        first: technicianFirst,
+        initials: technicianInitials(technician.name),
+        avatarUrl: technician.avatar_url,
+        phone: technician.phone || null,
+        meta: [
+          technicianRatingLabel === "N/A" ? "New" : technicianRatingLabel,
+          `${Number.isFinite(technicianJobs) ? technicianJobs : 0} ${technicianJobs === 1 ? "job" : "jobs"}`,
+          "Verified",
+        ].join(" · "),
+      }
+    : null;
+
+  const billTotal = Number(amountCardDetails.finalAmount ?? finalAmount);
+  const hasBillTotal = Boolean(amountCardDetails.hasPricing) && Number.isFinite(billTotal) && billTotal > 0;
+  const requestRow = {
+    title: formatDisplayLabel(requestServiceType) || "Service request",
+    line:
+      [requestExtras?.vehicle_model || requestExtras?.vehicle_name, formatDisplayLabel(request?.vehicle_type)]
+        .filter(Boolean)
+        .join(" · ") || "Request details",
+    art: vehicleArt(request?.vehicle_type),
+    fare: hasBillTotal && status !== "cancelled" ? money(billTotal, true) : null,
+  };
+
+  const bill: TrackingBill | null =
+    shouldShowAmount && hasBillTotal
+      ? {
+          rows: [
+            { label: "Technician charge", value: money(amountCardDetails.baseAmount) },
+            { label: "Platform fee", value: money(amountCardDetails.platformFee) },
+            ...(amountCardDetails.paymentMode === "upi" && amountCardDetails.razorpayFee > 0
+              ? [{ label: "Payment fee", value: money(amountCardDetails.razorpayFee) }]
+              : []),
+          ],
+          total: money(billTotal),
+          note: [
+            requestExtras?.price_locked ? "Price locked." : null,
+            phase === "pay" ? "Pay online or in cash." : "You pay after the work is done.",
+          ]
+            .filter(Boolean)
+            .join(" "),
+        }
+      : null;
+
+  const cardProps: TrackingCardProps = {
+    phase,
+    headline,
+    steps,
+    live: liveChip,
+    notice: staleNotice,
+    onRefresh: refresh,
+    technician: technicianView,
+    request: requestRow,
+    pay:
+      phase === "pay"
+        ? {
+            amountLabel,
+            technicianFirst,
+            onPayOnline: handleOnlinePaymentClick,
+            onPayCash: handleCashPaymentClick,
+          }
+        : null,
+    rating:
+      phase === "rate"
+        ? {
+            onSubmit: () => {
+              toast.success("Thank you for your feedback");
+              navigate("/");
+            },
+          }
+        : null,
+    onHome: goHome,
+    onCancel: canCancel && phase === "search" ? () => setIsCancelOpen(true) : undefined,
+  };
+
+  const detailsProps = {
+    place: {
+      title: isTowingRequest ? "Towing route" : "Help is coming to",
+      pickupLabel: isTowingRequest ? "Pickup" : "Your location",
+      address: serviceLocationLabel,
+      drop: routeSummaryVisible
+        ? {
+            label: Number.isFinite(routeDistanceKm) ? `Drop · ${routeDistanceKm.toFixed(1)} km` : "Drop",
+            address: dropAddress || "Drop selected",
+          }
+        : null,
+    },
+    bill,
+    onShare: () => void handleShareTracking(),
+    onHelp: () => setIsEmergencyDialogOpen(true),
+    onCancel: canCancel && phase !== "search" ? () => setIsCancelOpen(true) : undefined,
+    cancelClosedNote: isCancelClosed(status)
+      ? "Cancelling closed when your technician set off. If something is wrong, contact support."
+      : null,
+    requestLine: [`Request #${request?.id ?? requestId}`, sentAt ? `sent at ${sentAt}` : null].filter(Boolean).join(" · "),
+  };
 
   const summaryBreakdown = summaryPaymentDetails.hasPricing
     ? {
@@ -1302,807 +1097,24 @@ const RequestTracking = () => {
     );
   }
 
-  if (isMobile) {
-    return (
-      <div
-        className="relative h-[100dvh] w-full overflow-hidden bg-slate-950"
-        style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
-      >
-        {/* Fullscreen Map Background */}
-        <motion.div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: mapHeight }}>
-          <LiveTrackingMap
-            techLocation={technicianMapLocation}
-            {...technicianMotionProps}
-            userLocation={requestMapLocation}
-            dropLocation={trackingDropLocation}
-            routePolyline={trackingRoutePolyline}
-            routeDestination={liveTrackingDestination}
-            trackingSessionId={request.id}
-            eta={eta}
-            variant="fullscreen"
-            status={status}
-            distanceLabel={mapDistanceLabel}
-            mapMode={trackingMapModeFromSheetSnap(sheetSnapState)}
-            onInteract={() => snapTo("collapsed")}
-            showRoutePath={shouldShowLiveRoute}
-            showStatusOverlay={false}
-            className="h-full w-full"
-          />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 z-20 bg-gradient-to-b from-black/60 to-transparent" />
+  const dialogs = (
+    <>
+      <TrackingHelpDialog
+        open={isEmergencyDialogOpen}
+        onOpenChange={setIsEmergencyDialogOpen}
+        onShare={() => void handleShareTracking()}
+      />
 
-          {/* Top Bar Controls */}
-          <div className="absolute inset-x-4 z-30 pt-[calc(env(safe-area-inset-top)+0.75rem)] top-0">
-            <div className="flex items-center justify-between gap-3">
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={() => navigate("/")}
-                className="h-10 w-10 rounded-full bg-card/95 text-foreground shadow-lg backdrop-blur hover:bg-card"
-                aria-label="Back to home"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <Badge
-                className={cn(
-                  "border-0 px-3 py-2 text-[11px] font-bold normal-case tracking-normal text-white shadow-md",
-                  trackingFreshnessBadgeClass(effectiveTrackingFreshness)
-                )}
-              >
-                {effectiveTrackingFreshness === "LIVE" ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Wifi className="h-3 w-3" />
-                    ResQNow Live
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    <WifiOff className="h-3 w-3" />
-                    {TRACKING_FRESHNESS_LABELS[effectiveTrackingFreshness]}
-                  </span>
-                )}
-              </Badge>
-              <Button
-                type="button"
-                onClick={() => setIsEmergencyDialogOpen(true)}
-                className="h-10 rounded-full bg-red-600 px-3 text-xs font-black text-white shadow-lg shadow-red-950/20 hover:bg-red-700"
-                aria-label="Open SOS support"
-              >
-                <ShieldAlert className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                SOS
-              </Button>
-            </div>
-            {request?.address?.trim() ? (
-              <div className="mt-11 flex justify-end">
-                <span className="max-w-[15.5rem] truncate rounded-md bg-slate-950 px-3 py-1.5 text-[11px] font-bold text-white shadow-lg">
-                  {request.address}
-                </span>
-              </div>
-            ) : null}
-            {technician && eta ? (
-              <div className="mt-4 flex">
-                <span className="rounded-full border border-white/50 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-900 shadow-lg backdrop-blur">
-                  {eta}
-                </span>
-              </div>
-            ) : null}
-          </div>
-        </motion.div>
-
-        {/* Draggable Bottom Sheet */}
-        <motion.div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-40 w-full"
-          style={{ y: sheetY, top: 0, height: "100dvh" }}
-          drag="y"
-          dragControls={dragControls}
-          dragListener={false}
-          dragConstraints={{ top: HALF_Y, bottom: COLLAPSED_Y }}
-          dragElastic={0.08}
-          onDragEnd={handleDragEnd}
-        >
-          <MobileTrackingSummaryDock
-            summary={compactTrackingSummary}
-            technician={compactTechnician}
-            isConnected={isConnected}
-            trackingFreshness={effectiveTrackingFreshness}
-            isMapFocus={isMapFocus}
-            timeline={mobileTimeline}
-            serviceSummary={mobileServiceSummary}
-            onRefresh={refresh}
-            onEmergency={() => setIsEmergencyDialogOpen(true)}
-            onShare={() => void handleShareTracking()}
-            canCancel={canCancelRequest}
-            onRequestCancellation={() => {
-              snapTo("half");
-              setIsMobileCancellationOpen(true);
-            }}
-            onDragStart={(event) => dragControls.start(event)}
-            onShowMap={() => snapTo("collapsed")}
-            onShowDetails={() => snapTo("half")}
-            paymentAction={
-              showPayment && !paymentCompleted && isMapFocus
-                ? {
-                    amountLabel: `${currency} ${amountDueLabel}`,
-                    onPayOnline: handleOnlinePaymentClick,
-                  }
-                : null
-            }
-          />
-
-          {/* Scrollable Content Container (Pure native touch scrolling) */}
-          {isDetailsFocus && (
-            <div
-              className="flex-1 overflow-y-auto overscroll-y-contain px-4 sm:px-5 py-4 space-y-4 touch-pan-y"
-              style={{
-                WebkitOverflowScrolling: "touch",
-                paddingBottom: showExpandedPaymentBar
-                  ? "calc(env(safe-area-inset-bottom, 16px) + 6.5rem)"
-                  : "calc(env(safe-area-inset-bottom, 16px) + 3rem)",
-              }}
-            >
-            {/* Status subtitle description */}
-            <p className="text-xs font-medium leading-relaxed text-slate-500">
-              {statusMeta.subtitle}
-            </p>
-
-            {/* Towing Route Details */}
-            {routeSummaryVisible && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 shadow-sm">
-                <div className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  Towing route details
-                </div>
-                <div className="space-y-2 text-xs font-semibold text-slate-700">
-                  <div className="flex items-start gap-2">
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 shrink-0">Pickup</span>
-                    <span className="line-clamp-2 text-slate-800">{request.address || "Pickup selected"}</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800 shrink-0">Drop</span>
-                    <span className="line-clamp-2 text-slate-800">{request.dropLocation?.address || request.drop_address || "Drop selected"}</span>
-                  </div>
-                  {Number.isFinite(routeDistanceKm) && (
-                    <div className="mt-1 rounded-xl bg-white border border-slate-200/60 px-3 py-2 text-slate-900 font-bold text-[11px]">
-                      {routeDistanceKm.toFixed(1)} km total towing route
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Journey Progress Stepper */}
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Journey progress</span>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-extrabold text-primary">{stageProgress}%</span>
-              </div>
-              <div className="flex items-start">
-                {trackingSteps.map((step, index) => {
-                  const isLast = index === trackingSteps.length - 1;
-                  return (
-                    <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
-                      <div className="flex flex-col items-center">
-                        <div className={cn(
-                          "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500",
-                          step.complete && !step.active
-                            ? "bg-primary text-white shadow-[0_4px_12px_rgba(239,68,68,0.25)]"
-                            : step.active
-                              ? "bg-primary text-white shadow-[0_0_0_4px_rgba(239,68,68,0.15)] ring-1 ring-primary/20"
-                              : "bg-white text-slate-300 border border-slate-200"
-                        )}>
-                          {step.icon}
-                        </div>
-                        <p className={cn(
-                          "mt-2 text-center text-[9px] font-bold leading-tight",
-                          step.complete || step.active ? "text-slate-800" : "text-slate-400"
-                        )}>
-                          {step.label}
-                        </p>
-                      </div>
-                      {!isLast && (
-                        <div className="flex flex-1 items-center px-1" style={{ paddingTop: 14 }}>
-                          <div className="relative h-1 w-full rounded-full bg-slate-200 overflow-hidden">
-                            <div className={cn(
-                              "absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-700 ease-out",
-                              index < stageIndex ? "w-full" : index === stageIndex ? "w-1/2 opacity-50" : "w-0"
-                            )} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Live Amount Breakdown Card */}
-            {shouldShowAmount && (
-              <AmountCard
-                amount={finalAmount}
-                technicianAmount={amountCardDetails.baseAmount}
-                platformFee={amountCardDetails.platformFee}
-                razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
-                total={amountCardDetails.finalAmount}
-                paymentMode={amountCardDetails.paymentMode}
-                currency={currency}
-                title="Final Amount"
-                helperText="Live payment breakdown from your current service request."
-                badgeText={null}
-              />
-            )}
-
-            {/* Main Payment Section with Action Buttons */}
-            {showPayment && !paymentCompleted && (
-              <div className="space-y-2.5">
-                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 text-white shadow-xl">
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">
-                          Amount due
-                        </p>
-                        <h3 className="mt-1 text-3xl font-black">
-                          {currency} {amountDueLabel}
-                        </h3>
-                      </div>
-                      <Badge className="border border-white/20 bg-white/15 text-white hover:bg-white/15 text-[10px] font-bold uppercase">
-                        Pending
-                      </Badge>
-                    </div>
-                    <Button
-                      onClick={handleOnlinePaymentClick}
-                      className="mt-4 h-12 w-full rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-100 shadow-md"
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Pay securely online
-                    </Button>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCashPaymentClick}
-                  className="h-11 w-full rounded-xl border-slate-200 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-slate-50"
-                >
-                  <Banknote className="mr-2 h-4 w-4 text-slate-500" />
-                  Pay with cash instead
-                </Button>
-              </div>
-            )}
-
-            {/* Technician Profile Card */}
-            {technician ? (
-              <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center gap-3.5">
-                  <div className="relative">
-                    <Avatar className="h-12 w-12 ring-2 ring-slate-100 shadow-sm">
-                      <AvatarImage src={technician.avatar_url} />
-                      <AvatarFallback className="bg-slate-100 text-sm font-bold text-slate-600">{(technician.name || "T")[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -bottom-1 -right-1 rounded-full border-2 border-white bg-blue-500 p-0.5 text-white">
-                      <ShieldCheck className="h-2.5 w-2.5" />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[15px] font-extrabold text-slate-900">{technician.name}</h3>
-                    <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      <span className="font-bold text-slate-800">{technicianRatingLabel}</span>
-                      <span className="text-slate-300">|</span>
-                      <span>{Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-10 w-10 rounded-full border-slate-200 text-slate-600 hover:bg-slate-50"
-                      asChild
-                    >
-                      <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
-                        <MessageSquare className="h-4 w-4" />
-                      </a>
-                    </Button>
-                    <Button
-                      size="icon"
-                      className="h-10 w-10 rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800"
-                      asChild
-                    >
-                      <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
-                        <Phone className="h-4 w-4 fill-current" />
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : status === "pending" ? (
-              <div className="rounded-2xl border border-border bg-muted/50 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-                  Matching with nearby partners...
-                </div>
-              </div>
-            ) : null}
-
-            {/* Active Service Timer */}
-            {!showPayment && (status === "en-route" || status === "in-progress" || status === "en_route_pickup" || status === "vehicle_loaded" || status === "enroute_drop") && (
-              <div className="rounded-2xl border border-border p-3.5 bg-card">
-                <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock3 className="h-3.5 w-3.5 text-primary" />
-                    Active service timer
-                  </span>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs font-bold text-foreground">
-                    {elapsedSeconds > 0 ? formatElapsedTime() : "00:00"}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      "h-full rounded-full bg-emerald-500 transition-all duration-1000",
-                      status === "en-route" ? "w-1/3" : "w-2/3 animate-pulse"
-                    )}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Request ID & Home Navigation */}
-            <div className="pt-2">
-              <p className="text-center text-[11px] font-semibold text-slate-400">
-                Request ID #{request.id}
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => navigate("/")}
-                className="mt-3 h-10 w-full rounded-xl text-xs font-semibold"
-              >
-                Back to home
-              </Button>
-            </div>
-
-            {/* Cancel Request Dialog */}
-            {canCancelRequest && (
-              <Dialog open={isMobileCancellationOpen} onOpenChange={setIsMobileCancellationOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setIsMobileCancellationOpen(true)}
-                    className="h-10 w-full rounded-xl text-[11px] font-semibold uppercase tracking-[0.12em] text-red-500 hover:bg-red-50 hover:text-red-600"
-                  >
-                    Cancel request
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="w-[calc(100%-1.5rem)] max-w-md rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Cancel this request?</DialogTitle>
-                    <DialogDescription>This action cannot be undone.</DialogDescription>
-                  </DialogHeader>
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      const formData = new FormData(e.currentTarget);
-                      const reason = formData.get("reason") as string;
-                      try {
-                        const res = await apiFetch(`/api/service-requests/${requestId}/cancel`, {
-                          method: "PATCH",
-                          body: JSON.stringify({ reason })
-                        });
-                        if (res.ok) {
-                          refresh();
-                          setIsMobileCancellationOpen(false);
-                          toast.success("Request cancelled");
-                        } else {
-                          toast.error("Unable to cancel request");
-                        }
-                      } catch {
-                        toast.error("Error cancelling request");
-                      }
-                    }}
-                  >
-                    <div className="space-y-4 py-2">
-                      <div>
-                        <Label htmlFor="reason">Reason</Label>
-                        <Textarea
-                          id="reason"
-                          name="reason"
-                          required
-                          className="mt-2 min-h-[90px]"
-                          placeholder="Tell us why you want to cancel."
-                        />
-                      </div>
-                      <Button type="submit" variant="destructive" className="w-full">
-                        Confirm cancellation
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
-
-            {status === "cancelled" && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  This request was cancelled. You can place a fresh request from the home screen.
-                </div>
-              </div>
-            )}
-            </div>
-          )}
-
-          {/* Sticky Bottom Quick-Pay Bar when payment is pending */}
-          {showExpandedPaymentBar && (
-            <div className="pointer-events-auto border-t border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] backdrop-blur-md pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Total Due</span>
-                  <div className="text-xl font-black text-slate-900 leading-tight">
-                    {currency} {amountDueLabel}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCashPaymentClick}
-                    className="h-10 rounded-xl border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                  >
-                    <Banknote className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
-                    Cash
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleOnlinePaymentClick}
-                    className="h-10 rounded-xl bg-orange-600 px-4 text-xs font-extrabold text-white shadow-md shadow-orange-500/25 hover:bg-orange-500"
-                  >
-                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                    Pay Online
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </motion.div>
-
-        <Dialog open={isEmergencyDialogOpen} onOpenChange={setIsEmergencyDialogOpen}>
-          <DialogContent className="w-[calc(100%-1.5rem)] max-w-sm rounded-2xl">
-            <DialogHeader>
-              <DialogTitle>Emergency &amp; support</DialogTitle>
-              <DialogDescription>
-                Choose the quickest safe way to get help for this active request.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-2.5 pt-1">
-              <Button asChild className="h-11 rounded-xl bg-red-600 font-bold text-white hover:bg-red-700">
-                <a href="/emergency" aria-label="Open emergency assistance">
-                  <ShieldAlert className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Emergency assistance
-                </a>
-              </Button>
-              <Button asChild variant="outline" className="h-11 rounded-xl border-slate-200 font-bold text-slate-700">
-                <a href="/contact" aria-label="Contact ResQNow support">
-                  Contact support
-                </a>
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <PaymentSummaryDialog
-          isOpen={showPaymentSummary}
-          onClose={() => setShowPaymentSummary(false)}
-          onConfirm={handleConfirmPayment}
-          baseAmount={requestAmount}
-          isProcessing={isProcessingPayment}
-          paymentMethod={selectedPaymentMethod}
-          platformFeePercent={SERVICE_REQUEST_PLATFORM_FEE_PERCENT}
-          paymentFeePercent={0}
-          currency={currency}
-          breakdown={summaryBreakdown}
-          showCouponSection={true}
-          couponCodeInput={couponCodeInput}
-          onCouponCodeInputChange={(value) => {
-            setCouponCodeInput(value);
-            if (couponMessage) setCouponMessage(null);
-          }}
-          onApplyCoupon={handleApplyCoupon}
-          onRemoveCoupon={handleRemoveCoupon}
-          isApplyingCoupon={isFetchingQuote}
-          couponAppliedCode={appliedCouponCode}
-          couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
-          couponMessage={couponMessage}
-        />
-
-        {paymentCompleted && (status === "completed" || status === "paid" || status === "payment_pending") && (
-          <ClientJobCompletion
-            technicianName={technician?.name || "Technician"}
-            onSubmitReview={() => {
-              toast.success("Thank you for your feedback");
-              navigate("/");
-            }}
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="container mx-auto max-w-5xl px-4 py-6 sm:py-8"
-      style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}
-    >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_1fr] items-start">
-        {/* Left Column: Map, Towing Route & Stepper */}
-        <div className="space-y-5">
-          <Card className="overflow-hidden rounded-2xl border-border/80 shadow-md">
-            <CardContent className="p-0">
-              <LiveTrackingMap
-                techLocation={technicianMapLocation}
-                {...technicianMotionProps}
-                userLocation={requestMapLocation}
-                dropLocation={trackingDropLocation}
-                routePolyline={trackingRoutePolyline}
-                routeDestination={liveTrackingDestination}
-                trackingSessionId={request.id}
-                eta={eta}
-                status={status}
-                distanceLabel={mapDistanceLabel}
-                showRoutePath={shouldShowLiveRoute}
-                className="h-[380px] sm:h-[440px] w-full mb-0"
-              />
-            </CardContent>
-          </Card>
-
-          {routeSummaryVisible && (
-            <Card className="rounded-2xl border-border/80 bg-card p-4 shadow-sm">
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                <MapPin className="h-4 w-4 text-primary" />
-                Towing route details
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex gap-2">
-                  <span className="font-semibold text-emerald-600">Pickup:</span>
-                  <span className="text-foreground">{request.address || "Selected location"}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="font-semibold text-rose-600">Drop:</span>
-                  <span className="text-foreground">{request.dropLocation?.address || request.drop_address || "Selected location"}</span>
-                </div>
-                {Number.isFinite(routeDistanceKm) && (
-                  <div className="mt-2 rounded-xl bg-muted/50 px-3 py-2 text-xs font-bold text-foreground">
-                    {routeDistanceKm.toFixed(1)} km estimated towing distance
-                  </div>
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* Desktop Stepper */}
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Journey progress</span>
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">{stageProgress}%</span>
-            </div>
-            <div className="flex items-start">
-              {trackingSteps.map((step, index) => {
-                const isLast = index === trackingSteps.length - 1;
-                return (
-                  <div key={step.label} className={cn("flex items-start", isLast ? "" : "flex-1")}>
-                    <div className="flex flex-col items-center">
-                      <div className={cn(
-                        "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-500",
-                        step.complete && !step.active
-                          ? "bg-primary text-white shadow-[0_4px_12px_rgba(239,68,68,0.25)]"
-                          : step.active
-                            ? "bg-primary text-white shadow-[0_0_0_4px_rgba(239,68,68,0.15)] ring-1 ring-primary/20"
-                            : "bg-background text-muted-foreground border border-border"
-                      )}>
-                        {step.icon}
-                      </div>
-                      <p className={cn(
-                        "mt-2 text-center text-[10px] font-bold leading-tight",
-                        step.complete || step.active ? "text-foreground" : "text-muted-foreground"
-                      )}>
-                        {step.label}
-                      </p>
-                    </div>
-                    {!isLast && (
-                      <div className="flex flex-1 items-center px-1" style={{ paddingTop: 14 }}>
-                        <div className="relative h-1 w-full rounded-full bg-muted overflow-hidden">
-                          <div className={cn(
-                            "absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-700 ease-out",
-                            index < stageIndex ? "w-full" : index === stageIndex ? "w-1/2 opacity-50" : "w-0"
-                          )} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Status, Payment, Technician & Actions */}
-        <div className="space-y-4">
-          <Card className="rounded-2xl border-border/80 shadow-md">
-            <CardContent className="space-y-5 p-5 sm:p-6">
-              <div className="flex items-center justify-between">
-                <Badge className={cn("text-white", trackingFreshnessBadgeClass(effectiveTrackingFreshness))}>
-                  {TRACKING_FRESHNESS_LABELS[effectiveTrackingFreshness].toUpperCase()}
-                </Badge>
-                <p className="text-xs text-muted-foreground">Request #{request.id}</p>
-              </div>
-
-              <div>
-                <h2 className="text-xl font-black text-foreground">{statusMeta.title}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{statusMeta.subtitle}</p>
-              </div>
-
-              {/* Technician Info */}
-              {technician && (
-                <div className="rounded-2xl border border-border bg-muted/20 p-4">
-                  <div className="flex items-center gap-3.5">
-                    <Avatar className="h-12 w-12 ring-2 ring-border shadow-sm">
-                      <AvatarImage src={technician.avatar_url} />
-                      <AvatarFallback className="bg-muted text-sm font-bold text-foreground">{(technician.name || "T")[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-extrabold text-foreground">{technician.name}</h3>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        <span className="font-bold text-foreground">{technicianRatingLabel}</span>
-                        <span>|</span>
-                        <span>{Number.isFinite(technicianJobs) ? technicianJobs : 0} jobs</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="icon" variant="outline" className="h-9 w-9 rounded-full" asChild>
-                        <a href={`sms:${technician.phone || ""}`} aria-label="Message technician">
-                          <MessageSquare className="h-4 w-4" />
-                        </a>
-                      </Button>
-                      <Button size="icon" className="h-9 w-9 rounded-full bg-slate-900 text-white hover:bg-slate-800" asChild>
-                        <a href={`tel:${technician.phone || ""}`} aria-label="Call technician">
-                          <Phone className="h-4 w-4 fill-current" />
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Amount Breakdown */}
-              {shouldShowAmount && (
-                <AmountCard
-                  amount={finalAmount}
-                  technicianAmount={amountCardDetails.baseAmount}
-                  platformFee={amountCardDetails.platformFee}
-                  razorpayFee={amountCardDetails.paymentMode === "upi" ? amountCardDetails.razorpayFee : 0}
-                  total={amountCardDetails.finalAmount}
-                  paymentMode={amountCardDetails.paymentMode}
-                  currency={currency}
-                  title="Final Amount"
-                  helperText="Live payment breakdown from your current service request."
-                  badgeText={null}
-                />
-              )}
-
-              {/* Payment Box */}
-              {showPayment && !paymentCompleted && (
-                <div className="space-y-2">
-                  <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-orange-600 p-5 text-white shadow-lg">
-                    <p className="text-xs uppercase tracking-[0.12em] text-white/70">Amount due</p>
-                    <p className="mt-1 text-3xl font-black">
-                      {currency} {amountDueLabel}
-                    </p>
-                    <Button
-                      onClick={handleOnlinePaymentClick}
-                      className="mt-4 w-full bg-white text-slate-900 font-bold hover:bg-slate-100 shadow-md"
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Pay securely online
-                    </Button>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCashPaymentClick}
-                    className="w-full text-xs font-semibold uppercase tracking-wider"
-                  >
-                    <Banknote className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Pay with cash instead
-                  </Button>
-                </div>
-              )}
-
-              {/* Active Timer */}
-              {!showPayment && (status === "en-route" || status === "in-progress" || status === "en_route_pickup" || status === "vehicle_loaded" || status === "enroute_drop") && (
-                <div className="rounded-2xl border border-border p-3.5 bg-muted/20">
-                  <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock3 className="h-3.5 w-3.5 text-primary" />
-                      Active service timer
-                    </span>
-                    <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs font-bold text-foreground">
-                      {elapsedSeconds > 0 ? formatElapsedTime() : "00:00"}
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={cn(
-                        "h-full rounded-full bg-emerald-500 transition-all duration-1000",
-                        status === "en-route" ? "w-1/3" : "w-2/3 animate-pulse"
-                      )}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <Button onClick={() => navigate("/")} variant="outline" className="w-full">
-                Back to home
-              </Button>
-
-              {/* Cancel Request Dialog */}
-              {status !== "cancelled" && status !== "completed" && !paymentCompleted && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="w-full text-xs font-semibold uppercase tracking-wider text-red-500 hover:bg-red-50 hover:text-red-600"
-                    >
-                      Cancel request
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md rounded-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Cancel this request?</DialogTitle>
-                      <DialogDescription>This action cannot be undone.</DialogDescription>
-                    </DialogHeader>
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const reason = formData.get("reason") as string;
-                        try {
-                          const res = await apiFetch(`/api/service-requests/${requestId}/cancel`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ reason })
-                          });
-                          if (res.ok) {
-                            refresh();
-                            toast.success("Request cancelled");
-                          } else {
-                            toast.error("Unable to cancel request");
-                          }
-                        } catch {
-                          toast.error("Error cancelling request");
-                        }
-                      }}
-                    >
-                      <div className="space-y-4 py-2">
-                        <div>
-                          <Label htmlFor="reason">Reason</Label>
-                          <Textarea
-                            id="reason"
-                            name="reason"
-                            required
-                            className="mt-2 min-h-[90px]"
-                            placeholder="Tell us why you want to cancel."
-                          />
-                        </div>
-                        <Button type="submit" variant="destructive" className="w-full">
-                          Confirm cancellation
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <TrackingCancelDialog
+        open={isCancelOpen && canCancel}
+        onOpenChange={setIsCancelOpen}
+        text={
+          phase === "search"
+            ? "We are still finding a technician for you."
+            : `${technicianFirst} has accepted and is getting ready. You can cancel until they set off.`
+        }
+        onConfirm={cancelRequest}
+      />
 
       <PaymentSummaryDialog
         isOpen={showPaymentSummary}
@@ -2128,16 +1140,161 @@ const RequestTracking = () => {
         couponHint={[couponHint, couponUsageHint].filter(Boolean).join(" ") || null}
         couponMessage={couponMessage}
       />
+    </>
+  );
 
-      {paymentCompleted && (status === "completed" || status === "paid" || status === "payment_pending") && (
-        <ClientJobCompletion
-          technicianName={technician?.name || "Technician"}
-          onSubmitReview={() => {
-            toast.success("Thank you for your feedback");
-            navigate("/");
-          }}
-        />
-      )}
+  if (isMobile) {
+    return (
+      <div className="lt lt-screen">
+        {/* The map fills the screen down to the card */}
+        <motion.div className="lt-mapwrap" style={{ height: sheet.mapHeight }}>
+          <LiveTrackingMap
+            techLocation={technicianMapLocation}
+            {...technicianMotionProps}
+            userLocation={requestMapLocation}
+            dropLocation={trackingDropLocation}
+            routePolyline={trackingRoutePolyline}
+            routeDestination={liveTrackingDestination}
+            trackingSessionId={request.id}
+            eta={eta}
+            variant="fullscreen"
+            status={status}
+            distanceLabel={mapDistanceLabel}
+            mapMode={trackingMapModeFromSheetSnap(sheet.snap)}
+            onInteract={() => sheet.snapTo("collapsed")}
+            showRoutePath={shouldShowLiveRoute}
+            showStatusOverlay={false}
+            className="h-full w-full"
+          />
+        </motion.div>
+
+        <div className="lt-top" ref={sheet.topBarRef}>
+          <button type="button" className="lt-round lt-press" aria-label="Back to home" onClick={goHome}>
+            <MaterialSymbol name="arrow_back" />
+          </button>
+          <button
+            type="button"
+            className="lt-sos lt-press"
+            aria-label="Open safety and help"
+            onClick={() => setIsEmergencyDialogOpen(true)}
+          >
+            <MaterialSymbol name="emergency" />
+            SOS
+          </button>
+        </div>
+
+        {/* The card: a strip over the map, the card itself, or opened for details */}
+        <motion.div
+          className="lt-dock"
+          style={{ y: sheet.sheetY }}
+          drag={canResize ? "y" : false}
+          dragControls={sheet.dragControls}
+          dragListener={false}
+          dragConstraints={sheet.dragConstraints}
+          dragElastic={0.08}
+          onDragStart={sheet.onDragStart}
+          onDragEnd={sheet.onDragEnd}
+        >
+          <section
+            className="lt-sheet"
+            data-testid="tracking-sheet"
+            data-size={sheet.snap}
+            aria-label="Live tracking"
+            style={{ height: sheet.sheetHeight }}
+          >
+            {canResize ? (
+              <button
+                type="button"
+                className="lt-grab"
+                aria-label={
+                  sheet.snap === "collapsed"
+                    ? "Open the card"
+                    : sheet.snap === "expanded"
+                      ? "Close details"
+                      : "Open details"
+                }
+                onPointerDown={sheet.startDrag}
+                onClick={sheet.stepFromHandle}
+              >
+                <span />
+              </button>
+            ) : (
+              <div className="lt-grab is-still" aria-hidden="true" />
+            )}
+            <div className={cn("lt-scroll", sheet.scrollable && "is-open")} ref={sheet.scrollRef}>
+              <motion.div className="lt-peek" ref={sheet.cardRef} style={{ opacity: sheet.cardOpacity }}>
+                <TrackingCard
+                  {...cardProps}
+                  details={canResize ? { open: sheet.snap === "expanded", onToggle: sheet.toggleDetails } : undefined}
+                  drag={canResize ? { onPointerDown: sheet.startDrag } : undefined}
+                />
+              </motion.div>
+              {canResize ? (
+                <div ref={sheet.detailsRef}>
+                  <TrackingDetails {...detailsProps} />
+                </div>
+              ) : null}
+            </div>
+            {canResize ? (
+              <motion.div className="lt-mini" ref={sheet.stripRef} style={{ opacity: sheet.stripOpacity }}>
+                <TrackingStrip
+                  headline={stripHeadline}
+                  steps={steps}
+                  dot={liveChip ? (liveChip.tone === "ok" ? "ok" : "warn") : null}
+                  call={technician?.phone ? { phone: technician.phone, first: technicianFirst } : null}
+                  pay={phase === "pay" ? { onPayOnline: handleOnlinePaymentClick } : null}
+                  onExpand={sheet.showCard}
+                  drag={{ onPointerDown: sheet.startDrag }}
+                />
+              </motion.div>
+            ) : null}
+          </section>
+        </motion.div>
+
+        {dialogs}
+      </div>
+    );
+  }
+
+  return (
+    <div className="lt lt-desk container mx-auto max-w-5xl px-4 py-6 sm:py-8">
+      <div className="lt-desk-bar">
+        <button type="button" className="lt-back lt-press" onClick={goHome}>
+          <MaterialSymbol name="arrow_back" />
+          Back to home
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.35fr_1fr]">
+        <Card className="lt-desk-map overflow-hidden rounded-2xl border-border/80 shadow-md">
+          <CardContent className="p-0">
+            <LiveTrackingMap
+              techLocation={technicianMapLocation}
+              {...technicianMotionProps}
+              userLocation={requestMapLocation}
+              dropLocation={trackingDropLocation}
+              routePolyline={trackingRoutePolyline}
+              routeDestination={liveTrackingDestination}
+              trackingSessionId={request.id}
+              eta={eta}
+              status={status}
+              distanceLabel={mapDistanceLabel}
+              showRoutePath={shouldShowLiveRoute}
+              className="w-full mb-0"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Beside the map the card does not move, so its details are always open */}
+        <section className="lt-panel" data-testid="tracking-sheet" data-size="open" aria-label="Live tracking">
+          <div className="lt-peek">
+            <TrackingCard {...cardProps} />
+          </div>
+          {canResize ? <TrackingDetails {...detailsProps} /> : null}
+        </section>
+      </div>
+
+      {dialogs}
     </div>
   );
 };

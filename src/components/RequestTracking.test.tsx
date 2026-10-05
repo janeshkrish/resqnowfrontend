@@ -1,8 +1,7 @@
 import { act } from "react";
-import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -20,6 +19,7 @@ const trackingHarness = vi.hoisted(() => ({
   request: {} as Record<string, unknown>,
   mapProps: null as Record<string, unknown> | null,
   refresh: vi.fn(),
+  trackingFreshness: undefined as string | undefined,
 }));
 
 const viewportHarness = vi.hoisted(() => ({ isMobile: false }));
@@ -43,6 +43,7 @@ vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
     technician: trackingHarness.technician,
     isLoading: false,
     isConnected: true,
+    trackingFreshness: trackingHarness.trackingFreshness,
     refresh: trackingHarness.refresh,
   }),
 }));
@@ -66,14 +67,6 @@ vi.mock("@/components/payments/PaymentSummaryDialog", () => ({
   PaymentSummaryDialog: () => null,
 }));
 
-vi.mock("./ui/avatar", () => ({
-  Avatar: ({ children }: { children: ReactNode }) => <span>{children}</span>,
-  AvatarFallback: ({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  ),
-  AvatarImage: () => null,
-}));
-
 beforeAll(() => {
   (
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
@@ -88,6 +81,7 @@ describe("RequestTracking live metrics", () => {
     viewportHarness.isMobile = false;
     trackingHarness.mapProps = null;
     trackingHarness.refresh.mockReset();
+    trackingHarness.trackingFreshness = undefined;
     trackingHarness.request = {
       id: "request-1",
       isTowing: false,
@@ -256,17 +250,18 @@ describe("RequestTracking live metrics", () => {
   });
 
   it.each([
-    [true, "Traffic-aware"],
-    [false, "Estimated"],
-  ])("labels the ETA by its basis (trafficAware=%s)", async (trafficAware, label) => {
+    [true, "live traffic"],
+    [false, "road estimate"],
+  ])("says what the minutes are based on (trafficAware=%s)", async (trafficAware, basis) => {
     viewportHarness.isMobile = true;
     trackingHarness.technician.liveEta = roadEta({ trafficAware, provider: trafficAware ? "mappls" : "osrm" });
 
     await renderTracking();
 
-    const summary = screen.getByTestId("mobile-tracking-summary");
-    expect(summary).toHaveTextContent("17 min");
-    expect(summary).toHaveTextContent(`12.3 km away · ${label}`);
+    const card = screen.getByTestId("tracking-card");
+    expect(within(card).getByTestId("tracking-big")).toHaveTextContent("17 min");
+    expect(card).toHaveTextContent(/Arrives by \d{1,2}:\d{2} (am|pm)/);
+    expect(card).toHaveTextContent(`12.3 km away · ${basis}`);
   });
 
   it("formats long ETAs in hours", async () => {
@@ -306,57 +301,69 @@ describe("RequestTracking live metrics", () => {
     });
   });
 
-  it("keeps mobile tracking to one redesigned dock when returning from map focus", async () => {
+  it("tells the map how much room the card leaves it as the card changes size", async () => {
     viewportHarness.isMobile = true;
     await renderTracking();
 
-    expect(screen.getByTestId("mobile-tracking-summary")).toHaveTextContent("17 min");
-    expect(trackingHarness.mapProps).toMatchObject({
-      mapMode: "balanced",
-      showStatusOverlay: false,
-    });
-    expect(screen.queryByRole("button", { name: "Show map focus" })).not.toBeInTheDocument();
+    const sheet = screen.getByTestId("tracking-sheet");
+    expect(sheet).toHaveAttribute("data-size", "half");
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "balanced", showStatusOverlay: false });
+    expect(screen.getAllByText("Test Technician")).toHaveLength(1);
 
+    // Touching the map gives it the screen: the card becomes the strip.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Show more map" }));
+      (trackingHarness.mapProps?.onInteract as () => void)();
     });
+    expect(sheet).toHaveAttribute("data-size", "collapsed");
     expect(trackingHarness.mapProps).toMatchObject({ mapMode: "map" });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "View service details" }));
+      fireEvent.click(screen.getByRole("button", { name: "Show the full card" }));
     });
+    expect(sheet).toHaveAttribute("data-size", "half");
     expect(trackingHarness.mapProps).toMatchObject({ mapMode: "balanced" });
-    expect(screen.queryByText("Journey progress")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Test Technician")).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open details" }));
+    });
+    expect(sheet).toHaveAttribute("data-size", "expanded");
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "sheet" });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Close details" }));
+    });
+    expect(sheet).toHaveAttribute("data-size", "half");
+    expect(trackingHarness.mapProps).toMatchObject({ mapMode: "balanced" });
   });
 
-  it("wires the mobile dock and floating SOS control to the existing request actions", async () => {
+  it("opens this request's safety and help from SOS", async () => {
     viewportHarness.isMobile = true;
     await renderTracking();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Refresh live tracking" }));
+      fireEvent.click(screen.getByRole("button", { name: "Open safety and help" }));
     });
-    expect(trackingHarness.refresh).toHaveBeenCalledOnce();
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open emergency support" }));
-    });
-    expect(screen.getByRole("dialog")).toHaveTextContent("Emergency & support");
-    expect(screen.getByRole("link", { name: "Open emergency assistance" })).toHaveAttribute("href", "/emergency");
-    expect(screen.getByRole("link", { name: "Contact ResQNow support" })).toHaveAttribute("href", "/contact");
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    });
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open SOS support" }));
-    });
-    expect(screen.getByRole("dialog")).toHaveTextContent("Emergency & support");
+    const help = screen.getByRole("dialog", { name: "Safety and help" });
+    expect(within(help).getByRole("link", { name: "Open emergency assistance" })).toHaveAttribute("href", "/emergency");
+    expect(within(help).getByRole("link", { name: "Contact ResQNow support" })).toHaveAttribute("href", "/contact");
+    expect(within(help).getByRole("button", { name: "Share live tracking" })).toBeInTheDocument();
   });
 
-  it("keeps payment reachable in map focus without forcing the details sheet", async () => {
+  it("offers Refresh only when the technician's position has stopped arriving", async () => {
+    viewportHarness.isMobile = true;
+    await renderTracking();
+    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
+
+    trackingHarness.trackingFreshness = "DELAYED";
+    await renderTracking();
+    expect(screen.getByRole("status")).toHaveTextContent("Location is delayed. Showing where Test was last seen.");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    });
+    expect(trackingHarness.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("keeps payment one tap away when the card is the strip", async () => {
     viewportHarness.isMobile = true;
     trackingHarness.request = {
       ...trackingHarness.request,
@@ -365,17 +372,67 @@ describe("RequestTracking live metrics", () => {
     };
     await renderTracking();
 
+    expect(screen.getByRole("button", { name: /^Pay ₹[\d,.]+ online$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pay cash to Test" })).toBeInTheDocument();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Show more map" }));
+      (trackingHarness.mapProps?.onInteract as () => void)();
     });
-    expect(screen.getByRole("button", { name: /Pay INR .* online/ })).toBeInTheDocument();
+    expect(screen.getByTestId("tracking-sheet")).toHaveAttribute("data-size", "collapsed");
+    expect(screen.getByRole("button", { name: "Pay" })).toBeInTheDocument();
     expect(trackingHarness.mapProps).toMatchObject({ mapMode: "map" });
   });
 
-  it("keeps the desktop tracking hierarchy when the mobile viewport flag is false", async () => {
+  it("keeps one size for the rating, which needs an answer", async () => {
+    viewportHarness.isMobile = true;
+    trackingHarness.request = { ...trackingHarness.request, status: "paid", payment_status: "completed" };
     await renderTracking();
 
-    expect(screen.queryByTestId("mobile-tracking-summary")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tracking-big")).toHaveTextContent("How was Test?");
+    await act(async () => {
+      (trackingHarness.mapProps?.onInteract as () => void)();
+    });
+    expect(screen.getByTestId("tracking-sheet")).toHaveAttribute("data-size", "half");
+    expect(screen.queryByRole("button", { name: "Open details" })).not.toBeInTheDocument();
+  });
+
+  it("puts the card beside the map with its details open on a wide screen", async () => {
+    await renderTracking();
+
+    expect(screen.getByTestId("tracking-sheet")).toHaveAttribute("data-size", "open");
+    expect(screen.getByTestId("tracking-details")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show request details" })).not.toBeInTheDocument();
     expect(trackingHarness.mapProps).toMatchObject({ showRoutePath: true });
+  });
+
+  describe("cancelling", () => {
+    const cancelButtons = () => screen.queryAllByRole("button", { name: "Cancel request" });
+
+    it.each(["pending", "assigned", "accepted", "technician_assigned"])("is offered while the request is %s", async (status) => {
+      trackingHarness.request = { ...trackingHarness.request, status };
+      if (status === "pending") trackingHarness.technician = null as unknown as Record<string, unknown>;
+      await renderTracking();
+
+      expect(cancelButtons()).toHaveLength(1);
+      expect(screen.queryByTestId("tracking-cancel-closed")).not.toBeInTheDocument();
+    });
+
+    it.each([
+      "en-route", "on_the_way", "en_route_pickup", "arrived", "arrived_pickup", "in-progress", "service_started",
+      "vehicle_loaded", "enroute_drop", "arrived_drop",
+    ])("is closed, with the reason, once the request is %s", async (status) => {
+      trackingHarness.request = { ...trackingHarness.request, status };
+      await renderTracking();
+
+      expect(cancelButtons()).toHaveLength(0);
+      expect(screen.getByTestId("tracking-cancel-closed")).toHaveTextContent("Cancelling closed when your technician set off.");
+    });
+
+    it.each(["payment_pending", "completed", "cancelled"])("is not offered once the request is %s", async (status) => {
+      trackingHarness.request = { ...trackingHarness.request, status };
+      await renderTracking();
+
+      expect(cancelButtons()).toHaveLength(0);
+      expect(screen.queryByTestId("tracking-cancel-closed")).not.toBeInTheDocument();
+    });
   });
 });

@@ -6820,11 +6820,13 @@ button.lt-req { cursor: pointer; }
 
 
 /* The homepage palette and image assets, scoped to partner registration. */
-.rq-signup {
+.rq-signup:not(.rq-signup--admin) {
   --primary: 355 70% 41%; --primary-foreground: 0 0% 100%;
   --background: 0 0% 100%; --foreground: 225 24% 18%; --card: 0 0% 100%;
   --muted: 220 23% 96%; --muted-foreground: 220 10% 45%; --border: 220 16% 90%;
   --input: 220 16% 90%; --ring: 355 70% 41%;
+}
+.rq-signup {
   min-height: 100vh; background: #f7f8fa; color: #242b3d;
   font-family: 'Manrope', 'Inter', system-ui, sans-serif; padding-bottom: 98px;
 }
@@ -6997,4 +6999,133 @@ button.lt-req { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rq-signup *, .rq-signup *::before, .rq-signup *::after { animation: none !important; transition: none !important; }
+}
+
+/* The admin uses the same registration fields and inherits the portal theme. */
+.rq-signup--admin {
+  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  padding: 0; overflow: hidden; border: 1px solid hsl(var(--border));
+  border-radius: var(--radius); background: hsl(var(--card));
+  color: hsl(var(--foreground)); font-family: inherit;
+  box-shadow: 0 1px 2px hsl(var(--foreground) / .04);
+}
+.rq-signup--admin .rq-signup-layout {
+  flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 0;
+  grid-template-columns: 230px minmax(0, 1fr); gap: 0; align-items: stretch;
+}
+.rq-signup--admin .rq-signup-sidebar {
+  position: static; overflow-y: auto; padding: 26px 20px;
+  border-right: 1px solid hsl(var(--border)); background: hsl(var(--muted) / .35);
+}
+.rq-signup--admin .rq-signup-kicker { color: hsl(var(--primary)); font-size: 11px; letter-spacing: 1px; }
+.rq-signup--admin .rq-signup-sidebar h2 {
+  font-family: inherit; font-size: 17px; font-weight: 600; line-height: 1.5;
+  letter-spacing: -.3px; margin: 10px 0 8px;
+}
+.rq-signup--admin .rq-signup-sidebar > p { font-size: 12px; color: hsl(var(--muted-foreground)); }
+.rq-signup--admin .rq-signup-sidebar nav { margin-top: 24px; gap: 6px; }
+.rq-signup--admin .rq-signup-sidebar nav button { padding: 10px; border-radius: 8px; color: hsl(var(--muted-foreground)); }
+.rq-signup--admin .rq-signup-sidebar nav button > span { border-color: hsl(var(--border)); background: hsl(var(--card)); font-size: 11px; }
+.rq-signup--admin .rq-signup-sidebar nav strong { font-size: 13px; font-weight: 500; }
+.rq-signup--admin .rq-signup-sidebar nav small { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.rq-signup--admin .rq-signup-sidebar nav button:not(:disabled):hover { background: hsl(var(--muted)); }
+.rq-signup--admin .rq-signup-sidebar nav button.is-current {
+  background: hsl(var(--primary) / .08); border-color: hsl(var(--primary) / .2);
+  color: hsl(var(--primary)); box-shadow: none;
+}
+.rq-signup--admin .rq-signup-sidebar nav .is-current > span {
+  background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+}
+.rq-signup--admin .rq-signup-sidebar nav .is-complete { color: hsl(var(--foreground)); }
+.rq-signup--admin .rq-signup-sidebar nav .is-complete > span {
+  background: hsl(var(--primary) / .1); border-color: hsl(var(--primary) / .2); color: hsl(var(--primary));
+}
+.rq-signup--admin .rq-signup-sidebar nav button:disabled { cursor: not-allowed; opacity: .6; }
+.rq-signup--admin .rq-signup-sidebar-note { border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: 11px; }
+.rq-signup--admin .rq-signup-sidebar-note svg { color: hsl(var(--primary)); }
+.rq-signup--admin .rq-signup-main { min-height: 0; overflow-y: auto; padding: 28px; }
+.rq-signup--admin .rq-signup-intro { padding-bottom: 24px; }
+.rq-signup--admin .rq-signup-intro h1 { font-family: inherit; font-size: 24px; font-weight: 600; letter-spacing: -.5px; }
+.rq-signup--admin .rq-signup-intro p { font-size: 13px; color: hsl(var(--muted-foreground)); }
+.rq-signup--admin .rq-signup-main form > div:not(.h-24) > .bg-card,
+.rq-signup--admin .rq-signup-card,
+.rq-signup--admin .rq-signup-main form > .bg-card {
+  padding: 22px; border-radius: var(--radius); border-color: hsl(var(--border));
+  background: hsl(var(--card)); box-shadow: none;
+}
+.rq-signup--admin .rq-signup-main h3 { font-size: 16px; font-weight: 600; letter-spacing: 0; }
+.rq-signup--admin .rq-signup-main .bg-card > .border-b p { font-size: 12px; color: hsl(var(--muted-foreground)); }
+.rq-signup--admin .rq-signup-main label {
+  font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: hsl(var(--foreground));
+}
+.rq-signup--admin .rq-signup-main input:not([type='file']),
+.rq-signup--admin .rq-signup-main textarea,
+.rq-signup--admin .rq-signup-main button[role='combobox'] {
+  background: hsl(var(--background)); border-color: hsl(var(--input));
+  border-radius: calc(var(--radius) - 2px); font-size: 14px; color: hsl(var(--foreground));
+}
+.rq-signup--admin .rq-signup-main input:not([type='file']),
+.rq-signup--admin .rq-signup-main button[role='combobox'] { height: 42px; }
+.rq-signup--admin .rq-signup-main input:focus,
+.rq-signup--admin .rq-signup-main textarea:focus {
+  border-color: hsl(var(--ring)); box-shadow: 0 0 0 2px hsl(var(--ring) / .15);
+}
+.rq-signup--admin .rq-signup-main input::placeholder,
+.rq-signup--admin .rq-signup-main textarea::placeholder { color: hsl(var(--muted-foreground)); }
+.rq-signup--admin .rq-signup-main .bg-gradient-to-br {
+  border-radius: var(--radius); border-color: hsl(var(--border)); background: hsl(var(--muted) / .4);
+}
+.rq-signup--admin :is(.rq-choice, .rq-subtype, .rq-availability, .rq-pricing-fields, .rq-consent-container, .rq-review-documents figure) {
+  background: hsl(var(--muted) / .35); border-color: hsl(var(--border));
+  border-radius: calc(var(--radius) - 2px); color: hsl(var(--muted-foreground));
+}
+.rq-signup--admin :is(.rq-choice.is-selected, .rq-subtype.is-selected, .rq-availability.is-selected) {
+  background: hsl(var(--primary) / .08); border-color: hsl(var(--primary)); color: hsl(var(--primary));
+}
+.rq-signup--admin .rq-choice:hover { border-color: hsl(var(--primary) / .5); }
+.rq-signup--admin .rq-choice i { border-color: hsl(var(--border)); }
+.rq-signup--admin .rq-choice.is-selected i { background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.rq-signup--admin :is(.rq-choice, .rq-subtype):focus-visible { outline-color: hsl(var(--ring)); }
+.rq-signup--admin .rq-vehicle-choice strong { font-size: 13px; }
+.rq-signup--admin .rq-vehicle-choice small { font-size: 11px; }
+.rq-signup--admin .rq-service-choice strong { font-size: 12px; }
+.rq-signup--admin .rq-upload { background: hsl(var(--muted) / .35); border-color: hsl(var(--border)); }
+.rq-signup--admin .rq-upload.has-image { border-color: hsl(var(--primary) / .3); }
+.rq-signup--admin :is(.rq-upload-placeholder, .rq-upload-busy, .rq-text-button, .rq-signup-label, .rq-review-pricing-group h3, .rq-pricing-context strong, .rq-pricing-service-heading > svg.is-open) { color: hsl(var(--primary)); }
+.rq-signup--admin .rq-upload-busy { background: hsl(var(--card) / .85); }
+.rq-signup--admin .rq-upload-remove { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+.rq-signup--admin :is(.rq-upload-placeholder strong, .rq-review-heading h2, .rq-review-grid dd) { color: hsl(var(--foreground)); font-size: 13px; }
+.rq-signup--admin :is(.rq-optional, .rq-upload-placeholder small, .rq-availability p, .rq-signup-label span, .rq-pricing-service-heading small, .rq-review-grid dt, .rq-review-documents figcaption, .rq-review-document-empty, .rq-review-pricing-row h4, .rq-review-missing, .rq-pricing-context span, .rq-price-input > span, .rq-signup-hint, .rq-loading) { color: hsl(var(--muted-foreground)); font-size: 12px; }
+.rq-signup--admin :is(.rq-review-heading, .rq-pricing-service-body, .rq-review-pricing-group + .rq-review-pricing-group, .rq-review-pricing-row + .rq-review-pricing-row) { border-color: hsl(var(--border)); }
+.rq-signup--admin .rq-consent-divider { background: hsl(var(--border)); }
+.rq-signup--admin .rq-signup-tip { background: hsl(var(--primary) / .05); border-color: hsl(var(--primary) / .2); color: hsl(var(--primary)); }
+.rq-signup--admin .rq-signup-tip strong { font-size: 13px; }
+.rq-signup--admin .rq-signup-tip p { color: hsl(var(--muted-foreground)); font-size: 12px; }
+.rq-signup--admin .rq-signup-error { background: hsl(var(--destructive) / .08); color: hsl(var(--destructive)); font-size: 12px; }
+.rq-signup--admin .rq-signup-main .rq-pricing-service { padding: 0; }
+.rq-signup--admin .rq-text-button { font-size: 12px; }
+.rq-signup--admin .rq-signup-footer {
+  position: static; flex-shrink: 0; width: auto; padding: 16px 28px; z-index: auto;
+  background: hsl(var(--card)); border-color: hsl(var(--border)); backdrop-filter: none;
+}
+.rq-signup--admin .rq-signup-footer button { height: 40px; font-size: 14px; font-weight: 500; border-radius: calc(var(--radius) - 2px); border-color: hsl(var(--input)); }
+.rq-signup--admin .rq-signup-footer button:last-child { flex-basis: 200px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.rq-signup--admin .rq-signup-footer button:last-child:hover { background: hsl(var(--primary) / .9); }
+.rq-signup-footer-progress { margin-right: auto; color: hsl(var(--muted-foreground)); font-size: 12px; align-self: center; }
+.rq-signup-footer-progress strong { display: block; margin-top: 2px; font-size: 13px; font-weight: 500; color: hsl(var(--foreground)); }
+@media (max-width: 800px) {
+  .rq-signup--admin .rq-signup-layout { display: flex; }
+  .rq-signup--admin .rq-signup-main { padding: 20px 16px; }
+  .rq-signup--admin .rq-signup-mobile-progress { color: hsl(var(--muted-foreground)); font-size: 12px; margin-bottom: 22px; }
+  .rq-signup--admin .rq-signup-mobile-progress > div { background: hsl(var(--muted)); }
+  .rq-signup--admin .rq-signup-mobile-progress i { background: hsl(var(--primary)); }
+  .rq-signup--admin .rq-signup-intro h1 { font-size: 22px; }
+  .rq-signup--admin .rq-signup-main form > div:not(.h-24) > .bg-card,
+  .rq-signup--admin .rq-signup-card,
+  .rq-signup--admin .rq-signup-main form > .bg-card { padding: 16px; }
+  .rq-signup--admin .rq-signup-main .rq-pricing-service { padding: 0; }
+  .rq-signup--admin .rq-signup-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); gap: 8px; }
+  .rq-signup--admin .rq-signup-footer button { min-width: 0; flex: 1; padding-left: 10px; padding-right: 10px; font-size: 13px; }
+  .rq-signup--admin .rq-signup-footer button:last-child { flex: 1.5; }
+  .rq-signup-footer-progress { display: none; }
 }

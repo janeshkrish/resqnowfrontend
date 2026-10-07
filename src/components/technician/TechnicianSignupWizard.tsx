@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import LocationDetector, { type LocationState } from "./LocationDetector";
 import DynamicPricingStep, { type PricingTemplate } from "./DynamicPricingStep";
 import { technicianAuthService, technicianSchema, type TechnicianFormValues } from "@/services/technicianAuthService";
+import { technicianAdminService } from "@/services/technicianAdminService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
@@ -206,7 +207,9 @@ function TechnicianApplicationPreview({ data, template, onEdit }: { data: Techni
     </div>;
 }
 
-const TechnicianSignupWizard = () => {
+const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "admin" }) => {
+    const isAdmin = variant === "admin";
+    const mainRef = useRef<HTMLElement>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [isEditingPreview, setIsEditingPreview] = useState(false);
     const [pricingTemplate, setPricingTemplate] = useState<PricingTemplate | null>(null);
@@ -273,8 +276,9 @@ const TechnicianSignupWizard = () => {
 
     // Scroll to top on step change
     useEffect(() => {
-        window.scrollTo(0, 0);
-    }, [currentStep]);
+        if (isAdmin && mainRef.current) mainRef.current.scrollTop = 0;
+        else window.scrollTo(0, 0);
+    }, [currentStep, isAdmin]);
 
     const handleNext = async () => {
         if (uploadingDocuments.length) { toast.error("Please wait for your photos to finish uploading."); return; }
@@ -346,10 +350,15 @@ const TechnicianSignupWizard = () => {
                 whatsapp_number: data.phone
             };
 
-            await technicianAuthService.register(payload);
-
-            toast.success("Submitted!");
-            navigate("/technician/login");
+            if (isAdmin) {
+                await technicianAdminService.createTechnician({ ...payload, status: "pending" });
+                toast.success("Technician created successfully!");
+                navigate("/admin/technicians");
+            } else {
+                await technicianAuthService.register(payload);
+                toast.success("Submitted!");
+                navigate("/technician/login");
+            }
         } catch (error: unknown) {
             toast.error(error instanceof Error ? error.message : "Registration failed. Please try again.");
         } finally {
@@ -358,17 +367,17 @@ const TechnicianSignupWizard = () => {
     };
 
     return (
-        <div className="rq-signup">
-            <header className="rq-signup-header">
+        <div className={cn("rq-signup", isAdmin && "rq-signup--admin")}>
+            {!isAdmin && <header className="rq-signup-header">
                 <a href="/" aria-label="ResQNow home"><img src="/images/resqnow-wordmark.png" alt="ResQNow" /></a>
                 <span className="rq-signup-header-label">PARTNER REGISTRATION</span>
                 <a href="/technician/login">Already a partner? <strong>Log in <ArrowRight size={14} /></strong></a>
-            </header>
+            </header>}
             <div className="rq-signup-layout">
                 <aside className="rq-signup-sidebar">
-                    <div className="rq-signup-kicker">LET'S GET YOU STARTED</div>
-                    <h2>Your skills.<br />Our network.</h2>
-                    <p>Help drivers get back on the road. Build your business with ResQNow.</p>
+                    <div className="rq-signup-kicker">{isAdmin ? "ADD TECHNICIAN" : "LET'S GET YOU STARTED"}</div>
+                    <h2>{isAdmin ? "Technician onboarding" : <>Your skills.<br />Our network.</>}</h2>
+                    <p>{isAdmin ? "Complete the registration details, then review before adding the technician." : "Help drivers get back on the road. Build your business with ResQNow."}</p>
                     <nav aria-label="Registration progress">
                         {STEPS.map((step, index) => <button type="button" key={step.id} disabled={index > currentStep || uploadingDocuments.length > 0} onClick={() => { setIsEditingPreview(false); setCurrentStep(index); }}
                             aria-current={index === currentStep ? "step" : undefined} className={index === currentStep ? "is-current" : index < currentStep ? "is-complete" : ""}>
@@ -379,7 +388,7 @@ const TechnicianSignupWizard = () => {
                     </nav>
                     <div className="rq-signup-sidebar-note"><CheckCircle2 size={18} /><span>Your details are kept secure.<br />Our team reviews every application.</span></div>
                 </aside>
-                <main className="rq-signup-main">
+                <main ref={mainRef} className="rq-signup-main">
                     <div className="rq-signup-mobile-progress"><span>Step {currentStep + 1} of {STEPS.length} · {STEPS[currentStep].title}</span><div><i style={{ width: ((currentStep + 1) / STEPS.length * 100) + "%" }} /></div></div>
                     <div className="rq-signup-intro">
                         <span className="rq-signup-kicker">STEP {String(currentStep + 1).padStart(2, "0")} / {String(STEPS.length).padStart(2, "0")}</span>
@@ -868,8 +877,8 @@ const TechnicianSignupWizard = () => {
                             </div>
                         )}
 
-                        {/* SPACER FOR FIXED FOOTER */}
-                        <div className="h-24" />
+                        {/* SPACER FOR THE PUBLIC FORM'S FIXED FOOTER */}
+                        {!isAdmin && <div className="h-24" />}
 
                     </form>
                 </Form>
@@ -878,11 +887,12 @@ const TechnicianSignupWizard = () => {
 
             {/* FIXED BOTTOM ACTION BAR */}
             <div className="rq-signup-footer">
+                {isAdmin && <span className="rq-signup-footer-progress">Step {currentStep + 1} of {STEPS.length}<strong>{STEPS[currentStep].title}</strong></span>}
                 {(currentStep > 0 || isEditingPreview) && (
                     <Button variant="outline" onClick={handleBack} disabled={uploadingDocuments.length > 0 || isSubmitting} className="flex-1 h-12 rounded-xl border-slate-300 text-muted-foreground font-bold">{isEditingPreview ? "Back to preview" : "Back"}</Button>
                 )}
                 <Button type="button" onClick={handleNext} disabled={isSubmitting || uploadingDocuments.length > 0 || (currentStep === 7 && (!consentAgreed || !hasAcceptedTechnicianAgreement))} className="flex-[2] h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
-                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : uploadingDocuments.length ? "Uploading photos…" : isEditingPreview ? "Save & return to preview" : (currentStep === 7 ? "Submit Application" : "Continue")}
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : uploadingDocuments.length ? "Uploading photos…" : isEditingPreview ? "Save & return to preview" : (currentStep === 7 ? (isAdmin ? "Add Technician" : "Submit Application") : "Continue")}
                 </Button>
             </div>
         </div>

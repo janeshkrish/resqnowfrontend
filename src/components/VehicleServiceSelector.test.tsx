@@ -18,6 +18,7 @@ vi.mock("./technician/LocationDetector", () => ({
 
 import VehicleServiceSelector from "./VehicleServiceSelector";
 import TechnicianSignupWizard from "./technician/TechnicianSignupWizard";
+import AdminAddTechnicianWizard from "./admin/AdminAddTechnicianWizard";
 
 const LocationProbe = () => {
   const location = useLocation();
@@ -199,9 +200,15 @@ describe('technician application preview', () => {
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-  it('reviews all six sections before Finish and validates edits before returning to preview', async () => {
+  it.each(['public', 'admin'] as const)('%s registration reviews all six sections, validates edits, and returns to its portal after submission', async variant => {
     const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
-    render(<MemoryRouter><TechnicianSignupWizard /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={[variant === 'admin' ? '/admin/technicians/add' : '/technician/signup']}>
+      <Routes>
+        <Route path="/admin/technicians/add" element={<AdminAddTechnicianWizard />} />
+        <Route path="/technician/signup" element={<TechnicianSignupWizard />} />
+        <Route path="*" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>);
     fireEvent.change(screen.getByLabelText(/Your Name/), { target: { value: 'Arun Kumar' } });
     fireEvent.change(screen.getByLabelText(/Shop Name/), { target: { value: 'Arun Auto Care' } });
     fireEvent.change(screen.getByLabelText(/Mobile Number/), { target: { value: '9876543210' } });
@@ -247,7 +254,13 @@ describe('technician application preview', () => {
     expect(screen.getByText('₹0')).toBeInTheDocument();
     next();
     await screen.findByRole('heading', { name: "You're almost on the road." });
-    expect(screen.getByRole('button', { name: 'Submit Application' })).toBeDisabled();
+    const submitName = variant === 'admin' ? 'Add Technician' : 'Submit Application';
+    expect(screen.getByRole('button', { name: submitName })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I confirm my details and agree to the Terms *' }));
+    expect(screen.getByRole('button', { name: submitName })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and agree to the ResQNow Technician Agreement *' }));
+    fireEvent.click(screen.getByRole('button', { name: submitName }));
+    expect(await screen.findByTestId('location')).toHaveTextContent(variant === 'admin' ? '/admin/technicians' : '/technician/login');
     scrollSpy.mockRestore();
   });
 });

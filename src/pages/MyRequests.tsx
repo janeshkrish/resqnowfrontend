@@ -1,447 +1,297 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiFetch } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
-import { Clock, MapPin, Car, Wrench, CheckCircle, AlertCircle, RefreshCw, Wifi, WifiOff, Star } from "lucide-react";
-import { format } from "date-fns";
-import { toast } from "@/components/ui/sonner";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
-import NotificationBanner from "@/components/notifications/NotificationBanner";
-import TechnicianRatingDialog from "@/components/rating/TechnicianRatingDialog";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-interface ServiceRequest {
-  _id?: string;
-  id: string;
-  service_type: string;
-  vehicle_type: string | null;
-  vehicle_model: string | null;
-  address: string | null;
-  status: string | null;
-  serviceStatus?: string | null;
-  payment_status?: string | null;
-  paymentStatus?: string | null;
-  created_at: string;
-  updated_at: string;
-  technician_id: string | null;
-  contact_phone: string | null;
-  has_review?: boolean;
-  technician?: {
-    id: string;
-    name: string;
-    phone: string;
-    rating: number | null;
-  } | null;
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import TechnicianRatingDialog from "@/components/rating/TechnicianRatingDialog";
+import { toast } from "@/components/ui/sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import {
+  askAgainPath,
+  callHref,
+  canRate,
+  isEarlier,
+  isInProgress,
+  monthOf,
+  requestPath,
+  serviceState,
+  stageOf,
+  wasCancelled,
+} from "@/lib/activity";
+import { apiFetch } from "@/lib/api";
+import { firstName } from "@/lib/customerTracking";
+import { newestFirst, requestClock, requestDay, requestId, requestTime, type MyRequest } from "@/lib/myRequests";
+import { serviceArt, serviceName } from "@/lib/services";
+import { cn } from "@/lib/utils";
+
+const KNOWN_STATES = ["pending", "accepted", "technician_assigned", "on_the_way", "arrived", "in_progress", "job_completed", "cancelled"];
+const STEPS = ["On the way", "At vehicle", "Done"];
+
+type Shown = "all" | "done" | "cancelled";
+
+/** The service's picture on its soft tile; a plain spanner when the request is for something we have no picture of. */
+function Art({ request, small = false }: { request: MyRequest; small?: boolean }) {
+  const art = serviceArt(request.service_type);
+  return (
+    <span className={cn("rq-av-art", small && "is-sm")} aria-hidden="true">
+      {art ? <img src={art} alt="" draggable={false} /> : <MaterialSymbol name="build" />}
+    </span>
+  );
 }
 
+/**
+ * Activity (/my-requests): what is happening now, the technicians still to rate, and the latest earlier
+ * requests, on one screen. "See all" opens every earlier request.
+ */
 const MyRequests = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [requests, setRequests] = useState<ServiceRequest[]>([]);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [requests, setRequests] = useState<MyRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
-  const [activeTab, setActiveTab] = useState("active");
-  const [showNotificationBanner, setShowNotificationBanner] = useState(true);
-  const [ratingDialog, setRatingDialog] = useState<{
-    open: boolean;
-    request: ServiceRequest | null;
-  }>({ open: false, request: null });
-
-  const { sendNotification, permission } = usePushNotifications();
+  const [alertsDismissed, setAlertsDismissed] = useState(false);
+  const [shown, setShown] = useState<Shown>("all");
+  const [rating, setRating] = useState<{ request: MyRequest; stars: number } | null>(null);
+  const { permission, isSupported, requestPermission } = usePushNotifications();
 
   useEffect(() => {
     if (!user) return;
 
     const fetchRequests = async () => {
-      // Don't set loading on poll updates to avoid UI flicker, only initial load
-      // But we can check if requests is empty to set initial loading
       try {
         const res = await apiFetch("/api/service-requests");
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
-
-        // Backend returns requests with technician object
-        // Maps directly to our state roughly
-        const mappedData = data.map((req: any) => ({
-          ...req,
-          has_review: !!req.has_review
-        }));
-
-        setRequests(mappedData);
-        setIsConnected(true); // Connected to backend
+        setRequests((Array.isArray(data) ? data : []).map((req: MyRequest) => ({ ...req, has_review: !!req.has_review })));
+        setIsConnected(true);
       } catch (error) {
-        console.error('Error fetching requests:', error);
-        toast.error('Failed to load your requests');
+        console.error("Error fetching requests:", error);
+        toast.error("Failed to load your requests");
         setIsConnected(false);
-
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchRequests();
-
     // Poll every 2 seconds to keep request progress updates near real-time.
     const intervalId = setInterval(fetchRequests, 2000);
-
     return () => clearInterval(intervalId);
-
   }, [user]);
 
-  const getStatusBadge = (status: string | null) => {
-    const normalized = String(status || "").trim().toLowerCase();
-    switch (normalized) {
-      case 'pending':
-        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> Pending</Badge>;
-      case 'accepted':
-      case 'technician_assigned':
-      case 'assigned':
-        return <Badge className="bg-red-500 gap-1"><Wrench className="h-3 w-3" /> Assigned</Badge>;
-      case 'on_the_way':
-      case 'on-the-way':
-      case 'en_route':
-      case 'en-route':
-        return <Badge className="bg-amber-500 gap-1"><Car className="h-3 w-3" /> En Route</Badge>;
-      case 'service_started':
-      case 'in_progress':
-      case 'in-progress':
-        return <Badge className="bg-purple-500 gap-1"><Wrench className="h-3 w-3" /> In Progress</Badge>;
-      case 'awaiting_payment':
-      case 'payment_pending':
-        return <Badge className="bg-yellow-500 gap-1"><Clock className="h-3 w-3" /> Waiting for payment</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-500 gap-1"><CheckCircle className="h-3 w-3" /> Completed</Badge>;
-      case 'paid':
-        return <Badge className="bg-green-600 gap-1"><CheckCircle className="h-3 w-3" /> Paid</Badge>;
-      case 'cancelled':
-        return <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" /> Cancelled</Badge>;
-      default:
-        return <Badge>{status || 'Unknown'}</Badge>;
-    }
-  };
-
-  const getServiceId = (request: ServiceRequest) => {
-    const resolved = request._id || request.id;
-    return String(resolved || "").trim();
-  };
-
-  const normalizeServiceStatus = (request: ServiceRequest) => {
-    const rawStatus = String(request.serviceStatus || request.status || "").trim().toLowerCase();
-    switch (rawStatus) {
-      case "assigned":
-      case "technician_assigned":
-        return "technician_assigned";
-      case "accepted":
-        return "accepted";
-      case "on-the-way":
-      case "on_the_way":
-      case "en-route":
-      case "en_route":
-        return "on_the_way";
-      case "arrived":
-        return "arrived";
-      case "in-progress":
-      case "in_progress":
-        return "in_progress";
-      case "payment_pending":
-      case "awaiting_payment":
-      case "completed":
-      case "job_completed":
-      case "paid":
-        return "job_completed";
-      case "cancelled":
-        return "cancelled";
-      case "pending":
-        return "pending";
-      default:
-        return rawStatus || "pending";
-    }
-  };
-
-  const normalizePaymentStatus = (request: ServiceRequest) => {
-    const rawPaymentStatus = String(request.paymentStatus || request.payment_status || "").trim().toLowerCase();
-    switch (rawPaymentStatus) {
-      case "completed":
-      case "paid":
-        return "paid";
-      case "pending":
-      case "payment_pending":
-      case "awaiting_payment":
-        return "payment_pending";
-      default:
-        return rawPaymentStatus || "payment_pending";
-    }
-  };
-
-  const isKnownRedirectStatus = (serviceStatus: string) => {
-    return [
-      "pending",
-      "accepted",
-      "technician_assigned",
-      "on_the_way",
-      "arrived",
-      "in_progress",
-      "job_completed",
-      "cancelled",
-    ].includes(serviceStatus);
-  };
-
-  const getServiceRedirectPath = (request: ServiceRequest) => {
-    const serviceId = getServiceId(request);
-    if (!serviceId) return null;
-
-    const serviceStatus = normalizeServiceStatus(request);
-    const paymentStatus = normalizePaymentStatus(request);
-
-    switch (serviceStatus) {
-      case "pending":
-      case "accepted":
-      case "technician_assigned":
-      case "on_the_way":
-      case "arrived":
-      case "in_progress":
-        return `/service-tracking/${serviceId}`;
-      case "job_completed":
-        return paymentStatus === "paid"
-          ? `/service-summary/${serviceId}`
-          : `/payment/${serviceId}`;
-      case "cancelled":
-        return `/service-summary/${serviceId}`;
-      default:
-        return `/service-tracking/${serviceId}`;
-    }
-  };
-
-  const handleServiceCardClick = (request: ServiceRequest) => {
-    const serviceId = getServiceId(request);
-    if (!serviceId) {
+  const open = (request: MyRequest) => {
+    if (!requestId(request).trim()) {
       toast.error("Unable to open this service right now.");
       return;
     }
-    const serviceStatus = normalizeServiceStatus(request);
-    if (!isKnownRedirectStatus(serviceStatus)) {
-      toast.info("Status updated. Opening live tracking.");
-    }
-    const redirectPath = getServiceRedirectPath(request);
-    if (!redirectPath) {
+    if (!KNOWN_STATES.includes(serviceState(request))) toast.info("Status updated. Opening live tracking.");
+    const path = requestPath(request);
+    if (!path) {
       toast.error("Invalid service state. Please refresh and try again.");
       return;
     }
-    navigate(redirectPath);
+    navigate(path);
   };
 
-  const activeRequests = requests.filter((request) => {
-    const serviceStatus = normalizeServiceStatus(request);
-    const paymentStatus = normalizePaymentStatus(request);
-    if (serviceStatus === "cancelled") return false;
-    return serviceStatus !== "job_completed" || paymentStatus !== "paid";
-  });
+  // Back from "See all": to where the customer came from, or to Activity when this was the first page opened.
+  const backFromAll = () => (location.key !== "default" ? navigate(-1) : navigate("/my-requests", { replace: true }));
 
-  const completedRequests = requests.filter((request) => {
-    const serviceStatus = normalizeServiceStatus(request);
-    const paymentStatus = normalizePaymentStatus(request);
-    if (serviceStatus === "cancelled") return true;
-    return serviceStatus === "job_completed" && paymentStatus === "paid";
-  });
+  const active = newestFirst(requests.filter(isInProgress));
+  const earlier = newestFirst(requests.filter(isEarlier));
+  const toRate = earlier.filter(canRate).slice(0, 3);
+  const showAlerts = isSupported && permission === "default" && !alertsDismissed;
+  const viewingAll = searchParams.get("view") === "all" && earlier.length > 0;
 
-  const renderRequestCard = (request: ServiceRequest) => {
-    const serviceStatus = normalizeServiceStatus(request);
-    const paymentStatus = normalizePaymentStatus(request);
-    const canTrack =
-      ["pending", "accepted", "technician_assigned", "on_the_way", "arrived", "in_progress"].includes(serviceStatus) ||
-      (serviceStatus === "job_completed" && paymentStatus !== "paid");
-    const isPaidCompleted = serviceStatus === "job_completed" && paymentStatus === "paid";
+  const detailOf = (request: MyRequest) => [serviceName(request.service_type), request.vehicle_model, requestDay(request)].filter(Boolean).join(" · ");
 
+  const row = (request: MyRequest, first: boolean, last: boolean) => {
+    const cancelled = wasCancelled(request);
+    const again = cancelled || canRate(request) ? null : askAgainPath(request);
+    const name = serviceName(request.service_type);
     return (
-      <Card
-        key={request.id}
-        role="button"
-        tabIndex={0}
-        onClick={() => handleServiceCardClick(request)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleServiceCardClick(request);
-          }
-        }}
-        className="cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg active:scale-[0.99] active:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h4 className="font-semibold text-lg">{request.service_type}</h4>
-              <p className="text-sm text-muted-foreground">
-                {request.vehicle_type} {request.vehicle_model && `- ${request.vehicle_model}`}
-              </p>
-            </div>
-            {getStatusBadge(request.status)}
-          </div>
-
-          <div className="space-y-2 text-sm mb-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{request.address || "Address not specified"}</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{format(new Date(request.created_at), "PPp")}</span>
-            </div>
-            {request.technician && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Wrench className="h-4 w-4" />
-                <span>{request.technician.name} - {request.technician.phone}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            {canTrack && (
-              <div className="flex-1">
-                <Button variant="outline" size="sm" className="w-full">
-                  Track Request
-                </Button>
-              </div>
-            )}
-            {isPaidCompleted && request.technician && !request.has_review && (
-              <Button
-                size="sm"
-                className="gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRatingDialog({ open: true, request });
-                }}
-              >
-                <Star className="h-4 w-4" />
-                Rate Service
-              </Button>
-            )}
-            {isPaidCompleted && request.has_review && (
-              <Badge variant="secondary" className="gap-1">
-                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                Rated
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div key={requestId(request)} className={cn("rq-av-row", first && "is-first", last && "is-last", cancelled && "is-void")}>
+        <button type="button" className="rq-av-row-main" onClick={() => open(request)} aria-label={`${detailOf(request)}${cancelled ? ", cancelled" : ""}`}>
+          <Art request={request} small />
+          <span className="rq-av-row-text"><b>{name}</b><span>{[requestDay(request), request.vehicle_model].filter(Boolean).join(" · ")}</span></span>
+        </button>
+        {canRate(request) ? (
+          <button type="button" className="rq-av-pill rq-press" aria-label={`Rate ${firstName(request.technician?.name)} for ${detailOf(request)}`} onClick={() => setRating({ request, stars: 0 })}>
+            <MaterialSymbol name="star" />Rate
+          </button>
+        ) : again ? (
+          <Link to={again} className="rq-av-pill rq-press" aria-label={`Ask for ${name} again`}><MaterialSymbol name="replay" />Ask again</Link>
+        ) : cancelled ? <span className="rq-av-row-end">Cancelled</span> : null}
+      </div>
     );
   };
 
+  let body;
   if (isLoading) {
-    return (
-      <div className="container py-8">
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+    body = (
+      <div className="rq-av-loading" role="status" aria-label="Loading your requests">
+        <span className="rq-shimmer" style={{ height: 32, width: "45%" }} />
+        <span className="rq-shimmer" style={{ height: 176, borderRadius: 24 }} />
+        <span className="rq-shimmer" style={{ height: 190, borderRadius: 20 }} />
       </div>
+    );
+  } else if (viewingAll) {
+    const picked = earlier.filter((request) => shown === "all" || (shown === "cancelled" ? wasCancelled(request) : !wasCancelled(request)));
+    const cancelledCount = earlier.filter(wasCancelled).length;
+    const chips: { id: Shown; name: string; count: number }[] = [
+      { id: "all", name: "All", count: earlier.length },
+      { id: "done", name: "Completed", count: earlier.length - cancelledCount },
+      { id: "cancelled", name: "Cancelled", count: cancelledCount },
+    ];
+    body = (
+      <>
+        <button type="button" className="rq-icon-btn rq-press" aria-label="Back to Activity" onClick={backFromAll}><MaterialSymbol name="arrow_back" /></button>
+        <h1 className="rq-pg-h1 rq-av-all-title">All requests</h1>
+        <div className="rq-av-chips" role="radiogroup" aria-label="Show">
+          {chips.map((chip) => (
+            <button key={chip.id} type="button" role="radio" aria-checked={shown === chip.id} className={cn("rq-av-chip rq-press", shown === chip.id && "is-on")} onClick={() => setShown(chip.id)}>
+              {chip.name}<i>{chip.count}</i>
+            </button>
+          ))}
+        </div>
+        {picked.map((request, index) => {
+          const month = monthOf(requestTime(request));
+          const first = index === 0 || monthOf(requestTime(picked[index - 1])) !== month;
+          const last = index === picked.length - 1 || monthOf(requestTime(picked[index + 1])) !== month;
+          return (
+            <div key={requestId(request)}>
+              {first ? <h2 className="rq-av-month">{month}</h2> : null}
+              {row(request, first, last)}
+            </div>
+          );
+        })}
+        <p className="rq-av-end">{picked.length ? (shown === "all" ? "That’s every request you’ve made." : "That’s all of them.") : "Nothing here."}</p>
+      </>
+    );
+  } else if (!requests.length) {
+    body = (
+      <>
+        <h1 className="rq-pg-h1">No requests <em>yet</em></h1>
+        <p className="rq-pg-sub">When you ask for help, you can follow it here, from finding a technician to paying.</p>
+        <div className="rq-av-new" aria-hidden="true"><img src="/images/vehicles/car.webp" alt="" draggable={false} /></div>
+        <Link to="/services" className="rq-btn rq-btn-block rq-press"><MaterialSymbol name="car_repair" />Get help</Link>
+      </>
+    );
+  } else {
+    // Enough of the latest to fill the screen without scrolling.
+    const latest = earlier.slice(0, active.length > 1 || showAlerts ? 2 : active.length ? 3 : 4);
+    body = (
+      <>
+        <div className="rq-av-title">
+          <h1 className="rq-pg-h1">Activity</h1>
+          {active.length ? (
+            <span className={cn("rq-av-live", !isConnected && "is-off")}><i aria-hidden="true" />{isConnected ? "Live" : "Reconnecting…"}</span>
+          ) : null}
+        </div>
+        <p className="rq-pg-sub">
+          {active.length ? `${active.length} in progress · ${earlier.length} earlier` : `${earlier.length} ${earlier.length === 1 ? "request" : "requests"} so far`}
+        </p>
+
+        {showAlerts ? (
+          <p className="rq-av-alert">
+            <MaterialSymbol name="notifications" />
+            <span>Get an alert when help arrives</span>
+            <button type="button" className="rq-text-btn" onClick={() => void requestPermission().then(() => setAlertsDismissed(true))}>Turn on</button>
+            <button type="button" className="rq-av-x" aria-label="Not now" onClick={() => setAlertsDismissed(true)}><MaterialSymbol name="close" /></button>
+          </p>
+        ) : null}
+
+        {active.length ? (
+          <div className="rq-av-jobs">
+            {active.map((request) => {
+              const stage = stageOf(request);
+              const call = callHref(request);
+              const name = serviceName(request.service_type);
+              return (
+                <article key={requestId(request)} className="rq-av-job" aria-label={`${name}: ${stage.say}`}>
+                  <button type="button" className="rq-av-job-top" onClick={() => open(request)}>
+                    <Art request={request} />
+                    <span className="rq-av-job-text">
+                      <b className="rq-av-job-say">{stage.say}</b>
+                      <span className="rq-av-job-what">{[name, request.vehicle_model, requestClock(request)].filter(Boolean).join(" · ")}</span>
+                    </span>
+                  </button>
+                  <ol className="rq-av-steps" aria-label={`Step ${stage.now + 1} of 4`}>
+                    {[stage.firstStep, ...STEPS].map((label, index) => (
+                      <li key={label} className={index < stage.now ? "is-done" : index === stage.now ? "is-now" : undefined}><i /><span>{label}</span></li>
+                    ))}
+                  </ol>
+                  <div className="rq-av-job-actions">
+                    <button type="button" className="rq-btn rq-av-grow rq-press" onClick={() => open(request)}>{stage.action}<MaterialSymbol name="arrow_forward" /></button>
+                    {call ? (
+                      <a href={call} className="rq-btn rq-btn-soft rq-press" aria-label={`Call ${firstName(request.technician?.name)}`}><MaterialSymbol name="call" />Call</a>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="rq-av-idle"><MaterialSymbol name="check_circle" /><span>Nothing in progress right now.</span><Link to="/services" className="rq-text-btn">Get help<MaterialSymbol name="chevron_right" /></Link></p>
+        )}
+
+        {toRate.length && active.length < 2 ? (
+          <>
+            <div className="rq-av-head"><h2 className="rq-pg-h2">{toRate.length === 1 ? "Rate your technician" : "Rate your technicians"}</h2></div>
+            <div className="rq-av-rail">
+              {toRate.map((request) => (
+                <div key={requestId(request)} className={cn("rq-av-rate", toRate.length === 1 && "is-only")}>
+                  <div className="rq-av-rate-top">
+                    <Art request={request} small />
+                    <span className="rq-av-rate-text"><b>How was {firstName(request.technician?.name)}?</b><span>{[serviceName(request.service_type), requestDay(request)].filter(Boolean).join(" · ")}</span></span>
+                  </div>
+                  <div className="rq-av-rate-stars" role="group" aria-label={`Rate ${firstName(request.technician?.name)}`}>
+                    {[1, 2, 3, 4, 5].map((stars) => (
+                      <button key={stars} type="button" className="rq-av-rate-star" aria-label={`${stars} ${stars === 1 ? "star" : "stars"}`} onClick={() => setRating({ request, stars })}>
+                        <MaterialSymbol name="star" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {earlier.length ? (
+          <>
+            <div className="rq-av-head">
+              <h2 className="rq-pg-h2">Earlier</h2>
+              {earlier.length > latest.length ? (
+                <button type="button" className="rq-text-btn" onClick={() => { setShown("all"); setSearchParams({ view: "all" }); }}>See all {earlier.length}<MaterialSymbol name="chevron_right" /></button>
+              ) : null}
+            </div>
+            <div>{latest.map((request, index) => row(request, index === 0, index === latest.length - 1))}</div>
+          </>
+        ) : null}
+      </>
     );
   }
 
   return (
-    <div className="container py-6 max-w-4xl">
-      {/* Notification permission banner */}
-      {showNotificationBanner && permission === "default" && (
-        <div className="mb-6">
-          <NotificationBanner onDismiss={() => setShowNotificationBanner(false)} />
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">My Service Requests</h1>
-          <p className="text-muted-foreground">Track and manage your roadside assistance requests</p>
-        </div>
-        <Badge
-          variant="outline"
-
-          className={`text-xs ${isConnected ? 'border-green-500 text-green-600' : 'border-yellow-500 text-yellow-600'}`}
-        >
-          {isConnected ? (
-            <>
-              <Wifi className="h-3 w-3 mr-1" />
-              Live Updates
-            </>
-          ) : (
-            <>
-              <WifiOff className="h-3 w-3 mr-1" />
-              Connecting...
-            </>
-          )}
-        </Badge>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="active" className="gap-2">
-            <Clock className="h-4 w-4" />
-            Active ({activeRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
-            <CheckCircle className="h-4 w-4" />
-            History ({completedRequests.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="active">
-          {activeRequests.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No active requests</h3>
-                <p className="text-muted-foreground mb-6">
-                  You don't have any ongoing service requests at the moment.
-                </p>
-                <Link to="/services">
-                  <Button>Request Service</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {activeRequests.map(renderRequestCard)}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="history">
-          {completedRequests.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No completed requests</h3>
-                <p className="text-muted-foreground">
-                  Your completed service requests will appear here.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {completedRequests.map(renderRequestCard)}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Rating Dialog */}
-      {ratingDialog.request && ratingDialog.request.technician && user && (
+    <div className="rq-pg rq-av">
+      <div className="rq-pg-in">{body}</div>
+      {rating?.request.technician ? (
         <TechnicianRatingDialog
-          isOpen={ratingDialog.open}
-          onOpenChange={(open) => setRatingDialog({ ...ratingDialog, open })}
-          requestId={ratingDialog.request.id}
-          technicianId={ratingDialog.request.technician.id}
-          technicianName={ratingDialog.request.technician.name}
+          isOpen
+          onOpenChange={(isOpen) => { if (!isOpen) setRating(null); }}
+          requestId={requestId(rating.request)}
+          technicianId={String(rating.request.technician.id ?? "")}
+          technicianName={firstName(rating.request.technician.name)}
+          initialRating={rating.stars}
+          detail={detailOf(rating.request)}
           onSuccess={() => {
-            // Mark the request as reviewed locally
-            setRequests(prev => prev.map(r =>
-
-              r.id === ratingDialog.request?.id ? { ...r, has_review: true } : r
-            ));
+            const rated = requestId(rating.request);
+            setRequests((list) => list.map((request) => (requestId(request) === rated ? { ...request, has_review: true } : request)));
           }}
         />
-      )}
+      ) : null}
     </div>
   );
 };

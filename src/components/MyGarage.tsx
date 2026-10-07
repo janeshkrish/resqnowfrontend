@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 import AddVehicleFlow, { type NewVehicle } from "@/components/garage/AddVehicleFlow";
-import { EmptyGarage, HeroCard, RemoveDialog, VehicleRow, VehicleSheet } from "@/components/garage/GarageParts";
+import { EmptyGarage, RemoveDialog, VehicleBay, VehicleChips, VehicleSheet } from "@/components/garage/GarageParts";
 import { useAuth } from "@/contexts/AuthContext";
+import { garageCountLine, helpHistory } from "@/lib/garageShow";
+import { MY_REQUESTS_KEY, fetchMyRequests } from "@/lib/myRequests";
 import {
   GARAGE_QUERY_KEY,
   addVehicle,
@@ -62,6 +64,26 @@ export default function MyGarage({ startAdding = false, onAddClosed, onBack, emb
   const vehicles = byNewest(vehiclesQuery.data ?? []);
   const sheetVehicle = vehicles.find((v) => v.id === sheetId) ?? null;
 
+  // The vehicle on show in the bay, and the one that was there before it (seen driving off).
+  const [shown, setShown] = useState<{ id: number | null; previousId: number | null }>({ id: null, previousId: null });
+  const onShow = vehicles.find((v) => v.id === shown.id) ?? vehicles[0] ?? null;
+  const leaving = vehicles.find((v) => v.id === shown.previousId) ?? null;
+  const show = (vehicle: Vehicle) => {
+    if (onShow && vehicle.id !== onShow.id) setShown({ id: vehicle.id, previousId: onShow.id });
+  };
+  const step = (by: 1 | -1) => {
+    const next = onShow ? vehicles[vehicles.findIndex((v) => v.id === onShow.id) + by] : undefined;
+    if (next) show(next);
+  };
+
+  // Past requests, for "Helped" and "Last help". The garage works without them.
+  const requestsQuery = useQuery({
+    queryKey: MY_REQUESTS_KEY,
+    queryFn: ({ signal }) => fetchMyRequests(signal),
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  });
+
   const closeAdd = () => {
     setAdding(false);
     onAddClosed?.();
@@ -71,6 +93,8 @@ export default function MyGarage({ startAdding = false, onAddClosed, onBack, emb
     mutationFn: (input: NewVehicle) => addVehicle(input),
     onSuccess: async (_result, input) => {
       await queryClient.invalidateQueries({ queryKey: GARAGE_QUERY_KEY });
+      // The new vehicle is the newest, so it is the one on show.
+      setShown({ id: null, previousId: null });
       closeAdd();
       showToast(`${shortMake(input.make)} ${input.model} saved to your garage`);
     },
@@ -136,25 +160,24 @@ export default function MyGarage({ startAdding = false, onAddClosed, onBack, emb
     );
   } else if (!vehicles.length) {
     body = <EmptyGarage onAdd={startAdd} />;
-  } else {
-    const [hero, ...rest] = vehicles;
+  } else if (onShow) {
     body = (
       <>
         <div className="rqg-head">
-          <p className="rqg-kicker">My garage</p>
-          <h1 className="rqg-h1">Your vehicles</h1>
-          <p className="rqg-sub">{vehicles.length} {vehicles.length === 1 ? "vehicle" : "vehicles"} · pick one when you ask for help</p>
+          <h1 className="rqg-h1">My garage</h1>
+          <p className="rqg-sub">{garageCountLine(vehicles)}</p>
         </div>
-        <HeroCard vehicle={hero} onHelp={() => getHelp(hero)} onMore={() => setSheetId(hero.id)} />
-        {rest.length ? (
-          <>
-            <p className="rqg-sec"><span>Also in your garage</span><span>{rest.length}</span></p>
-            <div className="rqg-list">
-              {rest.map((vehicle) => <VehicleRow key={vehicle.id} vehicle={vehicle} onOpen={() => setSheetId(vehicle.id)} />)}
-            </div>
-          </>
-        ) : null}
-        <p className="rqg-tip"><MaterialSymbol name="bolt" />When you ask for help, pick a saved vehicle and its details fill in for you.</p>
+        <VehicleBay
+          vehicle={onShow}
+          previous={leaving}
+          position={vehicles.findIndex((v) => v.id === onShow.id) + 1}
+          total={vehicles.length}
+          history={requestsQuery.data ? helpHistory(onShow, requestsQuery.data) : null}
+          onHelp={() => getHelp(onShow)}
+          onMore={() => setSheetId(onShow.id)}
+          onSwipe={step}
+        />
+        {vehicles.length > 1 ? <VehicleChips vehicles={vehicles} shownId={onShow.id} onShow={show} /> : null}
       </>
     );
   }

@@ -6,9 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (path: string) => new Response(JSON.stringify(
-    path.startsWith("/api/public/vehicle-photo")
-      ? { photo: null }
-      : [{ id: 7, type: "car", make: "Tata Motors", model: "Nexon", license_plate: "KA 01 AB 1234", status: "ready" }],
+    path === "/api/vehicles"
+      ? [{ id: 7, type: "car", make: "Tata Motors", model: "Nexon", license_plate: "KA 01 AB 1234", status: "ready" }]
+      : [],
   ), { status: 200 })),
 }));
 
@@ -41,6 +41,6 @@ describe("My garage page", () => {
 
     // Leaving the steps lands on the garage itself.
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(await screen.findByRole("heading", { name: "Your vehicles" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "My garage" })).toBeInTheDocument();
   });
 });

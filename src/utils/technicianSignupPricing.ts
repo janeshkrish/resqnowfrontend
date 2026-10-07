@@ -1,3 +1,5 @@
+import type { PricingRow, PricingTemplate } from "@/components/technician/DynamicPricingStep";
+import type { VehicleArtId } from "@/lib/vehicleClasses";
 import {
   canonicalizeServiceKey,
   canonicalizeVehicleKey,
@@ -271,4 +273,109 @@ export function buildSignupPricingPayload(pricingConfig: unknown) {
     serviceCosts,
     pricingSummary,
   };
+}
+
+
+export type SignupVehicle = 'bike' | 'car' | 'commercial' | 'ev';
+export const SIGNUP_VEHICLES = [
+  { id: 'bike', label: 'Bike', description: 'Economy · Sports · Bullet · Scooter', image: '/images/vehicles/bike.webp' },
+  { id: 'car', label: 'Car', description: 'Sedan · Hatchback · SUV · MPV', image: '/images/vehicles/car.webp' },
+  { id: 'commercial', label: 'Truck', description: 'SCV · LCV · MCV · HCV', image: '/images/vehicles/truck.webp' },
+  { id: 'ev', label: 'EV', description: 'Electric vehicles', image: '/images/vehicles/ev.webp' },
+] as const;
+export const SIGNUP_SUBTYPES: Record<SignupVehicle, { id: string; label: string; detail?: string; art?: VehicleArtId }[]> = {
+  bike: [{ id: 'commuter-bike', label: 'Economy', art: 'commuter' }, { id: 'sports-bike', label: 'Sports', art: 'sports' }, { id: 'premium-bike', label: 'Bullet', art: 'cruiser' }, { id: 'scooter', label: 'Scooter', art: 'scooter' }],
+  car: [{ id: 'sedan', label: 'Sedan' }, { id: 'hatchback', label: 'Hatchback' }, { id: 'suv', label: 'SUV' }, { id: 'mpv', label: 'MPV' }],
+  commercial: [{ id: 'scv', label: 'SCV', detail: 'Small commercial' }, { id: 'lcv', label: 'LCV', detail: 'Light commercial' }, { id: 'mcv', label: 'MCV', detail: 'Medium commercial' }, { id: 'hcv', label: 'HCV', detail: 'Heavy commercial' }],
+  ev: [{ id: 'commuter-bike', label: 'Economy', art: 'commuter' }, { id: 'sports-bike', label: 'Sports', art: 'sports' }, { id: 'premium-bike', label: 'Bullet', art: 'cruiser' }, { id: 'scooter', label: 'Scooter', art: 'scooter' }, { id: 'bike', label: 'Bike', art: 'commuter' }, { id: 'bus', label: 'Bus' }, { id: 'sedan', label: 'Sedan', art: 'sedan' }, { id: 'suv', label: 'SUV', art: 'suv' }, { id: 'mpv', label: 'MPV', art: 'muv' }, { id: 'hatchback', label: 'Hatchback', art: 'hatch' }],
+};
+export const SIGNUP_SERVICES = [
+  { id: 'towing', label: 'Towing', description: 'Vehicle towing' },
+  { id: 'flat-tire', label: 'Flat tyre', description: 'Tyre & puncture repair' },
+  { id: 'battery', label: 'Battery', description: 'Battery jumpstart' },
+  { id: 'mechanical', label: 'Mechanic', description: 'Roadside repairs' },
+  { id: 'fuel', label: 'Fuel', description: 'Emergency fuel delivery' },
+  { id: 'lockout', label: 'Lockout', description: 'Vehicle unlocking' },
+  { id: 'winching', label: 'Winching', description: 'Vehicle recovery' },
+  { id: 'ev-charging', label: 'EV charging', description: 'Portable charging' },
+] as const;
+
+const REQUEST_SUBTYPE_ALIASES: Record<string, Record<string, string[]>> = {
+  bike: { bike: ['commuter-bike', 'sports-bike', 'premium-bike'], scooter: ['scooter'] },
+  car: { sedan: ['sedan'], hatchback: ['hatchback'], suv: ['compact-suv', 'big-suv'], mpv: ['mpv'] },
+  commercial: { scv: ['pickup-mini-truck'], lcv: ['tempo-van', 'light-commercial'], mcv: ['mcv'], hcv: ['heavy-truck'] },
+  ev: { scooter: ['electric-scooter'], bike: ['electric-bike'], car: ['electric-car', 'electric-suv'], bus: ['electric-bus'] },
+};
+
+// Keep the existing dispatch and homepage pricing readers in sync with the
+// detailed subtype rows, using the same existing technician pricing structures.
+export function buildLegacySignupPricingConfig(rows: PricingRow[]) {
+  const groups = new Map<string, Map<string, PricingRow[]>>();
+  for (const row of rows) {
+    const domain = String(row.pricing_json.service_domain || '');
+    const vehicle = String(row.pricing_json.vehicle_type || '');
+    if (!domain || !vehicle) continue;
+    if (!groups.has(domain)) groups.set(domain, new Map());
+    const vehicles = groups.get(domain)!;
+    vehicles.set(vehicle, [...(vehicles.get(vehicle) || []), row]);
+  }
+  return [...groups].map(([domain, vehicles]) => {
+    const vehiclePricing = Object.fromEntries([...vehicles].map(([vehicle, subtypeRows]) => {
+      const normalized: Record<string, string | number>[] = subtypeRows.map(row => {
+        const fields = row.pricing_json;
+        const tyrePrices = [fields.tube_tyre_price, fields.tubeless_tyre_price, fields.tubeless_price]
+          .filter(value => value !== '' && value != null).map(Number);
+        return { ...fields, label: fields.vehicle_subtype_label,
+          service_charge: fields.service_charge ?? fields.jumpstart_charge ?? fields.unlock_charge ?? fields.charging_support_fee ?? fields.recovery_fee ?? (tyrePrices.length ? Math.min(...tyrePrices) : fields.base_charge),
+          extra_km_charge: fields.extra_km_charge ?? fields.cost_per_km,
+          tubeless_price: fields.tubeless_price ?? fields.tubeless_tyre_price,
+          free_km: fields.free_km ?? fields.free_distance,
+        };
+      });
+      const subcategories = Object.fromEntries(subtypeRows.map((row, index) => [row.pricing_json.vehicle_subtype, normalized[index]]));
+      for (const [subtype, fields] of Object.entries(subcategories)) {
+        for (const alias of REQUEST_SUBTYPE_ALIASES[vehicle]?.[subtype] || []) subcategories[alias] = fields;
+      }
+      // The current customer SUV/MUV option also covers MPVs when SUV is not offered.
+      if (vehicle === 'car' && subcategories.mpv && !subcategories['big-suv']) subcategories['big-suv'] = subcategories.mpv;
+      const defaults = [...normalized].sort((a, b) => (Number(a.service_charge || a.delivery_charge || 0) + Number(a.visit_charge || 0)) - (Number(b.service_charge || b.delivery_charge || 0) + Number(b.visit_charge || 0)))[0];
+      return [vehicle, { ...defaults, selected_subcategories: subtypeRows.map(row => row.pricing_json.vehicle_subtype),
+        subcategories }];
+    }));
+    const key = domain === 'flat-tire' ? 'flat_tire_vehicle_pricing' : domain === 'towing' ? 'towing_vehicle_pricing' : 'vehicle_pricing';
+    return { service_domain: domain, service_name: domain, vehicle_categories: [...vehicles.keys()], [key]: vehiclePricing };
+  });
+}
+
+export function filterSignupPricing(rows: PricingRow[], template: PricingTemplate, services: string[], vehicles: string[]) {
+  return rows.filter(row => {
+    const service = template.services.find(item => String(item.id) === String(row.service_id));
+    const vehicle = template.categories.find(item => String(item.id) === String(row.vehicle_category_id));
+    const vehicleType = vehicle && canonicalizeVehicleKey(vehicle.category_name);
+    const validSubtype = vehicleType && SIGNUP_SUBTYPES[vehicleType as SignupVehicle]?.some(subtype => subtype.id === row.pricing_json.vehicle_subtype);
+    return service && vehicle && vehicleType && validSubtype && services.includes(canonicalizeServiceKey(service.service_slug || service.service_name))
+      && vehicles.includes(vehicleType);
+  });
+}
+export function getSignupPricingError(rows: PricingRow[], template: PricingTemplate, services: string[], vehicles: string[]) {
+  for (const serviceId of services) {
+    const service = template.services.find(item => canonicalizeServiceKey(item.service_slug || item.service_name) === serviceId);
+    if (!service) return 'Pricing is unavailable for a selected service. Please retry loading the prices.';
+    const fields = template.pricingFields.filter(field => String(field.service_id) === String(service.id));
+    if (!fields.length) return `Pricing fields are unavailable for ${service.service_name}. Please retry.`;
+    for (const vehicleId of vehicles) {
+      const vehicle = template.categories.find(item => canonicalizeVehicleKey(item.category_name) === vehicleId);
+      const relevantRows = rows.filter(row => row.service_id === service.id && row.vehicle_category_id === vehicle?.id);
+      if (!vehicle || !relevantRows.length) return `Choose a ${vehicleId} subtype and set its ${SIGNUP_SERVICES.find(s => s.id === serviceId)?.label || serviceId} prices.`;
+      for (const row of relevantRows) {
+        for (const field of fields) {
+          const raw = row.pricing_json[field.field_key];
+          if ((field.required && (raw === '' || raw == null)) || (raw !== '' && raw != null && (!Number.isFinite(Number(raw)) || Number(raw) < 0))) {
+            return `Enter a valid ${field.field_label.toLowerCase()} for ${row.pricing_json.vehicle_subtype_label}.`;
+          }
+        }
+      }
+    }
+  }
+  return null;
 }

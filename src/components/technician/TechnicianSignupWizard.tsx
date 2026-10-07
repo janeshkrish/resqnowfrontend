@@ -1,132 +1,35 @@
-import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import React, { useState, useEffect, useId, useRef } from "react";
+import { useForm, type FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import LocationDetector from "./LocationDetector";
-import DynamicPricingStep from "./DynamicPricingStep";
-import { technicianAuthService } from "@/services/technicianAuthService";
+import LocationDetector, { type LocationState } from "./LocationDetector";
+import DynamicPricingStep, { type PricingTemplate } from "./DynamicPricingStep";
+import { technicianAuthService, technicianSchema, type TechnicianFormValues } from "@/services/technicianAuthService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
-    Loader2, ArrowRight, Check, Car, MapPin, User, Wrench, CreditCard,
-    Upload, Clock, Key, AlertTriangle, Truck, Zap,
-    CheckCircle2, ChevronRight, Fuel, ChevronLeft, Building2, Wallet,
-    Globe, Briefcase, Smartphone, Bike, Bus
+    Loader2, ArrowRight, Check, Car, MapPin, Wrench, CreditCard, ImagePlus, X,
+    Clock, Truck,
+    CheckCircle2, ChevronRight, Building2, Wallet,
+    Globe, Briefcase, Smartphone, Bus, Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { SERVICE_CATALOG } from "@/config/serviceCatalog";
 import {
     normalizeSpecialtiesForApi,
     normalizeVehicleTypesForApi,
-    normalizePricingConfigForApi,
 } from "@/config/technicianNormalization";
-import { apiUrl, apiFetch } from "@/lib/api";
+import { apiFetch, apiUrl } from "@/lib/api";
 import {
-    buildSignupPricingPayload,
     getSelectedSignupVehicleTypes,
+    buildLegacySignupPricingConfig, filterSignupPricing, getSignupPricingError,
+    SIGNUP_VEHICLES, SIGNUP_SERVICES,
 } from "@/utils/technicianSignupPricing";
-
-// --- Zod Schema ---
-
-const technicianSchema = z.object({
-    // Step 0: Personal
-    proprietor_name: z.string().min(2, "Name required"),
-    name: z.string().min(2, "Shop Name required"),
-    email: z.string().email("Invalid email"),
-    password: z.string().min(6, "Min 6 chars"),
-    confirmPassword: z.string(),
-    phone: z.string().min(10, "Min 10 digits"),
-    alternate_phone: z.string().optional(),
-    location: z.object({
-        address: z.string().min(5, "Address required"),
-        latitude: z.number().nullable().refine(val => val !== null, "GPS Location required"),
-        longitude: z.number().nullable(),
-        state: z.string().min(2, "State required"),
-        locality: z.string().optional(),
-        city: z.string().optional(),
-        district: z.string().optional(),
-        pincode: z.string().optional(),
-    }),
-    serviceAreaRange: z.coerce.number().min(1, "Min 1 km"),
-    experience: z.coerce.number().min(0, "Invalid experience"),
-
-    // Step 1: Services
-    specialties: z.array(z.string()).min(1, "Select at least one service"),
-    vehicle_types: z.any().refine((data) => data && Object.values(data).some(val => val === true), {
-        message: "Select at least one vehicle type"
-    }),
-    towing_fleet_types: z.array(z.string()).default([]),
-
-    // Step 2: Verification
-    aadhaar_number: z.string().min(12, "12 digits required").max(12),
-    gst_number: z.string().optional(),
-    documents: z.object({
-        garage_front: z.string().optional(),
-        profile_photo: z.string().optional(),
-        tools_photo: z.string().optional(),
-        facilities_photo: z.string().optional(),
-    }),
-
-    // Step 3: Operations
-    working_hours: z.object({
-        opening_time: z.string().min(1, "Required"),
-        closing_time: z.string().min(1, "Required"),
-        weekly_off: z.string(),
-        is_24x7: z.boolean(),
-    }),
-    app_readiness: z.object({
-        has_smartphone: z.boolean().refine(val => val === true, "Required"),
-        preferred_language: z.string(),
-    }),
-
-    // Step 4: Pricing
-    pricing_config: z.array(z.any()),
-
-    // Step 5: Banking
-    payment_details: z.object({
-        modes: z.record(z.boolean()),
-        upi_id: z.string().optional(),
-        bank_account_number: z.string().optional(),
-        ifsc_code: z.string().optional(),
-        bank_name: z.string().optional(),
-    }),
-    trade_license_number: z.string().optional(),
-
-    // Step 6: Consent
-    consent: z.object({
-        agreed: z.boolean().refine(val => val === true, "Required"),
-    }),
-}).superRefine((data, ctx) => {
-    if (data.password !== data.confirmPassword) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Mismatch",
-            path: ["confirmPassword"],
-        });
-    }
-
-    if (data.specialties.includes("towing") && data.towing_fleet_types.length === 0) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Select at least one tow truck type",
-            path: ["towing_fleet_types"],
-        });
-    }
-});
-
-type TechnicianFormValues = z.infer<typeof technicianSchema>;
-type SignupVehicleType = ReturnType<typeof getSelectedSignupVehicleTypes>[number];
-
 
 // --- Constants ---
 
@@ -137,39 +40,8 @@ const STEPS = [
     { id: 3, title: "Operations", subtitle: "Hours" },
     { id: 4, title: "Pricing", subtitle: "Rates" },
     { id: 5, title: "Banking", subtitle: "Payouts" },
-    { id: 6, title: "Finish", subtitle: "Submit" },
-];
-
-const SERVICE_VISUALS: Record<string, { icon: any; desc: string }> = {
-    towing: { icon: Truck, desc: "Vehicle towing" },
-    "flat-tire": { icon: AlertTriangle, desc: "Tire repair" },
-    battery: { icon: Zap, desc: "Battery jumpstart" },
-    mechanical: { icon: Wrench, desc: "Mechanical support" },
-    fuel: { icon: Fuel, desc: "Emergency fuel" },
-    lockout: { icon: Key, desc: "Vehicle unlock" },
-    winching: { icon: Truck, desc: "Vehicle recovery" },
-    "ev-charging": { icon: Zap, desc: "Portable charging" },
-};
-
-const ALL_SERVICES = SERVICE_CATALOG
-    .filter((service) => service.id !== "other")
-    .map((service) => ({
-        id: service.id,
-        label: service.name,
-        icon: SERVICE_VISUALS[service.id]?.icon || Wrench,
-        desc: SERVICE_VISUALS[service.id]?.desc || service.description,
-    }));
-
-const SERVICE_NAME_BY_ID = ALL_SERVICES.reduce<Record<string, string>>((acc, service) => {
-    acc[service.id] = service.label;
-    return acc;
-}, {});
-
-const VEHICLES = [
-    { id: "bike", label: "M/Cycle", icon: Bike, description: "Two-wheelers and scooters" },
-    { id: "car", label: "Car", icon: Car, description: "Cars and personal vehicles" },
-    { id: "commercial", label: "Truck", icon: Bus, description: "Commercial vehicles" },
-    { id: "ev", label: "EV", icon: Zap, description: "Electric vehicles" },
+    { id: 6, title: "Preview", subtitle: "Review" },
+    { id: 7, title: "Finish", subtitle: "Submit" },
 ];
 
 const TOWING_FLEET_TYPES = [
@@ -193,587 +65,172 @@ const TOWING_FLEET_TYPES = [
     },
 ] as const;
 
-const VEHICLE_PRICING_VISUALS: Record<string, { label: string; icon: any; description: string }> = {
-    bike: { label: "Bike", icon: Bike, description: "Two-wheeler roadside jobs" },
-    car: { label: "Car", icon: Car, description: "Personal cars and SUVs" },
-    commercial: { label: "Commercial", icon: Bus, description: "Truck and fleet support" },
-    ev: { label: "EV", icon: Zap, description: "Electric vehicle support" },
-};
-
-const FLAT_TIRE_SUBCATEGORY_CONFIG: Record<string, { label: string; helper: string; items: { id: string; label: string }[] }> = {
-    bike: {
-        label: "Bike Categories",
-        helper: "Pick the two-wheeler segments you service.",
-        items: [
-            { id: "scooter", label: "Scooter" },
-            { id: "commuter-bike", label: "Commuter Bike" },
-            { id: "sports-bike", label: "Sports Bike" },
-            { id: "premium-bike", label: "Premium Bike" },
-        ],
-    },
-    car: {
-        label: "Car Categories",
-        helper: "Pick the car segments you cover.",
-        items: [
-            { id: "hatchback", label: "Hatchback" },
-            { id: "compact-suv", label: "Compact SUV" },
-            { id: "sedan", label: "Sedan" },
-            { id: "big-suv", label: "Big SUV" },
-        ],
-    },
-    commercial: {
-        label: "Truck Categories",
-        helper: "Pick the commercial segments you support.",
-        items: [
-            { id: "pickup-mini-truck", label: "Pickup / Mini Truck" },
-            { id: "tempo-van", label: "Tempo / Van" },
-            { id: "light-commercial", label: "Light Commercial" },
-            { id: "heavy-truck", label: "Heavy Truck" },
-        ],
-    },
-    ev: {
-        label: "EV Categories",
-        helper: "Pick the electric vehicle segments you handle.",
-        items: [
-            { id: "electric-scooter", label: "Electric Scooter" },
-            { id: "electric-bike", label: "Electric Bike" },
-            { id: "electric-car", label: "Electric Car" },
-            { id: "electric-suv", label: "Electric SUV" },
-        ],
-    },
-};
-
-const SERVICE_PRICING_FIELD_CONFIG: Record<
-    string,
-    {
-        description: string;
-        helper?: string;
-        fields: { id: string; label: string; placeholder: string }[];
-    }
-> = {
-    mechanical: {
-        description: "Enter the standard roadside repair charge for each vehicle category you support.",
-        fields: [
-            { id: "service_charge", label: "Service charge (INR)", placeholder: "e.g. 450" },
-            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 150" },
-        ],
-    },
-    battery: {
-        description: "Set your jumpstart pricing by vehicle category.",
-        fields: [
-            { id: "service_charge", label: "Jumpstart charge (INR)", placeholder: "e.g. 350" },
-            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 120" },
-        ],
-    },
-    fuel: {
-        description: "Enter only the delivery charge. Fuel cost can still be billed separately.",
-        helper: "Fuel amount can be collected separately at actuals.",
-        fields: [{ id: "delivery_charge", label: "Delivery charge (INR)", placeholder: "e.g. 200" }],
-    },
-    lockout: {
-        description: "Set your lockout support pricing for each category you service.",
-        fields: [
-            { id: "service_charge", label: "Unlock charge (INR)", placeholder: "e.g. 400" },
-            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 100" },
-        ],
-    },
-    winching: {
-        description: "Set the recovery fee you want to quote for each vehicle category.",
-        fields: [
-            { id: "service_charge", label: "Recovery fee (INR)", placeholder: "e.g. 800" },
-            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 200" },
-        ],
-    },
-    "ev-charging": {
-        description: "Set the emergency charging support fee by vehicle category.",
-        fields: [
-            { id: "service_charge", label: "Charging support fee (INR)", placeholder: "e.g. 500" },
-            { id: "visit_charge", label: "Visit charge (INR)", placeholder: "e.g. 150" },
-        ],
-    },
-};
-
 const toggleArrayValue = (values: string[], nextValue: string) =>
     values.includes(nextValue) ? values.filter((value) => value !== nextValue) : [...values, nextValue];
 
 
 // --- Components ---
 
-const ImageUpload = ({ value, onChange, label }: { value?: string; onChange: (url: string) => void; label: string }) => {
-    const [uploading, setUploading] = useState(false);
+function TechnicianImageUpload({ value, onChange, label, onUploadStateChange }: { value?: string; onChange: (url: string) => void; label: string; onUploadStateChange?: (label: string, uploading: boolean) => void }) {
+  const id = useId();
+  const [uploading, setUploading] = useState(false);
+  const [localPreview, setLocalPreview] = useState('');
+  const [previewError, setPreviewError] = useState(false);
+  const previewRef = useRef('');
+  const uploadRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current); uploadRef.current?.abort(); }, []);
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+  const clearPreview = () => {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = ''; setLocalPreview(''); setPreviewError(false);
+  };
+  const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please choose an image.'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Choose an image smaller than 10 MB.'); return; }
+    clearPreview();
+    previewRef.current = URL.createObjectURL(file); setLocalPreview(previewRef.current);
+    setUploading(true);
+    onUploadStateChange?.(label, true);
+    const controller = new AbortController(); uploadRef.current = controller;
+    const body = new FormData(); body.append('file', file);
+    try {
+      const response = await fetch(apiUrl('/api/upload'), { method: 'POST', body, signal: controller.signal });
+      const data = await response.json();
+      if (!response.ok || typeof data.url !== 'string' || !data.url) throw new Error('Upload failed');
+      // Store the original backend resource path; use the local preview immediately.
+      onChange(data.url); toast.success(`${label} uploaded`);
+    } catch (error) {
+      if (!controller.signal.aborted) { clearPreview(); toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.'); }
+    } finally { if (!controller.signal.aborted) { setUploading(false); onUploadStateChange?.(label, false); } }
+  };
+  const src = localPreview || (value ? (/^(https?:|blob:|data:)/.test(value) ? value : apiUrl(value)) : '');
+  return <div className={`rq-upload ${src ? 'has-image' : ''}`}>
+    <label htmlFor={id} className="rq-upload-target">
+      {src && !previewError ? <img src={src} alt={`${label} preview`} onError={() => setPreviewError(true)} /> : <span className="rq-upload-placeholder"><ImagePlus size={22} /><strong>{label}</strong><small>{previewError ? 'Preview unavailable · replace photo' : 'Tap to add a photo'}</small></span>}
+      {src && <span className="rq-upload-caption"><Check size={12} />{label}</span>}
+      <input id={id} type="file" accept="image/*" aria-label={`Upload ${label}`} onChange={upload} disabled={uploading} />
+    </label>
+    {src && !uploading && <button type="button" className="rq-upload-remove" aria-label={`Remove ${label}`} onClick={() => { clearPreview(); onChange(''); }}><X size={14} /></button>}
+    {uploading && <div className="rq-upload-busy" role="status"><Loader2 size={20} className="animate-spin" />Uploading…</div>}
+  </div>;
+}
 
-        setUploading(true);
-        const formData = new FormData();
-        formData.append("file", file);
+function SignupPreviewSection({ title, step, onEdit, children }: { title: string; step: number; onEdit: (step: number) => void; children: React.ReactNode }) {
+    return <section className="rq-signup-card rq-review-section">
+        <div className="rq-review-heading"><h2>{title}</h2><button type="button" className="rq-text-button" aria-label={`Edit ${title}`} onClick={() => onEdit(step)}><Pencil size={12} />Edit</button></div>
+        {children}
+    </section>;
+}
 
-        try {
-            const res = await fetch(apiUrl("/api/upload"), {
-                method: "POST",
-                body: formData,
-            });
+function SignupPreviewDetail({ label, value }: { label: string; value?: React.ReactNode }) {
+    return <div><dt>{label}</dt><dd>{value === "" || value == null ? "Not provided" : value}</dd></div>;
+}
 
-            if (!res.ok) throw new Error("Upload failed");
-
-            const data = await res.json();
-            onChange(data.url);
-            toast.success("Uploaded!");
-        } catch (err) {
-            console.error(err);
-            toast.error("Upload failed");
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    return (
-        <div className="border border-dashed border-slate-300 rounded-lg p-3 flex flex-col items-center justify-center text-center bg-muted relative group h-28">
-            {value ? (
-                <div className="relative w-full h-full rounded overflow-hidden">
-                    <img src={value} alt="Uploaded" className="object-cover w-full h-full" />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="secondary" size="sm" onClick={() => onChange("")} type="button">Remove</Button>
-                    </div>
-                </div>
-            ) : (
-                <>
-                    <Upload className="w-5 h-5 text-slate-400 mb-1" />
-                    <div className="font-medium text-muted-foreground text-[10px] uppercase">{label}</div>
-                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} disabled={uploading} />
-                    {uploading && <div className="absolute inset-0 bg-card dark:bg-slate-900/80 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-primary" /></div>}
-                </>
-            )}
-        </div>
-    );
-};
-
-// --- SERVICE CONFIGURATION WITH STRUCTURED VEHICLE PRICING ---
-const ServiceConfigCard = ({ serviceId, index, register, watch, setValue, selectedVehicleTypes }: any) => {
-    const prefix = `pricing_config.${index}`;
-    const serviceLabel = SERVICE_NAME_BY_ID[serviceId] || serviceId;
-    const serviceVisual = ALL_SERVICES.find((service) => service.id === serviceId);
-    const serviceIcon = serviceVisual?.icon || Wrench;
-    const vehicleCategories = (watch(`${prefix}.vehicle_categories`) || []) as SignupVehicleType[];
-    const towingFleetTypes = (watch("towing_fleet_types") || []) as string[];
-    const availableVehicleTypes = (selectedVehicleTypes || []).filter((vehicleType: SignupVehicleType) => VEHICLE_PRICING_VISUALS[vehicleType]);
-    const pricingMeta = SERVICE_PRICING_FIELD_CONFIG[serviceId];
-    const cardDescription =
-        serviceId === "flat-tire"
-            ? "Tap the vehicle categories and subcategories you cover, then enter separate tube tyre and tubeless puncture prices."
-            : serviceId === "towing"
-                ? "Select the vehicle categories you tow and set separate pricing for each selected tow truck type."
-                : pricingMeta?.description || "Tap the vehicle categories you support, then enter your pricing.";
-
-    const syncField = (fieldName: string, value: unknown) => {
-        setValue(fieldName, value, { shouldDirty: true, shouldValidate: true });
-    };
-
-    const toggleVehicleCategory = (vehicleType: SignupVehicleType) => {
-        syncField(`${prefix}.vehicle_categories`, toggleArrayValue(vehicleCategories, vehicleType));
-    };
-
-    const toggleFlatTireSubcategory = (
-        vehicleType: SignupVehicleType,
-        subcategoryId: string,
-        subcategoryLabel: string
-    ) => {
-        const fieldName = `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.selected_subcategories`;
-        const currentValues = (watch(fieldName) || []) as string[];
-        const nextValues = toggleArrayValue(currentValues, subcategoryId);
-        syncField(fieldName, nextValues);
-        if (nextValues.includes(subcategoryId)) {
-            syncField(
-                `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.label`,
-                subcategoryLabel
-            );
-        }
-    };
-
-    const renderVehiclePricingSection = (vehicleType: SignupVehicleType) => {
-        const visual = VEHICLE_PRICING_VISUALS[vehicleType];
-        if (!visual) return null;
-
-        const VehicleIcon = visual.icon;
-
-        if (serviceId === "towing") {
-            return (
-                <div key={vehicleType} className="rounded-2xl border border-border/70 bg-card p-4 space-y-4">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <VehicleIcon className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-foreground">{visual.label}</h4>
-                            <p className="text-xs text-muted-foreground">{visual.description}</p>
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border border-dashed border-primary/20 bg-primary/5 px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-primary/80">Fleet Selected</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            {towingFleetTypes.length > 0 ? (
-                                towingFleetTypes.map((fleetType) => {
-                                    const fleetConfig = TOWING_FLEET_TYPES.find((option) => option.id === fleetType);
-                                    return (
-                                        <span key={fleetType} className="rounded-full border border-primary/20 bg-card px-3 py-1 text-xs font-medium text-foreground">
-                                            {fleetConfig?.label || fleetType}
-                                        </span>
-                                    );
-                                })
-                            ) : (
-                                <span className="text-xs text-muted-foreground">Select tow truck types above to complete this section.</span>
-                            )}
-                        </div>
-                    </div>
-
-                    {towingFleetTypes.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                            Select at least one tow truck type above to add pricing for this vehicle category.
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {towingFleetTypes.map((fleetType) => {
-                                const fleetConfig = TOWING_FLEET_TYPES.find((option) => option.id === fleetType);
-                                if (!fleetConfig) return null;
-                                const FleetIcon = fleetConfig.icon;
-
-                                return (
-                                    <div key={fleetType} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                                <FleetIcon className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-foreground">{fleetConfig.label}</p>
-                                                <p className="text-xs text-muted-foreground">{fleetConfig.description}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid gap-3 md:grid-cols-3">
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-foreground">Base charge (INR)</Label>
-                                                <Input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    min="0"
-                                                    placeholder="e.g. 1200"
-                                                    {...register(
-                                                        `${prefix}.towing_vehicle_pricing.${vehicleType}.fleet_pricing.${fleetType}.base_charge`
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-foreground">Free distance up to (km)</Label>
-                                                <Input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    min="0"
-                                                    placeholder="e.g. 5"
-                                                    {...register(
-                                                        `${prefix}.towing_vehicle_pricing.${vehicleType}.fleet_pricing.${fleetType}.free_distance`
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-foreground">Cost per km (INR)</Label>
-                                                <Input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    min="0"
-                                                    placeholder="e.g. 45"
-                                                    {...register(
-                                                        `${prefix}.towing_vehicle_pricing.${vehicleType}.fleet_pricing.${fleetType}.per_km_charge`
-                                                    )}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        if (serviceId === "flat-tire") {
-            const subcategoryConfig = FLAT_TIRE_SUBCATEGORY_CONFIG[vehicleType];
-            const selectedSubcategories = (watch(
-                `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.selected_subcategories`
-            ) || []) as string[];
-
-            return (
-                <div key={vehicleType} className="rounded-2xl border border-border/70 bg-card p-4 space-y-4">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <VehicleIcon className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-foreground">{subcategoryConfig?.label || visual.label}</h4>
-                            <p className="text-xs text-muted-foreground">
-                                {subcategoryConfig?.helper || "Select the segments you cover and enter pricing."}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        {subcategoryConfig?.items.map((subcategory) => {
-                            const isSelected = selectedSubcategories.includes(subcategory.id);
-                            return (
-                                <button
-                                    key={subcategory.id}
-                                    type="button"
-                                    onClick={() => toggleFlatTireSubcategory(vehicleType, subcategory.id, subcategory.label)}
-                                    className={cn(
-                                        "rounded-xl border px-3 py-3 text-left transition-all",
-                                        isSelected
-                                            ? "border-primary bg-primary/5 shadow-sm"
-                                            : "border-border bg-muted/30 hover:bg-muted/60"
-                                    )}
-                                >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <span className="text-sm font-semibold text-foreground">{subcategory.label}</span>
-                                        {isSelected ? (
-                                            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-white">
-                                                <Check className="h-3.5 w-3.5" />
-                                            </div>
-                                        ) : (
-                                            <div className="h-5 w-5 rounded border-2 border-border" />
-                                        )}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                        <div className="mb-3">
-                            <p className="font-semibold text-foreground">Visit and distance charges</p>
-                            <p className="text-xs text-muted-foreground">Add the visit charge and distance pricing for this vehicle category.</p>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-3">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-foreground">Visit charge (INR)</Label>
-                                <Input
-                                    type="number"
-                                    inputMode="numeric"
-                                    min="0"
-                                    placeholder="e.g. 120"
-                                    {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.visit_charge`)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-foreground">Free distance up to (km)</Label>
-                                <Input
-                                    type="number"
-                                    inputMode="numeric"
-                                    min="0"
-                                    placeholder="e.g. 3"
-                                    {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.free_distance`)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-foreground">Cost per km (INR)</Label>
-                                <Input
-                                    type="number"
-                                    inputMode="numeric"
-                                    min="0"
-                                    placeholder="e.g. 20"
-                                    {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.extra_km_charge`)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {selectedSubcategories.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                            Tap at least one {visual.label.toLowerCase()} segment to add puncture pricing.
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {selectedSubcategories.map((subcategoryId) => {
-                                const subcategory = subcategoryConfig?.items.find((item) => item.id === subcategoryId);
-                                if (!subcategory) return null;
-
-                                return (
-                                    <div key={subcategoryId} className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                                        <div className="mb-3 flex items-center justify-between gap-3">
-                                            <div>
-                                                <p className="font-semibold text-foreground">{subcategory.label}</p>
-                                                <p className="text-xs text-muted-foreground">Enter the puncture pricing for both tyre types.</p>
-                                            </div>
-                                        </div>
-                                        <input
-                                            type="hidden"
-                                            {...register(`${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.label`)}
-                                            value={subcategory.label}
-                                            readOnly
-                                        />
-                                        <div className="grid gap-3 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-foreground">Tube tyre puncture (INR)</Label>
-                                                <Input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    min="0"
-                                                    placeholder="e.g. 120"
-                                                    {...register(
-                                                        `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.tube_tyre_price`
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-foreground">Tubeless puncture (INR)</Label>
-                                                <Input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    min="0"
-                                                    placeholder="e.g. 180"
-                                                    {...register(
-                                                        `${prefix}.flat_tire_vehicle_pricing.${vehicleType}.subcategories.${subcategoryId}.tubeless_price`
-                                                    )}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        return (
-            <div key={vehicleType} className="rounded-2xl border border-border/70 bg-card p-4 space-y-4">
-                <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <VehicleIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-foreground">{visual.label}</h4>
-                        <p className="text-xs text-muted-foreground">{visual.description}</p>
-                    </div>
-                </div>
-                <div className={cn("grid gap-3", pricingMeta?.fields.length === 1 ? "md:grid-cols-1" : "md:grid-cols-2")}>
-                    {pricingMeta?.fields.map((field) => (
-                        <div key={field.id} className="space-y-2">
-                            <Label className="text-xs font-semibold text-foreground">{field.label}</Label>
-                            <Input
-                                type="number"
-                                inputMode="numeric"
-                                min="0"
-                                placeholder={field.placeholder}
-                                {...register(`${prefix}.vehicle_pricing.${vehicleType}.${field.id}`)}
-                            />
-                        </div>
-                    ))}
-                </div>
-                {pricingMeta?.helper ? (
-                    <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                        {pricingMeta.helper}
-                    </div>
-                ) : null}
-            </div>
-        );
-    };
-
-    return (
-        <Card className="mb-4 border shadow-sm">
-            <CardHeader className="border-b bg-muted/60 px-4 py-3">
-                <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        {React.createElement(serviceIcon, { className: "h-5 w-5" })}
-                    </div>
-                    <div className="space-y-1">
-                        <CardTitle className="text-base font-bold text-foreground">{serviceLabel}</CardTitle>
-                        <CardDescription className="text-xs leading-relaxed text-muted-foreground">
-                            {cardDescription}
-                        </CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-5 p-4">
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-semibold text-foreground">Vehicle categories</p>
-                            <p className="text-xs text-muted-foreground">Tap the categories you want to price for this service.</p>
-                        </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        {availableVehicleTypes.map((vehicleType: SignupVehicleType) => {
-                            const visual = VEHICLE_PRICING_VISUALS[vehicleType];
-                            if (!visual) return null;
-                            const isSelected = vehicleCategories.includes(vehicleType);
-                            return (
-                                <button
-                                    key={vehicleType}
-                                    type="button"
-                                    onClick={() => toggleVehicleCategory(vehicleType)}
-                                    className={cn(
-                                        "rounded-2xl border px-4 py-4 text-left transition-all",
-                                        isSelected
-                                            ? "border-primary bg-primary/5 shadow-sm"
-                                            : "border-border bg-muted/20 hover:bg-muted/60"
-                                    )}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className={cn(
-                                            "flex h-10 w-10 items-center justify-center rounded-full",
-                                            isSelected ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                                        )}>
-                                            <visual.icon className="h-5 w-5" />
-                                        </div>
-                                        {isSelected ? (
-                                            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-white">
-                                                <Check className="h-3.5 w-3.5" />
-                                            </div>
-                                        ) : (
-                                            <div className="h-5 w-5 rounded border-2 border-border" />
-                                        )}
-                                    </div>
-                                    <p className="mt-3 text-sm font-semibold text-foreground">{visual.label}</p>
-                                    <p className="mt-1 text-xs text-muted-foreground">{visual.description}</p>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {vehicleCategories.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
-                        Select at least one vehicle category above to enter pricing for {serviceLabel.toLowerCase()}.
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {vehicleCategories
-                            .filter((vehicleType) => availableVehicleTypes.includes(vehicleType))
-                            .map((vehicleType) => renderVehiclePricingSection(vehicleType))}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    );
-};
-
-
-// --- Main Layout ---
+function TechnicianApplicationPreview({ data, template, onEdit }: { data: TechnicianFormValues; template: PricingTemplate | null; onEdit: (step: number) => void }) {
+    const vehicles = getSelectedSignupVehicleTypes(data.vehicle_types);
+    const rows = template ? filterSignupPricing(data.pricing_config, template, data.specialties, vehicles) : [];
+    const documentLabels = [{ key: "garage_front", label: "Shop Front" }, { key: "profile_photo", label: "Profile Photo" }, { key: "tools_photo", label: "Tools / Bay" }, { key: "facilities_photo", label: "Facilities" }] as const;
+    const paymentModes = Object.entries(data.payment_details.modes).filter(([, enabled]) => enabled).map(([mode]) => mode === "upi" ? "UPI" : mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, " "));
+    const amount = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    return <div className="space-y-6" data-testid="signup-application-preview">
+        <SignupPreviewSection title="Personal details" step={0} onEdit={onEdit}>
+            <dl className="rq-review-grid">
+                <SignupPreviewDetail label="Your name" value={data.proprietor_name} />
+                <SignupPreviewDetail label="Shop name" value={data.name} />
+                <SignupPreviewDetail label="Mobile number" value={data.phone} />
+                <SignupPreviewDetail label="Alternate mobile" value={data.alternate_phone} />
+                <SignupPreviewDetail label="Email address" value={data.email} />
+                <SignupPreviewDetail label="Password" value={data.password ? "Set (hidden)" : "Not set"} />
+                <SignupPreviewDetail label="Address" value={data.location.address} />
+                <SignupPreviewDetail label="Locality" value={data.location.locality} />
+                <SignupPreviewDetail label="City / town" value={data.location.city} />
+                <SignupPreviewDetail label="District" value={data.location.district} />
+                <SignupPreviewDetail label="State" value={data.location.state} />
+                <SignupPreviewDetail label="Pincode" value={data.location.pincode} />
+                <SignupPreviewDetail label="GPS location" value={data.location.latitude != null && data.location.longitude != null ? `${data.location.latitude}, ${data.location.longitude}` : ""} />
+                <SignupPreviewDetail label="Experience" value={`${data.experience} years`} />
+                <SignupPreviewDetail label="Service range" value={`${data.serviceAreaRange} km`} />
+            </dl>
+        </SignupPreviewSection>
+        <SignupPreviewSection title="Services" step={1} onEdit={onEdit}>
+            <dl className="rq-review-grid">
+                <SignupPreviewDetail label="Vehicle types" value={SIGNUP_VEHICLES.filter(vehicle => vehicles.includes(vehicle.id)).map(vehicle => vehicle.label).join(" · ")} />
+                <SignupPreviewDetail label="Services offered" value={data.specialties.map(service => SIGNUP_SERVICES.find(item => item.id === service)?.label || service).join(" · ")} />
+                {data.specialties.includes("towing") && <SignupPreviewDetail label="Towing fleet" value={data.towing_fleet_types.map(fleet => TOWING_FLEET_TYPES.find(item => item.id === fleet)?.label || fleet).join(" · ")} />}
+            </dl>
+        </SignupPreviewSection>
+        <SignupPreviewSection title="Verification" step={2} onEdit={onEdit}>
+            <dl className="rq-review-grid"><SignupPreviewDetail label="Aadhaar number" value={data.aadhaar_number} /><SignupPreviewDetail label="GSTIN" value={data.gst_number} /></dl>
+            <div className="rq-review-documents">{documentLabels.map(({ key, label }) => {
+                const value = data.documents[key];
+                const src = value && (/^(https?:|blob:|data:)/.test(value) ? value : apiUrl(value));
+                return <figure key={key}>{src ? <img src={src} alt={`${label} application preview`} /> : <div className="rq-review-document-empty"><ImagePlus size={20} /><span>Not added</span></div>}<figcaption>{label}</figcaption></figure>;
+            })}</div>
+        </SignupPreviewSection>
+        <SignupPreviewSection title="Operations" step={3} onEdit={onEdit}>
+            <dl className="rq-review-grid">
+                <SignupPreviewDetail label="Availability" value={data.working_hours.is_24x7 ? "24 × 7" : "Scheduled hours"} />
+                {!data.working_hours.is_24x7 && <><SignupPreviewDetail label="Open" value={data.working_hours.opening_time} /><SignupPreviewDetail label="Close" value={data.working_hours.closing_time} /><SignupPreviewDetail label="Weekly off" value={data.working_hours.weekly_off} /></>}
+                <SignupPreviewDetail label="Preferred language" value={data.app_readiness.preferred_language} />
+            </dl>
+        </SignupPreviewSection>
+        <SignupPreviewSection title="Pricing" step={4} onEdit={onEdit}>
+            {data.specialties.map(service => <div className="rq-review-pricing-group" key={service}>
+                <h3>{SIGNUP_SERVICES.find(item => item.id === service)?.label || service}</h3>
+                {vehicles.map(vehicle => {
+                    const vehicleRows = rows.filter(row => row.pricing_json.service_domain === service && row.pricing_json.vehicle_type === vehicle);
+                    const vehicleLabel = SIGNUP_VEHICLES.find(item => item.id === vehicle)?.label || vehicle;
+                    return vehicleRows.length ? vehicleRows.map(row => <div className="rq-review-pricing-row" key={`${vehicle}:${row.pricing_json.vehicle_subtype}`}>
+                        <h4>{vehicleLabel} · {row.pricing_json.vehicle_subtype_label}</h4>
+                        <dl className="rq-review-grid">{template?.pricingFields.filter(field => String(field.service_id) === String(row.service_id)).map(field => {
+                            const raw = row.pricing_json[field.field_key];
+                            const value = raw === "" || raw == null || !Number.isFinite(Number(raw)) ? "Not set" : /distance|free_km/i.test(field.field_key) ? `${raw} km` : amount.format(Number(raw));
+                            return <SignupPreviewDetail key={field.id} label={field.field_label} value={value} />;
+                        })}</dl>
+                    </div>) : <p className="rq-review-missing" key={vehicle}>{vehicleLabel} · Pricing not added</p>;
+                })}
+            </div>)}
+        </SignupPreviewSection>
+        <SignupPreviewSection title="Banking" step={5} onEdit={onEdit}>
+            <dl className="rq-review-grid">
+                <SignupPreviewDetail label="Payout methods" value={paymentModes.join(" · ")} />
+                <SignupPreviewDetail label="UPI ID" value={data.payment_details.upi_id} />
+                <SignupPreviewDetail label="Bank name" value={data.payment_details.bank_name} />
+                <SignupPreviewDetail label="Account number" value={data.payment_details.bank_account_number} />
+                <SignupPreviewDetail label="IFSC code" value={data.payment_details.ifsc_code} />
+            </dl>
+        </SignupPreviewSection>
+    </div>;
+}
 
 const TechnicianSignupWizard = () => {
     const [currentStep, setCurrentStep] = useState(0);
-    const [pricingTemplate, setPricingTemplate] = useState<any>(null);
-
-    useEffect(() => {
-        apiFetch("/api/technicians/pricing-template")
-            .then(res => res.json())
-            .then(data => setPricingTemplate(data))
-            .catch(err => console.error(err));
+    const [isEditingPreview, setIsEditingPreview] = useState(false);
+    const [pricingTemplate, setPricingTemplate] = useState<PricingTemplate | null>(null);
+    const [pricingLoading, setPricingLoading] = useState(true);
+    const [pricingLoadError, setPricingLoadError] = useState("");
+    const [pricingError, setPricingError] = useState("");
+    const loadPricing = React.useCallback(async () => {
+        setPricingLoading(true); setPricingLoadError("");
+        try {
+            const response = await apiFetch("/api/technicians/pricing-template");
+            if (!response.ok) throw new Error("Could not load pricing options");
+            const data = await response.json();
+            if (![data.services, data.categories, data.pricingFields].every(Array.isArray)) throw new Error("Invalid pricing options");
+            setPricingTemplate({ ...data, subcategories: data.subcategories || [] });
+        } catch { setPricingLoadError("We couldn't load pricing options. Please try again."); }
+        finally { setPricingLoading(false); }
     }, []);
+
+    useEffect(() => { void loadPricing(); }, [loadPricing]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadingDocuments, setUploadingDocuments] = useState<string[]>([]);
+    const handleUploadStateChange = React.useCallback((label: string, uploading: boolean) => {
+        setUploadingDocuments(previous => uploading ? [...new Set([...previous, label])] : previous.filter(item => item !== label));
+    }, []);
     const [isTechnicianAgreementOpen, setIsTechnicianAgreementOpen] = useState(false);
     const [hasAcceptedTechnicianAgreement, setHasAcceptedTechnicianAgreement] = useState(false);
     const [showTechnicianAgreementError, setShowTechnicianAgreementError] = useState(false);
@@ -787,69 +244,32 @@ const TechnicianSignupWizard = () => {
             location: { latitude: null, longitude: null, address: "", locality: "", city: "", district: "", state: "", pincode: "" },
             serviceAreaRange: 10, experience: 0,
             aadhaar_number: "", gst_number: "",
-            vehicle_types: {},
+            vehicle_types: { bike: false, car: false, commercial: false, ev: false },
             specialties: [],
             towing_fleet_types: [],
             pricing_config: [],
-            working_hours: { opening_time: "09:00", closing_time: "20:00", weekly_off: "Sunday", is_24x7: false },
+            working_hours: { opening_time: "", closing_time: "", weekly_off: "None", is_24x7: false },
             payment_details: { modes: { cash: true }, upi_id: "", bank_name: "", bank_account_number: "", ifsc_code: "" },
             app_readiness: { has_smartphone: false, preferred_language: "English" },
             documents: { garage_front: "", profile_photo: "", tools_photo: "", facilities_photo: "" },
-            consent: { agreed: false }
+            consent: { agreed: false },
         }
     });
 
-    const { control, watch, setValue, trigger, register, formState: { errors } } = form;
+    const { control, watch, setValue, trigger, formState: { errors } } = form;
     const selectedServices = watch("specialties") || [];
     const selectedVehicleTypeMap = watch("vehicle_types");
     const selectedVehicleTypes = getSelectedSignupVehicleTypes(selectedVehicleTypeMap);
     const towingFleetTypes = watch("towing_fleet_types") || [];
+    const pricingValue = watch("pricing_config") || [];
+    const hours = watch("working_hours");
+    const emailEntered = Boolean(watch("email")?.trim());
+    const hasScheduledHours = Boolean(hours.opening_time || hours.closing_time);
+    const consentAgreed = watch("consent.agreed");
 
-    const handleLocationDetected = React.useCallback((loc: any) => {
+    const handleLocationDetected = React.useCallback((loc: LocationState) => {
         setValue("location", loc);
     }, [setValue]);
-
-    useEffect(() => {
-        const currentPricingConfig = Array.isArray(form.getValues("pricing_config")) ? form.getValues("pricing_config") : [];
-        const nextPricingConfig = selectedServices.map((serviceId: string) => {
-            const existingEntry =
-                currentPricingConfig.find((entry: any) => {
-                    const existingServiceId = String(entry?.service_domain || entry?.service_name || entry?.service || "").trim();
-                    return existingServiceId === serviceId;
-                }) || {};
-
-            const existingVehicleCategories = Array.isArray(existingEntry.vehicle_categories)
-                ? existingEntry.vehicle_categories.filter((vehicleType: SignupVehicleType) => selectedVehicleTypes.includes(vehicleType))
-                : [];
-
-            const nextEntry = {
-                ...existingEntry,
-                service_name: serviceId,
-                service_domain: serviceId,
-                vehicle_categories: existingVehicleCategories.length > 0 ? existingVehicleCategories : [...selectedVehicleTypes],
-            };
-
-            if (serviceId === "towing") {
-                return {
-                    ...nextEntry,
-                    towing_fleet_types: [...towingFleetTypes],
-                };
-            }
-
-            const { towing_fleet_types: _unused, ...restEntry } = nextEntry;
-            return restEntry;
-        });
-
-        if (JSON.stringify(currentPricingConfig) !== JSON.stringify(nextPricingConfig)) {
-            setValue("pricing_config", nextPricingConfig, { shouldDirty: false, shouldValidate: false });
-        }
-    }, [
-        form,
-        selectedServices,
-        selectedVehicleTypes,
-        setValue,
-        towingFleetTypes,
-    ]);
 
     // Scroll to top on step change
     useEffect(() => {
@@ -857,40 +277,62 @@ const TechnicianSignupWizard = () => {
     }, [currentStep]);
 
     const handleNext = async () => {
-        let fields: any[] = [];
-        if (currentStep === 0) fields = ["proprietor_name", "name", "email", "password", "phone", "location", "experience", "serviceAreaRange"];
+        if (uploadingDocuments.length) { toast.error("Please wait for your photos to finish uploading."); return; }
+        let fields: FieldPath<TechnicianFormValues>[] = [];
+        if (currentStep === 0) fields = ["proprietor_name", "name", "email", "password", "confirmPassword", "phone", "location", "experience", "serviceAreaRange"];
         if (currentStep === 1) fields = ["specialties", "vehicle_types", "towing_fleet_types"];
         if (currentStep === 2) fields = ["aadhaar_number", "documents"];
-        if (currentStep === 6) fields = ["consent"];
+        if (currentStep === 3) fields = ["working_hours", "app_readiness"];
+        if (currentStep === 4 || currentStep === 6 || currentStep === 7) {
+            const message = !pricingTemplate || pricingLoadError ? "Please load the pricing options before continuing." : getSignupPricingError(filterSignupPricing(form.getValues("pricing_config"), pricingTemplate, selectedServices, selectedVehicleTypes), pricingTemplate, selectedServices, selectedVehicleTypes);
+            setPricingError(message || "");
+            if (message) { toast.error(message); return; }
+        }
+        if (currentStep === 6) fields = ["proprietor_name", "name", "email", "password", "confirmPassword", "phone", "alternate_phone", "location", "experience", "serviceAreaRange", "specialties", "vehicle_types", "towing_fleet_types", "aadhaar_number", "gst_number", "documents", "working_hours", "app_readiness", "pricing_config", "payment_details"];
+        if (currentStep === 7) fields = ["consent"];
 
         const isValid = await trigger(fields);
         if (isValid) {
-            if (currentStep === 6 && !hasAcceptedTechnicianAgreement) {
+            if (currentStep === 7 && !hasAcceptedTechnicianAgreement) {
                 setShowTechnicianAgreementError(true);
                 toast.error("Please accept the ResQNow Technician Agreement.");
                 return;
             }
-            if (currentStep < STEPS.length - 1) setCurrentStep(prev => prev + 1);
-            else await onSubmit(form.getValues());
+            if (isEditingPreview) { setIsEditingPreview(false); setCurrentStep(6); }
+            else if (currentStep < STEPS.length - 1) setCurrentStep(prev => prev + 1);
+            else {
+                const allValid = await trigger();
+                if (!allValid) { toast.error("Please check the required details in your application."); return; }
+                await onSubmit(form.getValues());
+            }
         } else {
             console.log("Validation Errors:", errors);
             toast.error("Please fill required fields.");
         }
     };
 
-    const handleBack = () => setCurrentStep(prev => Math.max(0, prev - 1));
+    const handleBack = () => {
+        if (uploadingDocuments.length) return;
+        if (isEditingPreview) { setIsEditingPreview(false); setCurrentStep(6); }
+        else setCurrentStep(prev => Math.max(0, prev - 1));
+    };
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: TechnicianFormValues) => {
         setIsSubmitting(true);
         try {
             if (data.password !== data.confirmPassword) { toast.error("Password mismatch"); return; }
             const normalizedSpecialties = normalizeSpecialtiesForApi(data.specialties);
             const normalizedVehicleTypes = normalizeVehicleTypesForApi(data.vehicle_types);
-            const selectedSignupVehicleTypes = getSelectedSignupVehicleTypes(normalizedVehicleTypes);
+            const filteredPricing = pricingTemplate ? filterSignupPricing(data.pricing_config, pricingTemplate, normalizedSpecialties, getSelectedSignupVehicleTypes(normalizedVehicleTypes)) : [];
+            const legacyPricing = buildLegacySignupPricingConfig(filteredPricing).map(entry => entry.service_domain === "towing" ? { ...entry, towing_fleet_types: towingFleetTypes } : entry);
             const payload = {
                 ...data,
-                specialties: data.specialties,
-                vehicle_types: data.vehicle_types,
+                specialties: normalizedSpecialties,
+                vehicle_types: normalizedVehicleTypes,
+                pricing_config: legacyPricing,
+                dynamic_pricing_config: filteredPricing,
+                technician_agreement_accepted: hasAcceptedTechnicianAgreement,
+                working_hours: data.working_hours.is_24x7 ? { is_24x7: true, opening_time: "", closing_time: "", weekly_off: "None" } : data.working_hours,
                 address: data.location.address,
                 latitude: data.location.latitude,
                 longitude: data.location.longitude,
@@ -899,94 +341,86 @@ const TechnicianSignupWizard = () => {
                 district: data.location.district,
                 state: data.location.state,
                 service_type: data.specialties[0] || "other",
-                service_costs: {}, // legacy format fallback
-                pricing: {}, // legacy format fallback
-                whatsapp_number: data.whatsapp_number || data.phone
+                service_costs: legacyPricing,
+                pricing: {},
+                whatsapp_number: data.phone
             };
-            
-            const techResult = await technicianAuthService.register(payload);
-            
-            // Now submit the new dynamic pricing
-            if (data.pricing_config && data.pricing_config.length > 0) {
-                await apiFetch("/api/technicians/service-pricing", {
-                    method: "POST",
-                    technician: true,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ pricing_data: data.pricing_config })
-                });
-            }
+
+            await technicianAuthService.register(payload);
 
             toast.success("Submitted!");
             navigate("/technician/login");
-        } catch (error: any) {
-            toast.error(error.message || "Failed");
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : "Registration failed. Please try again.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="bg-muted min-h-screen text-foreground pb-24 md:pb-0">
-
-            {/* Sticky Header: Progress Bar */}
-            <div className="fixed top-0 left-0 right-0 z-50 bg-card dark:bg-slate-900 border-b shadow-sm">
-                <div className="h-14 flex items-center justify-between px-4 max-w-2xl mx-auto">
-                    {currentStep > 0 ? (
-                        <button onClick={handleBack} className="p-2 -ml-2 text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
-                    ) : <div className="w-9" />}
-
-                    <div className="font-bold text-foreground text-sm">
-                        {STEPS[currentStep].title} <span className="text-slate-400 font-normal">({currentStep + 1}/{STEPS.length})</span>
+        <div className="rq-signup">
+            <header className="rq-signup-header">
+                <a href="/" aria-label="ResQNow home"><img src="/images/resqnow-wordmark.png" alt="ResQNow" /></a>
+                <span className="rq-signup-header-label">PARTNER REGISTRATION</span>
+                <a href="/technician/login">Already a partner? <strong>Log in <ArrowRight size={14} /></strong></a>
+            </header>
+            <div className="rq-signup-layout">
+                <aside className="rq-signup-sidebar">
+                    <div className="rq-signup-kicker">LET'S GET YOU STARTED</div>
+                    <h2>Your skills.<br />Our network.</h2>
+                    <p>Help drivers get back on the road. Build your business with ResQNow.</p>
+                    <nav aria-label="Registration progress">
+                        {STEPS.map((step, index) => <button type="button" key={step.id} disabled={index > currentStep || uploadingDocuments.length > 0} onClick={() => { setIsEditingPreview(false); setCurrentStep(index); }}
+                            aria-current={index === currentStep ? "step" : undefined} className={index === currentStep ? "is-current" : index < currentStep ? "is-complete" : ""}>
+                            <span>{index < currentStep ? <Check size={15} /> : String(index + 1).padStart(2, "0")}</span>
+                            <div><strong>{step.title}</strong><small>{step.subtitle}</small></div>
+                            {index === currentStep && <ChevronRight size={15} />}
+                        </button>)}
+                    </nav>
+                    <div className="rq-signup-sidebar-note"><CheckCircle2 size={18} /><span>Your details are kept secure.<br />Our team reviews every application.</span></div>
+                </aside>
+                <main className="rq-signup-main">
+                    <div className="rq-signup-mobile-progress"><span>Step {currentStep + 1} of {STEPS.length} · {STEPS[currentStep].title}</span><div><i style={{ width: ((currentStep + 1) / STEPS.length * 100) + "%" }} /></div></div>
+                    <div className="rq-signup-intro">
+                        <span className="rq-signup-kicker">STEP {String(currentStep + 1).padStart(2, "0")} / {String(STEPS.length).padStart(2, "0")}</span>
+                        <h1>{["Let's get to know you.", "What do you work on?", "A little proof. A lot of trust.", "Your hours. Your choice.", "Your expertise. Your rates.", "Let's set up your payouts.", "Review your application.", "You're almost on the road."][currentStep]}</h1>
+                        <p>{["Tell us about yourself and your workshop. Fields marked * are required.", "Choose the vehicles and services you can confidently support.", "Help us verify your identity and get to know your workshop.", "Tell drivers when you're available to help.", "Set prices for the services and vehicles you selected. One type at a time.", "Add your preferred payout details for the jobs you complete.", "Check your details below. Use Edit on any section to make a change.", "Review your details and accept both agreements to send your application."][currentStep]}</p>
                     </div>
-
-                    <div className="w-9" /> {/* Spacer */}
-                </div>
-                {/* Progress Line */}
-                <div className="h-1 w-full bg-muted/50">
-                    <div className="h-full bg-primary transition-all duration-300" style={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }} />
-                </div>
-            </div>
-
-            <div className="pt-20 px-4 md:px-0 max-w-xl mx-auto">
-                <div className="mb-6 animate-in fade-in slide-in-from-bottom-2">
-                    <h1 className="text-3xl font-black text-foreground tracking-tight leading-tight">Apply to be a<br /><span className="text-primary">ResQNow Partner</span></h1>
-                    <p className="text-sm font-medium text-muted-foreground mt-2">Join our network of elite mobile mechanics and tow truck operators. Complete the form below to get started.</p>
-                </div>
                 <Form {...form}>
-                    <form className="space-y-6">
+                    <form className="space-y-6" onSubmit={event => { event.preventDefault(); void handleNext(); }}>
 
                         {/* STEP 0: PERSONAL */}
                         {currentStep === 0 && (
                             <div className="space-y-6 animate-in fade-in">
                                 <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
                                     <div className="pb-2 border-b border-border/50">
-                                        <h3 className="font-bold text-lg">Contact Information</h3>
-                                        <p className="text-xs text-muted-foreground">Basic details for your profile.</p>
+                                        <h3 className="font-bold text-lg">Personal & contact details</h3>
+                                        <p className="text-xs text-muted-foreground">Email and password are optional. If you add an email, a password is required.</p>
                                     </div>
                                     <div className="space-y-4">
                                         <FormField control={control} name="proprietor_name" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Your Name</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="e.g. John Doe" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Your Name *</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Your full name" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={control} name="name" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Shop Name</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="e.g. John's Garage" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Shop Name *</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="e.g. John's Garage" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <div className="grid grid-cols-2 gap-3">
                                             <FormField control={control} name="phone" render={({ field }) => (
-                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Mobile Number</FormLabel><FormControl><Input {...field} type="tel" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Mobile Number *</FormLabel><FormControl><Input {...field} type="tel" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
                                             )} />
                                             <FormField control={control} name="alternate_phone" render={({ field }) => (
                                                 <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Alt Mobile (Opt)</FormLabel><FormControl><Input {...field} type="tel" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
                                             )} />
                                         </div>
                                         <FormField control={control} name="email" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Email Address</FormLabel><FormControl><Input {...field} type="email" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="contact@example.com" /></FormControl></FormItem>
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Email Address <span className="rq-optional">Optional</span></FormLabel><FormControl><Input {...field} type="email" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="contact@example.com" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <div className="grid grid-cols-2 gap-3">
                                             <FormField control={control} name="password" render={({ field }) => (
-                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Password</FormLabel><FormControl><Input {...field} type="password" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Password {emailEntered ? "*" : <span className="rq-optional">Optional</span>}</FormLabel><FormControl><Input {...field} type="password" autoComplete="new-password" placeholder="At least 8 characters" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
                                             )} />
                                             <FormField control={control} name="confirmPassword" render={({ field }) => (
-                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Confirm Password</FormLabel><FormControl><Input {...field} type="password" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Confirm Password {watch("password") ? "*" : <span className="rq-optional">Optional</span>}</FormLabel><FormControl><Input {...field} type="password" className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>
                                             )} />
                                         </div>
                                     </div>
@@ -1159,19 +593,13 @@ const TechnicianSignupWizard = () => {
                                     </div>
                                     {errors.vehicle_types && <p className="text-xs text-red-500 font-medium bg-red-50 p-2 rounded">Please select at least one vehicle type.</p>}
                                     <div className="grid grid-cols-2 gap-3 pt-2">
-                                        {VEHICLES.map(v => (
-                                            <FormField key={v.id} control={control} name={`vehicle_types.${v.id}` as any} render={({ field }) => (
-                                                <FormItem className={cn("border rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all relative overflow-hidden", field.value ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-muted/30 hover:bg-muted/60")} onClick={() => { field.onChange(!field.value); trigger("vehicle_types"); }}>
-                                                    {field.value ? (
-                                                        <div className="bg-primary text-white rounded flex items-center justify-center w-5 h-5 shrink-0 shadow-sm"><Check className="w-3.5 h-3.5" /></div>
-                                                    ) : (
-                                                        <div className="border-2 border-slate-300 rounded w-5 h-5 shrink-0" />
-                                                    )}
-                                                    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", field.value ? "bg-primary text-white shadow-sm" : "bg-muted text-slate-400")}><v.icon className="w-4 h-4" /></div>
-                                                    <div className="font-semibold text-sm leading-tight text-foreground">{v.label}</div>
-                                                </FormItem>
-                                            )} />
-                                        ))}
+                                        {SIGNUP_VEHICLES.map(v => <FormField key={v.id} control={control} name={`vehicle_types.${v.id}`} render={({ field }) => (
+                                            <button type="button" aria-label={v.label} aria-pressed={Boolean(field.value)} className={cn("rq-choice rq-vehicle-choice", field.value && "is-selected")}
+                                                onClick={() => { field.onChange(!field.value); void trigger("vehicle_types"); }}>
+                                                <img src={v.image} alt="" /><span><strong>{v.label}</strong><small>{v.description}</small></span>
+                                                <i>{field.value && <Check size={12} />}</i>
+                                            </button>
+                                        )} />)}
                                     </div>
                                 </div>
 
@@ -1182,26 +610,11 @@ const TechnicianSignupWizard = () => {
                                     </div>
                                     {errors.specialties && <p className="text-xs text-red-500 font-medium bg-red-50 p-2 rounded">Please select at least one service.</p>}
                                     <div className="grid grid-cols-3 gap-2 pt-2">
-                                        {ALL_SERVICES.map(s => {
-                                            const isSelected = selectedServices?.includes(s.id);
-                                            return (
-                                                <div key={s.id} onClick={() => {
-                                                    const c = selectedServices || [];
-                                                    setValue("specialties", c.includes(s.id) ? c.filter((x: string) => x !== s.id) : [...c, s.id], { shouldValidate: true });
-                                                }}
-                                                    className={cn("flex flex-col items-center justify-between p-2 rounded-xl border text-center h-28 transition-all active:scale-95 relative", isSelected ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-muted/30 hover:bg-muted/60 text-muted-foreground/80")}>
-                                                    <div className="absolute top-2 right-2">
-                                                        {isSelected ? (
-                                                            <div className="bg-primary text-white rounded flex items-center justify-center w-4 h-4 shadow-sm"><Check className="w-3 h-3" /></div>
-                                                        ) : (
-                                                            <div className="border-2 border-border/70 rounded w-4 h-4" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 flex items-center justify-center pt-2"><s.icon className="w-6 h-6" /></div>
-                                                    <div className="text-[10px] font-bold leading-tight pb-1 w-full px-1">{s.label}</div>
-                                                </div>
-                                            );
-                                        })}
+                                        {SIGNUP_SERVICES.map(s => <button type="button" key={s.id} aria-label={s.label} aria-pressed={selectedServices.includes(s.id)}
+                                            className={cn("rq-choice rq-service-choice", selectedServices.includes(s.id) && "is-selected")}
+                                            onClick={() => setValue("specialties", toggleArrayValue(selectedServices, s.id), { shouldValidate: true, shouldDirty: true })}>
+                                            <img src={`/images/home/services/${s.id}.webp`} alt="" /><strong>{s.label}</strong><i>{selectedServices.includes(s.id) && <Check size={12} />}</i>
+                                        </button>)}
                                     </div>
                                 </div>
 
@@ -1289,11 +702,11 @@ const TechnicianSignupWizard = () => {
                                         <h3 className="font-bold text-lg">Shop Photos</h3>
                                         <p className="text-xs text-muted-foreground">Upload images of your garage/setup.</p>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <FormField control={control} name="documents.garage_front" render={({ field }) => <ImageUpload label="Shop Front" value={field.value} onChange={field.onChange} />} />
-                                        <FormField control={control} name="documents.profile_photo" render={({ field }) => <ImageUpload label="Profile Photo" value={field.value} onChange={field.onChange} />} />
-                                        <FormField control={control} name="documents.tools_photo" render={({ field }) => <ImageUpload label="Tools / Bay" value={field.value} onChange={field.onChange} />} />
-                                        <FormField control={control} name="documents.facilities_photo" render={({ field }) => <ImageUpload label="Facilities" value={field.value} onChange={field.onChange} />} />
+                                    <div className="rq-upload-grid">
+                                        <FormField control={control} name="documents.garage_front" render={({ field }) => <TechnicianImageUpload label="Shop Front" value={field.value} onChange={field.onChange} onUploadStateChange={handleUploadStateChange} />} />
+                                        <FormField control={control} name="documents.profile_photo" render={({ field }) => <TechnicianImageUpload label="Profile Photo" value={field.value} onChange={field.onChange} onUploadStateChange={handleUploadStateChange} />} />
+                                        <FormField control={control} name="documents.tools_photo" render={({ field }) => <TechnicianImageUpload label="Tools / Bay" value={field.value} onChange={field.onChange} onUploadStateChange={handleUploadStateChange} />} />
+                                        <FormField control={control} name="documents.facilities_photo" render={({ field }) => <TechnicianImageUpload label="Facilities" value={field.value} onChange={field.onChange} onUploadStateChange={handleUploadStateChange} />} />
                                     </div>
                                 </div>
                             </div>
@@ -1305,31 +718,28 @@ const TechnicianSignupWizard = () => {
                                 <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5 space-y-4">
                                     <div className="pb-2 border-b border-border/50">
                                         <h3 className="font-bold text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Working Hours</h3>
-                                        <p className="text-xs text-muted-foreground mt-1">Set your standard availability.</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Choose fixed working hours or round-the-clock availability.</p>
                                     </div>
                                     <div className="space-y-4 pt-2">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <FormField control={control} name="working_hours.opening_time" render={({ field }) => (<FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Open</FormLabel><FormControl><Input type="time" {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl></FormItem>)} />
-                                            <FormField control={control} name="working_hours.closing_time" render={({ field }) => (<FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Close</FormLabel><FormControl><Input type="time" {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl></FormItem>)} />
+                                        <div className={cn("grid grid-cols-2 gap-4", hours.is_24x7 && "opacity-40")}>
+                                            <FormField control={control} name="working_hours.opening_time" render={({ field }) => (<FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Open</FormLabel><FormControl><Input type="time" {...field} disabled={hours.is_24x7} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={control} name="working_hours.closing_time" render={({ field }) => (<FormItem><FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Close</FormLabel><FormControl><Input type="time" {...field} disabled={hours.is_24x7} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" /></FormControl><FormMessage /></FormItem>)} />
                                         </div>
                                         <FormField control={control} name="working_hours.weekly_off" render={({ field }) => (
-                                            <FormItem>
+                                            <FormItem className={hours.is_24x7 ? "opacity-40" : ""}>
                                                 <FormLabel className="text-[11px] font-bold uppercase text-muted-foreground/80 tracking-wider">Weekly Off</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <Select onValueChange={field.onChange} value={field.value} disabled={hours.is_24x7}>
                                                     <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all"><SelectValue placeholder="Select Day" /></SelectTrigger></FormControl>
-                                                    <SelectContent>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                                                    <SelectContent>{["None", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                                                 </Select>
                                             </FormItem>
                                         )} />
                                         <div className="pt-2">
+                                            {hasScheduledHours && <button type="button" className="rq-text-button" onClick={() => { setValue("working_hours.opening_time", ""); setValue("working_hours.closing_time", ""); setValue("working_hours.weekly_off", "None"); }}>Clear hours to choose 24/7</button>}
                                             <FormField control={control} name="working_hours.is_24x7" render={({ field }) => (
-                                                <FormItem className={cn("flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer", field.value ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card dark:bg-slate-900")} onClick={() => field.onChange(!field.value)}>
-                                                    {field.value ? (
-                                                        <div className="bg-primary text-white rounded flex items-center justify-center w-5 h-5 shrink-0"><Check className="w-3.5 h-3.5" /></div>
-                                                    ) : (
-                                                        <div className="border-2 border-slate-300 rounded w-5 h-5 shrink-0" />
-                                                    )}
-                                                    <span className="text-sm font-bold text-foreground">I am available 24/7</span>
+                                                <FormItem className={cn("rq-availability", field.value && "is-selected", hasScheduledHours && "is-disabled")}>
+                                                    <FormControl><Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} disabled={hasScheduledHours} /></FormControl>
+                                                    <div><FormLabel>I am available 24 × 7</FormLabel><p>Ready to help, any day and any time.</p></div>
                                                 </FormItem>
                                             )} />
                                         </div>
@@ -1359,20 +769,13 @@ const TechnicianSignupWizard = () => {
                         {/* STEP 4: PRICING */}
                         {currentStep === 4 && (
                             <div className="space-y-4 animate-in fade-in">
-                                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-900/20 p-4 rounded-[1.5rem] border border-amber-200 dark:border-amber-900/50 flex items-start gap-3 shadow-sm">
-                                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full shrink-0"><AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" /></div>
-                                    <div>
-                                        <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Dynamic Base Pricing Config</h4>
-                                        <p className="text-xs text-amber-800/80 dark:text-amber-400/80 mt-0.5 leading-relaxed">Set your standard base prices.</p>
-                                    </div>
-                                </div>
-                                <DynamicPricingStep 
-                                    services={pricingTemplate?.services || []} 
-                                    categories={pricingTemplate?.categories || []} 
-                                    pricingFields={pricingTemplate?.pricingFields || []} 
-                                    selectedServiceNames={selectedServices.map((id: string) => SERVICE_NAME_BY_ID[id] || id)} 
-                                    onChange={(data: any) => setValue('pricing_config', data)} 
-                                />
+                                <div className="rq-signup-tip"><CreditCard size={19} /><div><strong>Clear prices. Confident customers.</strong><p>Only your selected services and vehicles appear below. Enter amounts in rupees.</p></div></div>
+                                {pricingLoading ? <div className="rq-signup-card rq-loading"><Loader2 className="animate-spin" /> Loading pricing options…</div> : pricingTemplate && <DynamicPricingStep
+                                    {...pricingTemplate} selectedServiceIds={selectedServices} selectedVehicleTypes={selectedVehicleTypes}
+                                    value={pricingValue} onChange={data => { setValue("pricing_config", data, { shouldDirty: true }); setPricingError(""); }} />}
+                                {pricingLoadError && <p className="rq-signup-error" role="alert">{pricingLoadError}</p>}
+                                {!pricingLoading && <button type="button" className="rq-text-button" onClick={() => void loadPricing()}>Reload pricing options</button>}
+                                {pricingError && <p className="rq-signup-error" role="alert">{pricingError}</p>}
                             </div>
                         )}
 
@@ -1417,56 +820,49 @@ const TechnicianSignupWizard = () => {
                             </div>
                         )}
 
-                        {/* STEP 6: FINISH */}
+                        {/* STEP 6: APPLICATION PREVIEW */}
                         {currentStep === 6 && (
+                            <div className="space-y-6">
+                                {pricingError && <p className="rq-signup-error" role="alert">{pricingError}</p>}
+                                <TechnicianApplicationPreview data={form.getValues()} template={pricingTemplate} onEdit={step => { setPricingError(""); setIsEditingPreview(true); setCurrentStep(step); }} />
+                            </div>
+                        )}
+
+                        {/* STEP 7: FINISH */}
+                        {currentStep === 7 && (
                             <div className="bg-card dark:bg-slate-900 rounded-[2rem] shadow-lg border border-border/60 p-8 text-center space-y-8 animate-in zoom-in-95 duration-500">
                                 <div className="relative w-28 h-28 mx-auto">
-                                    <div className="absolute inset-0 bg-green-500 blur-[30px] opacity-20 rounded-full animate-pulse"></div>
-                                    <div className="relative w-full h-full bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-xl shadow-green-500/20 ring-8 ring-green-50 dark:ring-green-950/30">
+                                    <div className="absolute inset-0 bg-primary blur-[30px] opacity-10 rounded-full"></div>
+                                    <div className="relative w-full h-full bg-primary rounded-full flex items-center justify-center shadow-xl shadow-primary/10 ring-8 ring-red-50">
                                         <Check className="w-12 h-12 text-white" strokeWidth={3} />
                                     </div>
                                 </div>
                                 <div>
-                                    <h2 className="text-3xl font-black text-foreground drop-shadow-sm mb-2">Ready to Launch</h2>
+                                    <h2 className="text-3xl font-black text-foreground drop-shadow-sm mb-2">Ready when you are.</h2>
                                     <p className="text-sm font-medium text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
-                                        You are one step away from joining the fastest growing roadside assistance network.
+                                        Your application will be reviewed by our team. We’ll contact you on your registered phone number.
                                     </p>
                                 </div>
-                                <div className="bg-muted/50 p-4 rounded-2xl border border-border/50 text-left">
+                                <div className="rq-consent-container" data-testid="signup-consents">
                                     <FormField control={control} name="consent.agreed" render={({ field }) => (
                                         <FormItem className="flex items-start gap-4">
                                             <FormControl>
                                                 <Checkbox checked={field.value} onCheckedChange={field.onChange} className="w-5 h-5 mt-0.5" />
                                             </FormControl>
                                             <div className="space-y-1">
-                                                <FormLabel className="font-bold text-sm text-foreground">I agree to the Terms</FormLabel>
+                                                <FormLabel className="font-bold text-sm text-foreground">I confirm my details and agree to the Terms *</FormLabel>
                                                 <p className="text-[10px] text-muted-foreground leading-normal">By checking this box, I confirm all provided details are accurate and agree to the ResQNow Partner Platform conditions and background verification processes.</p>
+                                                <FormMessage />
                                             </div>
                                         </FormItem>
                                     )} />
-                                </div>
-                            </div>
-                        )}
-
-                        {currentStep === 6 && (
-                            <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border/60 p-5">
-                                <div className="flex items-start gap-4">
-                                    <Checkbox
-                                        checked={hasAcceptedTechnicianAgreement}
-                                        onCheckedChange={(checked) => {
-                                            const isChecked = checked === true;
-                                            setHasAcceptedTechnicianAgreement(isChecked);
-                                            if (isChecked) {
-                                                setShowTechnicianAgreementError(false);
-                                            }
-                                        }}
-                                        className="w-5 h-5 mt-0.5"
-                                    />
-                                    <div className="space-y-1">
-                                        <p className="font-bold text-sm text-foreground">I have read and agree to the ResQNow Technician Agreement.</p>
-                                        {showTechnicianAgreementError && (
-                                            <p className="text-xs text-red-500">Please accept this agreement to submit.</p>
-                                        )}
+                                    <div className="rq-consent-divider" />
+                                    <div className="flex items-start gap-4">
+                                        <Checkbox id="technician-agreement" checked={hasAcceptedTechnicianAgreement} onCheckedChange={checked => { setHasAcceptedTechnicianAgreement(checked === true); setShowTechnicianAgreementError(false); }} />
+                                        <div><Label htmlFor="technician-agreement">I have read and agree to the ResQNow Technician Agreement *</Label>
+                                            <button type="button" className="rq-text-button" onClick={() => { setCurrentStep(0); setIsTechnicianAgreementOpen(true); }}>Read technician agreement <ArrowRight size={12} /></button>
+                                            {showTechnicianAgreementError && <p className="rq-signup-error">Please accept the technician agreement.</p>}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1477,15 +873,16 @@ const TechnicianSignupWizard = () => {
 
                     </form>
                 </Form>
+                </main>
             </div>
 
             {/* FIXED BOTTOM ACTION BAR */}
-            <div className="fixed bottom-0 left-0 right-0 bg-card dark:bg-slate-900 border-t p-4 px-6 z-50 flex gap-4 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-                {currentStep > 0 && (
-                    <Button variant="outline" onClick={handleBack} className="flex-1 h-12 rounded-xl border-slate-300 text-muted-foreground font-bold">Back</Button>
+            <div className="rq-signup-footer">
+                {(currentStep > 0 || isEditingPreview) && (
+                    <Button variant="outline" onClick={handleBack} disabled={uploadingDocuments.length > 0 || isSubmitting} className="flex-1 h-12 rounded-xl border-slate-300 text-muted-foreground font-bold">{isEditingPreview ? "Back to preview" : "Back"}</Button>
                 )}
-                <Button onClick={handleNext} disabled={isSubmitting} className={cn("flex-[2] h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20", currentStep === 6 ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90")}>
-                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (currentStep === 6 ? "Submit Application" : "Continue")}
+                <Button type="button" onClick={handleNext} disabled={isSubmitting || uploadingDocuments.length > 0 || (currentStep === 7 && (!consentAgreed || !hasAcceptedTechnicianAgreement))} className="flex-[2] h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : uploadingDocuments.length ? "Uploading photos…" : isEditingPreview ? "Save & return to preview" : (currentStep === 7 ? "Submit Application" : "Continue")}
                 </Button>
             </div>
         </div>

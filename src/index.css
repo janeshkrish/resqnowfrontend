@@ -6817,3 +6817,184 @@ button.lt-req { cursor: pointer; }
   .lt-modal { animation: none; }
   .lt-press { transition: none; }
 }
+
+
+/* The homepage palette and image assets, scoped to partner registration. */
+.rq-signup {
+  --primary: 355 70% 41%; --primary-foreground: 0 0% 100%;
+  --background: 0 0% 100%; --foreground: 225 24% 18%; --card: 0 0% 100%;
+  --muted: 220 23% 96%; --muted-foreground: 220 10% 45%; --border: 220 16% 90%;
+  --input: 220 16% 90%; --ring: 355 70% 41%;
+  min-height: 100vh; background: #f7f8fa; color: #242b3d;
+  font-family: 'Manrope', 'Inter', system-ui, sans-serif; padding-bottom: 98px;
+}
+.rq-signup *, .rq-signup *::before, .rq-signup *::after { box-sizing: border-box; }
+.rq-signup-header { height: 82px; background: #fff; border-bottom: 1px solid #e8eaef; display: flex; align-items: center; justify-content: space-between; padding: 0 max(32px, calc((100vw - 1180px) / 2)); gap: 24px; }
+.rq-signup-header img { width: 146px; height: 40px; object-fit: contain; }
+.rq-signup-header-label { font-size: 10px; letter-spacing: 2px; font-weight: 800; color: #7a8190; }
+.rq-signup-header > a:last-child { display: flex; gap: 8px; font-size: 12px; color: #778092; white-space: nowrap; }
+.rq-signup-header strong { color: #b01f2a; display: inline-flex; align-items: center; gap: 5px; }
+.rq-signup-layout { max-width: 1120px; padding: 44px 24px 0; margin: auto; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 68px; align-items: start; }
+.rq-signup-sidebar { position: sticky; top: 30px; padding: 6px 0; }
+.rq-signup-kicker { font-size: 10px; font-weight: 800; letter-spacing: 1.8px; color: #b01f2a; }
+.rq-signup-sidebar h2 { margin: 18px 0 14px; font: 800 35px/1.16 'Plus Jakarta Sans', 'Manrope', sans-serif; letter-spacing: -1.5px; }
+.rq-signup-sidebar > p { max-width: 228px; color: #798091; font-size: 12px; line-height: 1.8; }
+.rq-signup-sidebar nav { margin-top: 28px; display: grid; gap: 8px; }
+.rq-signup-sidebar nav button { padding: 12px 14px; display: flex; align-items: center; gap: 13px; text-align: left; border: 1px solid transparent; border-radius: 12px; background: transparent; color: #9aa0ad; }
+.rq-signup-sidebar nav button > span { width: 30px; height: 30px; border: 1px solid #dfe3eb; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.rq-signup-sidebar nav button div { flex: 1; }
+.rq-signup-sidebar nav strong { display: block; font-size: 12px; }
+.rq-signup-sidebar nav small { display: block; font-size: 10px; margin-top: 2px; color: #9aa0ad; }
+.rq-signup-sidebar nav button.is-current { background: #fff; border-color: #e9c5c9; color: #b01f2a; box-shadow: 0 4px 16px #20263805; }
+.rq-signup-sidebar nav .is-current > span { color: white; background: #b01f2a; border-color: #b01f2a; }
+.rq-signup-sidebar nav .is-complete { color: #566477; }
+.rq-signup-sidebar nav .is-complete > span { color: #b01f2a; background: #f5e9eb; border-color: #eddadc; }
+.rq-signup-sidebar-note { display: flex; gap: 10px; padding: 20px 0; margin-top: 24px; border-top: 1px solid #e4e7ed; font-size: 10px; color: #939ba9; line-height: 1.8; }
+.rq-signup-sidebar-note svg { flex-shrink: 0; color: #b01f2a; margin-top: 3px; }
+.rq-signup-main { width: 100%; min-width: 0; }
+.rq-signup-intro { padding: 0 0 26px; }
+.rq-signup-intro h1 { font: 800 31px/1.3 'Plus Jakarta Sans', 'Manrope', sans-serif; margin: 10px 0 10px; letter-spacing: -1.1px; }
+.rq-signup-intro p { font-size: 12px; color: #7b8392; line-height: 1.8; max-width: 560px; }
+.rq-signup-main form > div:not(.h-24) > .bg-card, .rq-signup-card, .rq-signup-main form > .bg-card {
+  border: 1px solid #e4e7ee; border-radius: 18px; background: #fff; padding: 24px; box-shadow: 0 3px 18px #25314d03;
+}
+.rq-signup-main h3 { font-size: 16px; font-weight: 800; letter-spacing: -.4px; }
+.rq-signup-main .bg-card > .border-b { padding-bottom: 14px; margin-bottom: 4px; }
+.rq-signup-main .bg-card > .border-b p { color: #8a91a0; font-size: 11px; margin-top: 5px; line-height: 1.65; }
+.rq-signup-main label { font-size: 10px; font-weight: 700; letter-spacing: .6px; color: #667083; }
+.rq-signup-main input:not([type='file']), .rq-signup-main textarea, .rq-signup-main button[role='combobox'] { background: #f8f9fb; border: 1px solid #e9ecf2; border-radius: 9px; font-size: 12px; font-weight: 500; color: #283048; }
+.rq-signup-main input:focus, .rq-signup-main textarea:focus { border-color: #b01f2a; outline: none; box-shadow: 0 0 0 3px #b01f2a0a; }
+.rq-signup-main input:disabled, .rq-signup-main button:disabled { cursor: not-allowed; }
+.rq-signup-main input::placeholder, .rq-signup-main textarea::placeholder { color: #a3a9b4; font-weight: 400; }
+.rq-signup-main .bg-gradient-to-br { background: #f4eded; border-color: #eeddde; }
+.rq-optional { text-transform: none; letter-spacing: 0; color: #a0a7b3; font-weight: 500; margin-left: 5px; }
+.rq-choice { position: relative; border: 1px solid #e4e7ee; border-radius: 12px; background: #f8f9fb; color: #88909f; transition: background .15s, border-color .15s, color .15s; cursor: pointer; }
+.rq-choice:hover { border-color: #c5cbd5; }
+.rq-choice:focus-visible, .rq-subtype:focus-visible { outline: 2px solid #b01f2a; outline-offset: 3px; }
+.rq-choice img { filter: grayscale(1); opacity: .38; object-fit: contain; mix-blend-mode: multiply; transition: filter .15s, opacity .15s; }
+.rq-choice.is-selected { border-color: #b01f2a; background: #fff5f5; color: #b01f2a; }
+.rq-choice.is-selected img { filter: none; opacity: 1; }
+.rq-choice i { width: 16px; height: 16px; border: 1px solid #d6dbe4; border-radius: 4px; position: absolute; right: 10px; top: 10px; display: flex; align-items: center; justify-content: center; }
+.rq-choice.is-selected i { background: #b01f2a; color: #fff; border-color: #b01f2a; }
+.rq-vehicle-choice { display: flex; text-align: left; align-items: center; gap: 14px; padding: 18px 12px; min-height: 86px; }
+.rq-vehicle-choice img { width: 44px; height: 36px; flex-shrink: 0; }
+.rq-vehicle-choice strong { display: block; font-size: 12px; }
+.rq-vehicle-choice small { display: block; font-size: 9px; margin-top: 5px; line-height: 1.5; max-width: 150px; }
+.rq-service-choice { padding: 16px 10px 14px; min-height: 103px; display: flex; flex-direction: column; gap: 13px; align-items: center; justify-content: center; }
+.rq-service-choice img { width: 32px; height: 32px; }
+.rq-service-choice strong { font-size: 11px; font-weight: 700; }
+.rq-upload-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 10px; }
+.rq-upload { height: 155px; position: relative; border: 1px dashed #d5dae4; border-radius: 12px; overflow: hidden; background: #fafbfc; }
+.rq-upload.has-image { border-style: solid; border-color: #dfc9cc; }
+.rq-upload-target { height: 100%; display: block; position: relative; cursor: pointer; }
+.rq-upload-target > img { width: 100%; height: 100%; object-fit: cover; }
+.rq-upload-target input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.rq-upload-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: #b01f2a; }
+.rq-upload-placeholder strong { color: #586274; font-size: 11px; letter-spacing: 0; }
+.rq-upload-placeholder small { font-size: 9px; color: #a0a7b4; letter-spacing: 0; }
+.rq-upload-caption { position: absolute; bottom: 0; left: 0; right: 0; display: flex; gap: 6px; align-items: center; background: #242b3dd9; color: #fff; padding: 8px 10px; font-size: 9px; }
+.rq-upload-remove { position: absolute; top: 8px; right: 8px; border: 0; background: #ffffffeb; border-radius: 50%; width: 25px; height: 25px; display: grid; place-items: center; }
+.rq-upload-busy { position: absolute; inset: 0; background: #ffffffb3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #b01f2a; font-size: 11px; }
+.rq-availability { display: flex; gap: 12px; align-items: center; background: #fafbfc; padding: 16px; border: 1px solid #e4e7ee; border-radius: 10px; }
+.rq-availability.is-selected { border-color: #b01f2a; background: #fff5f5; }
+.rq-availability.is-disabled { opacity: .4; background: #e9ecf1; }
+.rq-availability label { color: #283048; font-size: 12px; letter-spacing: 0; }
+.rq-availability p { font-size: 10px; color: #8791a1; margin: 4px 0 0; }
+.rq-signup-main button[role='checkbox'] { border-radius: 4px; flex-shrink: 0; }
+.rq-text-button { color: #b01f2a; font-size: 10px; font-weight: 700; display: flex; gap: 5px; align-items: center; margin: 8px 0; }
+.rq-text-button:hover { text-decoration: underline; }
+.rq-signup-tip { display: flex; gap: 12px; border: 1px solid #eddbdd; background: #faf1f2; border-radius: 12px; padding: 17px 20px; color: #b01f2a; }
+.rq-signup-tip > svg { flex-shrink: 0; }
+.rq-signup-tip strong { font-size: 11px; }
+.rq-signup-tip p { font-size: 10px; line-height: 1.7; color: #947277; margin: 5px 0 0; }
+.rq-pricing-services { display: grid; gap: 14px; }
+.rq-signup-main .rq-pricing-service { padding: 0; overflow: hidden; }
+.rq-pricing-service-heading { display: flex; align-items: center; gap: 13px; width: 100%; padding: 18px 22px; text-align: left; }
+.rq-pricing-service-heading img { width: 32px; height: 32px; object-fit: contain; mix-blend-mode: multiply; }
+.rq-pricing-service-heading span { flex: 1; }
+.rq-pricing-service-heading strong { display: block; font-size: 14px; font-weight: 800; }
+.rq-pricing-service-heading small { display: block; font-size: 10px; color: #929aaa; margin-top: 4px; }
+.rq-pricing-service-heading > svg { color: #8c95a6; transition: transform .15s; }
+.rq-pricing-service-heading > svg.is-open { transform: rotate(180deg); color: #b01f2a; }
+.rq-pricing-service-body { border-top: 1px solid #eceef3; padding: 22px; }
+.rq-signup-label { font-size: 10px; color: #b01f2a; display: flex; gap: 8px; font-weight: 800; margin: 0 0 12px; }
+.rq-signup-label span { color: #798294; font-weight: 600; }
+.rq-pricing-vehicles { display: flex; gap: 9px; flex-wrap: wrap; }
+.rq-pricing-vehicle { display: flex; gap: 8px; align-items: center; padding: 12px 16px; font-size: 11px; font-weight: 700; min-width: 90px; }
+.rq-pricing-vehicle img { width: 31px; height: 25px; }
+.rq-pricing-subtypes { margin-top: 24px; }
+.rq-subtype-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.rq-subtype { border: 1px solid #e4e7ee; border-radius: 8px; background: #fff; padding: 10px 16px; font-size: 11px; color: #8b94a2; display: flex; align-items: center; gap: 6px; }
+.rq-subtype small { font-size: 9px; }
+.rq-subtype.is-selected { border-color: #b01f2a; color: #b01f2a; background: #fff5f5; }
+.rq-subtype-art { display: inline-flex; align-items: center; flex-shrink: 0; }
+.rq-subtype:not(.is-selected) .rq-subtype-art { filter: grayscale(1); opacity: .38; }
+.rq-review-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid #eceef3; }
+.rq-review-heading h2 { font-size: 14px; font-weight: 800; color: #283048; }
+.rq-review-heading .rq-text-button { margin: -7px -6px -7px 0; padding: 7px 6px; min-height: 32px; font-size: 11px; flex-shrink: 0; cursor: pointer; }
+.rq-review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.rq-review-grid dt { font-size: 10px; font-weight: 600; color: #8b94a2; margin-bottom: 5px; }
+.rq-review-grid dd { font-size: 12px; font-weight: 600; line-height: 1.6; color: #283048; overflow-wrap: anywhere; }
+.rq-review-documents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+.rq-review-documents figure { overflow: hidden; border: 1px solid #e4e7ee; border-radius: 10px; background: #fafbfc; }
+.rq-review-documents img { width: 100%; height: 112px; object-fit: cover; }
+.rq-review-document-empty { display: flex; align-items: center; justify-content: center; gap: 8px; height: 112px; font-size: 10px; color: #98a0ae; }
+.rq-review-documents figcaption { padding: 9px 12px; font-size: 10px; font-weight: 600; color: #687386; }
+.rq-review-pricing-group + .rq-review-pricing-group { border-top: 1px solid #eceef3; margin-top: 20px; padding-top: 20px; }
+.rq-review-pricing-group h3 { font-size: 13px; font-weight: 800; color: #b01f2a; margin-bottom: 14px; }
+.rq-review-pricing-row + .rq-review-pricing-row { margin-top: 18px; padding-top: 16px; border-top: 1px solid #f0f1f5; }
+.rq-review-pricing-row h4 { font-size: 11px; font-weight: 700; color: #687386; margin-bottom: 12px; }
+.rq-review-missing { font-size: 11px; color: #8b94a2; line-height: 1.8; margin: 8px 0; }
+.rq-pricing-fields { background: #f8f9fb; border: 1px solid #e9ecf2; padding: 20px; margin-top: 22px; border-radius: 12px; }
+.rq-pricing-context { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+.rq-pricing-context span { font-size: 10px; color: #808a9b; }
+.rq-pricing-context strong { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #b01f2a; }
+.rq-signup-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px 14px; }
+.rq-field label { display: block; margin-bottom: 8px; letter-spacing: 0; }
+.rq-price-input { position: relative; }
+.rq-price-input > span { position: absolute; left: 12px; top: 13px; color: #9099a9; font-size: 11px; }
+.rq-signup-main .rq-price-input input { padding-left: 36px; background: #fff; height: 43px; }
+.rq-signup-hint { font-size: 9px; color: #98a0ae; line-height: 1.7; margin: 16px 0 0; }
+.rq-signup-error { color: #b01f2a; background: #fff4f4; border-radius: 8px; padding: 10px 12px; font-size: 11px; line-height: 1.65; }
+.rq-loading { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #8b94a2; }
+.rq-consent-container { background: #fafbfc; padding: 20px; border: 1px solid #e9ecf2; border-radius: 12px; text-align: left; }
+.rq-consent-container label { font-size: 11px; letter-spacing: 0; line-height: 1.8; color: #283048; }
+.rq-consent-divider { height: 1px; background: #e7eaf0; margin: 19px 0; }
+.rq-signup-footer { position: fixed; z-index: 40; bottom: 0; background: #ffffffef; backdrop-filter: blur(12px); border-top: 1px solid #e8eaef; display: flex; gap: 12px; padding: 18px max(24px, calc((100vw - 1072px) / 2)); width: 100%; justify-content: flex-end; }
+.rq-signup-footer button { flex: 0 1 160px; font-size: 12px; border-radius: 9px; box-shadow: none; height: 45px; }
+.rq-signup-footer button:last-child { flex: 0 1 255px; background: #b01f2a; color: #fff; }
+.rq-signup-footer button:last-child:hover { background: #9c1b25; }
+.rq-signup-footer button:disabled { opacity: .4; }
+.rq-signup-mobile-progress { display: none; }
+@media (max-width: 800px) {
+  .rq-signup-header { padding: 0 20px; height: 68px; }
+  .rq-signup-header img { width: 115px; height: 32px; }
+  .rq-signup-header-label { display: none; }
+  .rq-signup-header > a:last-child { font-size: 10px; gap: 5px; }
+  .rq-signup-layout { display: block; padding: 22px 18px 0; max-width: 630px; }
+  .rq-signup-sidebar { display: none; }
+  .rq-signup-mobile-progress { display: block; font-size: 10px; color: #8a91a0; margin-bottom: 28px; }
+  .rq-signup-mobile-progress > div { height: 3px; background: #e4e7ee; border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .rq-signup-mobile-progress i { height: 100%; background: #b01f2a; display: block; transition: width .2s; }
+  .rq-signup-intro h1 { font-size: 26px; }
+  .rq-signup-intro p { font-size: 11px; }
+  .rq-signup-main form > div:not(.h-24) > .bg-card, .rq-signup-card, .rq-signup-main form > .bg-card { padding: 19px; border-radius: 15px; }
+  .rq-signup-main .rq-pricing-service { padding: 0; }
+  .rq-vehicle-choice { padding: 15px 10px; gap: 8px; min-height: 85px; }
+  .rq-vehicle-choice img { width: 33px; height: 29px; }
+  .rq-vehicle-choice i { right: 6px; top: 6px; width: 12px; height: 12px; }
+  .rq-vehicle-choice small { font-size: 8px; }
+  .rq-upload { height: 130px; }
+  .rq-pricing-service-body { padding: 17px; }
+  .rq-pricing-fields { padding: 15px; }
+  .rq-subtype { padding: 10px 12px; }
+  .rq-subtype small { display: none; }
+  .rq-signup-footer { padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); }
+  .rq-signup-footer button { flex: 1; }
+  .rq-signup-footer button:last-child { flex: 2; }
+  .rq-signup-main .text-center .w-28 { width: 76px; height: 76px; }
+  .rq-signup-main .text-center h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rq-signup *, .rq-signup *::before, .rq-signup *::after { animation: none !important; transition: none !important; }
+}

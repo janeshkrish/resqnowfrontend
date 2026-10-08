@@ -77,7 +77,13 @@ async function openSearch(page: Page, { request = pending(), fromTheSlide = fals
     (window as unknown as { __sentMarks: Record<string, number> }).__sentMarks = marks;
     const look = () => {
       const overlay = document.querySelector('[data-testid="request-sent"]');
-      if (overlay && marks.shown == null) marks.shown = performance.now();
+      if (overlay && marks.shown == null) {
+        marks.shown = performance.now();
+        // How it looked when it appeared: a still picture or not, and whether the crimson sweep was showing.
+        marks.still = overlay.classList.contains("is-still") ? 1 : 0;
+        const wipe = document.querySelector(".rq-rs-wipe");
+        marks.wipe = wipe && getComputedStyle(wipe).display !== "none" ? 1 : 0;
+      }
       if (overlay?.getAttribute("data-stage") === "opening" && marks.opening == null) marks.opening = performance.now();
       if (!overlay && marks.shown != null && marks.gone == null) marks.gone = performance.now();
     };
@@ -111,7 +117,7 @@ async function openSearch(page: Page, { request = pending(), fromTheSlide = fals
     return reply(404, {});
   });
 
-  await page.goto("/request-service-tracking/5502");
+  await page.goto("/request-service-tracking/5502", { waitUntil: "domcontentloaded" });
   const accept = () => {
     state.request = { ...state.request, status: "accepted", technician: ARUN };
     socket.send("job:status_update", { requestId: "5502", status: "accepted" });
@@ -185,6 +191,9 @@ test.describe("straight after the slide", () => {
     // Then it opens up and is gone, leaving the search.
     await expect(overlay).toHaveCount(0, { timeout: 8000 });
     const times = await sentTimes(page);
+    const look = await page.evaluate(() => (window as unknown as { __sentMarks: Record<string, number> }).__sentMarks);
+    expect(look.still).toBe(0);
+    expect(look.wipe).toBe(1);
     // It plays for 3.4 seconds, then takes under a second to open into the map.
     expect(times.played).toBeGreaterThan(3200);
     expect(times.played).toBeLessThan(4400);
@@ -224,13 +233,17 @@ test.describe("straight after the slide", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openSearch(page, { fromTheSlide: true });
 
-    const overlay = sent(page);
-    await expect(overlay).toBeVisible();
-    await expect(overlay).toHaveClass(/is-still/);
-    await expect(overlay.getByText("Request sent", { exact: true })).toBeVisible();
-    await expect(page.locator(".rq-rs-wipe")).toBeHidden();
-    await expect(overlay).toHaveCount(0, { timeout: 4000 });
+    // It is on screen for under two seconds, so the page's own notes are read once it has gone.
     await expect(page.getByTestId("tracking-big")).toHaveText("Finding a locksmith nearby");
+    await expect(sent(page)).toHaveCount(0, { timeout: 8000 });
+    const marks = await page.evaluate(() => (window as unknown as { __sentMarks: Record<string, number> }).__sentMarks);
+    expect(marks.shown).toBeGreaterThan(0);
+    expect(marks.still).toBe(1);
+    expect(marks.wipe).toBe(0);
+    // A second and a half of the still picture, then a short fade.
+    expect(marks.opening - marks.shown).toBeGreaterThan(1300);
+    expect(marks.opening - marks.shown).toBeLessThan(2600);
+    expect(marks.gone - marks.opening).toBeLessThan(1200);
   });
 });
 

@@ -12,7 +12,7 @@ type UnifiedRequestFlowOptions = {
   storageKey: string;
   resetRequested?: boolean;
   user?: { name?: string; email?: string; phone?: string; id?: number | string } | null;
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { state?: unknown }) => void;
   updateProfile?: (payload: { phone?: string }) => Promise<unknown>;
   createInitialFormData: (techId: string | null) => ServiceRequestFormData;
   validateStep1: (formData: ServiceRequestFormData) => boolean;
@@ -516,7 +516,7 @@ export function useUnifiedServiceRequestFlow({
       }
 
       toast.success(successTitle, { description: successDescription });
-      navigate(`/request-service-tracking/${data.id}`);
+      navigate(`/request-service-tracking/${data.id}`, { state: { requestSent: true } });
     } catch (error: any) {
       toast.error("Submission Failed", {
         description: error?.message || "Please try again."

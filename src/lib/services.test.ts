@@ -11,8 +11,19 @@ describe("serviceOf", () => {
     expect(serviceOf("EV")?.id).toBe("ev-charging");
   });
 
+  it("looks past the kind of vehicle the request form saves in front of the service", () => {
+    expect(serviceOf("car-towing")?.id).toBe("towing");
+    expect(serviceOf("bike-flat-tire")?.id).toBe("flat-tire");
+    expect(serviceOf("commercial-lockout")?.id).toBe("lockout");
+    expect(serviceOf("ev-ev-charging")?.id).toBe("ev-charging");
+    expect(serviceOf("ev-battery")?.id).toBe("battery");
+    // "ev-charging" is a service of its own, not "charging" for an EV.
+    expect(serviceOf("ev-charging")?.id).toBe("ev-charging");
+  });
+
   it("is nothing for a request that is not one of the listed services", () => {
     expect(serviceOf("emergency")).toBeNull();
+    expect(serviceOf("car-emergency")).toBeNull();
     expect(serviceOf("other")).toBeNull();
     expect(serviceOf(null)).toBeNull();
   });
@@ -27,6 +38,9 @@ describe("serviceName", () => {
   it("tidies up a type it does not know, and has a name when there is none", () => {
     expect(serviceName("brake_check")).toBe("Brake check");
     expect(serviceName("")).toBe("Roadside help");
+    expect(serviceName("car-towing")).toBe("Towing");
+    expect(serviceName("car-emergency")).toBe("Emergency");
+    expect(serviceName("bike-other")).toBe("Roadside help");
   });
 });
 
@@ -42,6 +56,7 @@ describe("serviceArt", () => {
       "/images/home/services/winching.webp",
       "/images/home/services/ev-charging.webp",
     ]);
+    expect(serviceArt("car-towing")).toBe("/images/home/services/towing.webp");
     expect(serviceArt("other")).toBeNull();
   });
 });

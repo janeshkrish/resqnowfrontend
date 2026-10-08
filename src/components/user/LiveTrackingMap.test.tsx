@@ -410,6 +410,59 @@ describe("LiveTrackingMap", () => {
       expect(customer.querySelector(".tracking-place-marker__pulse")).not.toBeNull();
     });
 
+    it("draws waves around the customer only while a technician is being found", () => {
+      const searching = render(<LiveTrackingMap techLocation={null} userLocation={base.userLocation} status="pending" variant="fullscreen" />);
+      const customer = markerHtml("customer");
+      expect(customer.querySelector('[data-tracking-place="customer"]')).toHaveClass("is-searching");
+      expect(customer.querySelector(".tracking-place-marker__zone")).not.toBeNull();
+      expect(customer.querySelectorAll(".tracking-place-marker__wave")).toHaveLength(3);
+      expect(customer.querySelector(".tracking-place-marker__label")).toHaveTextContent("You");
+      searching.unmount();
+
+      render(<LiveTrackingMap {...base} status="accepted" variant="fullscreen" />);
+      expect(markerHtml("customer").querySelector('[data-tracking-place="customer"]')).not.toHaveClass("is-searching");
+      expect(markerHtml("customer").querySelector(".tracking-place-marker__wave")).toBeNull();
+    });
+
+    it("leaves the small map on the home card without the waves", () => {
+      render(<LiveTrackingMap techLocation={null} userLocation={base.userLocation} status="pending" variant="mini" />);
+      expect(markerHtml("customer").querySelector('[data-tracking-place="customer"]')).not.toHaveClass("is-searching");
+    });
+
+    it("draws nearby technicians small while searching, and not once someone has accepted", () => {
+      const nearby = [
+        { id: "21", lat: 12.981, lng: 77.601 },
+        { id: "22", lat: 12.979, lng: 77.598 },
+      ];
+      const searching = render(
+        <LiveTrackingMap techLocation={null} userLocation={base.userLocation} status="pending" nearbyTechnicians={nearby} nearbyGlyph="auto_towing" />,
+      );
+      const ids = () => surfaceCapture.props?.markers.map((marker) => marker.id);
+      expect(ids()).toEqual(["nearby-21", "nearby-22", "customer"]);
+      const first = surfaceCapture.props?.markers[0];
+      expect(first).toMatchObject({ position: { lat: 12.981, lng: 77.601 }, anchor: "center", width: 32, height: 32 });
+      // Under the customer's own marker.
+      expect(first!.zIndex!).toBeLessThan(surfaceCapture.props!.markers[2].zIndex!);
+      const marker = markerHtml("nearby-21");
+      expect(marker.querySelector('[data-tracking-marker="nearby"]')).toHaveClass("mappls-marker-shell", "tracking-nearby-marker");
+      expect(marker.querySelector(".rq-symbol")).toHaveTextContent("auto_towing");
+      searching.unmount();
+
+      render(<LiveTrackingMap {...base} status="accepted" nearbyTechnicians={nearby} />);
+      expect(ids()).toEqual(["customer", "technician"]);
+    });
+
+    it("does not let the nearby technicians move the camera", () => {
+      const alone = render(<LiveTrackingMap techLocation={null} userLocation={base.userLocation} status="pending" />);
+      const camera = surfaceCapture.props?.camera;
+      alone.unmount();
+
+      render(
+        <LiveTrackingMap techLocation={null} userLocation={base.userLocation} status="pending" nearbyTechnicians={[{ id: "21", lat: 13.4, lng: 78.2 }]} />,
+      );
+      expect(surfaceCapture.props?.camera).toEqual(camera);
+    });
+
     it("tells the pickup from the drop on a tow", () => {
       render(<LiveTrackingMap {...base} dropLocation={{ lat: 12.99, lng: 77.61 }} userLabel="Pickup" technicianVehicle="tow" />);
 

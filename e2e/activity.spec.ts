@@ -12,7 +12,8 @@ const done = (id: number, service: string, vehicle: string, kind: string, day: s
 
 // Noon-ish times, so the day shown is the same in every time zone the tests run in.
 const onTheWay = (): Request => ({
-  id: 5502, service_type: "lockout", vehicle_type: "commercial", vehicle_model: "Tata Yodha", address: "Bharathi Nagar, Coimbatore",
+  // Spelled the way the request form saves it, with the kind of vehicle in front.
+  id: 5502, service_type: "commercial-lockout", vehicle_type: "commercial", vehicle_model: "Tata Yodha", address: "Bharathi Nagar, Coimbatore",
   status: "on_the_way", payment_status: "pending", created_at: "2026-10-05T07:30:00Z", technician: tech(9, "Arun Kumar"),
 });
 const paymentDue = (): Request => ({

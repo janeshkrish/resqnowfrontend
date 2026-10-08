@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { toast } from "@/components/ui/sonner";
+import { useNearbySearchTechnicians } from "@/hooks/useNearbySearchTechnicians";
 import { useRealtimeServiceRequest } from "@/hooks/useRealtimeServiceRequest";
 import { apiFetch } from "@/lib/api";
 import { PaymentSummaryDialog } from "@/components/payments/PaymentSummaryDialog";
@@ -20,6 +21,7 @@ import {
   type TrackingLiveChip,
 } from "@/components/user/tracking/TrackingCard";
 import { TrackingCancelDialog, TrackingHelpDialog } from "@/components/user/tracking/TrackingDialogs";
+import { RequestSentOverlay } from "@/components/user/tracking/RequestSentOverlay";
 import { useTrackingSheet } from "@/components/user/tracking/useTrackingSheet";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -40,7 +42,16 @@ import {
   trackingStripHeadline,
   vehicleArt,
 } from "@/lib/customerTracking";
+import {
+  findingArt,
+  findingCopy,
+  findingLines,
+  hasSeenRequestSent,
+  markRequestSentSeen,
+  sentNextLine,
+} from "@/lib/findingTechnician";
 import { distanceMeters, etaBasisLabel, formatEtaDuration, usableLiveEta } from "@/lib/liveEta";
+import { serviceName, serviceOf } from "@/lib/services";
 import { formatClockTime } from "@/lib/technicianArrival";
 import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
 import {
@@ -210,6 +221,14 @@ const RequestTracking = () => {
   const params = useParams<{ requestId?: string; serviceId?: string }>();
   const requestId = params.requestId || params.serviceId || "";
   const navigate = useNavigate();
+  const location = useLocation();
+  // Straight from the request form: the request-sent moment plays once, over the page while it loads.
+  const [showRequestSent, setShowRequestSent] = useState(
+    () => Boolean((location.state as { requestSent?: boolean } | null)?.requestSent) && !hasSeenRequestSent(requestId),
+  );
+  useEffect(() => {
+    if (showRequestSent) markRequestSentSeen(requestId);
+  }, [showRequestSent, requestId]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showPayment, setShowPayment] = useState(false);
   const [showPaymentSummary, setShowPaymentSummary] = useState(false);
@@ -871,6 +890,16 @@ const RequestTracking = () => {
 
   const phase = trackingPhase({ status, paymentDue: showPayment, paymentCompleted });
   const canResize = canResizeTrackingSheet(phase);
+
+  // While a technician is being found: the words for this service, and who is nearby and available for it.
+  const finding = findingCopy(requestServiceType);
+  const isSearching = Boolean(request) && phase === "search";
+  const nearbyTechnicians = useNearbySearchTechnicians({
+    enabled: isSearching,
+    location: requestMapLocation,
+    serviceType: requestServiceType,
+    vehicleType: request?.vehicle_type,
+  });
   const sheet = useTrackingSheet({
     enabled: isMobile,
     viewportHeight,
@@ -937,7 +966,11 @@ const RequestTracking = () => {
     fallback: statusMeta,
   };
   const headline = trackingHeadline(headlineInput);
-  const stripHeadline = trackingStripHeadline({ ...headlineInput, freshness: effectiveTrackingFreshness });
+  const findingText = findingLines(finding);
+  const stripHeadline =
+    phase === "search"
+      ? { ...trackingStripHeadline({ ...headlineInput, freshness: effectiveTrackingFreshness }), big: finding.title, sub: findingText[0] }
+      : trackingStripHeadline({ ...headlineInput, freshness: effectiveTrackingFreshness });
   const steps = trackingSteps(phase, isTowingRequest);
   // The technician's marker carries the same minutes as the card, on a tow as well.
   const mapEta =
@@ -981,7 +1014,7 @@ const RequestTracking = () => {
   const billTotal = Number(amountCardDetails.finalAmount ?? finalAmount);
   const hasBillTotal = Boolean(amountCardDetails.hasPricing) && Number.isFinite(billTotal) && billTotal > 0;
   const requestRow = {
-    title: formatDisplayLabel(requestServiceType) || "Service request",
+    title: serviceOf(requestServiceType) ? serviceName(requestServiceType) : formatDisplayLabel(requestServiceType) || "Service request",
     line:
       [requestExtras?.vehicle_model || requestExtras?.vehicle_name, formatDisplayLabel(request?.vehicle_type)]
         .filter(Boolean)
@@ -1062,6 +1095,36 @@ const RequestTracking = () => {
       : null,
     requestLine: [`Request #${request?.id ?? requestId}`, sentAt ? `sent at ${sentAt}` : null].filter(Boolean).join(" · "),
   };
+  if (phase === "search") {
+    cardProps.finding = {
+      title: finding.title,
+      lines: findingText,
+      // Beside the map on a wide screen the details are always open and already say where help is going.
+      place: isMobile
+        ? { pickupLabel: detailsProps.place.pickupLabel, address: detailsProps.place.address, drop: detailsProps.place.drop }
+        : undefined,
+    };
+  }
+
+  // The request-sent moment sits over whatever the page is showing; it ends early once the search is over.
+  const requestSent = showRequestSent ? (
+    <RequestSentOverlay
+      nextLine={sentNextLine(finding)}
+      art={findingArt(requestServiceType)}
+      glyph={finding.glyph}
+      card={request ? { title: requestRow.title, line: requestRow.line, art: requestRow.art, fare: requestRow.fare } : null}
+      cutShort={!isLoading && !isSearching}
+      reduceMotion={Boolean(reduceMotion)}
+      onDone={() => setShowRequestSent(false)}
+    />
+  ) : null;
+  // It keeps the same place beside the page whatever the page is showing, so loading does not start it again.
+  const withRequestSent = (page: ReactNode) => (
+    <>
+      {page}
+      {requestSent}
+    </>
+  );
 
   const summaryBreakdown = summaryPaymentDetails.hasPricing
     ? {
@@ -1087,18 +1150,18 @@ const RequestTracking = () => {
     : null;
 
   if (isLoading) {
-    return (
+    return withRequestSent(
       <div className="flex h-screen items-center justify-center bg-muted">
         <LoadingSpinner />
-      </div>
+      </div>,
     );
   }
 
   if (!request) {
-    return (
+    return withRequestSent(
       <div className="p-8 text-center">
         Request not found <Button onClick={() => navigate("/")}>Home</Button>
-      </div>
+      </div>,
     );
   }
 
@@ -1149,7 +1212,7 @@ const RequestTracking = () => {
   );
 
   if (isMobile) {
-    return (
+    return withRequestSent(
       <div className="lt lt-screen">
         {/* The map fills the screen down to the card */}
         <motion.div className="lt-mapwrap" style={{ height: sheet.mapHeight }}>
@@ -1170,6 +1233,8 @@ const RequestTracking = () => {
             showRoutePath={shouldShowLiveRoute}
             technicianVehicle={isTowingRequest ? "tow" : "bike"}
             userLabel={isTowingRequest ? "Pickup" : "You"}
+            nearbyTechnicians={nearbyTechnicians}
+            nearbyGlyph={finding.glyph}
             showStatusOverlay={false}
             className="h-full w-full"
           />
@@ -1259,11 +1324,11 @@ const RequestTracking = () => {
         </motion.div>
 
         {dialogs}
-      </div>
+      </div>,
     );
   }
 
-  return (
+  return withRequestSent(
     <div className="lt lt-desk container mx-auto max-w-5xl px-4 py-6 sm:py-8">
       <div className="lt-desk-bar">
         <button type="button" className="lt-back lt-press" onClick={goHome}>
@@ -1289,6 +1354,8 @@ const RequestTracking = () => {
               showRoutePath={shouldShowLiveRoute}
             technicianVehicle={isTowingRequest ? "tow" : "bike"}
             userLabel={isTowingRequest ? "Pickup" : "You"}
+              nearbyTechnicians={nearbyTechnicians}
+              nearbyGlyph={finding.glyph}
               className="w-full mb-0"
             />
           </CardContent>
@@ -1304,7 +1371,7 @@ const RequestTracking = () => {
       </div>
 
       {dialogs}
-    </div>
+    </div>,
   );
 };
 

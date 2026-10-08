@@ -61,7 +61,7 @@ export const useServiceRequestSubmit = () => {
       toast.success("Service request submitted successfully!");
 
       // Navigate to tracking page with the actual request ID
-      navigate(`/request-service-tracking/${result.id}`);
+      navigate(`/request-service-tracking/${result.id}`, { state: { requestSent: true } });
 
       return result;
     } catch (error: any) {

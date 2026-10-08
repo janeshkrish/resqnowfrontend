@@ -54,6 +54,10 @@ interface LiveTrackingMapProps {
   dropLabel?: string;
   /** The map could not be drawn. */
   onUnavailable?: () => void;
+  /** While a technician is still being found: who is nearby and available for this job, drawn small. */
+  nearbyTechnicians?: Array<{ id: string; lat: number; lng: number }>;
+  /** The symbol on a nearby technician's marker. */
+  nearbyGlyph?: string;
 }
 
 const FALLBACK_CENTER: MapPoint = { lat: 20.5937, lng: 78.9629 };
@@ -121,12 +125,24 @@ const buildRouteCurve = (
 // markers it replaces, so nothing about where Mappls puts a marker changes: the map
 // point is 18px below the middle of the box.
 
+// While a technician is being found, the customer's spot sits in a soft area with waves spreading from it.
+const SEARCH_WAVES =
+  '<span class="tracking-place-marker__zone"></span><span class="tracking-place-marker__wave"></span><span class="tracking-place-marker__wave is-2"></span><span class="tracking-place-marker__wave is-3"></span>';
+
 /** A place on the map: the customer's spot (a dot) or the drop (a square), with one word over it. */
-const createPlaceMarkerHtml = (label: string, kind: "customer" | "drop") => `
-  <div class="mappls-marker-shell tracking-place-marker${kind === "drop" ? " is-drop" : ""}" data-tracking-place="${kind}">
+const createPlaceMarkerHtml = (label: string, kind: "customer" | "drop", searching = false) => `
+  <div class="mappls-marker-shell tracking-place-marker${kind === "drop" ? " is-drop" : ""}${searching ? " is-searching" : ""}" data-tracking-place="${kind}">
+    ${searching ? SEARCH_WAVES : ""}
     ${label ? `<span class="tracking-place-marker__label">${escapeHtml(label)}</span>` : ""}
     ${kind === "customer" ? '<span class="tracking-place-marker__pulse"></span>' : ""}
     <span class="tracking-place-marker__dot"></span>
+  </div>
+`;
+
+/** A technician nearby who could take the job: a small white disc with their kind of vehicle. */
+const createNearbyMarkerHtml = (glyph: string) => `
+  <div class="mappls-marker-shell tracking-nearby-marker" data-tracking-marker="nearby">
+    <span class="rq-symbol" aria-hidden="true">${escapeHtml(glyph)}</span>
   </div>
 `;
 
@@ -254,6 +270,8 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   userLabel = "You",
   dropLabel = "Drop",
   onUnavailable,
+  nearbyTechnicians,
+  nearbyGlyph = "two_wheeler",
 }) => {
   const reduceMotion = Boolean(useReducedMotion());
   const playbackTarget = useMemo<TrackingPlaybackPoint | null>(() => {
@@ -434,13 +452,28 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   const technicianIsStale =
     markerFreshness === "DELAYED" || markerFreshness === "RECONNECTING" || markerFreshness === "OFFLINE";
   const technicianHasHeading = playback.bearing != null && Number.isFinite(playback.bearing);
+  // Still looking for a technician. The small map on the home card stays as it is.
+  const isSearching = variant !== "mini" && String(status ?? "").trim().toLowerCase() === "pending";
   const markers = useMemo<MapMarkerSpec[]>(() => {
     const next: MapMarkerSpec[] = [];
+    if (isSearching) {
+      for (const nearby of nearbyTechnicians ?? []) {
+        next.push({
+          id: `nearby-${nearby.id}`,
+          position: { lat: nearby.lat, lng: nearby.lng },
+          html: createNearbyMarkerHtml(nearbyGlyph),
+          anchor: "center",
+          zIndex: 600,
+          width: 32,
+          height: 32,
+        });
+      }
+    }
     if (userLocation) {
       next.push({
         id: "customer",
         position: userLocation,
-        html: createPlaceMarkerHtml(userLabel, "customer"),
+        html: createPlaceMarkerHtml(userLabel, "customer", isSearching),
         anchor: "center",
         zIndex: 640,
         width: 86,
@@ -483,6 +516,9 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
     dropLabel,
     dropLocation,
     etaLabel,
+    isSearching,
+    nearbyGlyph,
+    nearbyTechnicians,
     playback.bearing,
     playback.isRepositioning,
     technicianHasHeading,

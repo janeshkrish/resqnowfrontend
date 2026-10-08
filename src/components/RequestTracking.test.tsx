@@ -20,9 +20,15 @@ const trackingHarness = vi.hoisted(() => ({
   mapProps: null as Record<string, unknown> | null,
   refresh: vi.fn(),
   trackingFreshness: undefined as string | undefined,
+  isLoading: false,
 }));
 
 const viewportHarness = vi.hoisted(() => ({ isMobile: false }));
+
+const nearbyHarness = vi.hoisted(() => ({
+  options: null as Record<string, unknown> | null,
+  result: undefined as Array<{ id: string; lat: number; lng: number }> | undefined,
+}));
 
 const roadEta = (overrides: Record<string, unknown> = {}) => ({
   requestId: "request-1",
@@ -41,11 +47,18 @@ vi.mock("@/hooks/useRealtimeServiceRequest", () => ({
   useRealtimeServiceRequest: () => ({
     request: trackingHarness.request,
     technician: trackingHarness.technician,
-    isLoading: false,
+    isLoading: trackingHarness.isLoading,
     isConnected: true,
     trackingFreshness: trackingHarness.trackingFreshness,
     refresh: trackingHarness.refresh,
   }),
+}));
+
+vi.mock("@/hooks/useNearbySearchTechnicians", () => ({
+  useNearbySearchTechnicians: (options: Record<string, unknown>) => {
+    nearbyHarness.options = options;
+    return options.enabled ? nearbyHarness.result : undefined;
+  },
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({
@@ -79,6 +92,10 @@ describe("RequestTracking live metrics", () => {
 
   beforeEach(() => {
     viewportHarness.isMobile = false;
+    nearbyHarness.options = null;
+    nearbyHarness.result = undefined;
+    trackingHarness.isLoading = false;
+    sessionStorage.clear();
     trackingHarness.mapProps = null;
     trackingHarness.refresh.mockReset();
     trackingHarness.trackingFreshness = undefined;
@@ -131,6 +148,125 @@ describe("RequestTracking live metrics", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+  });
+
+  describe("while a technician is being found", () => {
+    const search = (overrides: Record<string, unknown> = {}) => {
+      trackingHarness.technician = null as unknown as Record<string, unknown>;
+      trackingHarness.request = {
+        ...trackingHarness.request,
+        status: "pending",
+        service_type: "car-towing",
+        vehicle_type: "car",
+        location_lat: 11.0168,
+        location_lng: 76.9558,
+        ...overrides,
+      };
+    };
+    const renderFrom = async (entry: string | { pathname: string; state: unknown }) => {
+      await act(async () => {
+        root.render(
+          <MemoryRouter initialEntries={[entry]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
+              <Route path="/requests/:requestId" element={<RequestTracking />} />
+            </Routes>
+          </MemoryRouter>,
+        );
+      });
+      await waitFor(() => expect(trackingHarness.mapProps).not.toBeNull());
+    };
+
+    it("shows the search card for the service, with where help is going and Cancel", async () => {
+      viewportHarness.isMobile = true;
+      search();
+      await renderTracking();
+
+      const card = screen.getByTestId("tracking-card");
+      expect(card).toHaveAttribute("data-phase", "search");
+      expect(screen.getByTestId("tracking-big")).toHaveTextContent("Finding a tow truck nearby");
+      const lines = within(screen.getByTestId("tracking-finding-lines")).getAllByText(/./);
+      expect(lines.map((line) => line.textContent)).toEqual(["Contacting tow operators near you", "Waiting for one of them to accept"]);
+      expect(screen.getByTestId("tracking-trip")).toHaveTextContent("Customer location");
+      // The service is named on its own: the row beneath already says what kind of vehicle it is.
+      expect(within(screen.getByTestId("tracking-request")).getByText("Towing")).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+    });
+
+    it("leaves where help is going to the details beside the card on a wide screen", async () => {
+      search();
+      await renderTracking();
+
+      expect(screen.getByTestId("tracking-big")).toHaveTextContent("Finding a tow truck nearby");
+      expect(screen.queryByTestId("tracking-trip")).toBeNull();
+      expect(screen.getByTestId("tracking-details")).toHaveTextContent("Customer location");
+    });
+
+    it("asks who is nearby for this service and vehicle, and gives them to the map", async () => {
+      search();
+      nearbyHarness.result = [{ id: "21", lat: 11.02, lng: 76.96 }];
+      await renderTracking();
+
+      expect(nearbyHarness.options).toMatchObject({
+        enabled: true,
+        location: { lat: 11.0168, lng: 76.9558 },
+        serviceType: "car-towing",
+        vehicleType: "car",
+      });
+      expect(trackingHarness.mapProps).toMatchObject({ status: "pending", nearbyTechnicians: nearbyHarness.result, nearbyGlyph: "auto_towing" });
+    });
+
+    it("stops once a technician has accepted", async () => {
+      nearbyHarness.result = [{ id: "21", lat: 11.02, lng: 76.96 }];
+      await renderTracking();
+
+      expect(nearbyHarness.options).toMatchObject({ enabled: false });
+      expect(trackingHarness.mapProps?.nearbyTechnicians).toBeUndefined();
+      expect(screen.getByTestId("tracking-card")).toHaveAttribute("data-phase", "way");
+      expect(screen.queryByTestId("tracking-finding-lines")).toBeNull();
+    });
+
+    it("plays the request-sent moment once, and only when the page was opened by sending a request", async () => {
+      search();
+      await renderFrom({ pathname: "/requests/request-1", state: { requestSent: true } });
+      const sent = screen.getByTestId("request-sent");
+      expect(sent).toHaveTextContent("Request sent");
+      expect(sent).toHaveTextContent("Finding a tow truck near you");
+      expect(within(screen.getByTestId("request-sent-card")).getByText("Towing")).toBeInTheDocument();
+
+      // The same page again (a reload keeps the note that the request was sent): it does not play twice.
+      act(() => root.unmount());
+      root = createRoot(container);
+      trackingHarness.mapProps = null;
+      await renderFrom({ pathname: "/requests/request-1", state: { requestSent: true } });
+      expect(screen.queryByTestId("request-sent")).toBeNull();
+    });
+
+    it("keeps playing, not starting again, when the request finishes loading under it", async () => {
+      search();
+      trackingHarness.isLoading = true;
+      const tree = () => (
+        <MemoryRouter initialEntries={[{ pathname: "/requests/request-1", state: { requestSent: true } }]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
+            <Route path="/requests/:requestId" element={<RequestTracking />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      await act(async () => root.render(tree()));
+      const whileLoading = screen.getByTestId("request-sent");
+      expect(screen.queryByTestId("tracking-card")).toBeNull();
+
+      trackingHarness.isLoading = false;
+      await act(async () => root.render(tree()));
+      expect(screen.getByTestId("tracking-card")).toBeInTheDocument();
+      // The very same element: had it been put up afresh, its animation would have begun again.
+      expect(screen.getByTestId("request-sent")).toBe(whileLoading);
+    });
+
+    it("does not play it when the page is simply opened", async () => {
+      search();
+      await renderTracking();
+      expect(screen.queryByTestId("request-sent")).toBeNull();
+    });
   });
 
   it("prefers fresh server route distance and ETA over Haversine estimates", async () => {

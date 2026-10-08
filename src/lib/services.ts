@@ -33,19 +33,27 @@ const ALIASES: Record<string, ServiceId> = {
   "ev-charge": "ev-charging",
 };
 
-/** The service a request's `service_type` means, or null when it is something else ("other", "emergency"). */
-export function serviceOf(type: string | null | undefined): ServiceInfo | null {
-  const key = String(type ?? "").trim().toLowerCase().replace(/[\s_]+/g, "-");
+const byKey = (key: string) => {
   const id = (ALIASES[key] ?? key) as ServiceId;
   return SERVICES.find((service) => service.id === id) ?? null;
+};
+
+/**
+ * The service a request's `service_type` means, or null when it is something else ("other", "emergency").
+ * The request form saves the kind of vehicle in front of it ("car-towing", "ev-ev-charging"), so that is looked past.
+ */
+export function serviceOf(type: string | null | undefined): ServiceInfo | null {
+  const key = String(type ?? "").trim().toLowerCase().replace(/[\s_]+/g, "-");
+  return byKey(key) ?? byKey(key.replace(/^(car|bike|ev|commercial|truck)-/, ""));
 }
 
-/** "Flat tyre" for the screen; an unknown type is shown as it was saved, tidied up. */
+/** "Flat tyre" for the screen; an unknown type is shown as it was saved, tidied up and without the kind of vehicle. */
 export function serviceName(type: string | null | undefined): string {
   const known = serviceOf(type);
   if (known) return known.name;
-  const words = String(type ?? "").trim().replace(/[-_]+/g, " ");
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Roadside help";
+  const words = String(type ?? "").trim().replace(/^(car|bike|ev|commercial|truck)[-_\s]+/i, "").replace(/[-_]+/g, " ");
+  if (!words || words.toLowerCase() === "other") return "Roadside help";
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** The service's picture, the one the home page uses; null when the type has none. */

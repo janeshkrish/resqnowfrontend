@@ -375,8 +375,8 @@ test.describe("the card changes size on a phone", () => {
 test.describe("cancelling", () => {
   test("is on the card while a technician is being found", async ({ page }) => {
     const { seen } = await openTracking(page, request({ status: "pending", technician: null }));
-    await expect(page.getByTestId("tracking-big")).toHaveText("Finding a technician");
-    await expect(card(page).locator(".lt-say")).toHaveText(/^Request sent · /);
+    await expect(page.getByTestId("tracking-big")).toHaveText("Finding a locksmith nearby");
+    await expect(page.getByTestId(isPhone() ? "tracking-trip" : "tracking-details")).toContainText("Bharathi Nagar, Ward 41, North Zone, Coimbatore 641001");
     await shot(page, "searching");
 
     await card(page).getByRole("button", { name: "Cancel request" }).click();

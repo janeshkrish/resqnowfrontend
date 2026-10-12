@@ -9,6 +9,7 @@ import {
   isLiveMapPath,
   isServiceRequestFlowPath,
   isServiceRequestFormPath,
+  isTabPagePath,
   isTrackingExperiencePath,
   isVehicleSelectionPath,
 } from "@/lib/appShellRoutes";
@@ -39,8 +40,12 @@ const MobileAppHeader = () => {
   // My garage has its own top bar with a back button.
   if (isGaragePath(location.pathname)) return null;
 
+  // Get help, Activity and Account bring their own heading, so this bar only shows there when the
+  // customer has switched the bottom bar off (it is then the way back home).
+  const isTabPage = isTabPagePath(location.pathname);
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border">
+    <header className={`sticky top-0 z-50 w-full bg-card/95 backdrop-blur-lg border-b border-border${isTabPage ? " rq-tab-topbar" : ""}`}>
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-2.5">
           {isServiceRequestFlow && (

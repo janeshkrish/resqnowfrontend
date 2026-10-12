@@ -3,6 +3,7 @@ import {
   isGaragePath,
   isServiceRequestFlowPath,
   isServiceRequestFormPath,
+  isTabPagePath,
   isVehicleSelectionPath,
   shouldHideSupportSurfaces,
 } from "./appShellRoutes";
@@ -20,6 +21,26 @@ describe("isGaragePath", () => {
   it("hides the chat bubble in the garage, where it would cover the toast", () => {
     expect(shouldHideSupportSurfaces("/my-garage")).toBe(true);
     expect(shouldHideSupportSurfaces("/services")).toBe(false);
+  });
+});
+
+describe("isTabPagePath", () => {
+  it("matches Get help, Activity and Account, which bring their own heading", () => {
+    expect(isTabPagePath("/services")).toBe(true);
+    expect(isTabPagePath("/my-requests")).toBe(true);
+    expect(isTabPagePath("/settings")).toBe(true);
+    expect(isTabPagePath("/settings/")).toBe(true);
+    expect(isTabPagePath("/profile")).toBe(true);
+
+    expect(isTabPagePath("/")).toBe(false);
+    expect(isTabPagePath("/services/towing")).toBe(false);
+    expect(isTabPagePath("/subscription")).toBe(false);
+    expect(isTabPagePath("/technician/settings")).toBe(false);
+  });
+
+  it("keeps the chat bubble there, since Account's Help opens it", () => {
+    expect(shouldHideSupportSurfaces("/settings")).toBe(false);
+    expect(shouldHideSupportSurfaces("/my-requests")).toBe(false);
   });
 });
 

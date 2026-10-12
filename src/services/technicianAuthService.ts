@@ -1,3 +1,4 @@
+import * as z from "zod";
 import { Technician } from "@/types/technician";
 import { apiFetch, setTechnicianToken } from "@/lib/api";
 import { getTechnicianOperationalRole } from "@/utils/technicianRole";
@@ -210,3 +211,100 @@ export const technicianAuthService = {
     return true;
   },
 };
+
+
+export const technicianSchema = z.object({
+    // Step 0: Personal
+    proprietor_name: z.string().min(2, "Name required"),
+    name: z.string().min(2, "Shop Name required"),
+    email: z.string().trim().email("Enter a valid email").or(z.literal("")),
+    password: z.string().min(8, "Use at least 8 characters").or(z.literal("")),
+    confirmPassword: z.string(),
+    phone: z.string().min(10, "Min 10 digits"),
+    alternate_phone: z.string().optional(),
+    location: z.object({
+        address: z.string().min(5, "Address required"),
+        latitude: z.number().nullable().refine(val => val !== null, "GPS Location required"),
+        longitude: z.number().nullable(),
+        state: z.string().min(2, "State required"),
+        locality: z.string().optional(),
+        city: z.string().optional(),
+        district: z.string().optional(),
+        pincode: z.string().optional(),
+    }),
+    serviceAreaRange: z.coerce.number().min(1, "Min 1 km"),
+    experience: z.coerce.number().min(0, "Invalid experience"),
+
+    // Step 1: Services
+    specialties: z.array(z.string()).min(1, "Select at least one service"),
+    vehicle_types: z.record(z.boolean()).refine((data) => data && Object.values(data).some(val => val === true), {
+        message: "Select at least one vehicle type"
+    }),
+    towing_fleet_types: z.array(z.string()).default([]),
+
+    // Step 2: Verification
+    aadhaar_number: z.string().min(12, "12 digits required").max(12),
+    gst_number: z.string().optional(),
+    documents: z.object({
+        garage_front: z.string().optional(),
+        profile_photo: z.string().optional(),
+        tools_photo: z.string().optional(),
+        facilities_photo: z.string().optional(),
+    }),
+
+    // Step 3: Operations
+    working_hours: z.object({
+        opening_time: z.string(),
+        closing_time: z.string(),
+        weekly_off: z.string(),
+        is_24x7: z.boolean(),
+    }),
+    app_readiness: z.object({
+        has_smartphone: z.boolean(),
+        preferred_language: z.string(),
+    }),
+
+    // Step 4: Pricing
+    pricing_config: z.array(z.any()),
+
+    // Step 5: Banking
+    payment_details: z.object({
+        modes: z.record(z.boolean()),
+        upi_id: z.string().optional(),
+        bank_account_number: z.string().optional(),
+        ifsc_code: z.string().optional(),
+        bank_name: z.string().optional(),
+    }),
+    trade_license_number: z.string().optional(),
+
+    // Step 6: Consent
+    consent: z.object({
+        agreed: z.boolean().refine(val => val === true, "Required"),
+    }),
+}).superRefine((data, ctx) => {
+    if (data.email && !data.password) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A password is required when you enter an email", path: ["password"] });
+    }
+    if (!data.working_hours.is_24x7) {
+        for (const key of ["opening_time", "closing_time"] as const) {
+            if (!data.working_hours[key]) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Choose working hours or 24/7 availability", path: ["working_hours", key] });
+        }
+    }
+    if (data.password !== data.confirmPassword) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Mismatch",
+            path: ["confirmPassword"],
+        });
+    }
+
+    if (data.specialties.includes("towing") && data.towing_fleet_types.length === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Select at least one tow truck type",
+            path: ["towing_fleet_types"],
+        });
+    }
+});
+
+export type TechnicianFormValues = z.infer<typeof technicianSchema>;

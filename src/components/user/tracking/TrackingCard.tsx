@@ -32,6 +32,14 @@ export type TrackingPayActions = {
   onPayCash: () => void;
 };
 
+/** While a technician is being found: what is being found, the two lines that take turns, and where help is going. */
+export type TrackingFinding = {
+  title: string;
+  lines: [string, string];
+  /** Left out where the details beside the card already say where help is going. */
+  place?: { pickupLabel: string; address: string; drop: { label: string; address: string } | null };
+};
+
 /** Pointer handlers that let the top of the card be dragged like the handle. */
 export type TrackingDragProps = { onPointerDown?: (event: PointerEvent<HTMLElement>) => void };
 
@@ -132,6 +140,8 @@ export type TrackingCardProps = {
   onHome: () => void;
   /** Cancel sits on the card itself only while a technician is still being found. */
   onCancel?: () => void;
+  /** Given while a technician is being found; the card is then the search card. */
+  finding?: TrackingFinding;
   drag?: TrackingDragProps;
 };
 
@@ -150,6 +160,7 @@ export function TrackingCard({
   rating,
   onHome,
   onCancel,
+  finding,
   drag,
 }: TrackingCardProps) {
   const requestRow = request ? (
@@ -174,6 +185,82 @@ export function TrackingCard({
       ) : null}
     </>
   ) : null;
+
+  const requestBlock = request ? (
+    details ? (
+      <button
+        type="button"
+        className="lt-req lt-press"
+        data-testid="tracking-request"
+        aria-expanded={details.open}
+        aria-label={`${details.open ? "Hide" : "Show"} request details`}
+        onClick={details.onToggle}
+      >
+        {requestRow}
+      </button>
+    ) : (
+      <div className="lt-req" data-testid="tracking-request">
+        {requestRow}
+      </div>
+    )
+  ) : null;
+
+  // Still finding a technician: a plain card that says so, keeps moving, and leaves Cancel one tap away.
+  if (phase === "search" && finding) {
+    return (
+      <div className="lt-pad" data-testid="tracking-card" data-phase={phase}>
+        <div className={cn("lt-find", drag?.onPointerDown && "is-grab")} {...drag}>
+          <p className="lt-find-title" data-testid="tracking-big">
+            {finding.title}
+          </p>
+          <p className="lt-find-sub" data-testid="tracking-finding-lines" aria-hidden="true">
+            <span>{finding.lines[0]}</span>
+            <span>{finding.lines[1]}</span>
+          </p>
+          <p className="sr-only" aria-live="polite">
+            {finding.lines[0]}
+          </p>
+          <div className="lt-find-bar" aria-hidden="true">
+            <i />
+          </div>
+        </div>
+
+        {finding.place ? (
+          <div className="lt-trip" data-testid="tracking-trip">
+            <span className="lt-trip-rail" aria-hidden="true">
+              <i className="is-from" />
+              {finding.place.drop ? (
+                <>
+                  <i className="is-line" />
+                  <i className="is-to" />
+                </>
+              ) : null}
+            </span>
+            <span className="lt-trip-stops">
+              <span className="lt-trip-stop">
+                <small>{finding.place.pickupLabel}</small>
+                <b>{finding.place.address}</b>
+              </span>
+              {finding.place.drop ? (
+                <span className="lt-trip-stop">
+                  <small>{finding.place.drop.label}</small>
+                  <b>{finding.place.drop.address}</b>
+                </span>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
+
+        {requestBlock}
+
+        {onCancel ? (
+          <button type="button" className="lt-ghost is-danger is-soft lt-press" onClick={onCancel}>
+            Cancel request
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="lt-pad" data-testid="tracking-card" data-phase={phase}>
@@ -263,24 +350,7 @@ export function TrackingCard({
         </>
       ) : null}
 
-      {request && phase !== "rate" && phase !== "closed" && phase !== "cancelled" ? (
-        details ? (
-          <button
-            type="button"
-            className="lt-req lt-press"
-            data-testid="tracking-request"
-            aria-expanded={details.open}
-            aria-label={`${details.open ? "Hide" : "Show"} request details`}
-            onClick={details.onToggle}
-          >
-            {requestRow}
-          </button>
-        ) : (
-          <div className="lt-req" data-testid="tracking-request">
-            {requestRow}
-          </div>
-        )
-      ) : null}
+      {phase !== "rate" && phase !== "closed" && phase !== "cancelled" ? requestBlock : null}
 
       {onCancel ? (
         <button type="button" className="lt-ghost is-danger lt-press" onClick={onCancel}>

@@ -21,6 +21,9 @@ export const isServiceRequestFormPath = (pathname: string) =>
 /** My garage is a full page with its own back button (/my-garage and /my-garage/add). */
 export const isGaragePath = (pathname: string) => /^\/my-garage(\/|$)/.test(pathname);
 
+/** Get help, Activity and Account: on phones each brings its own heading, so the app's top bar is not shown. */
+export const isTabPagePath = (pathname: string) => /^\/(services|my-requests|settings|profile)\/?$/.test(pathname);
+
 export const isTrackingExperiencePath = (pathname: string) =>
   TRACKING_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 

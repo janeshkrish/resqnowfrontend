@@ -30,6 +30,13 @@ const Chatbot = () => {
     }
   }, [messages, open, loading]);
 
+  // Other pages can open the assistant (Account, Help, Ask the assistant).
+  useEffect(() => {
+    const openChat = () => setOpen(true);
+    window.addEventListener("resqnow:open-chat", openChat);
+    return () => window.removeEventListener("resqnow:open-chat", openChat);
+  }, []);
+
   // Session ID Management
   useEffect(() => {
     let sessionId = sessionStorage.getItem("chatSessionId");

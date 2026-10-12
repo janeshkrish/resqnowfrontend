@@ -23,11 +23,22 @@ describe("MobileAppHeader", () => {
   });
 
   it("keeps the existing logo header with SOS on every other screen", () => {
-    renderAt("/services");
+    renderAt("/subscription");
     expect(screen.queryByTestId("home-glass-header")).not.toBeInTheDocument();
     expect(screen.getByAltText("ResQNow Logo")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /sos/i })).toHaveAttribute("href", "/request-service/emergency");
+    expect(screen.getByRole("banner")).not.toHaveClass("rq-tab-topbar");
   });
+
+  it.each(["/services", "/my-requests", "/settings"])(
+    "on %s the bar is only for when the bottom bar is switched off, so the styles can hide it",
+    (path) => {
+      renderAt(path);
+      // Still there as the way home; index.css hides .rq-tab-topbar while the bottom bar is on the page.
+      expect(screen.getByRole("banner")).toHaveClass("rq-tab-topbar");
+      expect(screen.getByAltText("ResQNow Logo").closest("a")).toHaveAttribute("href", "/");
+    },
+  );
 
   it("steps aside on vehicle selection, which has its own back button", () => {
     const { container } = renderAt("/request-service/towing");

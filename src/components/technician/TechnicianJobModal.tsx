@@ -45,6 +45,8 @@ interface TechnicianJobModalProps {
     job: JobRequest | null;
     isOpen: boolean;
     isProcessing?: boolean;
+    processingMessage?: string | null;
+    onRetryAcceptance?: () => void;
     isUnavailable?: boolean;
     unavailableMessage?: string;
     onAccept: (jobId: string) => void;
@@ -58,6 +60,8 @@ export function TechnicianJobModal({
     job,
     isOpen,
     isProcessing = false,
+    processingMessage,
+    onRetryAcceptance,
     isUnavailable = false,
     unavailableMessage = "This job has already been taken by another technician.",
     onAccept,
@@ -68,7 +72,7 @@ export function TechnicianJobModal({
     const timeoutHandledRef = useRef(false);
 
     useEffect(() => {
-        if (isOpen && !isUnavailable) {
+        if (isOpen && !isUnavailable && !isProcessing) {
             timeoutHandledRef.current = false;
             setTimeLeft(OFFER_SECONDS);
             const timer = setInterval(() => {
@@ -82,15 +86,15 @@ export function TechnicianJobModal({
             }, 1000);
             return () => clearInterval(timer);
         }
-    }, [isOpen, isUnavailable]);
+    }, [isOpen, isUnavailable, isProcessing]);
 
     useEffect(() => {
-        if (!isOpen || isUnavailable || !job) return;
+        if (!isOpen || isUnavailable || isProcessing || !job) return;
         if (timeLeft > 0) return;
         if (timeoutHandledRef.current) return;
         timeoutHandledRef.current = true;
         onReject(job.id);
-    }, [isOpen, isUnavailable, job, onReject, timeLeft]);
+    }, [isOpen, isUnavailable, isProcessing, job, onReject, timeLeft]);
 
     if (!job) return null;
 
@@ -177,6 +181,8 @@ export function TechnicianJobModal({
                 </div>
 
                 <div className="tj-foot">
+                    {processingMessage ? <p role="status">{processingMessage}</p> : null}
+                    {onRetryAcceptance ? <button type="button" className="tj-ghost rq-press" onClick={onRetryAcceptance}>Retry acceptance</button> : null}
                     {isUnavailable ? (
                         <button type="button" className="tj-ghost rq-press" onClick={dismiss}>
                             Dismiss
@@ -189,7 +195,7 @@ export function TechnicianJobModal({
                             </div>
                             <SlideToSend
                                 text="Slide to accept"
-                                busyText="Accepting…"
+                                busyText={processingMessage ? "Checking acceptance…" : "Accepting…"}
                                 busy={isProcessing}
                                 urgent={Boolean(details?.urgent)}
                                 onSend={() => onAccept(job.id)}

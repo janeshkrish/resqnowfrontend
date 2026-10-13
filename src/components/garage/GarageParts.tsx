@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 
@@ -14,7 +14,8 @@ import {
   type Vehicle,
   type VehicleStatus,
 } from "@/lib/garage";
-import { studioImage, useVehiclePhoto } from "@/lib/vehiclePhoto";
+import { kindOf, savedSince, type HelpHistory } from "@/lib/garageShow";
+import { studioImage } from "@/lib/vehiclePhoto";
 import { cn } from "@/lib/utils";
 
 /** The brand's logo, or its initials when we have no logo for it. */
@@ -29,33 +30,12 @@ export function BrandLogo({ make, size = "md" }: { make: string; size?: "sm" | "
   );
 }
 
-/** A real photo of the model when there is one, otherwise the plain car or bike picture. */
-export function VehiclePhoto({ vehicle, className }: { vehicle: Pick<Vehicle, "make" | "model" | "type">; className?: string }) {
-  const { data: photo, isPending } = useVehiclePhoto(vehicle.make, vehicle.model);
-  const [broken, setBroken] = useState(false);
-  if (photo && !broken) {
-    return (
-      <span className={cn("rqg-photo is-photo", className)}>
-        <img src={photo.url} alt={`${shortMake(vehicle.make)} ${vehicle.model}`} loading="lazy" draggable={false} onError={() => setBroken(true)} />
-      </span>
-    );
-  }
+/** The app's studio picture of a car or a bike. */
+export function VehiclePhoto({ vehicle, className }: { vehicle: { type: string; make?: string; model?: string }; className?: string }) {
   return (
-    <span className={cn("rqg-photo is-studio", isPending && !broken && "is-loading", className)} aria-hidden="true">
-      {isPending && !broken ? null : <img src={studioImage(vehicle.type)} alt="" draggable={false} />}
+    <span className={cn("rqg-photo is-studio", className)} aria-hidden="true">
+      <img src={studioImage(vehicle.type)} alt="" draggable={false} />
     </span>
-  );
-}
-
-/** The photo's credit, which its licence requires wherever it is shown large. */
-export function PhotoCredit({ vehicle }: { vehicle: Pick<Vehicle, "make" | "model"> }) {
-  const { data: photo } = useVehiclePhoto(vehicle.make, vehicle.model);
-  if (!photo) return null;
-  return (
-    <p className="rqg-credit">
-      Photo: {photo.credit.author} · {photo.credit.license} ·{" "}
-      <a href={photo.credit.source} target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>
-    </p>
   );
 }
 
@@ -85,23 +65,98 @@ export function StatusBadge({ status, floating = false }: { status?: string; flo
 
 const typeLabel = (type: string) => (vehicleTypeOf(type) === "bike" ? "Bike" : "Car");
 
-export function HeroCard({ vehicle, onHelp, onMore }: { vehicle: Vehicle; onHelp: () => void; onMore: () => void }) {
+const kindClass = (type: string) => (vehicleTypeOf(type) === "bike" ? "is-bike" : "is-car");
+
+/**
+ * The bay: the vehicle on show stands side-on on a turning platform, with its model name behind it.
+ * Swiping the bay shows the next or the previous vehicle; the one leaving drives off as the next drives in.
+ */
+export function VehicleBay({
+  vehicle, previous, position, total, history, onHelp, onMore, onSwipe,
+}: {
+  vehicle: Vehicle;
+  /** The vehicle that was on show before this one, so it can be seen driving off. */
+  previous: Vehicle | null;
+  position: number;
+  total: number;
+  /** Null until the customer's requests have loaded. */
+  history: HelpHistory | null;
+  onHelp: () => void;
+  onMore: () => void;
+  onSwipe: (step: 1 | -1) => void;
+}) {
+  const status = normalizeStatus(vehicle.status);
+  const kind = kindOf(vehicle);
+  const since = savedSince(vehicle.created_at);
+  const pressedAt = useRef<number | null>(null);
+  const release = (event: PointerEvent<HTMLElement>) => {
+    const from = pressedAt.current;
+    pressedAt.current = null;
+    if (from == null) return;
+    const moved = event.clientX - from;
+    if (Math.abs(moved) > 40) onSwipe(moved < 0 ? 1 : -1);
+  };
+
   return (
-    <article className="rqg-hero" aria-label={`${shortMake(vehicle.make)} ${vehicle.model}`}>
-      <VehiclePhoto vehicle={vehicle} className="rqg-hero-photo" />
-      <StatusBadge status={vehicle.status} floating />
-      <div className="rqg-hero-body">
-        <div className="rqg-brand">
-          <BrandLogo make={vehicle.make} />
+    <article
+      className="rqg-show"
+      aria-label={`${shortMake(vehicle.make)} ${vehicle.model}, ${STATUS_LABELS[status]}`}
+      onPointerDown={(event) => { pressedAt.current = event.clientX; }}
+      onPointerUp={release}
+      onPointerCancel={() => { pressedAt.current = null; }}
+    >
+      {/* Keyed by the vehicle, so each one arrives with its own drive-in. */}
+      <div key={vehicle.id} className={cn("rqg-bay", `is-${status}`, previous && "has-leaving")}>
+        <span className="rqg-bay-word" aria-hidden="true"><span>{vehicle.model}</span></span>
+        <span className="rqg-bay-beam" aria-hidden="true" />
+        <span className="rqg-bay-beam is-two" aria-hidden="true" />
+        <span className="rqg-bay-disc" aria-hidden="true" />
+        <span className="rqg-bay-ring" aria-hidden="true" />
+        <span className="rqg-bay-streaks" aria-hidden="true"><i /><i /><i /></span>
+        {previous ? (
+          <span className={cn("rqg-bay-car is-out", kindClass(previous.type))} aria-hidden="true">
+            <img src={studioImage(previous.type)} alt="" draggable={false} />
+          </span>
+        ) : null}
+        {status === "maintenance" ? (
+          <>
+            <span className="rqg-bay-lift" aria-hidden="true"><i /><i /></span>
+            <span className="rqg-bay-tool" aria-hidden="true"><MaterialSymbol name="build" /></span>
+          </>
+        ) : null}
+        <span className={cn("rqg-bay-car is-in", kindClass(vehicle.type))} aria-hidden="true">
+          <img src={studioImage(vehicle.type)} alt="" draggable={false} />
+        </span>
+        {total > 1 ? <span className="rqg-bay-count" aria-hidden="true">{position} / {total}</span> : null}
+        <StatusBadge status={vehicle.status} floating />
+        {vehicle.license_plate ? <NumberPlate plate={vehicle.license_plate} size="lg" /> : null}
+      </div>
+      <div className="rqg-show-body">
+        <div className="rqg-show-brand">
+          <BrandLogo make={vehicle.make} size="sm" />
+          <span className="rqg-show-make">{vehicle.make}</span>
+          <span className="rqg-tag">{kind.label}</span>
+          {kind.noLongerSold ? <span className="rqg-tag is-old">No longer sold</span> : null}
+        </div>
+        <h2 className="rqg-show-model">{vehicle.model}</h2>
+        <dl className="rqg-spec">
+          <div><dt>In garage</dt><dd>{since ?? "—"}</dd></div>
           <div>
-            <p className="rqg-make">{vehicle.make}</p>
-            <p className="rqg-type">{typeLabel(vehicle.type)} · most recent</p>
+            <dt>Helped</dt>
+            <dd>
+              {history == null ? "—" : history.times > 0 && history.times < 10 ? (
+                <>
+                  <span className="rqg-roll" aria-hidden="true">
+                    <b style={{ transform: `translateY(-${history.times * 18}px)` }}>0<br />1<br />2<br />3<br />4<br />5<br />6<br />7<br />8<br />9</b>
+                  </span>
+                  <span aria-hidden="true">{history.times === 1 ? "time" : "times"}</span>
+                  <span className="sr-only">{history.times} {history.times === 1 ? "time" : "times"}</span>
+                </>
+              ) : history.times > 0 ? `${history.times} times` : "Not yet"}
+            </dd>
           </div>
-        </div>
-        <div className="rqg-hero-line">
-          <h2 className="rqg-model">{vehicle.model}</h2>
-          <NumberPlate plate={vehicle.license_plate} />
-        </div>
+          <div><dt>Last help</dt><dd>{history == null ? "—" : history.last ?? "None yet"}</dd></div>
+        </dl>
         <div className="rqg-hero-actions">
           <button type="button" className="rqg-btn rqg-grow rq-press" onClick={onHelp}>
             <MaterialSymbol name="car_repair" />Get help for this {typeLabel(vehicle.type).toLowerCase()}
@@ -115,20 +170,33 @@ export function HeroCard({ vehicle, onHelp, onMore }: { vehicle: Vehicle; onHelp
   );
 }
 
-export function VehicleRow({ vehicle, onOpen }: { vehicle: Vehicle; onOpen: () => void }) {
-  const status = normalizeStatus(vehicle.status);
+/** Every saved vehicle in a row; tapping one puts it on show. */
+export function VehicleChips({ vehicles, shownId, onShow }: { vehicles: Vehicle[]; shownId: number; onShow: (vehicle: Vehicle) => void }) {
   return (
-    <button type="button" className="rqg-row rq-press" onClick={onOpen} aria-label={`${shortMake(vehicle.make)} ${vehicle.model}, ${STATUS_LABELS[status]}`}>
-      <span className="rqg-thumb" aria-hidden="true"><VehiclePhoto vehicle={vehicle} /></span>
-      <span className="rqg-row-mid">
-        <span className="rqg-row-top"><BrandLogo make={vehicle.make} size="sm" /><b>{shortMake(vehicle.make)} {vehicle.model}</b></span>
-        <span className="rqg-row-meta">
-          <NumberPlate plate={vehicle.license_plate} size="sm" />
-          <span className={cn("rqg-row-status", `st-${status}`)}><span className="rqg-dot" aria-hidden="true" />{STATUS_LABELS[status]}</span>
-        </span>
-      </span>
-      <MaterialSymbol name="chevron_right" className="rqg-chev" />
-    </button>
+    <div className="rqg-rail" role="tablist" aria-label="Your vehicles">
+      {vehicles.map((vehicle) => {
+        const status = normalizeStatus(vehicle.status);
+        const on = vehicle.id === shownId;
+        return (
+          <button
+            key={vehicle.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            className={cn("rqg-chip rq-press", on && "is-on")}
+            aria-label={`${shortMake(vehicle.make)} ${vehicle.model}, ${STATUS_LABELS[status]}`}
+            onClick={() => onShow(vehicle)}
+          >
+            {on ? <span className="rqg-chip-tick" aria-hidden="true"><MaterialSymbol name="check" /></span> : null}
+            <BrandLogo make={vehicle.make} size="sm" />
+            <span className="rqg-chip-text">
+              <b>{vehicle.model}</b>
+              <span className={cn("rqg-row-status", `st-${status}`)}><span className="rqg-dot" aria-hidden="true" />{STATUS_LABELS[status]}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -164,7 +232,6 @@ export function VehicleSheet({
                 <VehiclePhoto vehicle={vehicle} />
                 <NumberPlate plate={vehicle.license_plate} />
               </div>
-              <PhotoCredit vehicle={vehicle} />
               <button type="button" className="rqg-btn rqg-block rq-press" onClick={() => onHelp(vehicle)}>
                 <MaterialSymbol name="car_repair" />Get help for this {typeLabel(vehicle.type).toLowerCase()}
               </button>

@@ -10,6 +10,8 @@ export type RequestSummary = {
   serviceStatus?: string | null;
   updated_at?: string;
   created_at?: string;
+  location_lat?: number | string | null;
+  location_lng?: number | string | null;
   technician?: { name?: string | null; phone?: string | null; rating?: number | null } | null;
 };
 
@@ -29,16 +31,6 @@ const STAGE_BY_STATUS: Record<string, ActiveStage> = {
   "in-progress": "in_progress",
   service_started: "in_progress",
 };
-
-export const STAGE_COPY: Record<ActiveStage, { title: string; step: number }> = {
-  pending: { title: "Finding a technician", step: 0 },
-  assigned: { title: "Technician assigned", step: 1 },
-  on_the_way: { title: "Help is on the way", step: 1 },
-  arrived: { title: "Your technician has arrived", step: 2 },
-  in_progress: { title: "Fixing your vehicle", step: 3 },
-};
-
-export const REQUEST_STEPS = ["Assigned", "On the way", "Arrived", "Fixing"];
 
 export function activeStage(request: RequestSummary): ActiveStage | null {
   const raw = String(request.serviceStatus || request.status || "").trim().toLowerCase();

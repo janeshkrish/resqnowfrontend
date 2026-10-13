@@ -337,7 +337,7 @@ const ServiceRequest = () => {
         title: "Service requested!",
         description: "Your request has been submitted. A technician will be assigned shortly.",
       });
-      navigate(`/request-service-tracking/${data.id}`);
+      navigate(`/request-service-tracking/${data.id}`, { state: { requestSent: true } });
     } catch (error) {
       console.error("Submission error", error);
       toast({

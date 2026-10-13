@@ -34,6 +34,8 @@ const quote = {
 
 async function openForm(page: Page, path: string, { garage = [] as Vehicle[] } = {}) {
   const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
+  // What the customer sent, as the backend then returns it: still looking for a technician.
+  let sentRequest: Record<string, unknown> | null = null;
   const estimates: Array<Record<string, unknown>> = [];
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -72,7 +74,15 @@ async function openForm(page: Page, path: string, { garage = [] as Vehicle[] } =
     if (url.pathname === "/api/public/route") return reply(404, {});
     if (url.pathname === "/api/pricing/towing-estimate") { estimates.push(json()); return reply(200, quote); }
     if (url.pathname === "/api/upload" && method === "POST") return reply(200, { url: "/api/upload/files/1727-tyre.jpg", filename: "1727-tyre.jpg" });
-    if (url.pathname === "/api/service-requests" && method === "POST") { posts.push({ path: url.pathname, body: json() }); return reply(201, { id: 5501 }); }
+    if (url.pathname === "/api/service-requests" && method === "POST") {
+      sentRequest = json();
+      posts.push({ path: url.pathname, body: sentRequest! });
+      return reply(201, { id: 5501 });
+    }
+    if (url.pathname === "/api/service-requests/5501" && method === "GET" && sentRequest) {
+      return reply(200, { ...sentRequest, id: 5501, _id: "5501", user_id: 41, status: "pending", payment_status: "pending", technician: null, created_at: new Date().toISOString() });
+    }
+    if (url.pathname === "/api/technicians/nearby") return reply(200, []);
     return reply(404, {});
   });
 
@@ -166,6 +176,15 @@ test("tows a car picked from the brand and model lists, with the fare and a save
   await slide(page);
 
   await expect(page).toHaveURL(/\/request-service-tracking\/5501$/);
+  // The slide ends on the request-sent moment, over the tracking page as it loads.
+  const sent = page.getByTestId("request-sent");
+  await expect(sent).toBeVisible();
+  await expect(sent.locator(".rq-rs-next")).toHaveText("Finding a tow truck near you");
+  await expect(page.getByTestId("request-sent-card")).toContainText("Towing");
+  if (SHOTS) {
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: `${SHOTS}/${test.info().project.name}-tow-sent.png` });
+  }
   const request = posts.find((entry) => entry.path === "/api/service-requests")!.body;
   expect(request).toMatchObject({
     service_type: "car-towing",
@@ -189,6 +208,13 @@ test("tows a car picked from the brand and model lists, with the fare and a save
   });
   expect(request.description).toBeNull();
   expect(posts.find((entry) => entry.path === "/api/vehicles")?.body).toEqual({ type: "car", make: "Maruti Suzuki", model: "Swift", license_plate: "TN 37 AB 1234" });
+
+  // The moment opens into the search for a tow truck, with Cancel one tap away.
+  await expect(sent).toHaveCount(0, { timeout: 8000 });
+  await expect(page.getByTestId("tracking-big")).toHaveText("Finding a tow truck nearby");
+  await expect(page.getByTestId("tracking-finding-lines").locator("span").first()).toHaveText("Contacting tow operators near you");
+  await expect(page.getByTestId("tracking-card").getByRole("button", { name: "Cancel request" })).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${test.info().project.name}-tow-search.png` });
 });
 
 test("fixes a bike puncture found by typing an old name, with the back tyre and a photo", async ({ page }) => {

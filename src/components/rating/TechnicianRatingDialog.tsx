@@ -1,18 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Star } from "lucide-react";
+import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { apiFetch } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 
 interface TechnicianRatingDialogProps {
   isOpen: boolean;
@@ -20,21 +12,37 @@ interface TechnicianRatingDialogProps {
   requestId: string;
   technicianId: string;
   technicianName: string;
+  /** The stars already tapped on the page, so the sheet opens with them chosen. */
+  initialRating?: number;
+  /** What was done and when: "Towing · Maruti Swift · 1 Oct". */
+  detail?: string;
   onSuccess?: () => void;
 }
 
+const WORDS = ["Tap a star", "Poor", "Fair", "Good", "Very good", "Excellent"];
+
+/** Rating a technician after a finished request: stars, an optional note, and Send. */
 const TechnicianRatingDialog = ({
   isOpen,
   onOpenChange,
   requestId,
   technicianId,
   technicianName,
+  initialRating = 0,
+  detail,
   onSuccess,
 }: TechnicianRatingDialogProps) => {
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState(initialRating);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hoveredRating, setHoveredRating] = useState(0);
+
+  // Each time the sheet opens it starts from the stars tapped on the page, with an empty note.
+  useEffect(() => {
+    if (isOpen) {
+      setRating(initialRating);
+      setComment("");
+    }
+  }, [isOpen, initialRating, requestId]);
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -73,78 +81,49 @@ const TechnicianRatingDialog = ({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit rating";
       toast.error(message);
-
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Rate Technician</DialogTitle>
-          <DialogDescription>
-            How was your experience with {technicianName}?
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col items-center justify-center py-6 space-y-4">
-          <div className="flex items-center space-x-1">
+    <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="rq-sheet-scrim" />
+        <Dialog.Content className="rq-sheet rq-rate" aria-describedby={undefined}>
+          <div className="rq-sheet-grab" aria-hidden="true" />
+          <Dialog.Title className="rq-sheet-title">How was {technicianName}?</Dialog.Title>
+          {detail ? <p className="rq-sheet-sub">{detail}</p> : null}
+          <div className="rq-rate-stars" role="radiogroup" aria-label="Your rating">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
-                className={`transition-all focus:outline-none ${star <= (hoveredRating || rating)
-                    ? "text-yellow-400 transform scale-110"
-                    : "text-gray-300"
-                  }`}
+                role="radio"
+                aria-checked={rating === star}
+                aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
+                className={cn("rq-rate-star", star <= rating && "is-on")}
                 onClick={() => setRating(star)}
-                onMouseEnter={() => setHoveredRating(star)}
-                onMouseLeave={() => setHoveredRating(0)}
               >
-                <Star className="w-8 h-8 fill-current" />
+                <MaterialSymbol name="star" />
               </button>
             ))}
           </div>
-          <p className="text-sm font-medium text-muted-foreground">
-            {rating === 0 ? "Select a rating" :
-              rating === 1 ? "Poor" :
-                rating === 2 ? "Fair" :
-                  rating === 3 ? "Good" :
-                    rating === 4 ? "Very Good" : "Excellent"}
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Textarea
-            placeholder="Share details about your experience (optional)"
+          <p className="rq-rate-word" aria-live="polite">{WORDS[rating]}</p>
+          <textarea
+            className="rq-rate-note"
+            aria-label="Anything to add? You can leave this empty"
+            placeholder="Anything to add? (you can skip this)"
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="min-h-[100px]"
+            onChange={(event) => setComment(event.target.value)}
           />
-        </div>
-
-        <DialogFooter className="sm:justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || rating === 0}
-          >
-
-            {isSubmitting ? "Submitting..." : "Submit Review"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <button type="button" className="rq-btn rq-btn-block rq-press" disabled={isSubmitting || rating === 0} onClick={() => void handleSubmit()}>
+            {isSubmitting ? "Sending…" : "Send rating"}
+          </button>
+          <Dialog.Close className="rq-text-btn rq-btn-block" disabled={isSubmitting}>Not now</Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 };
 

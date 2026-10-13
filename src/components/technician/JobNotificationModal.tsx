@@ -15,8 +15,6 @@ import { TechnicianJobModal, type JobRequest } from './TechnicianJobModal';
 const JOB_TAKEN_MESSAGE = 'This job has already been taken by another technician.';
 const FREE_STATUSES = ['pending', 'completed', 'closed', 'cancelled', 'rejected'];
 
-type AcceptedRequest = { id?: unknown; status?: string; job_status?: string };
-type AcceptResponse = { success?: boolean; error?: string; request?: AcceptedRequest; job?: AcceptedRequest };
 
 /**
  * The new-request card on every technician page except the dashboard, which shows the same
@@ -25,22 +23,25 @@ type AcceptResponse = { success?: boolean; error?: string; request?: AcceptedReq
 const JobNotificationModal = () => {
   const { socket } = useSocket();
   const { token } = useTechnicianAuth();
-  const { acceptedJobId, setAcceptedJobId } = useTechnicianJob();
+  const { acceptedJobId, setAcceptedJobId, acceptJob, pendingAcceptanceId, acceptanceMessage, checkAcceptance, canRetryAcceptance, retryAcceptance } = useTechnicianJob();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isDashboardRoute = pathname.startsWith('/technician/dashboard');
   const [job, setJob] = useState<JobRequest | null>(null);
   const [isUnavailable, setIsUnavailable] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [unavailableMessage, setUnavailableMessage] = useState(JOB_TAKEN_MESSAGE);
   const jobRef = useRef<JobRequest | null>(null);
   const unavailableRef = useRef(false);
   const acceptedJobIdRef = useRef(acceptedJobId);
+  const pendingAcceptanceRef = useRef(pendingAcceptanceId);
   const isMountedRef = useRef(true);
   const sirenRef = useRef<ReturnType<typeof createJobAlertSiren> | null>(null);
 
   jobRef.current = job;
   unavailableRef.current = isUnavailable;
   acceptedJobIdRef.current = acceptedJobId;
+  pendingAcceptanceRef.current = pendingAcceptanceId;
 
   const siren = () => (sirenRef.current ??= createJobAlertSiren());
 
@@ -58,13 +59,15 @@ const JobNotificationModal = () => {
     setIsUnavailable(false);
   }, []);
 
-  const markClosed = useCallback((requestId: string) => {
+  const markClosed = useCallback((requestId: string, message = JOB_TAKEN_MESSAGE) => {
     const current = jobRef.current;
     if (!current || String(current.id) !== requestId) return;
+    if (pendingAcceptanceRef.current === requestId) { void checkAcceptance(); return; }
     siren().stop();
     setIsUnavailable(true);
-    toast.warning(JOB_TAKEN_MESSAGE);
-  }, []);
+    setUnavailableMessage(message);
+    toast.warning(message);
+  }, [checkAcceptance]);
 
   const showOffer = useCallback(async (raw: Record<string, unknown>, source: 'socket' | 'push') => {
     const requestId = offerRequestId(raw);
@@ -91,13 +94,14 @@ const JobNotificationModal = () => {
     if (!next || !isMountedRef.current) return;
     setJob(next);
     setIsUnavailable(false);
+    setUnavailableMessage(JOB_TAKEN_MESSAGE);
     siren().start();
   }, []);
 
   useEffect(() => {
     if (!socket || isDashboardRoute) return;
     const handleOffer = (data: Record<string, unknown>) => void showOffer(data || {}, 'socket');
-    const handleRevoked = (data: Record<string, unknown>) => markClosed(offerRequestId(data));
+    const handleRevoked = (data: Record<string, unknown>) => markClosed(offerRequestId(data), String(data.message || JOB_TAKEN_MESSAGE));
     const handleStatus = (data: Record<string, unknown>) => {
       const current = jobRef.current;
       if (!current || String(current.id) !== offerRequestId(data)) return;
@@ -138,7 +142,7 @@ const JobNotificationModal = () => {
 
   const handleAccept = async (jobId: string) => {
     const requestId = String(jobId || '').trim();
-    if (!requestId || isSubmitting) return;
+    if (!requestId || isSubmitting || pendingAcceptanceId) return;
     if (isUnavailable) {
       toast.error(JOB_TAKEN_MESSAGE);
       return;
@@ -151,23 +155,8 @@ const JobNotificationModal = () => {
     try {
       setIsSubmitting(true);
       siren().stop();
-      const response = await apiFetch('/api/jobs/accept', {
-        method: 'POST',
-        technician: true,
-        body: JSON.stringify({ jobId: requestId }),
-      });
-      const data = (await readJsonSafely<AcceptResponse>(response)) || {};
+      const data = await acceptJob(requestId);
       if (!isMountedRef.current) return;
-      if (!data.success) {
-        if (response.status === 409) {
-          setIsUnavailable(true);
-          toast.error(JOB_TAKEN_MESSAGE);
-          return;
-        }
-        toast.error(data.error || 'Failed to accept job');
-        close();
-        return;
-      }
 
       const acceptedRequest = data.request || data.job || null;
       const acceptedId = String(acceptedRequest?.id || requestId).trim();
@@ -190,14 +179,21 @@ const JobNotificationModal = () => {
         },
       });
     } catch (error) {
-      console.error('Accept error:', error);
-      toast.error('Network error');
+      if (!isMountedRef.current) return;
+      const failure = error as { code?: string; message?: string };
+      const message = failure.message || 'Unable to confirm job acceptance.';
+      if (failure.code !== 'acceptance_unknown') {
+        setUnavailableMessage(message);
+        setIsUnavailable(true);
+      }
+      toast.error(message);
     } finally {
       if (isMountedRef.current) setIsSubmitting(false);
     }
   };
 
   const handleReject = async (jobId: string) => {
+    if (isSubmitting || pendingAcceptanceId) return;
     const requestId = String(jobId || '').trim();
     const wasUnavailable = isUnavailable;
     close();
@@ -215,15 +211,23 @@ const JobNotificationModal = () => {
     }
   };
 
-  if (!job || isDashboardRoute) return null;
+  if (!job || isDashboardRoute) return token && acceptanceMessage ? (
+    <div role="status" className="mx-4 my-2 rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm text-slate-900">
+      {acceptanceMessage}
+      {pendingAcceptanceId ? <button className="ml-2 underline" onClick={() => void checkAcceptance()}>Check again</button> : null}
+      {canRetryAcceptance ? <button className="ml-2 underline" onClick={() => void retryAcceptance().catch(() => {})}>Retry acceptance</button> : null}
+    </div>
+  ) : null;
 
   return (
     <TechnicianJobModal
       isOpen
       job={job}
-      isProcessing={isSubmitting}
+      isProcessing={isSubmitting || Boolean(pendingAcceptanceId)}
+      processingMessage={acceptanceMessage}
+      onRetryAcceptance={canRetryAcceptance ? () => void retryAcceptance().catch(() => {}) : undefined}
       isUnavailable={isUnavailable}
-      unavailableMessage={JOB_TAKEN_MESSAGE}
+      unavailableMessage={unavailableMessage}
       onAccept={handleAccept}
       onReject={handleReject}
       onDismissUnavailable={close}

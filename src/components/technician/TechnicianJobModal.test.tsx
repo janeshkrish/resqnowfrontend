@@ -37,6 +37,12 @@ function show(request: JobRequest, props: Partial<React.ComponentProps<typeof Te
 afterEach(() => vi.useRealTimers());
 
 describe("the new-request card", () => {
+  it('does not reject an acceptance whose result is still being checked', () => {
+    vi.useFakeTimers();
+    const { onReject } = show(job(), { isProcessing: true });
+    act(() => vi.advanceTimersByTime(31_000));
+    expect(onReject).not.toHaveBeenCalled();
+  });
   it("shows the earnings, distance, time, address, landmark and vehicle from the offer", () => {
     const { card } = show(job());
     expect(within(card).getByRole("heading", { name: "flat tyre" })).toBeInTheDocument();

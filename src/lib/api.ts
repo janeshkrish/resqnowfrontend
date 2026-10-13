@@ -1574,6 +1574,16 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     upsertRequest(next);
     return json({ success: true, request: withTechnician(next) });
   }
+  const acceptanceMatch = path.match(/^\/api\/jobs\/([^/]+)\/acceptance$/);
+  if (acceptanceMatch && method === "GET") {
+    const req = requestById(decodeURIComponent(acceptanceMatch[1]));
+    if (!req) return json({ state: "closed" }, 404);
+    const technician = readStore<AnyRecord | null>("resqnow_technician", null);
+    if (["cancelled", "completed", "paid", "closed", "rejected", "expired"].includes(req.status)) return json({ state: "closed" });
+    if (req.technician_id && String(req.technician_id) !== String(technician?.id)) return json({ state: "taken" });
+    if (req.technician_id && !["assigned", "pending"].includes(req.status)) return json({ state: "accepted", job: withTechnician(req) });
+    return json({ state: "available" });
+  }
   const requestStatusMatch = path.match(/^\/api\/service-requests\/([^/]+)\/(technician-status|status)$/);
   if (requestStatusMatch && method === "PATCH") {
     const req = requestById(requestStatusMatch[1]);

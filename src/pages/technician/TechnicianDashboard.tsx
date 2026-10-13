@@ -58,6 +58,7 @@ const TechnicianDashboard = () => {
   const [stats, setStats] = useState({ jobs: 0, earnings: 0, today: 0 });
   const [incomingJob, setIncomingJob] = useState<JobRequest | null>(null);
   const [incomingJobUnavailable, setIncomingJobUnavailable] = useState(false);
+  const [incomingJobUnavailableMessage, setIncomingJobUnavailableMessage] = useState("This job has already been taken by another technician.");
 
   // Modals & Completion
   const [showJobModal, setShowJobModal] = useState(false);
@@ -94,7 +95,7 @@ const TechnicianDashboard = () => {
     activeJobRouteTarget,
     defaultNavigationVehicleMode(technician?.vehicle_types),
   );
-  const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId } = useTechnicianJob();
+  const { acceptedJobId, setAcceptedJobId, clearAcceptedJobId, acceptJob, pendingAcceptanceId, acceptanceMessage, checkAcceptance, canRetryAcceptance, retryAcceptance } = useTechnicianJob();
   const JOB_TAKEN_MESSAGE = "This job has already been taken by another technician.";
 
   const socketRef = useRef<Socket | null>(null);
@@ -107,6 +108,10 @@ const TechnicianDashboard = () => {
   const activeJobAmountRef = useRef<number>(0);
   const activeJobSnapshotRef = useRef<any | null>(null);
   const acceptedJobIdRef = useRef<string | null>(acceptedJobId);
+  const pendingAcceptanceRef = useRef(pendingAcceptanceId);
+  pendingAcceptanceRef.current = pendingAcceptanceId;
+  const checkAcceptanceRef = useRef(checkAcceptance);
+  checkAcceptanceRef.current = checkAcceptance;
   const incomingJobRef = useRef<JobRequest | null>(incomingJob);
   const handledRouteJobRef = useRef<string | null>(null);
   const locationPermissionRef = useRef<"granted" | "denied" | null>(null);
@@ -588,10 +593,13 @@ const TechnicianDashboard = () => {
       if (!revokedRequestId) return;
       const currentOffer = incomingJobRef.current;
       if (!currentOffer || String(currentOffer.id) !== revokedRequestId) return;
+      if (pendingAcceptanceRef.current === revokedRequestId) { void checkAcceptanceRef.current(); return; }
       stopAlertSound();
+      const message = String(data?.message || JOB_TAKEN_MESSAGE);
+      setIncomingJobUnavailableMessage(message);
       setIncomingJobUnavailable(true);
       setShowJobModal(true);
-      toast.warning(JOB_TAKEN_MESSAGE);
+      toast.warning(message);
     };
 
     socket.on("job:revoked", handleRevoked);
@@ -892,6 +900,7 @@ const TechnicianDashboard = () => {
     });
     const stopClosed = onClosedJobOffer((requestId) => {
       if (!isShowing(requestId)) return;
+      if (pendingAcceptanceRef.current === requestId) { void checkAcceptanceRef.current(); return; }
       stopAlertSound();
       setIncomingJobUnavailable(true);
       setShowJobModal(true);
@@ -962,6 +971,7 @@ const TechnicianDashboard = () => {
 
       const useAcceptEndpoint =
         status === "accepted" && options?.useAcceptEndpoint !== false;
+      if (useAcceptEndpoint) return await acceptJob(normalizedJobId);
       const endpoint = useAcceptEndpoint
         ? "/api/jobs/accept"
         : `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-status`;
@@ -997,7 +1007,7 @@ const TechnicianDashboard = () => {
     } catch (e: any) {
       const statusCode = Number(e?.status || 0);
       // 409 on accept is handled by the caller so we can keep modal state visible and disabled.
-      if (!(statusCode === 409 && status === "accepted")) {
+      if (status !== "accepted") {
         toast.error(`Failed: ${e.message || "Unknown error"}`);
       }
       throw e;
@@ -1109,11 +1119,13 @@ const TechnicianDashboard = () => {
           if (shouldStop()) return;
           const statusCode = Number(error?.status || 0);
           if (statusCode === 409) {
+            setIncomingJobUnavailableMessage(error.message || JOB_TAKEN_MESSAGE);
             setIncomingJobUnavailable(true);
             setShowJobModal(true);
-            toast.error(JOB_TAKEN_MESSAGE);
+            toast.error(error.message || JOB_TAKEN_MESSAGE);
             return;
           }
+          if (error?.code === "acceptance_unknown") { toast.info(error.message); return; }
           throw error;
         }
       }
@@ -1222,7 +1234,7 @@ const TechnicianDashboard = () => {
   ]);
 
   const handleAcceptJob = async (jobId: string) => {
-    if (isJobActionLoading) return;
+    if (isJobActionLoading || pendingAcceptanceId) return;
     const normalizedJobId = String(jobId || "").trim();
     if (!normalizedJobId || normalizedJobId === "undefined") {
       toast.error("Invalid job request id");
@@ -1282,12 +1294,13 @@ const TechnicianDashboard = () => {
       const statusCode = Number(e?.status || 0);
       if (statusCode === 409) {
         if (!isMountedRef.current) return;
+        setIncomingJobUnavailableMessage(e.message || JOB_TAKEN_MESSAGE);
         setIncomingJobUnavailable(true);
         setShowJobModal(true);
-        toast.error(JOB_TAKEN_MESSAGE);
+        toast.error(e.message || JOB_TAKEN_MESSAGE);
         return;
       }
-      console.error(e);
+      toast.error(e.message || "Unable to confirm job acceptance.");
     } finally {
       if (isMountedRef.current) {
         setIsJobActionLoading(false);
@@ -1296,7 +1309,7 @@ const TechnicianDashboard = () => {
   };
 
   const handleRejectJob = async (jobId: string) => {
-    if (isJobActionLoading) return;
+    if (isJobActionLoading || pendingAcceptanceId) return;
     const normalizedJobId = String(jobId || "").trim();
     if (!normalizedJobId || normalizedJobId === "undefined") {
       toast.error("Invalid job request id");
@@ -2088,7 +2101,7 @@ const TechnicianDashboard = () => {
                   <div className="tj-pair">
                     <button
                       type="button"
-                      disabled={isJobActionLoading}
+                      disabled={isJobActionLoading || Boolean(pendingAcceptanceId)}
                       onClick={() => handleRejectJob(activeJob.id)}
                       className="tj-act"
                     >
@@ -2097,7 +2110,7 @@ const TechnicianDashboard = () => {
                     </button>
                     <button
                       type="button"
-                      disabled={isJobActionLoading}
+                      disabled={isJobActionLoading || Boolean(pendingAcceptanceId)}
                       onClick={() => handleAcceptJob(activeJob.id)}
                       className="tj-cta"
                     >
@@ -2167,9 +2180,11 @@ const TechnicianDashboard = () => {
         <TechnicianJobModal
           isOpen={showJobModal && !!incomingJob}
           job={incomingJob}
-          isProcessing={isJobActionLoading}
+          isProcessing={isJobActionLoading || Boolean(pendingAcceptanceId)}
+          processingMessage={acceptanceMessage}
+          onRetryAcceptance={canRetryAcceptance ? () => void retryAcceptance().catch(() => {}) : undefined}
           isUnavailable={incomingJobUnavailable}
-          unavailableMessage={JOB_TAKEN_MESSAGE}
+          unavailableMessage={incomingJobUnavailableMessage}
           onAccept={handleAcceptJob}
           onReject={handleRejectJob}
           onDismissUnavailable={(jobId) => {

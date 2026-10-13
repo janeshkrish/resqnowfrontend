@@ -1,30 +1,47 @@
- 
-import React, { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
+import { useCallback, useEffect, useState } from "react";
+
+import { TechBack, TechPage, TechStars } from "@/components/technician/app/TechUi";
 import { useSocket } from "@/contexts/SocketContext";
+import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { apiFetch } from "@/lib/api";
-import TechnicianReviews from "@/components/technician/TechnicianReviews";
-import { Skeleton } from "@/components/ui/skeleton";
+import { techDayLabel, techServiceName, useTechText } from "@/lib/technicianLanguage";
+import type { TechTextKey } from "@/lib/technicianText";
+import { buildOrderPerformanceSummary, type DashboardOrderRecord } from "@/utils/technicianDashboard";
+
+// The last job's state, as the performance summary names it, in the technician's words.
+const LAST_STATE: Record<string, TechTextKey> = {
+    completed: "jobs.state.done",
+    paid: "jobs.state.done",
+    cancelled: "jobs.state.cancelled",
+    rejected: "jobs.state.rejected",
+    "in progress": "jobs.state.working",
+};
 
 const TechnicianReviewsPage = () => {
     const { technician, token } = useTechnicianAuth();
     const { socket } = useSocket();
+    const { lang, t } = useTechText();
     const [reviews, setReviews] = useState<any[]>([]);
+    // The technician's requests, for how often they reached on time (the same list Home reads).
+    const [requests, setRequests] = useState<DashboardOrderRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchReviews = useCallback(async () => {
         if (!technician || !token) return;
         try {
-            const res = await apiFetch(`/api/technicians/me/reviews`, { technician: true });
+            const [res, requestsRes] = await Promise.all([
+                apiFetch(`/api/technicians/me/reviews`, { technician: true }),
+                apiFetch("/api/technicians/requests", { technician: true }).catch(() => null),
+            ]);
             if (res.ok) {
                 const reviewsData = await res.json();
                 if (Array.isArray(reviewsData)) {
                     setReviews(reviewsData);
                 }
+            }
+            if (requestsRes?.ok) {
+                const requestData = await requestsRes.json();
+                if (Array.isArray(requestData)) setRequests(requestData);
             }
         } catch (error) {
             console.error("Error fetching reviews:", error);
@@ -72,41 +89,88 @@ const TechnicianReviewsPage = () => {
 
     // Calculate generic aggregate rating if not provided by backend
     const averageRating = reviews.length > 0
-        ? (reviews.reduce((acc, curr) => acc + (curr.rating || 0), 0) / reviews.length).toFixed(1)
-        : "0.0";
+        ? reviews.reduce((acc, curr) => acc + (curr.rating || 0), 0) / reviews.length
+        : 0;
+
+    const performance = buildOrderPerformanceSummary(requests);
+    const last = performance.lastOrder;
+    const lastLate = Number(last?.lateByMinutes || 0) > 0;
+    const lastState = last ? LAST_STATE[last.statusLabel.toLowerCase()] : undefined;
 
     return (
-        <div className="container max-w-4xl mx-auto py-6 space-y-6">
-            <div className="flex items-center gap-4 mb-2">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link to="/technician/dashboard"><ArrowLeft className="w-5 h-5" /></Link>
-                </Button>
-                <h1 className="text-2xl font-bold text-foreground">Customer Reviews</h1>
-            </div>
+        <TechPage tab="home" testId="technician-rating">
+            <TechBack to="/technician/dashboard" />
+            <h1 className="tp-h1 tp-pj">{t("rating.title")}</h1>
 
             {loading ? (
-                <div className="space-y-3">
-                    <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-24 w-full" />
-                </div>
+                <p className="tp-empty" role="status">{t("common.loading")}</p>
             ) : (
                 <>
-                    <Card className="bg-amber-50 border-amber-100">
-                        <CardContent className="p-6 flex items-center gap-4">
-                            <div className="h-16 w-16 bg-card dark:bg-slate-900 rounded-full flex items-center justify-center shadow-sm">
-                                <Star className="w-8 h-8 text-amber-400 fill-amber-400" />
-                            </div>
-                            <div>
-                                <div className="text-3xl font-bold text-foreground">{averageRating}</div>
-                                <p className="text-muted-foreground/80 font-medium">Average Rating ({reviews.length} reviews)</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="tp-rate" data-testid="rating-average">
+                        <b className="tp-pj">{averageRating.toFixed(1)}</b>
+                        <TechStars value={averageRating} />
+                        <span>
+                            {reviews.length === 0
+                                ? t("rating.none")
+                                : reviews.length === 1
+                                    ? t("rating.fromOne")
+                                    : t("rating.from", { n: reviews.length })}
+                        </span>
+                    </div>
 
-                    <TechnicianReviews reviews={reviews} />
+                    <h2 className="tp-h2 tp-pj">{t("rating.onTimeTitle")}</h2>
+                    <div className="tp-time" data-testid="rating-on-time">
+                        {performance.totalOrders === 0 ? (
+                            <b>{t("rating.noJobs")}</b>
+                        ) : (
+                            <>
+                                <b>{t("rating.onTimeLine", { a: performance.onTimeOrders, b: performance.totalOrders })}</b>
+                                <div className="tp-split" aria-hidden="true">
+                                    {performance.onTimeOrders > 0 ? <i style={{ flex: performance.onTimeOrders }} /> : null}
+                                    {performance.lateOrders > 0 ? <i style={{ flex: performance.lateOrders, background: "#F04438" }} /> : null}
+                                </div>
+                                <div className="tp-key">
+                                    <span>{t("rating.onTime")} · {performance.onTimeOrders}</span>
+                                    <span>{t("rating.late")} · {performance.lateOrders}</span>
+                                </div>
+                            </>
+                        )}
+                        {last ? (
+                            <div className="tp-last">
+                                <span>{t("rating.lastJob")} <b>{techServiceName(lang, last.serviceType)}</b></span>
+                                {lastLate ? (
+                                    <span className="tp-state is-void">{t("rating.lateBy", { n: Number(last.lateByMinutes) })}</span>
+                                ) : (
+                                    <span className="tp-state is-off">{lastState ? t(lastState) : last.statusLabel}</span>
+                                )}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <h2 className="tp-h2 tp-pj">{t("rating.said")}</h2>
+                    <div className="tp-list" data-testid="rating-reviews">
+                        {reviews.length === 0 ? (
+                            <p className="tp-empty">{t("rating.noReviews")}</p>
+                        ) : (
+                            reviews.map((review, index) => {
+                                const stars = Number(review?.rating || 0);
+                                const when = techDayLabel(lang, review?.created_at || review?.date);
+                                return (
+                                    <div key={review?.id ?? index} className="tp-review">
+                                        <div className="tp-review-top">
+                                            <b>{review?.reviewer_name || review?.name}</b>
+                                            <TechStars value={stars} label={t("rating.stars", { n: stars })} />
+                                        </div>
+                                        {review?.comment ? <p>{review.comment}</p> : null}
+                                        {when ? <small>{when}</small> : null}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </>
             )}
-        </div>
+        </TechPage>
     );
 };
 

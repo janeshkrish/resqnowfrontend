@@ -37,6 +37,7 @@ function mapTechnicianData(data: Record<string, unknown>): Technician {
     name: String(data.name),
     email: String(data.email),
     phone: String(data.phone ?? ""),
+    upi_id: String(data.upi_id ?? ""),
     address: String(data.address ?? ""),
     region: String(data.region ?? ""),
     district: String(data.district ?? ""),

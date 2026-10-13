@@ -1,17 +1,15 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Landmark, TimerReset, TrendingUp, Wallet } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
+
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { TechPage, TechSheet } from "@/components/technician/app/TechUi";
 import { useSocket } from "@/contexts/SocketContext";
+import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { apiFetch } from "@/lib/api";
-import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsChart";
+import { serviceArt } from "@/lib/services";
+import { techDate, techDayLabel, techRupees, techServiceName, techTime, techWeekday, useTechText } from "@/lib/technicianLanguage";
+import type { TechTextKey } from "@/lib/technicianText";
+import { cn } from "@/lib/utils";
 
 interface EarningsHistoryPoint {
   date: string;
@@ -56,12 +54,14 @@ type TechnicianFinancials = {
   pending_withdrawals: number;
 };
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(Number(value || 0));
+// How a withdrawal request shows at each stage.
+const REQUEST_LOOK: Record<string, { icon: string; tone: string; state: string }> = {
+  pending: { icon: "hourglass_top", tone: "is-amber", state: "is-wait" },
+  processing: { icon: "hourglass_top", tone: "is-amber", state: "is-wait" },
+  paid: { icon: "check", tone: "is-green", state: "is-ok" },
+  rejected: { icon: "close", tone: "is-red", state: "is-void" },
+};
+const NOT_GIVEN = ["rejected", "failed", "disputed"];
 
 const nextIdempotencyKey = () =>
   globalThis.crypto?.randomUUID?.() || `wdr_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -69,6 +69,8 @@ const nextIdempotencyKey = () =>
 const TechnicianEarningsPage = () => {
   const { technician, token } = useTechnicianAuth();
   const { socket } = useSocket();
+  const { lang, t } = useTechText();
+  const [takeOpen, setTakeOpen] = useState(false);
   const [earningsHistory, setEarningsHistory] = useState<EarningsHistoryPoint[]>([]);
   const [transactions, setTransactions] = useState<WalletActivityRow[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequestRow[]>([]);
@@ -218,6 +220,7 @@ const TechnicianEarningsPage = () => {
       setWithdrawalNote("");
       setWithdrawalAmount("");
       await fetchEarnings();
+      setTakeOpen(false);
     } catch (error) {
       toast.error((error as Error)?.message || "Failed to submit withdrawal request.");
     } finally {
@@ -225,248 +228,209 @@ const TechnicianEarningsPage = () => {
     }
   };
 
+  const upiId = String(technician?.upi_id || "").trim();
+  const withdrawable = Number(stats.withdrawable_balance || 0);
+  const notGiven = withdrawals.reduce(
+    (total, request) => (NOT_GIVEN.includes(String(request.status || "").toLowerCase()) ? total + Number(request.amount || 0) : total),
+    0
+  );
+  const weekTotal = earningsHistory.reduce((total, point) => total + Number(point.amount || 0), 0);
+  const tallest = Math.max(1, ...earningsHistory.map((point) => Number(point.amount || 0)));
+  // The history runs oldest to newest and ends today.
+  const dayOf = (index: number) => {
+    const day = new Date();
+    day.setDate(day.getDate() - (earningsHistory.length - 1 - index));
+    return day;
+  };
+  const quickAmounts = [500, 1000].filter((value) => value < withdrawable);
+  const when = (value: unknown) => [techDayLabel(lang, value), techTime(lang, value)].filter(Boolean).join(", ");
+
   return (
-    <div className="container max-w-4xl mx-auto py-6 space-y-6">
-      <div className="mb-2 flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/technician/dashboard"><ArrowLeft className="h-5 w-5" /></Link>
-        </Button>
-        <h1 className="text-2xl font-bold text-foreground">Wallet & Withdrawals</h1>
-      </div>
+    <TechPage tab="money" testId="technician-money">
+      <h1 className="tp-h1 tp-pj">{t("money.title")}</h1>
 
       {loading ? (
-        <Skeleton className="h-[200px] w-full rounded-2xl" />
+        <p className="tp-empty" role="status">{t("common.loading")}</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <Card className="border-none bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-emerald-100">Withdrawable Balance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{formatCurrency(stats.withdrawable_balance)}</div>
-                <p className="mt-1 text-xs text-emerald-100">Ready for withdrawal request</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground/80">On Hold</CardTitle>
-                <TimerReset className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{formatCurrency(stats.pending_withdrawals)}</div>
-                <p className="mt-1 text-xs text-muted-foreground">Pending or processing withdrawals</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground/80">Today</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{formatCurrency(stats.today)}</div>
-                <p className="mt-1 text-xs text-muted-foreground">New wallet credits today</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground/80">Total Paid Out</CardTitle>
-                <Landmark className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{formatCurrency(stats.total_paid_out)}</div>
-                <p className="mt-1 text-xs text-muted-foreground">Settled manually by admin</p>
-              </CardContent>
-            </Card>
+          <section className="tp-hero">
+            <small>{t("money.ready")}</small>
+            <b className="tp-pj" data-testid="money-ready">{techRupees(withdrawable)}</b>
+            <button type="button" className="tp-big tp-press" disabled={withdrawable <= 0} onClick={() => setTakeOpen(true)}>
+              <MaterialSymbol name="arrow_outward" />
+              {t("money.takeOut")}
+            </button>
+          </section>
+
+          <h2 className="tp-h2 tp-pj">{t("money.where")}</h2>
+          <div className="tp-list" data-testid="money-where">
+            <div className="tp-row">
+              <span className="tp-ic is-amber" aria-hidden="true"><MaterialSymbol name="hourglass_top" /></span>
+              <span className="tp-text"><b>{t("money.waiting")}</b><span>{t("money.waitingSub")}</span></span>
+              <span className="tp-end"><b>{techRupees(stats.pending_withdrawals)}</b></span>
+            </div>
+            <div className="tp-row">
+              <span className="tp-ic is-green" aria-hidden="true"><MaterialSymbol name="check" /></span>
+              <span className="tp-text"><b>{t("money.paid")}</b><span>{t("money.paidSub")}</span></span>
+              <span className="tp-end"><b>{techRupees(stats.total_paid_out)}</b></span>
+            </div>
+            <div className="tp-row">
+              <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="error" /></span>
+              <span className="tp-text"><b>{t("money.held")}</b><span className="is-wrap">{t("money.heldSub")}</span></span>
+              <span className="tp-end"><b>{techRupees(notGiven)}</b></span>
+            </div>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-muted-foreground/80" />
-                Weekly Wallet Credits
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TechnicianEarningsChart data={earningsHistory} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Request Withdrawal</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,220px),1fr,auto]">
-                <div>
-                  <p className="mb-2 text-sm text-muted-foreground">Amount</p>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={withdrawalAmount}
-                    onChange={(event) => setWithdrawalAmount(event.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <p className="mb-2 text-sm text-muted-foreground">Note for admin</p>
-                  <Textarea
-                    value={withdrawalNote}
-                    onChange={(event) => setWithdrawalNote(event.target.value)}
-                    placeholder="Optional note for the payout team"
-                    className="min-h-[44px]"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={submitWithdrawal}
-                    disabled={submittingWithdrawal || stats.withdrawable_balance <= 0}
-                    className="w-full md:w-auto"
-                  >
-                    {submittingWithdrawal ? "Submitting..." : "Withdraw"}
-                  </Button>
-                </div>
-              </div>
-              <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                Available now: {formatCurrency(stats.withdrawable_balance)}. Pending requests remain on hold until the admin pays or rejects them.
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Withdrawal History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {withdrawals.length === 0 ? (
-                  <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                    No withdrawal requests yet.
+          <h2 className="tp-h2 tp-pj">{t("money.earned")}</h2>
+          <div className="tp-list tp-amounts" data-testid="money-earned">
+            {earningsHistory.length > 0 ? (
+              <div className="tp-bars" role="img" aria-label={t("money.weekAria", { n: earningsHistory.length })}>
+                {earningsHistory.map((point, index) => (
+                  <div key={`${point.date}-${index}`} className={cn("tp-bar", index === earningsHistory.length - 1 && "is-today")}>
+                    <small>{techRupees(Math.round(Number(point.amount || 0)))}</small>
+                    <i style={{ height: `${Math.max(6, Math.round((Number(point.amount || 0) / tallest) * 78))}px` }} />
+                    <em>{techWeekday(lang, dayOf(index))}</em>
                   </div>
-                ) : (
-                  withdrawals.map((request) => (
-                    <div key={request.id} className="rounded-xl border p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold">{request.withdrawalReference}</p>
-                            <Badge variant="outline" className="capitalize">
-                              {request.status}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {formatCurrency(request.amount)}
-                            {request.beneficiaryName ? ` • ${request.beneficiaryName}` : ""}
-                            {request.upiId ? ` • ${request.upiId}` : ""}
-                          </p>
-                          {request.note ? (
-                            <p className="mt-2 text-sm text-muted-foreground">{request.note}</p>
-                          ) : null}
-                          {request.rejectionReason ? (
-                            <p className="mt-2 text-sm text-rose-600">{request.rejectionReason}</p>
-                          ) : null}
-                        </div>
-                        <div className="text-sm text-muted-foreground md:text-right">
-                          <div>Created {request.createdAt ? new Date(request.createdAt).toLocaleString("en-IN") : "-"}</div>
-                          {request.processingStartedAt ? (
-                            <div>Processing {new Date(request.processingStartedAt).toLocaleString("en-IN")}</div>
-                          ) : null}
-                          {request.paidAt ? (
-                            <div>Paid {new Date(request.paidAt).toLocaleString("en-IN")}</div>
-                          ) : null}
-                          {request.payoutReference ? (
-                            <div className="font-medium text-foreground">{request.payoutReference}</div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                ))}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Wallet Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <p className="text-sm text-muted-foreground">Total Earned</p>
-                <p className="mt-1 text-xl font-semibold">{formatCurrency(stats.total_earnings || stats.total)}</p>
-              </div>
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <p className="text-sm text-muted-foreground">Current Withdrawable</p>
-                <p className="mt-1 text-xl font-semibold">{formatCurrency(stats.withdrawable_balance)}</p>
-              </div>
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <p className="text-sm text-muted-foreground">On Hold</p>
-                <p className="mt-1 text-xl font-semibold">{formatCurrency(stats.pending_withdrawals)}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Recent Wallet Activity</h3>
-              <p className="text-sm text-muted-foreground">
-                Credits come from successful platform-collected payments. Debits appear after admin marks a withdrawal as paid.
-              </p>
-            </div>
-            <div className="divide-y rounded-xl border bg-card dark:bg-slate-900">
-              {transactions.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground/80">No wallet activity found.</div>
-              ) : (
-                transactions.slice(0, 10).map((row) => {
-                  const created = row?.created_at ? new Date(row.created_at) : null;
-                  const validDate = !!created && !Number.isNaN(created.getTime());
-                  const dateLabel = validDate
-                    ? created.toLocaleString("en-IN", {
-                        weekday: "short",
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "Unknown date";
-                  const isPayout = row.entry_type === "payout_debit";
-                  const label = isPayout
-                    ? `Manual payout${row.payout_id ? ` #${row.payout_id}` : ""}`
-                    : String(row?.service_type || "Service earning").replace(/-/g, " ");
-
-                  return (
-                    <div
-                      key={`${row.entry_type}-${row.payment_id || row.payout_id || dateLabel}`}
-                      className="flex items-center justify-between gap-4 p-4"
-                    >
-                      <div>
-                        <p className="font-medium text-foreground">{dateLabel}</p>
-                        <p className="text-xs capitalize text-muted-foreground/80">{label}</p>
-                        {row.balance_after != null ? (
-                          <p className="mt-1 text-[11px] text-muted-foreground">
-                            Balance after: {formatCurrency(Number(row.balance_after || 0))}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-semibold ${isPayout ? "text-rose-600" : "text-emerald-700"}`}>
-                          {isPayout ? "-" : "+"}
-                          {formatCurrency(Number(row.technician_amount || 0))}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {isPayout ? "Payout settled" : "Wallet credited"}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            ) : null}
+            <div className="tp-row"><span className="is-label">{t("money.today")}</span><b>{techRupees(stats.today)}</b></div>
+            {earningsHistory.length > 0 ? (
+              <div className="tp-row"><span className="is-label">{t("money.week", { n: earningsHistory.length })}</span><b>{techRupees(weekTotal)}</b></div>
+            ) : null}
+            <div className="tp-row"><span className="is-label">{t("money.all")}</span><b>{techRupees(stats.total_earnings || stats.total)}</b></div>
           </div>
+
+          <h2 className="tp-h2 tp-pj">{t("money.asked")}</h2>
+          <div className="tp-list" data-testid="money-asked">
+            {withdrawals.length === 0 ? (
+              <p className="tp-empty">{t("money.askedNone")}</p>
+            ) : (
+              withdrawals.map((request) => {
+                const status = String(request.status || "").toLowerCase();
+                const look = REQUEST_LOOK[status] ?? REQUEST_LOOK.pending;
+                const known = status in REQUEST_LOOK;
+                const target = [request.beneficiaryName, request.upiId].filter(Boolean).join(" · ");
+                const dateLine = request.paidAt
+                  ? t("money.paidOn", { date: techDate(lang, request.paidAt) })
+                  : request.createdAt
+                    ? t("money.askedOn", { date: techDate(lang, request.createdAt) })
+                    : "";
+                return (
+                  <div key={request.id} className="tp-row is-tall" data-status={status}>
+                    <span className={cn("tp-ic", look.tone)} aria-hidden="true"><MaterialSymbol name={look.icon} /></span>
+                    <span className="tp-text">
+                      <b>{techRupees(request.amount)}</b>
+                      <span className="is-wrap">{[dateLine, target ? t("money.to", { upi: target }) : ""].filter(Boolean).join(" · ")}</span>
+                      <span className="is-wrap">{[t("money.ref", { ref: request.withdrawalReference }), request.payoutReference].filter(Boolean).join(" · ")}</span>
+                      {request.note ? <span className="is-wrap">{request.note}</span> : null}
+                      {request.rejectionReason ? <span className="is-bad">{t("money.notGiven", { reason: request.rejectionReason })}</span> : null}
+                    </span>
+                    <span className={cn("tp-state", look.state)}>
+                      {status === "paid" ? <MaterialSymbol name="check_circle" /> : null}
+                      {known ? t(`money.status.${status}` as TechTextKey) : request.status}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <h2 className="tp-h2 tp-pj">{t("money.inOut")}</h2>
+          <div className="tp-list" data-testid="money-activity">
+            {transactions.length === 0 ? (
+              <p className="tp-empty">{t("money.inOutNone")}</p>
+            ) : (
+              transactions.slice(0, 10).map((row, index) => {
+                const isPayout = row.entry_type === "payout_debit";
+                const art = isPayout ? null : serviceArt(row.service_type);
+                return (
+                  <div key={`${row.entry_type}-${row.payment_id || row.payout_id || index}`} className="tp-row">
+                    {isPayout ? (
+                      <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="arrow_outward" /></span>
+                    ) : (
+                      <span className="tp-thumb" aria-hidden="true">
+                        {art ? <img src={art} alt="" draggable={false} /> : <MaterialSymbol name="payments" />}
+                      </span>
+                    )}
+                    <span className="tp-text">
+                      <b>{isPayout ? t("money.paidOut") : row.service_type ? techServiceName(lang, row.service_type) : t("money.jobMoney")}</b>
+                      <span>{when(row.created_at)}</span>
+                    </span>
+                    <span className={cn("tp-end", isPayout ? "is-out" : "is-in")}>
+                      <b>{isPayout ? "−" : "+"}{techRupees(row.technician_amount)}</b>
+                      {row.balance_after != null ? <small>{t("money.balance", { amount: techRupees(row.balance_after) })}</small> : null}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <p className="tp-fine">{t("money.fine")}</p>
         </>
       )}
-    </div>
+
+      <TechSheet
+        open={takeOpen}
+        onClose={() => setTakeOpen(false)}
+        title={t("take.title")}
+        sub={t("take.sub", { amount: techRupees(withdrawable) })}
+      >
+        <label className="tp-amount">
+          <span aria-hidden="true">₹</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={withdrawalAmount}
+            onChange={(event) => setWithdrawalAmount(event.target.value)}
+            placeholder="0"
+            aria-label={t("take.amount")}
+          />
+        </label>
+        <div className="tp-quick">
+          {quickAmounts.map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={cn("tp-press", Number(withdrawalAmount) === value && "is-on")}
+              onClick={() => setWithdrawalAmount(String(value))}
+            >
+              {techRupees(value)}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={cn("tp-press", withdrawable > 0 && Number(withdrawalAmount) === withdrawable && "is-on")}
+            onClick={() => setWithdrawalAmount(withdrawable > 0 ? withdrawable.toFixed(2) : "")}
+          >
+            {t("take.all")}
+          </button>
+        </div>
+        <label className="tp-field" style={{ marginTop: 10 }}>
+          <small>{t("take.note")}</small>
+          <span className="tp-input">
+            <textarea
+              rows={1}
+              value={withdrawalNote}
+              onChange={(event) => setWithdrawalNote(event.target.value)}
+              placeholder={t("take.notePlaceholder")}
+            />
+          </span>
+        </label>
+        {upiId ? (
+          <p className="tp-to">
+            <MaterialSymbol name="account_balance" />
+            <span>{t("take.goesTo", { upi: upiId })}</span>
+          </p>
+        ) : null}
+        <button type="button" className="tp-big tp-press" disabled={submittingWithdrawal || withdrawable <= 0} onClick={submitWithdrawal}>
+          {submittingWithdrawal ? t("take.sending") : t("take.submit", { amount: techRupees(withdrawalAmount) })}
+        </button>
+        <p className="tp-fine" style={{ margin: "12px 0 0" }}>{t("take.fine")}</p>
+      </TechSheet>
+    </TechPage>
   );
 };
 

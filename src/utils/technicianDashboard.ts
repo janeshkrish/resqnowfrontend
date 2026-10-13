@@ -72,11 +72,6 @@ export const formatCurrency = (value: number | null | undefined) =>
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
 
-export const formatPlainCurrency = (value: number | null | undefined) =>
-  new Intl.NumberFormat("en-IN", {
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
-
 const toDate = (value: unknown) => {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -97,6 +92,21 @@ const formatServiceType = (value: unknown) =>
 export function countEnabledVehicleTypes(vehicleTypes: unknown): number {
   if (!vehicleTypes || typeof vehicleTypes !== "object") return 0;
   return Object.values(vehicleTypes as Record<string, unknown>).filter(Boolean).length;
+}
+
+/** How many of the technician's jobs were finished today (by this phone's clock). */
+export function countJobsDoneToday(orders: DashboardOrderRecord[], now = new Date()): number {
+  return orders.filter((order) => {
+    const status = normalizeTechnicianStatus(order?.status);
+    if (!["paid", "completed"].includes(status)) return false;
+    const finished = toDate(order?.completed_at) || toDate(order?.updated_at);
+    return Boolean(
+      finished &&
+        finished.getFullYear() === now.getFullYear() &&
+        finished.getMonth() === now.getMonth() &&
+        finished.getDate() === now.getDate()
+    );
+  }).length;
 }
 
 export function buildOrderOverviewCounts(orders: DashboardOrderRecord[]): OrderOverviewCounts {
@@ -230,10 +240,4 @@ export function calculateRewardPoints({
   completedJobs: number;
 }) {
   return Math.max(0, Math.floor(Number(totalEarnings || 0) / 1000) + Number(completedJobs || 0) * 5);
-}
-
-export function getGreetingName(name: string | null | undefined) {
-  const trimmed = String(name || "").trim();
-  if (!trimmed) return "Technician";
-  return trimmed.split(/\s+/)[0];
 }

@@ -32,6 +32,8 @@ export type Technician = {
   working_hours?: any;
   service_costs?: any;
   payment_details?: any;
+  /** Where ResQNow sends the technician's withdrawals. */
+  upi_id?: string;
   app_readiness?: any;
   vehicle_types?: any;
   resume_url?: string;

@@ -186,8 +186,9 @@ test.describe("web app", () => {
     const { errors } = await signInTechnician(page);
     await page.goto("/technician/dashboard");
 
-    const banner = page.getByRole("region", { name: "Job alerts" });
-    await expect(banner).toContainText("Turn on notifications so new requests reach you when the app is closed or the screen is off.");
+    const banner = page.getByTestId("job-alerts-banner");
+    await expect(banner).toContainText("Don’t miss a job");
+    await expect(banner).toContainText("Turn on notifications");
     // This time they answer Allow.
     await page.evaluate(() => Object.assign(window, { __notificationAnswer: "granted" }));
     await banner.getByRole("button", { name: "Turn on" }).click();
@@ -200,10 +201,10 @@ test.describe("web app", () => {
     const { errors } = await signInTechnician(page);
     await page.goto("/technician/dashboard");
 
-    const banner = page.getByRole("region", { name: "Job alerts" });
-    await expect(banner).toContainText("Notifications are blocked for this site. Allow them from the lock icon next to the address, then reload.");
+    const banner = page.getByTestId("job-alerts-banner");
+    await expect(banner).toContainText("Notifications are blocked. Allow them from the lock icon next to the address, then reload.");
     await expect(banner.getByRole("button", { name: "Turn on" })).toHaveCount(0);
-    await banner.getByRole("button", { name: "Later" }).click();
+    await banner.getByRole("button", { name: "Hide for now" }).click();
     await expect(banner).toBeHidden();
     expect(errors).toEqual([]);
   });
@@ -268,15 +269,16 @@ test.describe("Android app", () => {
     const { errors } = await signInTechnician(page);
     await page.goto("/technician/dashboard");
 
-    const banner = page.getByRole("region", { name: "Job alerts" });
-    await expect(banner).toContainText("Allow full-screen alerts so a new request wakes the screen when the phone is locked.");
-    await expect(banner).toContainText("Set ResQNow's battery use to Unrestricted");
+    const banner = page.getByTestId("job-alerts-banner");
+    await expect(banner).toContainText("Show new jobs on the lock screen");
+    await expect(banner).toContainText("Let ResQNow work when the screen is off");
+    await expect(banner).toContainText("Battery → Unrestricted");
     if (process.env.REQUEST_SHOTS_DIR) {
       await page.waitForTimeout(3500); // The app's splash screen (SplashWrapper) plays first.
       await page.screenshot({ path: `${process.env.REQUEST_SHOTS_DIR}/${test.info().project.name}-job-alerts-banner.png` });
     }
     await banner.getByRole("button", { name: "Allow" }).click();
-    await banner.getByRole("button", { name: "Open settings" }).click();
+    await banner.getByRole("button", { name: "Open", exact: true }).click();
     const opened = await page.evaluate(() =>
       (window as unknown as { __android: { calls: Array<{ plugin: string; method: string; options: { target?: string } }> } }).__android.calls
         .filter((call) => call.plugin === "JobAlerts" && call.method === "openSettings")

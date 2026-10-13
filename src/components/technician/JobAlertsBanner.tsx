@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { BellRing } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { checkJobAlerts, fixJobAlertIssue, type JobAlertIssue } from "@/lib/jobAlertReadiness";
 
-const COPY: Record<JobAlertIssue, { text: string; action?: string }> = {
-  notifications_off: {
-    text: "Turn on notifications so new requests reach you when the app is closed or the screen is off.",
-    action: "Turn on",
-  },
-  notifications_blocked: {
-    text: "Notifications are blocked for this site. Allow them from the lock icon next to the address, then reload.",
-  },
-  full_screen_off: {
-    text: "Allow full-screen alerts so a new request wakes the screen when the phone is locked.",
-    action: "Allow",
-  },
-  battery_restricted: {
-    text: "Set ResQNow's battery use to Unrestricted so the phone doesn't hold back requests while the screen is off.",
-    action: "Open settings",
-  },
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { checkJobAlerts, fixJobAlertIssue, type JobAlertIssue } from "@/lib/jobAlertReadiness";
+import { useTechText } from "@/lib/technicianLanguage";
+import type { TechTextKey } from "@/lib/technicianText";
+
+// What each thing in the way is called, and the button that fixes it. A blocked browser has no button:
+// only the technician can allow it, from the address bar.
+const COPY: Record<JobAlertIssue, { text: TechTextKey; sub?: TechTextKey; action?: TechTextKey }> = {
+  notifications_off: { text: "alerts.notifications_off", action: "alerts.notifications_off.action" },
+  notifications_blocked: { text: "alerts.notifications_blocked" },
+  full_screen_off: { text: "alerts.full_screen_off", action: "alerts.full_screen_off.action" },
+  battery_restricted: { text: "alerts.battery_restricted", sub: "alerts.battery_restricted.sub", action: "alerts.battery_restricted.action" },
 };
 
 const DISMISSED_KEY = "resqnow_job_alerts_banner_dismissed";
@@ -33,6 +26,7 @@ const readDismissed = () => {
 
 /** Shows only when this phone or browser would keep job alerts from reaching the technician. */
 export default function JobAlertsBanner() {
+  const { t } = useTechText();
   const [issues, setIssues] = useState<JobAlertIssue[]>([]);
   const [dismissed, setDismissed] = useState(readDismissed);
   const [busy, setBusy] = useState<JobAlertIssue | null>(null);
@@ -75,40 +69,36 @@ export default function JobAlertsBanner() {
   };
 
   return (
-    <section
-      aria-label="Job alerts"
-      className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
-    >
-      <div className="flex items-start gap-3">
-        <BellRing className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-        <div className="min-w-0 flex-1 space-y-3">
-          <p className="text-sm font-bold">Don't miss a request</p>
-          <ul className="space-y-3">
-            {issues.map((issue) => (
-              <li key={issue} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">{COPY[issue].text}</span>
-                {COPY[issue].action ? (
-                  <Button
-                    size="sm"
-                    className="shrink-0 rounded-xl bg-amber-600 font-bold text-white hover:bg-amber-700"
-                    disabled={busy !== null}
-                    onClick={() => void fix(issue)}
-                  >
-                    {COPY[issue].action}
-                  </Button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+    <section className="tp-note" aria-label={t("alerts.title")} data-testid="job-alerts-banner">
+      <div className="tp-note-row">
+        <MaterialSymbol name="notifications_active" />
+        <div>
+          <b>{t("alerts.title")}</b>
+          <span>{t("alerts.sub")}</span>
         </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
-        >
-          Later
+        <button type="button" className="tp-x" aria-label={t("alerts.hide")} onClick={dismiss}>
+          <MaterialSymbol name="close" />
         </button>
       </div>
+      <ol className="tp-fixes">
+        {issues.map((issue, index) => {
+          const copy = COPY[issue];
+          return (
+            <li key={issue} className="tp-fix" data-issue={issue}>
+              <i aria-hidden="true">{index + 1}</i>
+              <span>
+                {t(copy.text)}
+                {copy.sub ? <small>{t(copy.sub)}</small> : null}
+              </span>
+              {copy.action ? (
+                <button type="button" className="tp-pill tp-press" disabled={busy !== null} onClick={() => void fix(issue)}>
+                  {t(copy.action)}
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }

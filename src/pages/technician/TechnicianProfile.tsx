@@ -1,25 +1,35 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
-import { useSocket } from "@/contexts/SocketContext";
-import { useTheme } from "@/components/item-providers/ThemeProvider";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
+
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { useTheme } from "@/components/item-providers/ThemeProvider";
+import { TechBack, TechLanguageSheet, TechPage, TechSwitch } from "@/components/technician/app/TechUi";
+import { useSocket } from "@/contexts/SocketContext";
+import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { apiFetch, apiUrl } from "@/lib/api";
-import {
-    Loader2, User, MapPin, Phone, Briefcase, Star,
-    BarChart, Bell, Shield, Palette, LogOut, ChevronRight,
-    ArrowLeft, Sun, Moon, Globe, Camera, ImagePlus, Trash2
-} from "lucide-react";
+import { serviceArt, serviceOf } from "@/lib/services";
+import { TECH_SUPPORT_PHONE, techInitials } from "@/lib/technicianApp";
+import { techRupees, techServiceName, useTechText } from "@/lib/technicianLanguage";
+import { setTechnicianNavSettings } from "@/lib/technicianNavSettings";
+import { TECH_LANGUAGES, type TechTextKey } from "@/lib/technicianText";
+import { calculateRewardPoints } from "@/utils/technicianDashboard";
+import { isTowingTechnician } from "@/utils/technicianRole";
+import { cn } from "@/lib/utils";
 
 type ThemeMode = "light" | "dark" | "system";
+
+const THEMES: Array<{ value: ThemeMode; icon: string }> = [
+    { value: "light", icon: "light_mode" },
+    { value: "dark", icon: "dark_mode" },
+    { value: "system", icon: "phone_iphone" },
+];
+const THEME_LABEL: Record<ThemeMode, TechTextKey> = { light: "screen.light", dark: "screen.dark", system: "screen.system" };
+const VERIFICATION_LABEL: Record<string, TechTextKey> = {
+    pending: "work.status.pending",
+    verified: "work.status.verified",
+    rejected: "work.status.rejected",
+};
 
 const resolveTechnicianImageUrl = (value: unknown) => {
     const raw = String(value || "").trim();
@@ -27,38 +37,22 @@ const resolveTechnicianImageUrl = (value: unknown) => {
     return /^https?:\/\//i.test(raw) ? raw : apiUrl(raw);
 };
 
-const getInitials = (name: unknown) =>
-    String(name || "T")
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0] || "")
-        .join("")
-        .toUpperCase();
-
 const TechnicianProfile = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
-    const isMobile = useIsMobile();
     const { technician, isLoading, logout, refreshTechnician } = useTechnicianAuth();
     const { socket } = useSocket();
     const { theme, setTheme } = useTheme();
     const galleryInputRef = useRef<HTMLInputElement | null>(null);
     const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
-    const activeTab = searchParams.get("tab") || (isMobile ? "menu" : "profile");
+    const activeTab = searchParams.get("tab") || "menu";
+    const { lang, t } = useTechText();
+    const [languageOpen, setLanguageOpen] = useState(false);
 
     const handleTabChange = (id: string) => {
         setSearchParams({ tab: id });
     };
-
-    const sidebarItems = [
-        { id: "profile", label: "Profile", icon: User, description: "Personal info & service range" },
-        { id: "stats", label: "Stats & Specialties", icon: BarChart, description: "Your earnings & jobs" },
-        { id: "appearance", label: "Appearance", icon: Palette, description: "Theme & display" },
-        { id: "notifications", label: "Notifications", icon: Bell, description: "Email & push alerts" },
-        { id: "security", label: "Security", icon: Shield, description: "Password & app data" },
-    ];
 
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -263,6 +257,12 @@ const TechnicianProfile = () => {
         };
         setSettingsState(next);
         if (patch.appearance?.theme) setTheme(patch.appearance.theme);
+        if (patch.navigation) {
+            setTechnicianNavSettings({
+                enabled: next.navigation.mobile_bottom_nav_enabled !== false,
+                autoHide: next.navigation.auto_hide_bottom_nav !== false,
+            });
+        }
 
         setIsSaving(true);
         try {
@@ -271,6 +271,12 @@ const TechnicianProfile = () => {
             });
         } catch (err) {
             setSettingsState(prev);
+            if (patch.navigation) {
+                setTechnicianNavSettings({
+                    enabled: prev.navigation.mobile_bottom_nav_enabled !== false,
+                    autoHide: prev.navigation.auto_hide_bottom_nav !== false,
+                });
+            }
             toast.error("Failed to update settings");
         } finally {
             setIsSaving(false);
@@ -278,221 +284,183 @@ const TechnicianProfile = () => {
     };
 
     if (isLoading || !technician) {
-        return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-slate-400" /></div>;
+        return <TechPage tab="me"><p className="tp-empty" role="status">{t("common.loading")}</p></TechPage>;
     }
 
     const profileData = liveTechnician || technician;
     const profileImageUrl = resolveTechnicianImageUrl(profilePhotoPath || profileData?.documents?.profile_photo);
     const ratingLabel = Number(profileData?.rating || 0).toFixed(1);
 
+    const displayName = String(profileData?.name || profileData?.email?.split("@")[0] || "Technician");
+    const technicianIdentifier = String(profileData?.technician_id || profileData?.sp_id || profileData?.id || "");
+    const verification = String(profileData?.verification_status || "pending").toLowerCase();
+    const verificationTone = verification === "verified" ? "is-ok" : verification === "rejected" ? "is-no" : "is-wait";
+    const verificationLabel = verification in VERIFICATION_LABEL ? t(VERIFICATION_LABEL[verification]) : verification;
+    const jobsDone = Number(liveStats.completedJobs || profileData?.jobs_completed || 0);
+    const totalEarned = Number(liveStats.totalEarnings || profileData?.total_earnings || 0);
+    const points = calculateRewardPoints({ totalEarnings: totalEarned, completedJobs: jobsDone });
+    const specialties: string[] = Array.isArray(profileData?.specialties) ? profileData.specialties : [];
+    const languageName = TECH_LANGUAGES.find((language) => language.code === lang)?.name ?? "English";
+    const themeName = t(THEME_LABEL[settingsState.appearance.theme] ?? "screen.system");
+    const alertsOn = settingsState.notifications.push_notifications || settingsState.notifications.email_notifications;
+    const photo = (
+        <span className="tp-photo" aria-hidden="true">
+            {profileImageUrl ? <img src={profileImageUrl} alt="" /> : techInitials(displayName)}
+        </span>
+    );
+    const backToMe = <TechBack onClick={() => handleTabChange("menu")} />;
+
     const renderContent = () => {
         switch (activeTab) {
             case "profile":
                 return (
-                    <form onSubmit={handleProfileSubmit} className="space-y-6">
-                        <div className="zomato-card space-y-5">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex items-center gap-4">
-                                    <Avatar className="h-20 w-20 border-4 border-white shadow-lg">
-                                        {profileImageUrl ? (
-                                            <AvatarImage src={profileImageUrl} alt={`${profileData?.name || "Technician"} profile`} className="object-cover" />
-                                        ) : null}
-                                        <AvatarFallback className="bg-slate-100 text-lg font-black text-slate-900">
-                                            {getInitials(profileData?.name)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="min-w-0">
-                                        <p className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-red-700">
-                                            ResQNow Profile
-                                        </p>
-                                        <h3 className="mt-3 text-lg font-black leading-tight text-foreground break-words">
-                                            {profileData?.name || "Technician"}
-                                        </h3>
-                                        <p className="mt-1 text-sm text-muted-foreground break-all">{profileData?.email}</p>
-                                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                            Keep this photo visible to customers during dispatch
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap gap-2 sm:max-w-[18rem] sm:justify-end">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="rounded-full"
-                                        onClick={() => galleryInputRef.current?.click()}
-                                        disabled={isUploadingPhoto}
-                                    >
-                                        {isUploadingPhoto ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
-                                        Gallery
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="rounded-full"
-                                        onClick={() => cameraInputRef.current?.click()}
-                                        disabled={isUploadingPhoto}
-                                    >
-                                        <Camera className="mr-2 h-4 w-4" />
-                                        Camera
-                                    </Button>
-                                    {profilePhotoPath ? (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                            onClick={handleRemoveProfilePhoto}
-                                            disabled={isUploadingPhoto}
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Remove
-                                        </Button>
-                                    ) : null}
-                                </div>
+                    <form onSubmit={handleProfileSubmit} data-testid="technician-details">
+                        {backToMe}
+                        <h1 className="tp-h1 tp-pj">{t("details.title")}</h1>
+                        <div className="tp-photo-card">
+                            {photo}
+                            <p>{t("details.photoNote")}</p>
+                            <div className="tp-three">
+                                <button type="button" className="tp-press" disabled={isUploadingPhoto} onClick={() => galleryInputRef.current?.click()}>
+                                    <MaterialSymbol name="photo_library" />
+                                    {t("details.gallery")}
+                                </button>
+                                <button type="button" className="tp-press" disabled={isUploadingPhoto} onClick={() => cameraInputRef.current?.click()}>
+                                    <MaterialSymbol name="photo_camera" />
+                                    {t("details.camera")}
+                                </button>
+                                {profilePhotoPath ? (
+                                    <button type="button" className="is-warn tp-press" disabled={isUploadingPhoto} onClick={handleRemoveProfilePhoto}>
+                                        <MaterialSymbol name="delete" />
+                                        {t("details.remove")}
+                                    </button>
+                                ) : null}
                             </div>
-                            <input
-                                ref={galleryInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleProfilePhotoSelection}
-                            />
-                            <input
-                                ref={cameraInputRef}
-                                type="file"
-                                accept="image/*"
-                                capture="user"
-                                className="hidden"
-                                onChange={handleProfilePhotoSelection}
-                            />
+                            <input ref={galleryInputRef} type="file" accept="image/*" hidden onChange={handleProfilePhotoSelection} />
+                            <input ref={cameraInputRef} type="file" accept="image/*" capture="user" hidden onChange={handleProfilePhotoSelection} />
                         </div>
-                        <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-border">
-                                <h3 className="text-lg font-bold text-foreground">Personal Details</h3>
-                                <p className="text-xs text-muted-foreground/80">Update your contact information.</p>
-                            </div>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Full Name</Label>
-                                    <div className="relative">
-                                        <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input name="name" className="pl-9" value={formData.name} onChange={handleProfileChange} />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Email Address</Label>
-                                    <Input value={profileData?.email} disabled className="bg-muted text-muted-foreground" />
-                                    <p className="text-[10px] text-muted-foreground">Email cannot be changed.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Phone Number</Label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input name="phone" className="pl-9" value={formData.phone} onChange={handleProfileChange} />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Base Address</Label>
-                                    <div className="relative">
-                                        <MapPin className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                                        <Input name="address" className="pl-9" value={formData.address} onChange={handleProfileChange} />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Service Range (km)</Label>
-                                    <Input type="number" name="service_area_range" value={formData.service_area_range} onChange={handleProfileChange} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Experience (Years)</Label>
-                                    <Input type="number" name="experience" value={formData.experience} onChange={handleProfileChange} />
-                                </div>
-                            </div>
-                            <Button type="submit" className="w-full mt-4" disabled={isSaving}>
-                                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Save Changes
-                            </Button>
-                        </div>
+                        <label className="tp-field">
+                            <small>{t("details.name")}</small>
+                            <span className="tp-input">
+                                <MaterialSymbol name="person" />
+                                <input name="name" value={formData.name} onChange={handleProfileChange} autoComplete="name" />
+                            </span>
+                        </label>
+                        <label className="tp-field">
+                            <small>{t("details.email")}</small>
+                            <span className="tp-input is-locked">
+                                <MaterialSymbol name="lock" />
+                                <input value={profileData?.email || ""} disabled readOnly />
+                            </span>
+                        </label>
+                        <p className="tp-hint">{t("details.emailNote")}</p>
+                        <label className="tp-field">
+                            <small>{t("details.phone")}</small>
+                            <span className="tp-input">
+                                <MaterialSymbol name="call" />
+                                <input name="phone" type="tel" value={formData.phone} onChange={handleProfileChange} autoComplete="tel" />
+                            </span>
+                        </label>
+                        <label className="tp-field">
+                            <small>{t("details.address")}</small>
+                            <span className="tp-input">
+                                <MaterialSymbol name="location_on" />
+                                <input name="address" value={formData.address} onChange={handleProfileChange} autoComplete="street-address" />
+                            </span>
+                        </label>
+                        <label className="tp-field">
+                            <small>{t("details.range")}</small>
+                            <span className="tp-input">
+                                <input type="number" inputMode="numeric" name="service_area_range" value={formData.service_area_range} onChange={handleProfileChange} />
+                            </span>
+                        </label>
+                        <p className="tp-hint">{t("details.rangeNote")}</p>
+                        <label className="tp-field">
+                            <small>{t("details.experience")}</small>
+                            <span className="tp-input">
+                                <input type="number" inputMode="numeric" name="experience" value={formData.experience} onChange={handleProfileChange} />
+                            </span>
+                        </label>
+                        <button type="submit" className="tp-big tp-press" style={{ marginTop: 18 }} disabled={isSaving}>
+                            {isSaving ? t("common.saving") : t("common.save")}
+                        </button>
                     </form>
                 );
             case "stats":
                 return (
-                    <div className="space-y-6">
-                        <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-border">
-                                <h3 className="text-lg font-bold text-foreground">Account Status</h3>
+                    <div data-testid="technician-work">
+                        {backToMe}
+                        <h1 className="tp-h1 tp-pj">{t("work.title")}</h1>
+                        <div className="tp-list tp-amounts" style={{ marginTop: 14 }}>
+                            <div className="tp-row">
+                                <span className="is-label">{t("work.documents")}</span>
+                                <span className={cn("tp-tag", verificationTone)} style={{ marginLeft: "auto" }}>
+                                    {verification === "verified" ? <MaterialSymbol name="verified" /> : null}
+                                    {verificationLabel}
+                                </span>
                             </div>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
-                                    <span className="text-sm font-bold text-muted-foreground">Verification</span>
-                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded uppercase font-bold">
-                                        {profileData?.verification_status || "Pending"}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
-                                    <span className="text-sm font-bold text-muted-foreground">Jobs Done</span>
-                                    <span className="font-black text-foreground">{liveStats.completedJobs || profileData?.jobs_completed || 0}</span>
-                                </div>
-                                <div className="flex justify-between items-center bg-muted p-3 rounded-lg border border-border">
-                                    <span className="text-sm font-bold text-muted-foreground">Total Earnings</span>
-                                    <span className="font-black text-red-700">Rs {(liveStats.totalEarnings || profileData?.total_earnings || 0).toFixed(2)}</span>
-                                </div>
-                            </div>
+                            <div className="tp-row"><span className="is-label">{t("work.jobsDone")}</span><b>{jobsDone}</b></div>
+                            <div className="tp-row"><span className="is-label">{t("work.total")}</span><b>{techRupees(totalEarned)}</b></div>
                         </div>
-                        <div className="zomato-card space-y-4">
-                            <div className="pb-4 border-b border-border">
-                                <h3 className="text-lg font-bold text-foreground">Specialties</h3>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {(profileData?.specialties || []).map((spec: string) => (
-                                    <span key={spec} className="bg-red-50 text-red-700 font-bold text-xs px-3 py-1.5 rounded-full border border-red-100">
-                                        {spec}
-                                    </span>
-                                ))}
-                                {(!profileData?.specialties || profileData.specialties.length === 0) && (
-                                    <span className="text-muted-foreground text-sm font-medium">No specialties listed</span>
-                                )}
-                            </div>
+                        <h2 className="tp-h2 tp-pj">{t("work.whatIDo")}</h2>
+                        <div className="tp-list">
+                            {specialties.length === 0 ? (
+                                <p className="tp-empty">{t("work.none")}</p>
+                            ) : (
+                                specialties.map((specialty) => {
+                                    const art = serviceArt(specialty);
+                                    return (
+                                        <div key={specialty} className="tp-row">
+                                            <span className="tp-thumb" aria-hidden="true">
+                                                {art ? <img src={art} alt="" draggable={false} /> : <MaterialSymbol name="build" />}
+                                            </span>
+                                            <span className="tp-text"><b>{serviceOf(specialty) ? techServiceName(lang, specialty) : specialty}</b></span>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
+                        <p className="tp-fine">{t("work.changeNote")}</p>
                     </div>
                 );
             case "appearance":
                 return (
-                    <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-border">
-                            <h3 className="text-lg font-bold text-foreground">Appearance</h3>
-                            <p className="text-xs text-muted-foreground/80">Customize how the app looks.</p>
+                    <div data-testid="technician-screen">
+                        {backToMe}
+                        <h1 className="tp-h1 tp-pj">{t("screen.title")}</h1>
+                        <p className="tp-day">{t("screen.lightDark")}</p>
+                        <div className="tp-three" role="radiogroup" aria-label={t("screen.lightDark")} style={{ marginTop: 0 }}>
+                            {THEMES.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={settingsState.appearance.theme === option.value}
+                                    className={cn("tp-press", settingsState.appearance.theme === option.value && "is-on")}
+                                    onClick={() => updateSettings({ appearance: { theme: option.value } })}
+                                >
+                                    <MaterialSymbol name={option.icon} />
+                                    {t(THEME_LABEL[option.value])}
+                                </button>
+                            ))}
                         </div>
-                        <div className="flex flex-col gap-3">
-                            <Button variant={settingsState.appearance.theme === "light" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "light" } })} className="justify-start">
-                                <Sun className="w-4 h-4 mr-3" /> Light Mode
-                            </Button>
-                            <Button variant={settingsState.appearance.theme === "dark" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "dark" } })} className="justify-start">
-                                <Moon className="w-4 h-4 mr-3" /> Dark Mode
-                            </Button>
-                            <Button variant={settingsState.appearance.theme === "system" ? "default" : "outline"} onClick={() => updateSettings({ appearance: { theme: "system" } })} className="justify-start">
-                                <Globe className="w-4 h-4 mr-3" /> System Default
-                            </Button>
-                        </div>
-                        <Separator />
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label className="text-sm font-bold">Show Bottom Navigation</Label>
-                                    <p className="text-xs text-muted-foreground">Enable the technician bottom nav bar.</p>
-                                </div>
-                                <Switch
+                        <p className="tp-day">{t("screen.bar")}</p>
+                        <div className="tp-list">
+                            <div className="tp-row is-tall">
+                                <span className="tp-text"><b>{t("screen.showBar")}</b><span className="is-wrap">{t("screen.showBarSub")}</span></span>
+                                <TechSwitch
+                                    label={t("screen.showBar")}
                                     checked={!!settingsState.navigation.mobile_bottom_nav_enabled}
-                                    onCheckedChange={(c) => updateSettings({ navigation: { mobile_bottom_nav_enabled: c } })}
+                                    onChange={(c) => updateSettings({ navigation: { mobile_bottom_nav_enabled: c } })}
                                 />
                             </div>
-                            <Separator />
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label className="text-sm font-bold">Auto-hide Navigation</Label>
-                                    <p className="text-xs text-muted-foreground">Hide on scroll down and reveal on scroll up.</p>
-                                </div>
-                                <Switch
+                            <div className="tp-row is-tall">
+                                <span className="tp-text"><b>{t("screen.hideBar")}</b><span className="is-wrap">{t("screen.hideBarSub")}</span></span>
+                                <TechSwitch
+                                    label={t("screen.hideBar")}
                                     checked={!!settingsState.navigation.auto_hide_bottom_nav}
-                                    onCheckedChange={(c) => updateSettings({ navigation: { auto_hide_bottom_nav: c } })}
                                     disabled={!settingsState.navigation.mobile_bottom_nav_enabled}
+                                    onChange={(c) => updateSettings({ navigation: { auto_hide_bottom_nav: c } })}
                                 />
                             </div>
                         </div>
@@ -500,167 +468,125 @@ const TechnicianProfile = () => {
                 );
             case "notifications":
                 return (
-                    <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-border">
-                            <h3 className="text-lg font-bold text-foreground">Notifications</h3>
-                            <p className="text-xs text-muted-foreground/80">Manage alerts and emails.</p>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label className="text-sm font-bold">Email Notifications</Label>
-                                    <p className="text-xs text-muted-foreground">Receive job summaries via email.</p>
-                                </div>
-                                <Switch checked={settingsState.notifications.email_notifications} onCheckedChange={(c) => updateSettings({ notifications: { email_notifications: c } })} />
+                    <div data-testid="technician-alerts">
+                        {backToMe}
+                        <h1 className="tp-h1 tp-pj">{t("alertsPage.title")}</h1>
+                        <div className="tp-list" style={{ marginTop: 14 }}>
+                            <div className="tp-row is-tall">
+                                <span className="tp-ic is-amber" aria-hidden="true"><MaterialSymbol name="notifications_active" /></span>
+                                <span className="tp-text"><b>{t("alertsPage.phone")}</b><span className="is-wrap">{t("alertsPage.phoneSub")}</span></span>
+                                <TechSwitch
+                                    label={t("alertsPage.phone")}
+                                    checked={settingsState.notifications.push_notifications}
+                                    onChange={(c) => updateSettings({ notifications: { push_notifications: c } })}
+                                />
                             </div>
-                            <Separator />
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label className="text-sm font-bold">Push Notifications</Label>
-                                    <p className="text-xs text-muted-foreground">Instant alerts for new requests.</p>
-                                </div>
-                                <Switch checked={settingsState.notifications.push_notifications} onCheckedChange={(c) => updateSettings({ notifications: { push_notifications: c } })} />
+                            <div className="tp-row is-tall">
+                                <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="mail" /></span>
+                                <span className="tp-text"><b>{t("alertsPage.email")}</b><span className="is-wrap">{t("alertsPage.emailSub")}</span></span>
+                                <TechSwitch
+                                    label={t("alertsPage.email")}
+                                    checked={settingsState.notifications.email_notifications}
+                                    onChange={(c) => updateSettings({ notifications: { email_notifications: c } })}
+                                />
                             </div>
                         </div>
                     </div>
                 );
             case "security":
                 return (
-                    <div className="zomato-card space-y-4">
-                        <div className="pb-4 border-b border-border">
-                            <h3 className="text-lg font-bold text-foreground">Security & Privacy</h3>
-                        </div>
-                        <div className="space-y-3">
-                            <Button variant="outline" className="w-full justify-start rounded-xl font-bold">Update Password</Button>
-                            <Button variant="outline" className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 rounded-xl font-bold" onClick={() => toast.success("Cache cleared")}>Clear App Data</Button>
-                        </div>
+                    <div data-testid="technician-security">
+                        {backToMe}
+                        <h1 className="tp-h1 tp-pj">{t("security.title")}</h1>
+                        <button type="button" className="tp-big is-plain tp-press" style={{ marginTop: 16 }}>
+                            <MaterialSymbol name="lock_reset" />
+                            {t("security.password")}
+                        </button>
+                        <button type="button" className="tp-big is-warn tp-press" onClick={() => toast.success("Cache cleared")}>
+                            <MaterialSymbol name="delete" />
+                            {t("security.clear")}
+                        </button>
+                        <p className="tp-fine">{t("security.note")}</p>
                     </div>
                 );
             default:
-                return null;
+                return (
+                    <div data-testid="technician-me">
+                        <div className="tp-id">
+                            {photo}
+                            <div className="tp-id-text">
+                                <h1 className="tp-pj">{displayName}</h1>
+                                {technicianIdentifier ? <span>{t("me.id", { id: technicianIdentifier })}</span> : null}
+                                <span>{profileData?.email}</span>
+                            </div>
+                        </div>
+                        <div className="tp-tags">
+                            <span className={cn("tp-tag", verificationTone)}>
+                                {verification === "verified" ? <MaterialSymbol name="verified" /> : null}
+                                {verificationLabel}
+                            </span>
+                            <span className="tp-tag is-star"><MaterialSymbol name="star" />{ratingLabel}</span>
+                            <span className="tp-tag is-pts"><MaterialSymbol name="workspace_premium" />{t("home.points", { n: points })}</span>
+                        </div>
+                        <div className="tp-list" style={{ marginTop: 16 }}>
+                            <button type="button" className="tp-row" onClick={() => handleTabChange("profile")}>
+                                <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="person" /></span>
+                                <span className="tp-text"><b>{t("me.details")}</b><span>{t("me.detailsSub")}</span></span>
+                                <MaterialSymbol name="chevron_right" className="tp-chev" />
+                            </button>
+                            <button type="button" className="tp-row" onClick={() => handleTabChange("stats")}>
+                                <span className="tp-ic is-blue" aria-hidden="true"><MaterialSymbol name="build" /></span>
+                                <span className="tp-text"><b>{t("me.work")}</b><span>{t("me.workSub")}</span></span>
+                                <MaterialSymbol name="chevron_right" className="tp-chev" />
+                            </button>
+                            {isTowingTechnician(profileData) ? (
+                                <button type="button" className="tp-row" onClick={() => navigate("/technician/dashboard?view=fleet")}>
+                                    <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="auto_towing" /></span>
+                                    <span className="tp-text"><b>{t("me.fleet")}</b></span>
+                                    <MaterialSymbol name="chevron_right" className="tp-chev" />
+                                </button>
+                            ) : null}
+                            <button type="button" className="tp-row" onClick={() => handleTabChange("notifications")}>
+                                <span className="tp-ic is-amber" aria-hidden="true"><MaterialSymbol name="notifications_active" /></span>
+                                <span className="tp-text"><b>{t("me.alerts")}</b></span>
+                                <span className="tp-val">{t(alertsOn ? "common.on" : "common.off")}</span>
+                                <MaterialSymbol name="chevron_right" className="tp-chev" />
+                            </button>
+                            <button type="button" className="tp-row" onClick={() => setLanguageOpen(true)}>
+                                <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="translate" /></span>
+                                <span className="tp-text"><b>{t("me.language")}</b></span>
+                                <span className="tp-val">{languageName}</span>
+                                <MaterialSymbol name="chevron_right" className="tp-chev" />
+                            </button>
+                            <button type="button" className="tp-row" onClick={() => handleTabChange("appearance")}>
+                                <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="contrast" /></span>
+                                <span className="tp-text"><b>{t("me.screen")}</b></span>
+                                <span className="tp-val">{themeName}</span>
+                                <MaterialSymbol name="chevron_right" className="tp-chev" />
+                            </button>
+                            <button type="button" className="tp-row" onClick={() => handleTabChange("security")}>
+                                <span className="tp-ic" aria-hidden="true"><MaterialSymbol name="lock" /></span>
+                                <span className="tp-text"><b>{t("me.security")}</b></span>
+                                <MaterialSymbol name="chevron_right" className="tp-chev" />
+                            </button>
+                        </div>
+                        <a className="tp-big is-plain is-help tp-press" href={`tel:${TECH_SUPPORT_PHONE}`}>
+                            <MaterialSymbol name="call" />
+                            {t("common.callHelp")}
+                        </a>
+                        <div className="tp-list" style={{ marginTop: 12 }}>
+                            <button type="button" className="tp-row is-danger" style={{ minHeight: 64 }} onClick={() => { logout(); navigate("/"); }}>
+                                <span className="tp-ic is-red" aria-hidden="true"><MaterialSymbol name="logout" /></span>
+                                <span className="tp-text"><b>{t("me.logout")}</b></span>
+                            </button>
+                        </div>
+                        <TechLanguageSheet open={languageOpen} onClose={() => setLanguageOpen(false)} />
+                    </div>
+                );
         }
     };
 
-    if (isMobile) {
-        if (activeTab === "menu") {
-            return (
-                <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in duration-300">
-                    <div className="bg-card dark:bg-slate-900 px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6 border-b border-border">
-                        <div className="mb-5">
-                            <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-red-700">
-                                ResQNow Technician
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-5">
-                        <Avatar className="h-[4.5rem] w-[4.5rem] border-[3px] border-white shadow-md shrink-0">
-                            {profileImageUrl ? (
-                                <AvatarImage src={profileImageUrl} alt={`${profileData?.name || "Technician"} profile`} className="object-cover" />
-                            ) : null}
-                            <AvatarFallback className="bg-muted/50 text-slate-700 text-xl font-black">
-                                {getInitials(profileData?.name)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                            <h2 className="text-2xl font-black text-foreground tracking-tight leading-tight break-words">
-                                {profileData?.name || profileData?.email?.split('@')[0] || 'Technician'}
-                            </h2>
-                            <p className="text-sm font-semibold text-muted-foreground/80 break-all mb-2">{profileData?.email}</p>
-                            <div className="flex items-center gap-2">
-                                <span className="bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border border-yellow-200 flex items-center gap-1 w-fit">
-                                    <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" /> {ratingLabel}
-                                </span>
-                            </div>
-                        </div>
-                        </div>
-                    </div>
-
-                    <div className="px-4 space-y-4">
-                        <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
-                            {sidebarItems.map((item, index) => {
-                                const isLast = index === sidebarItems.length - 1;
-                                return (
-                                    <div key={item.id}>
-                                        <button onClick={() => handleTabChange(item.id)} className="w-full text-left p-4 flex items-center justify-between hover:bg-muted active:bg-muted/50 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-border">
-                                                    <item.icon className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-bold text-foreground">{item.label}</h3>
-                                                    <p className="text-[11px] font-medium text-muted-foreground/80">{item.description}</p>
-                                                </div>
-                                            </div>
-                                            <ChevronRight className="w-5 h-5 text-slate-300" />
-                                        </button>
-                                        {!isLast && <Separator className="mx-4 w-auto bg-muted/50" />}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="bg-card dark:bg-slate-900 rounded-[1.5rem] shadow-sm border border-border overflow-hidden">
-                            <button onClick={() => { logout(); navigate('/'); }} className="w-full text-left p-4 flex items-center justify-between hover:bg-red-50 active:bg-red-100 transition-colors">
-                                <div className="flex items-center gap-4 text-red-600">
-                                    <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
-                                        <LogOut className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="font-bold">Log out</h3>
-                                </div>
-                                <ChevronRight className="w-5 h-5 text-red-300" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        const currentItem = sidebarItems.find(i => i.id === activeTab);
-        return (
-            <div className="min-h-screen bg-muted pb-20 fade-in-0 animate-in slide-in-from-bottom-4 duration-300">
-                <div className="sticky top-0 z-50 bg-card dark:bg-slate-900/95 backdrop-blur-md px-4 py-4 flex items-center gap-4 border-b border-border shadow-sm">
-                    <button onClick={() => handleTabChange('menu')} className="w-10 h-10 flex items-center justify-center bg-muted border border-border rounded-full text-muted-foreground hover:bg-muted/50 active:scale-95 transition-all">
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <h2 className="text-lg font-black text-foreground tracking-tight">{currentItem?.label || 'Profile'}</h2>
-                </div>
-                <div className="p-4">
-                    {renderContent()}
-                </div>
-            </div>
-        );
-    }
-
-    // Desktop View
-    return (
-        <div className="container max-w-7xl mx-auto py-10 px-4 md:px-8">
-            <div className="space-y-6">
-                <div className="space-y-0.5">
-                    <p className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-red-700">
-                        ResQNow Technician Portal
-                    </p>
-                    <h2 className="pt-3 text-2xl font-bold tracking-tight text-foreground">My Profile & Settings</h2>
-                    <p className="text-sm text-muted-foreground/80">Manage your technician account settings.</p>
-                </div>
-                <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-8 lg:space-x-12">
-                    <aside className="md:w-1/4 lg:w-1/5">
-                        <nav className="flex space-x-2 md:flex-col md:space-x-0 md:space-y-2 overflow-x-auto pb-2 scrollbar-hide">
-                            {sidebarItems.map((item) => (
-                                <Button key={item.id} variant={activeTab === item.id ? "default" : "ghost"} className={`justify-start whitespace-nowrap rounded-xl ${activeTab === item.id ? "bg-slate-900 text-white shadow-sm" : "hover:bg-muted/50 text-muted-foreground"}`} onClick={() => handleTabChange(item.id)}>
-                                    <item.icon className="mr-2 h-4 w-4" /> {item.label}
-                                </Button>
-                            ))}
-                            <Separator className="my-4 hidden md:block" />
-                            <Button variant="ghost" className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50 hidden md:flex rounded-xl" onClick={() => { logout(); navigate('/'); }}>
-                                <LogOut className="mr-2 h-4 w-4" /> Log out
-                            </Button>
-                        </nav>
-                    </aside>
-                    <div className="flex-1 lg:max-w-3xl">
-                        {renderContent()}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+    return <TechPage tab="me" testId="technician-profile">{renderContent()}</TechPage>;
 };
 
 export default TechnicianProfile;

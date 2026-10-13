@@ -4,9 +4,21 @@ import { Outlet, useLocation } from "react-router-dom";
 import TechnicianHeader from "./TechnicianHeader";
 import JobNotificationModal from "./JobNotificationModal";
 
+const TECHNICIAN_APP_ROUTES = [
+  "/technician/dashboard",
+  "/technician/earnings",
+  "/technician/history",
+  "/technician/reviews",
+  "/technician/profile",
+  "/technician/settings",
+  "/technician/verification",
+];
+
 const TechnicianLayout = () => {
   const location = useLocation();
-  const isDashboardRoute = location.pathname === "/technician/dashboard";
+  // The technician app's own pages bring their heading and the bar at the bottom,
+  // so the site header and footer are left to the pages before sign-in and to a job in progress.
+  const isDashboardRoute = TECHNICIAN_APP_ROUTES.includes(location.pathname.replace(/\/+$/, ""));
 
   return (
     <div className="flex flex-col min-h-screen">

@@ -1,13 +1,15 @@
-import React from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
+import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { TechPage } from "@/components/technician/app/TechUi";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
-import { CheckCircle, Clock, XCircle, FileText, ShieldCheck } from "lucide-react";
+import { TECH_SUPPORT_PHONE } from "@/lib/technicianApp";
+import { useTechText } from "@/lib/technicianLanguage";
 
 const TechnicianVerification = () => {
   const { technician, isAuthenticated } = useTechnicianAuth();
-  
+  const { t } = useTechText();
+
   if (!isAuthenticated) {
     return <Navigate to="/technician/login" replace />;
   }
@@ -16,108 +18,71 @@ const TechnicianVerification = () => {
     switch (technician?.verification_status) {
       case "pending":
         return (
-          <div className="flex flex-col items-center py-6">
-            <Clock size={64} className="text-yellow-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Verification In Progress</h2>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
-              Your application is currently being reviewed by our team. This process typically takes 1-3 business days.
-            </p>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 w-full max-w-md">
-              <h3 className="font-medium text-yellow-800 mb-2 flex items-center">
-                <FileText className="mr-2 h-5 w-5" />
-                Next Steps
-              </h3>
-              <ul className="list-disc list-inside text-sm text-yellow-700 space-y-1">
-                <li>We'll review your qualifications and experience</li>
-                <li>We may contact you for additional information</li>
-                <li>You'll receive an email when your verification is complete</li>
-              </ul>
+          <>
+            <div className="tp-status" data-status="pending">
+              <MaterialSymbol name="hourglass_top" />
+              <h2 className="tp-pj">{t("verify.waitTitle")}</h2>
+              <p>{t("verify.waitSub")}</p>
             </div>
-          </div>
+            <h2 className="tp-h2 tp-pj">{t("verify.next")}</h2>
+            <div className="tp-list">
+              <ol className="tp-steps">
+                <li><i aria-hidden="true">1</i>{t("verify.step1")}</li>
+                <li><i aria-hidden="true">2</i>{t("verify.step2")}</li>
+                <li><i aria-hidden="true">3</i>{t("verify.step3")}</li>
+              </ol>
+            </div>
+          </>
         );
-        
       case "verified":
         return (
-          <div className="flex flex-col items-center py-6">
-            <CheckCircle size={64} className="text-green-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Verification Complete</h2>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
-              Congratulations! Your account has been verified. You're now an official ResQNow technician.
-            </p>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 w-full max-w-md">
-              <h3 className="font-medium text-green-800 mb-2 flex items-center">
-                <ShieldCheck className="mr-2 h-5 w-5" />
-                You're all set!
-              </h3>
-              <p className="text-sm text-green-700">
-                You can now access the technician dashboard and start accepting service requests.
-              </p>
+          <>
+            <div className="tp-status is-ok" data-status="verified">
+              <MaterialSymbol name="check" />
+              <h2 className="tp-pj">{t("verify.okTitle")}</h2>
+              <p>{t("verify.okSub")}</p>
             </div>
-            <Button className="mt-6" asChild>
-              <Link to="/technician/dashboard">
-                Go to Dashboard
-              </Link>
-            </Button>
-          </div>
+            <Link to="/technician/dashboard" className="tp-big tp-press" style={{ marginTop: 16 }}>
+              {t("verify.okGo")}
+            </Link>
+          </>
         );
-        
       case "rejected":
         return (
-          <div className="flex flex-col items-center py-6">
-            <XCircle size={64} className="text-red-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Verification Unsuccessful</h2>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
-              Unfortunately, we couldn't verify your account at this time. This could be due to incomplete information or not meeting our requirements.
-            </p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 w-full max-w-md">
-              <h3 className="font-medium text-red-800 mb-2">What can you do?</h3>
-              <p className="text-sm text-red-700 mb-4">
-                Please contact our support team for more details about why your verification was unsuccessful and how to proceed.
-              </p>
-              <Button variant="outline" className="w-full" asChild>
-                <Link to="/contact">
-                  Contact Support
-                </Link>
-              </Button>
+          <>
+            <div className="tp-status is-no" data-status="rejected">
+              <MaterialSymbol name="close" />
+              <h2 className="tp-pj">{t("verify.noTitle")}</h2>
+              <p>{t("verify.noSub")}</p>
             </div>
-          </div>
+            <h2 className="tp-h2 tp-pj">{t("verify.canDo")}</h2>
+            <p className="tp-fine" style={{ marginTop: 0 }}>{t("verify.canDoText")}</p>
+            <Link to="/contact" className="tp-big is-ink tp-press" style={{ marginTop: 16 }}>
+              {t("verify.contact")}
+            </Link>
+          </>
         );
-        
       default:
         return (
-          <div className="flex flex-col items-center py-6">
-            <p className="text-muted-foreground">Verification status not available.</p>
+          <div className="tp-status" data-status="unknown">
+            <MaterialSymbol name="info" />
+            <p>{t("verify.unknown")}</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="container py-12 flex flex-col items-center">
-      <div className="max-w-3xl w-full">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold">Account Verification</h1>
-          <p className="text-muted-foreground mt-2">Check the status of your technician account verification</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Verification Status</CardTitle>
-            <CardDescription>
-              {technician?.name} • {technician?.email}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {renderStatusContent()}
-          </CardContent>
-          <CardFooter className="flex justify-center border-t pt-6">
-            <p className="text-sm text-muted-foreground text-center">
-              Need help? Contact us at <span className="font-medium">support@resqnow.com</span>
-            </p>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
+    <TechPage tab="home" bare testId="technician-verification">
+      <h1 className="tp-h1 tp-pj">{t("verify.title")}</h1>
+      <p className="tp-sub">{[technician?.name, technician?.email].filter(Boolean).join(" · ")}</p>
+      {renderStatusContent()}
+      <a className="tp-big is-plain is-help tp-press" href={`tel:${TECH_SUPPORT_PHONE}`} style={{ marginTop: 16 }}>
+        <MaterialSymbol name="call" />
+        {t("common.callHelp")}
+      </a>
+      <p className="tp-fine" style={{ textAlign: "center" }}>{t("verify.write")}</p>
+    </TechPage>
   );
 };
 

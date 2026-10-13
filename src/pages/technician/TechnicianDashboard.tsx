@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
-import { Button } from "@/components/ui/button";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { JobKeyStrip, JobLocationBox, JobSays, JobVehicleRow } from "@/components/technician/JobCardParts";
@@ -11,16 +10,18 @@ import { offerRequestId, onClosedJobOffer, onPushedJobOffer } from "@/lib/jobOff
 import { JOB_ALERT_SOUND_URL } from "@/lib/jobAlertSound";
 import JobAlertsBanner from "@/components/technician/JobAlertsBanner";
 import { toast } from "sonner";
-import { Loader2, DollarSign, Briefcase, CreditCard, Star } from "lucide-react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import TechnicianJobCompletion from "@/components/technician/TechnicianJobCompletion";
 import io, { Socket } from "socket.io-client";
 import TechnicianJobMap from "@/components/technician/TechnicianJobMap";
-import TechnicianEarningsChart from "@/components/technician/TechnicianEarningsChart";
 import CancelledJobCard, { CancelledJobDetails } from "@/components/technician/CancelledJobCard";
 import { apiFetch, apiUrl, FRONTEND_ONLY_MODE, getRequiredApiBaseUrl, readJsonSafely } from "@/lib/api";
-import TechnicianBottomNav from "@/components/technician/TechnicianBottomNav"; // Import Bottom Nav
-import TechnicianDashboardOverview from "@/components/technician/dashboard/TechnicianDashboardOverview";
+import TechFleet from "@/components/technician/app/TechFleet";
+import TechHome from "@/components/technician/app/TechHome";
+import TechMessages from "@/components/technician/app/TechMessages";
+import TechTeam from "@/components/technician/app/TechTeam";
+import { TechPage } from "@/components/technician/app/TechUi";
 import { useTechnicianActiveJob } from "@/hooks/useTechnicianActiveJob";
 import { useRoadRouteEstimate } from "@/hooks/useRoadRouteEstimate";
 import { resolveActiveJobNavigationTarget } from "@/lib/activeJobNavigation";
@@ -33,10 +34,9 @@ import {
 } from "@/utils/technicianStatus";
 import {
   buildEarningsBreakdown,
-  buildOrderOverviewCounts,
-  buildOrderPerformanceSummary,
   calculateRewardPoints,
   countEnabledVehicleTypes,
+  countJobsDoneToday,
 } from "@/utils/technicianDashboard";
 import { isTowingTechnician as isTowingTechnicianRole } from "@/utils/technicianRole";
 import { useTechnicianJob } from "@/contexts/TechnicianJobContext";
@@ -47,8 +47,6 @@ import {
 } from "@/lib/technicianActiveJobRoute";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
-import FleetManagementModule from "@/components/technician/dashboard/towing/FleetManagementModule";
-import TeamManagementModule from "@/components/technician/dashboard/towing/TeamManagementModule";
 import type { FleetVehicle, FleetVehicleInput, TeamEmployee, TeamEmployeeInput } from "@/types/towingManagement";
 
 const TechnicianDashboard = () => {
@@ -1676,7 +1674,6 @@ const TechnicianDashboard = () => {
       : cancelledJob;
   const showCancelledJobCard = Boolean(isCancelled && visibleCancelledJob);
   const showActiveJobCard = Boolean(activeJob) && !showCancelledJobCard;
-  const showIdleDashboard = !showActiveJobCard && !showCancelledJobCard;
 
   if (isLoading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
   if (!technician) return <Navigate to="/technician/login" replace />;
@@ -1711,13 +1708,6 @@ const TechnicianDashboard = () => {
       return;
     }
     toggleAvailability(checked);
-  };
-
-  const scrollToSection = (sectionId: string) => {
-    if (typeof document === "undefined") return;
-    const target = document.getElementById(sectionId);
-    if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleFleetDialogOpenChange = (open: boolean) => {
@@ -1813,8 +1803,6 @@ const TechnicianDashboard = () => {
   };
 
   const totalEarningsValue = Number(walletSummary?.total_earnings ?? financials.total_earnings ?? stats.earnings ?? 0);
-  const orderOverview = buildOrderOverviewCounts(jobHistory);
-  const orderPerformance = buildOrderPerformanceSummary(jobHistory);
   const earningsBreakdown = buildEarningsBreakdown(walletSummary);
   const pointsBalance = calculateRewardPoints({
     totalEarnings: totalEarningsValue,
@@ -1833,176 +1821,113 @@ const TechnicianDashboard = () => {
   const technicianDisplayName = String(
     (technicianSnapshot as any)?.proprietor_name || technicianSnapshot?.name || "Technician"
   ).trim() || "Technician";
-  const technicianIdentifier = String(
-    (technicianSnapshot as any)?.technician_id || (technicianSnapshot as any)?.sp_id || technicianSnapshot?.id || ""
-  );
   const profilePhotoPath = String((technicianSnapshot as any)?.documents?.profile_photo || "").trim();
   const profileImageUrl = profilePhotoPath
     ? (/^https?:\/\//i.test(profilePhotoPath) ? profilePhotoPath : apiUrl(profilePhotoPath))
     : null;
+  const averageRating = Array.isArray(reviews) && reviews.length > 0
+    ? reviews.reduce((total, review) => total + Number(review?.rating || 0), 0) / reviews.length
+    : null;
+
+  // Home shows whenever no job is on. Messages, vehicles and team open in its place and are kept in the
+  // address, so the phone's Back button closes them.
+  const requestedView = new URLSearchParams(location.search).get("view");
+  const homeView = showActiveJobCard
+    ? "job"
+    : requestedView === "messages"
+      ? "messages"
+      : isTowingOperator && (requestedView === "fleet" || requestedView === "team")
+        ? requestedView
+        : "home";
+  const openHomeView = (next: "messages" | "fleet" | "team") => navigate(`/technician/dashboard?view=${next}`);
+  const closeHomeView = () => navigate("/technician/dashboard", { replace: true });
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] pb-24 md:pb-8 selection:bg-primary/20 relative">
-      <div className="mx-auto max-w-7xl space-y-5 px-4 pb-24 pt-4 md:px-6 md:pt-6">
-        <JobAlertsBanner />
-        {showIdleDashboard ? (
-          <TechnicianDashboardOverview
-            showTowingManagement={isTowingOperator}
-            technicianName={technicianDisplayName}
-            technicianId={technicianIdentifier}
-            profileImageUrl={profileImageUrl}
-            isOnline={isOnline}
-            pointsBalance={pointsBalance}
-            unreadNotifications={unreadNotifications}
-            notifications={notifications}
-            fleetCount={fleetCount}
-            teamCount={teamCount}
-            orderOverview={orderOverview}
-            orderPerformance={orderPerformance}
-            earnings={{
-              total: totalEarningsValue,
-              withdrawable: earningsBreakdown.withdrawable,
-              pending: earningsBreakdown.pending,
-              paid: earningsBreakdown.paid,
-              disputed: earningsBreakdown.disputed,
-            }}
-            onToggleAvailability={handleToggleAvailability}
-            onOpenNotifications={() => scrollToSection("dashboard-notifications")}
-            onViewProfile={() => navigate("/technician/profile?tab=profile")}
-            onOpenAppearanceSettings={() => navigate("/technician/profile?tab=appearance")}
-            onOpenNotificationSettings={() => navigate("/technician/profile?tab=notifications")}
-            onOpenSecuritySettings={() => navigate("/technician/profile?tab=security")}
-            onManageFleet={() => scrollToSection("dashboard-fleet")}
-            onAddVehicle={() => {
-              scrollToSection("dashboard-fleet");
-              openCreateVehicleDialog();
-            }}
-            onViewHistory={() => navigate("/technician/history")}
-            onOpenFinancialReport={() => navigate("/technician/earnings")}
-            onManageTeam={() => scrollToSection("dashboard-team")}
-            onAddServiceProvider={() => {
-              scrollToSection("dashboard-team");
-              openCreateEmployeeDialog();
-            }}
-          />
-        ) : null}
-
-        {showIdleDashboard && isTowingOperator ? (
-          <>
-            <FleetManagementModule
-              vehicles={towingManagement.vehicles}
-              isLoading={towingManagement.isVehiclesLoading}
-              isMutating={towingManagement.isMutating}
-              error={towingManagement.vehicleError}
-              dialogOpen={fleetDialogOpen}
-              selectedVehicle={selectedVehicle}
-              onDialogOpenChange={handleFleetDialogOpenChange}
-              onOpenCreate={openCreateVehicleDialog}
-              onEditVehicle={(vehicle) => {
-                setSelectedVehicle(vehicle);
-                setFleetDialogOpen(true);
+    <TechPage tab="home" wide={homeView === "job"} testId="technician-dashboard">
+      {homeView === "home" ? (
+        <TechHome
+          name={technicianDisplayName}
+          photoUrl={profileImageUrl}
+          isOnline={isOnline}
+          unread={unreadNotifications}
+          todayEarnings={Number(stats.today || 0)}
+          jobsDoneToday={countJobsDoneToday(jobHistory)}
+          points={pointsBalance}
+          withdrawable={earningsBreakdown.withdrawable}
+          jobsDone={Number(stats.jobs || 0)}
+          rating={averageRating}
+          pendingDues={Number(financials.pending_dues || 0)}
+          towing={isTowingOperator}
+          fleetCount={fleetCount}
+          teamCount={teamCount}
+          notice={showCancelledJobCard && visibleCancelledJob ? (
+            <CancelledJobCard
+              job={visibleCancelledJob}
+              onViewDetails={() => {
+                setCancelledJob(null);
+                navigate("/technician/history");
               }}
-              onDeleteVehicle={handleDeleteVehicle}
-              onRefresh={towingManagement.refreshVehicles}
-              onCreateVehicle={handleCreateVehicle}
-              onUpdateVehicle={handleUpdateVehicle}
             />
+          ) : null}
+          onToggleAvailability={handleToggleAvailability}
+          onOpenMessages={() => openHomeView("messages")}
+          onPayDues={handlePayDues}
+          onOpenFleet={() => openHomeView("fleet")}
+          onOpenTeam={() => openHomeView("team")}
+        />
+      ) : null}
 
-            <TeamManagementModule
-              employees={towingManagement.employees}
-              vehicles={towingManagement.vehicles}
-              isLoading={towingManagement.isEmployeesLoading}
-              isMutating={towingManagement.isMutating}
-              error={towingManagement.employeeError}
-              dialogOpen={employeeDialogOpen}
-              selectedEmployee={selectedEmployee}
-              onDialogOpenChange={handleEmployeeDialogOpenChange}
-              onOpenCreate={openCreateEmployeeDialog}
-              onEditEmployee={(employee) => {
-                setSelectedEmployee(employee);
-                setEmployeeDialogOpen(true);
-              }}
-              onDeleteEmployee={handleDeleteEmployee}
-              onRefresh={towingManagement.refreshEmployees}
-              onCreateEmployee={handleCreateEmployee}
-              onUpdateEmployee={handleUpdateEmployee}
-            />
-          </>
-        ) : null}
+      {homeView === "messages" ? <TechMessages messages={notifications} onBack={closeHomeView} /> : null}
 
+      {homeView === "fleet" ? (
+        <TechFleet
+          vehicles={towingManagement.vehicles}
+          isLoading={towingManagement.isVehiclesLoading}
+          isMutating={towingManagement.isMutating}
+          error={towingManagement.vehicleError}
+          dialogOpen={fleetDialogOpen}
+          selectedVehicle={selectedVehicle}
+          onBack={closeHomeView}
+          onDialogOpenChange={handleFleetDialogOpenChange}
+          onOpenCreate={openCreateVehicleDialog}
+          onEditVehicle={(vehicle) => {
+            setSelectedVehicle(vehicle);
+            setFleetDialogOpen(true);
+          }}
+          onDeleteVehicle={handleDeleteVehicle}
+          onRefresh={towingManagement.refreshVehicles}
+          onCreateVehicle={handleCreateVehicle}
+          onUpdateVehicle={handleUpdateVehicle}
+        />
+      ) : null}
 
+      {homeView === "team" ? (
+        <TechTeam
+          employees={towingManagement.employees}
+          vehicles={towingManagement.vehicles}
+          isLoading={towingManagement.isEmployeesLoading}
+          isMutating={towingManagement.isMutating}
+          error={towingManagement.employeeError}
+          dialogOpen={employeeDialogOpen}
+          selectedEmployee={selectedEmployee}
+          onBack={closeHomeView}
+          onDialogOpenChange={handleEmployeeDialogOpenChange}
+          onOpenCreate={openCreateEmployeeDialog}
+          onEditEmployee={(employee) => {
+            setSelectedEmployee(employee);
+            setEmployeeDialogOpen(true);
+          }}
+          onDeleteEmployee={handleDeleteEmployee}
+          onRefresh={towingManagement.refreshEmployees}
+          onCreateEmployee={handleCreateEmployee}
+          onUpdateEmployee={handleUpdateEmployee}
+        />
+      ) : null}
 
-
-        {/* 2. QUICK MENU GRID SECTION */}
-        {false && showIdleDashboard && (
-          <div className="grid grid-cols-2 gap-3">
-            <Link to="/technician/earnings" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
-              <div className="h-10 w-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-3 group-hover:scale-110 transition-transform">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Today</p>
-                <p className="text-xl font-black text-foreground leading-none">₹{stats.today}</p>
-              </div>
-            </Link>
-
-            <Link to="/technician/history" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
-              <div className="h-10 w-10 bg-red-50 rounded-full flex items-center justify-center text-red-600 mb-3 group-hover:scale-110 transition-transform">
-                <Briefcase className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Total Jobs</p>
-                <p className="text-xl font-black text-foreground leading-none">{stats.jobs}</p>
-              </div>
-            </Link>
-
-            <Link to="/technician/reviews" className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between active:scale-95 transition-transform group">
-              <div className="h-10 w-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-3 group-hover:scale-110 transition-transform">
-                <Star className="w-5 h-5 fill-amber-500" />
-              </div>
-              <div>
-                <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Rating</p>
-                <p className="text-xl font-black text-foreground leading-none">
-                  {Array.isArray(reviews) && reviews.length > 0 ? (reviews.reduce((acc, r) => acc + (r.rating || 0), 0) / reviews.length).toFixed(1) : "5.0"}
-                </p>
-              </div>
-            </Link>
-
-            {financials.pending_dues > 0 ? (
-              <div onClick={handlePayDues} className="bg-red-50 p-4 rounded-[1.5rem] border border-red-100 shadow-sm flex flex-col justify-between active:scale-95 transition-transform cursor-pointer group">
-                <div className="h-10 w-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-3 group-hover:scale-110 transition-transform">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-red-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Pending Dues</p>
-                  <p className="text-xl font-black text-red-700 leading-none">₹{financials.pending_dues}</p>
-                  <span className="text-[9px] font-bold text-red-600 mt-1 block">Pay Now</span>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-card dark:bg-slate-900 p-4 rounded-[1.5rem] border border-border shadow-sm flex flex-col justify-between opacity-70">
-                <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center text-slate-400 mb-3">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-0.5">Dues</p>
-                  <p className="text-xl font-black text-slate-300 leading-none">₹0</p>
-                  <span className="text-[9px] font-bold text-green-500 mt-1 block">All clear</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 3. BUSINESS ANALYTICS GRAPH (NEW POSITION) */}
-        {false && showIdleDashboard && Array.isArray(earningsHistory) && earningsHistory.length > 0 && (
-          <div className="mb-4">
-            <TechnicianEarningsChart data={earningsHistory} />
-          </div>
-        )}
-
-        {/* ACTIVE JOB HERO CARD */}
-        {showActiveJobCard ? (
+      {/* ACTIVE JOB HERO CARD */}
+      {showActiveJobCard ? (
+        <>
+          <JobAlertsBanner />
           <div className="tj relative mx-auto mb-4 max-w-3xl overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-200/50 dark:bg-slate-900">
 
             {/* Live Map Header */}
@@ -2153,35 +2078,25 @@ const TechnicianDashboard = () => {
               </div>
             </div>
           </div>
-        ) : showCancelledJobCard && visibleCancelledJob ? (
-          <CancelledJobCard
-            job={visibleCancelledJob}
-            className="mx-auto mb-4 max-w-3xl"
-            onViewDetails={() => {
-              setCancelledJob(null);
-              navigate("/technician/history");
-            }}
-          />
-        ) : null}
+        </>
+      ) : null}
 
-        <TechnicianJobModal
-          isOpen={showJobModal && !!incomingJob}
-          job={incomingJob}
-          isProcessing={isJobActionLoading}
-          isUnavailable={incomingJobUnavailable}
-          unavailableMessage={JOB_TAKEN_MESSAGE}
-          onAccept={handleAcceptJob}
-          onReject={handleRejectJob}
-          onDismissUnavailable={(jobId) => {
-            if (!incomingJob || String(incomingJob.id) !== String(jobId)) return;
-            setIncomingJob(null);
-            setIncomingJobUnavailable(false);
-            setShowJobModal(false);
-          }}
-        />
-      </div>
+      <TechnicianJobModal
+        isOpen={showJobModal && !!incomingJob}
+        job={incomingJob}
+        isProcessing={isJobActionLoading}
+        isUnavailable={incomingJobUnavailable}
+        unavailableMessage={JOB_TAKEN_MESSAGE}
+        onAccept={handleAcceptJob}
+        onReject={handleRejectJob}
+        onDismissUnavailable={(jobId) => {
+          if (!incomingJob || String(incomingJob.id) !== String(jobId)) return;
+          setIncomingJob(null);
+          setIncomingJobUnavailable(false);
+          setShowJobModal(false);
+        }}
+      />
 
-      <TechnicianBottomNav />
       {/* Completion Modal */}
       {showCompletionModal && (
         <TechnicianJobCompletion
@@ -2189,7 +2104,7 @@ const TechnicianDashboard = () => {
           onClose={() => setShowCompletionModal(false)}
         />
       )}
-    </div>
+    </TechPage>
   );
 };
 

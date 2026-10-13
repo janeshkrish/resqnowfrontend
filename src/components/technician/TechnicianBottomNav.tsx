@@ -1,155 +1,50 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Bell, Home, IndianRupee, User2 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
+
+import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { useAutoHideBottomNav } from "@/hooks/useAutoHideBottomNav";
+import { useTechText } from "@/lib/technicianLanguage";
+import { useTechnicianNavSettings } from "@/lib/technicianNavSettings";
+import type { TechTextKey } from "@/lib/technicianText";
+import { cn } from "@/lib/utils";
 
-type NavItemKey = "home" | "earnings" | "notifications" | "profile";
+export type TechnicianTab = "home" | "money" | "jobs" | "me";
 
-const TechnicianBottomNav = () => {
-  const location = useLocation();
+const TABS: Array<{ key: TechnicianTab; label: TechTextKey; icon: string; to: string }> = [
+  { key: "home", label: "nav.home", icon: "home", to: "/technician/dashboard" },
+  { key: "money", label: "nav.money", icon: "account_balance_wallet", to: "/technician/earnings" },
+  { key: "jobs", label: "nav.jobs", icon: "build", to: "/technician/history" },
+  { key: "me", label: "nav.me", icon: "person", to: "/technician/profile" },
+];
+
+/** The four places of the technician app. Hidden when the technician has switched the bar off. */
+const TechnicianBottomNav = ({ active }: { active: TechnicianTab }) => {
   const navigate = useNavigate();
-  const currentPath = location.pathname;
-  const [navEnabled, setNavEnabled] = useState(true);
-  const [autoHideEnabled, setAutoHideEnabled] = useState(true);
-  const [activeItem, setActiveItem] = useState<NavItemKey>("home");
+  const { t } = useTechText();
+  const { enabled, autoHide } = useTechnicianNavSettings();
+  const { isVisible, revealNav } = useAutoHideBottomNav({ enabled: enabled && autoHide });
 
-  const { visibilityClasses, revealNav } = useAutoHideBottomNav({
-    enabled: navEnabled && autoHideEnabled,
-  });
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    const loadNavigationSettings = async () => {
-      try {
-        const res = await apiFetch("/api/technicians/me/settings", { technician: true });
-        if (!res.ok) {
-          if (!isCancelled) {
-            setNavEnabled(true);
-            setAutoHideEnabled(true);
-          }
-          return;
-        }
-
-        const settings = await res.json();
-        const navigation = settings?.navigation || {};
-        if (isCancelled) return;
-        setNavEnabled(navigation.mobile_bottom_nav_enabled !== false);
-        setAutoHideEnabled(navigation.auto_hide_bottom_nav !== false);
-      } catch {
-        if (!isCancelled) {
-          setNavEnabled(true);
-          setAutoHideEnabled(true);
-        }
-      }
-    };
-
-    loadNavigationSettings();
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const hash = String(location.hash || "").trim();
-    if (hash === "#dashboard-notifications") setActiveItem("notifications");
-    else if (currentPath === "/technician/profile") setActiveItem("profile");
-    else if (currentPath === "/technician/earnings") setActiveItem("earnings");
-    else if (currentPath === "/technician/dashboard") setActiveItem("home");
-  }, [currentPath, location.hash]);
-
-  const scrollToSection = useCallback((sectionId: string, item: NavItemKey) => {
-    setActiveItem(item);
-
-    const target = document.getElementById(sectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", `#${sectionId}`);
-      }
-      return;
-    }
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
-
-  const navItems = [
-    {
-      key: "home" as const,
-      label: "Home",
-      icon: Home,
-      onClick: () => scrollToSection("dashboard-home", "home"),
-    },
-    {
-      key: "earnings" as const,
-      label: "Total Earnings",
-      icon: IndianRupee,
-      onClick: () => {
-        setActiveItem("earnings");
-        navigate("/technician/earnings");
-      },
-    },
-    {
-      key: "notifications" as const,
-      label: "Notification",
-      icon: Bell,
-      onClick: () => scrollToSection("dashboard-notifications", "notifications"),
-    },
-    {
-      key: "profile" as const,
-      label: "Profile",
-      icon: User2,
-      onClick: () => {
-        setActiveItem("profile");
-        navigate("/technician/profile?tab=profile");
-      },
-    },
-  ];
-
-  if (!navEnabled) {
-    return null;
-  }
+  if (!enabled) return null;
 
   return (
-    <div
-      className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-18px_45px_-25px_rgba(15,23,42,0.25)] backdrop-blur md:hidden",
-        "transition-transform transition-opacity duration-300 ease-out",
-        visibilityClasses
-      )}
+    <nav
+      className={cn("tp-nav", !isVisible && "is-hidden")}
+      aria-label={t("nav.label")}
+      data-testid="technician-nav"
       onPointerDown={revealNav}
     >
-      <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-2">
-        {navItems.map((item) => {
-          const isActive = activeItem === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={item.onClick}
-              className={cn(
-                "flex min-w-[72px] flex-col items-center gap-1 rounded-2xl px-2 py-2 transition-colors",
-                isActive ? "text-red-700" : "text-slate-400 hover:text-slate-700"
-              )}
-            >
-              <span
-                className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full transition-colors",
-                  isActive ? "bg-red-50" : "bg-transparent"
-                )}
-              >
-                <item.icon className={cn("h-5 w-5", isActive ? "fill-current" : "")} strokeWidth={isActive ? 2.5 : 2} />
-              </span>
-              <span className={cn("text-[10px] leading-tight", isActive ? "font-bold" : "font-medium")}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+      {TABS.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          className={cn("tp-tab tp-press", active === tab.key && "is-on")}
+          aria-current={active === tab.key ? "page" : undefined}
+          onClick={() => navigate(tab.to)}
+        >
+          <MaterialSymbol name={tab.icon} />
+          <span>{t(tab.label)}</span>
+        </button>
+      ))}
+    </nav>
   );
 };
 

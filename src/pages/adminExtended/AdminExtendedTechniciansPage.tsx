@@ -350,6 +350,12 @@ export default function AdminExtendedTechniciansPage() {
               Remind
             </button>
             <Link
+              to={`/admin/extended/technicians/${row.technicianId}/record`}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Record
+            </Link>
+            <Link
               to={`/admin/extended/technicians/${row.technicianId}/activity`}
               className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
             >

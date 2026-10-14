@@ -11,6 +11,7 @@ import {
   Wrench,
   Menu,
   LogOut,
+  Pin,
 } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
@@ -24,6 +25,7 @@ const navItems: NavItem[] = [
   { to: "/admin/extended/dashboard", label: "Dashboard", icon: Gauge },
   { to: "/admin/extended/command-center", label: "Operations Command Center", icon: Radar },
   { to: "/admin/extended/requests", label: "Requests", icon: Wrench },
+  { to: "/admin/extended/watch", label: "Watch list", icon: Pin },
   { to: "/admin/extended/technicians", label: "Technicians", icon: Users },
   { to: "/admin/extended/finance", label: "Finance", icon: CircleDollarSign },
   { to: "/admin/extended/analytics", label: "Analytics", icon: BarChart3 },

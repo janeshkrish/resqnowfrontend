@@ -108,7 +108,8 @@ describe("phoneLoginMessage", () => {
   });
 
   it("points to Google or email when phone login is not set up", () => {
-    for (const code of ["phone-login/not-configured", "auth/operation-not-allowed", "auth/billing-not-enabled"]) {
+    // configuration-not-found: Firebase Authentication was never started for the project.
+    for (const code of ["phone-login/not-configured", "auth/operation-not-allowed", "auth/billing-not-enabled", "auth/configuration-not-found"]) {
       expect(phoneLoginMessage(error(code), "send")).toBe(
         "Mobile number login is not available right now. Please use Google or email."
       );

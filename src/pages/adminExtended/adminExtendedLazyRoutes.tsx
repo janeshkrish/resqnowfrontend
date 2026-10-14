@@ -11,6 +11,9 @@ const AdminExtendedFinancePage = lazyWithReload(() => import("./AdminExtendedFin
 const AdminExtendedAnalyticsPage = lazyWithReload(() => import("./AdminExtendedAnalyticsPage"));
 const AdminExtendedComplaintsPage = lazyWithReload(() => import("./AdminExtendedComplaintsPage"));
 const AdminExtendedNotificationsPage = lazyWithReload(() => import("./AdminExtendedNotificationsPage"));
+const WatchListPage = lazyWithReload(() => import("./monitor/WatchListPage"));
+const RequestReplayPage = lazyWithReload(() => import("./monitor/RequestReplayPage"));
+const TechnicianRecordPage = lazyWithReload(() => import("./monitor/TechnicianRecordPage"));
 
 export const adminExtendedLazyRoutes: RouteObject[] = [
   {
@@ -20,9 +23,12 @@ export const adminExtendedLazyRoutes: RouteObject[] = [
       { index: true, element: <Navigate to="/admin/extended/dashboard" replace /> },
       { path: "dashboard", element: <AdminExtendedDashboardPage /> },
       { path: "requests", element: <AdminExtendedRequestsPage /> },
+      { path: "requests/:requestId/replay", element: <RequestReplayPage /> },
+      { path: "watch", element: <WatchListPage /> },
       { path: "command-center", element: <AdminExtendedCommandCenterPage /> },
       { path: "technicians", element: <AdminExtendedTechniciansPage /> },
       { path: "technicians/:technicianId/activity", element: <AdminExtendedTechnicianActivityPage /> },
+      { path: "technicians/:technicianId/record", element: <TechnicianRecordPage /> },
       { path: "finance", element: <AdminExtendedFinancePage /> },
       { path: "analytics", element: <AdminExtendedAnalyticsPage /> },
       { path: "complaints", element: <AdminExtendedComplaintsPage /> },

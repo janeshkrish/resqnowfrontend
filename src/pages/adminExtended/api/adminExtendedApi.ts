@@ -1,7 +1,7 @@
 import axios from "axios";
 import { apiFetch, apiUrl, readJsonSafely } from "@/lib/api";
 
-const adminApi = axios.create({
+export const adminApi = axios.create({
   baseURL: apiUrl("/api/admin"),
   timeout: 20000,
   headers: {

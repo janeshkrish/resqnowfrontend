@@ -35,13 +35,16 @@ const offerPush = {
 
 type Call = { method: string; path: string; body: unknown };
 
+// Shaped like a real technician login token: accepting a job reads the technician id from it.
+const TECHNICIAN_TOKEN = ["e30", Buffer.from(JSON.stringify({ type: "technician", id: 7 })).toString("base64url"), "e2e"].join(".");
+
 async function signInTechnician(page: Page, options: { onJob?: boolean } = {}) {
   const errors: string[] = [];
   const calls: Call[] = [];
   let accepted = false;
   page.on("pageerror", (error) => errors.push(error.message));
   // A signed-in technician: the test token only ever reaches the mocked API below.
-  await page.addInitScript(() => localStorage.setItem("resqnow_technician_token", "e2e-technician-token"));
+  await page.addInitScript((token) => localStorage.setItem("resqnow_technician_token", token), TECHNICIAN_TOKEN);
   await page.route((url) => url.hostname === "api.e2e.test", async (route) => {
     const request = route.request();
     const url = new URL(request.url());

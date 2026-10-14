@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Technician } from "@/types/technician";
 import { apiFetch } from "@/lib/api";
-import { Edit, Trash2, Search, Filter, UserPlus, Eye } from "lucide-react";
+import { Edit, Trash2, Search, Filter, UserPlus, Eye, History } from "lucide-react";
 import { toast } from "sonner";
 import { mapTechnicianData } from "@/utils/technicianMappers";
 import {
@@ -270,6 +270,16 @@ const TechnicianManagement = () => {
                         >
                           <Link to={`/admin/technician/${technician.id}`}>
                             <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Jobs, cancellations, delays and reviews"
+                          asChild
+                        >
+                          <Link to={`/admin/extended/technicians/${technician.id}/record`} aria-label="Jobs, cancellations, delays and reviews">
+                            <History className="h-4 w-4" />
                           </Link>
                         </Button>
                         <Button

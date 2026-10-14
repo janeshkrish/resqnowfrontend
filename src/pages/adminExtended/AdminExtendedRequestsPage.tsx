@@ -6,6 +6,7 @@ import DataTable from "./components/DataTable";
 import RequestDetailsModal from "./components/RequestDetailsModal";
 import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
 import { AdminRequestRow, getAdminRequests } from "./api/adminExtendedApi";
+import LiveRequestsBoard from "./monitor/LiveRequestsBoard";
 
 const PAGE_LIMIT = 10;
 
@@ -55,6 +56,7 @@ export default function AdminExtendedRequestsPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [detailsRequestId, setDetailsRequestId] = useState<number | null>(null);
+  const [view, setView] = useState<"live" | "all">("live");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -173,10 +175,22 @@ export default function AdminExtendedRequestsPage() {
 
   return (
     <section className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Request Control</h1>
-        <p className="text-sm text-slate-500">Click any request row to inspect and manage the complete request.</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Requests</h1>
+          <p className="text-sm text-slate-500">
+            {view === "live" ? "Every live job, updated as it happens. Monitor opens one job with its live map." : "Every request, past and present. Click a row to inspect and manage it."}
+          </p>
+        </div>
+        <div className="am-switch" role="tablist" aria-label="Requests view">
+          <button type="button" role="tab" aria-selected={view === "live"} className={view === "live" ? "is-on" : ""} onClick={() => setView("live")}>Live</button>
+          <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-on" : ""} onClick={() => setView("all")}>All requests</button>
+        </div>
       </header>
+
+      {view === "live" ? <LiveRequestsBoard /> : null}
+      {view === "all" ? (
+      <>
 
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1.8fr_1fr_1fr]">
         <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search by request ID, user, issue, location" className="h-10 rounded-lg border border-slate-200 px-3 text-sm" />
@@ -202,6 +216,9 @@ export default function AdminExtendedRequestsPage() {
         onPageChange={setPage}
         onRowClick={(row) => setDetailsRequestId(row.requestId)}
       />
+
+      </>
+      ) : null}
 
       <RequestDetailsModal requestId={detailsRequestId} open={detailsRequestId != null} onClose={() => setDetailsRequestId(null)} />
     </section>

@@ -254,7 +254,7 @@ test.describe("Android app", () => {
     await openInAndroidApp(page);
     const { errors } = await signInTechnician(page);
     await page.goto("/technician/profile");
-    await pushReady(page, page.getByRole("heading", { name: /Profile/ }).first());
+    await pushReady(page, page.getByTestId("technician-me"));
 
     await page.evaluate((data) => (window as unknown as { __android: { push(d: unknown): void } }).__android.push(data), offerPush);
     const card = page.getByRole("dialog");

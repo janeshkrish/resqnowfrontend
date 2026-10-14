@@ -34,6 +34,15 @@ export default defineConfig({
       // As in a build whose settings do not mention it: the tests see the app's own
       // default, whatever the developer's local .env says.
       VITE_NATIVE_BACKGROUND_TRACKING: "",
+      // A made-up Firebase project: mobile number login talks to Google, and the tests
+      // answer those calls themselves (e2e/customer-login.spec.ts). Push stays off.
+      VITE_FIREBASE_API_KEY: "e2e-firebase-key",
+      VITE_FIREBASE_AUTH_DOMAIN: "resqnow-e2e.firebaseapp.com",
+      VITE_FIREBASE_PROJECT_ID: "resqnow-e2e",
+      VITE_FIREBASE_STORAGE_BUCKET: "",
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "100000000000",
+      VITE_FIREBASE_APP_ID: "1:100000000000:web:e2e",
+      VITE_FIREBASE_VAPID_KEY: "",
     },
   },
 });

@@ -8410,7 +8410,7 @@ button.lt-req { cursor: pointer; }
 .tp-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tp-who { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .tp-who span { color: #475467; font-size: 13.5px; line-height: 18px; font-weight: 700; }
-.tp-who b { overflow: hidden; font-size: 19px; line-height: 25px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; text-overflow: ellipsis; }
+.tp-who h1 { margin: 0; overflow: hidden; color: #283048; font-size: 19px; line-height: 25px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; text-overflow: ellipsis; }
 .tp-lang { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; height: 44px; padding: 0 12px 0 10px; border: 1.5px solid #D0D5DD; border-radius: 999px; background: #FFFFFF; color: #283048; font-size: 14px; font-weight: 800; cursor: pointer; }
 .tp-lang .rq-symbol { font-size: 20px; }
 .tp-bell { position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 48px; height: 48px; padding: 0; border: 1.5px solid #D0D5DD; border-radius: 999px; background: #FFFFFF; color: #283048; cursor: pointer; }
@@ -9039,4 +9039,164 @@ fieldset.tp-field { min-width: 0; padding: 0; border: 0; }
   .rq-signup--admin .rq-signup-footer button { min-width: 0; flex: 1; padding-left: 10px; padding-right: 10px; font-size: 13px; }
   .rq-signup--admin .rq-signup-footer button:last-child { flex: 1.5; }
   .rq-signup-footer-progress { display: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Customer log in: the mobile number, then the SMS code, then (the    */
+/* first time) the name, all on one page under the picture.            */
+/* Light only. On a wide screen the picture takes the left half.       */
+/* ------------------------------------------------------------------ */
+@keyframes lgSpin { to { transform: rotate(360deg); } }
+@keyframes lgBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes lgUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+.lg {
+  --lg-ink: #283048;
+  --lg-sub: #5D6679;
+  --lg-faint: #8D95A6;
+  --lg-line: #D9DDE4;
+  --lg-hair: #ECEEF2;
+  --lg-brand: #B01F2A;
+  --lg-bad: #D92D20;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: #FFFFFF;
+  color: var(--lg-ink);
+  color-scheme: light;
+  font-family: "Manrope", "Inter", system-ui, sans-serif;
+}
+.lg button,
+.lg a,
+.lg input { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.lg a { text-decoration: none; }
+.lg h1,
+.lg h2 { font-family: "Plus Jakarta Sans", "Manrope", system-ui, sans-serif; }
+
+/* The picture, on its own colour so it reaches the edges */
+.lg-art { flex-shrink: 0; overflow: hidden; background: #FCE8EA; padding-top: env(safe-area-inset-top, 0px); }
+.lg-art-in { position: relative; max-width: 480px; margin: 0 auto; padding-top: 20px; }
+.lg-logo { position: relative; z-index: 2; display: inline-flex; margin-left: 22px; }
+.lg-logo img { display: block; width: auto; height: 34px; }
+.lg-hello { position: relative; z-index: 2; margin: 22px 24px 0; animation: lgUp 0.5s ease both; }
+.lg-hello h1 { margin: 0; color: var(--lg-ink); font-size: 30px; line-height: 35px; font-weight: 800; letter-spacing: -0.03em; }
+.lg-hello p { margin: 8px 0 0; color: var(--lg-sub); font-size: 15px; line-height: 21px; font-weight: 600; }
+/* The scene's sky sits behind the words: 37% of the picture's height, which is 34% of the width,
+   so the street lamp stays clear of the last line on wider phones. */
+.lg-pic { position: relative; z-index: 1; display: block; width: 110%; max-width: none; height: auto; margin: -34% 0 0 -5%; pointer-events: none; user-select: none; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16%); mask-image: linear-gradient(to bottom, transparent 0, #000 16%); }
+.lg-art.is-short .lg-hello p { display: none; }
+.lg-art.is-short .lg-hello h1 { font-size: 26px; line-height: 31px; }
+
+/* The white part */
+.lg-panel { flex: 1 0 auto; background: #FFFFFF; }
+.lg-panel-in { position: relative; max-width: 480px; margin: 0 auto; box-sizing: border-box; padding: 6px 24px calc(env(safe-area-inset-bottom, 0px) + 22px); }
+.lg-step { animation: lgUp 0.35s ease both; }
+
+.lg-rule { display: flex; align-items: center; gap: 14px; margin: 6px 0 16px; color: var(--lg-sub); font-family: inherit !important; font-size: 14px; line-height: 20px; font-weight: 700; white-space: nowrap; }
+.lg-rule::before,
+.lg-rule::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--lg-hair); }
+
+/* A field with its label inside: large while empty, small and at the top once in use */
+.lg-field { position: relative; display: flex; align-items: stretch; height: 58px; box-sizing: border-box; border: 1.5px solid var(--lg-line); border-radius: 14px; background: #FFFFFF; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.lg-field + .lg-field,
+.lg-note + .lg-field { margin-top: 12px; }
+.lg-field:focus-within { border-color: var(--lg-ink); box-shadow: inset 0 0 0 0.5px var(--lg-ink), 0 0 0 4px rgba(40, 48, 72, 0.07); }
+.lg-field.is-bad { border-color: var(--lg-bad); box-shadow: inset 0 0 0 0.5px var(--lg-bad); }
+.lg-fill { position: relative; flex: 1 1 auto; min-width: 0; }
+.lg-label { position: absolute; left: 16px; right: 12px; top: 50%; overflow: hidden; color: var(--lg-faint); font-size: 16px; line-height: 20px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; transform: translateY(-50%); transition: top 0.15s ease, font-size 0.15s ease, transform 0.15s ease; }
+.lg-field:focus-within .lg-label,
+.lg-field.has-value .lg-label { top: 9px; color: var(--lg-sub); font-size: 12px; line-height: 15px; font-weight: 700; transform: none; }
+.lg-field.is-bad .lg-label { color: var(--lg-bad); }
+.lg-fill input { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; margin: 0; padding: 22px 16px 5px; border: 0; border-radius: 14px; outline: 0; background: transparent; color: var(--lg-ink); font-size: 16.5px; line-height: 23px; font-weight: 700; caret-color: var(--lg-brand); }
+.lg-fill input:disabled { opacity: 1; -webkit-text-fill-color: var(--lg-ink); }
+.lg-phone .lg-label { left: 14px; }
+.lg-phone .lg-fill input { padding-left: 14px; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.lg-cc { display: flex; align-items: center; flex: 0 0 auto; padding: 0 14px 0 16px; border-right: 1.5px solid var(--lg-hair); color: var(--lg-ink); font-size: 16.5px; font-weight: 800; }
+.lg-show { flex-shrink: 0; height: 100%; padding: 0 14px; border: 0; background: transparent; color: var(--lg-ink); font-size: 14px; font-weight: 800; cursor: pointer; }
+.lg-note { display: flex; align-items: flex-start; gap: 6px; margin: 8px 2px 0; color: var(--lg-bad); font-size: 13.5px; line-height: 19px; font-weight: 700; }
+.lg-note .rq-symbol { margin-top: 1px; font-size: 17px; }
+.lg-banner { display: flex; align-items: flex-start; gap: 10px; margin: 6px 0 14px; padding: 12px 14px; border-radius: 14px; background: #FEF3F2; color: #912018; font-size: 14px; line-height: 20px; font-weight: 700; }
+.lg-banner .rq-symbol { color: var(--lg-bad); font-size: 20px; }
+
+/* Buttons */
+.lg-go { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 56px; margin-top: 14px; border: 0; border-radius: 14px; background: var(--lg-brand); color: #FFFFFF; font-size: 16.5px; font-weight: 800; cursor: pointer; transition: background 0.2s ease, transform 0.12s ease; }
+.lg-go:active:not(:disabled) { transform: scale(0.98); }
+.lg-go:focus-visible,
+.lg-google:focus-visible,
+.lg-chip:focus-visible { outline: 2px solid var(--lg-ink); outline-offset: 2px; }
+.lg-go.is-off { background: #F0F1F4; color: #A3AAB8; cursor: default; }
+.lg-go.is-busy { background: #C24A55; cursor: progress; }
+.lg-go.is-busy i,
+.lg-wait i { display: block; width: 18px; height: 18px; box-sizing: border-box; border-radius: 999px; animation: lgSpin 0.8s linear infinite; }
+.lg-go.is-busy i { border: 2.5px solid rgba(255, 255, 255, 0.4); border-top-color: #FFFFFF; }
+.lg-or { display: flex; align-items: center; gap: 14px; margin: 14px 0; color: var(--lg-faint); font-size: 13px; font-weight: 700; }
+.lg-or::before,
+.lg-or::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--lg-hair); }
+.lg-google { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 56px; box-sizing: border-box; border: 1.5px solid var(--lg-line); border-radius: 14px; background: #FFFFFF; color: var(--lg-ink); font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
+.lg-google:hover { background: #F9FAFB; }
+.lg-google:disabled { opacity: 0.6; cursor: progress; }
+.lg-google svg { display: block; width: 20px; height: 20px; }
+.lg-alt { margin: 6px 0 0; color: var(--lg-sub); font-size: 15px; line-height: 21px; font-weight: 600; text-align: center; }
+.lg-alt.is-small { margin-top: 2px; font-size: 14px; }
+.lg-quiet,
+.lg-link { height: 40px; padding: 0 4px; border: 0; background: transparent; cursor: pointer; }
+.lg-quiet { color: var(--lg-sub); font-size: 14px; font-weight: 700; }
+.lg-link { display: inline-flex; align-items: center; color: var(--lg-brand); font-size: inherit; font-weight: 800; }
+.lg-legal { margin: 2px 8px 0; color: var(--lg-faint); font-size: 12px; line-height: 17px; font-weight: 600; text-align: center; }
+.lg-legal a { color: var(--lg-sub); text-decoration: underline; text-decoration-color: #C8CDD6; text-underline-offset: 2px; }
+.lg-legal.is-small { margin-top: 14px; font-size: 11px; line-height: 15px; }
+.lg-legal.is-small a { color: var(--lg-faint); }
+
+/* The code */
+.lg-sent { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 6px 0 14px; }
+.lg-sent > div { min-width: 0; }
+.lg-sent h2 { margin: 0; color: var(--lg-ink); font-family: inherit !important; font-size: 18px; line-height: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.lg-sent > div > span { display: block; margin-top: 2px; color: var(--lg-sub); font-size: 14px; line-height: 20px; font-weight: 600; }
+.lg-chip { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; height: 36px; padding: 0 12px 0 10px; border: 1.5px solid var(--lg-line); border-radius: 999px; background: #FFFFFF; color: var(--lg-ink); font-size: 13.5px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.lg-chip .rq-symbol { font-size: 16px; }
+.lg-chip:disabled { opacity: 0.5; cursor: default; }
+.lg-done { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 6px 12px 6px 8px; border-radius: 999px; background: #ECFDF3; color: #067647; font-size: 13.5px; font-weight: 800; }
+.lg-done .rq-symbol { font-size: 18px; }
+.lg-code { position: relative; }
+.lg-code input { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; box-sizing: border-box; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; font-size: 16px; opacity: 0; cursor: text; }
+.lg-boxes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.lg-boxes > span { display: flex; align-items: center; justify-content: center; height: 60px; box-sizing: border-box; border: 1.5px solid var(--lg-line); border-radius: 14px; background: #FFFFFF; color: var(--lg-ink); font-size: 25px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lg-boxes > span.is-now { border-color: var(--lg-ink); box-shadow: inset 0 0 0 0.5px var(--lg-ink), 0 0 0 4px rgba(40, 48, 72, 0.07); }
+.lg-boxes > span.is-now::after { content: ""; width: 1.5px; height: 24px; background: var(--lg-brand); animation: lgBlink 1s steps(1) infinite; }
+.lg-code.is-bad .lg-boxes > span { border-color: var(--lg-bad); box-shadow: inset 0 0 0 0.5px var(--lg-bad); }
+.lg-inline { height: auto; padding: 0; border: 0; background: transparent; color: var(--lg-brand); font-size: inherit; font-weight: 800; cursor: pointer; }
+.lg-inline:disabled { opacity: 0.5; cursor: default; }
+.lg-resend { margin: 16px 2px 0; color: var(--lg-sub); font-size: 14.5px; line-height: 20px; font-weight: 600; }
+.lg-resend b { color: var(--lg-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+.lg-wait { display: flex; align-items: center; gap: 10px; margin: 16px 2px 0; color: var(--lg-sub); font-size: 14.5px; font-weight: 700; }
+.lg-wait i { border: 2.5px solid #D0D5DD; border-top-color: var(--lg-ink); }
+.lg-sentok { display: flex; align-items: center; gap: 6px; margin: 14px 2px 0; color: #067647; font-size: 14px; font-weight: 700; }
+.lg-sentok .rq-symbol { font-size: 18px; }
+
+/* reCAPTCHA runs out of sight; the line under the form names it instead of its badge. */
+.lg-captcha { position: absolute; width: 1px; height: 1px; overflow: hidden; }
+.grecaptcha-badge { visibility: hidden !important; }
+
+@media (min-width: 960px) {
+  .lg { flex-direction: row; }
+  .lg-art { display: flex; flex: 0 0 52%; min-height: 100vh; min-height: 100dvh; }
+  .lg-art-in { display: flex; flex-direction: column; width: 100%; max-width: none; margin: 0; padding: 40px 0 0; }
+  .lg-logo { margin-left: 56px; }
+  .lg-logo img { height: 40px; }
+  .lg-hello { margin: 48px 56px 0; }
+  .lg-hello h1,
+  .lg-art.is-short .lg-hello h1 { font-size: 46px; line-height: 52px; }
+  .lg-hello p,
+  .lg-art.is-short .lg-hello p { display: block; margin-top: 12px; font-size: 18px; line-height: 26px; }
+  .lg-pic { width: 100%; max-height: 64vh; margin: auto 0 0; object-fit: cover; object-position: center bottom; }
+  .lg-panel { display: flex; align-items: center; justify-content: center; padding: 48px 40px; }
+  .lg-panel-in { width: 100%; max-width: 400px; margin: 0; padding: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg *,
+  .lg *::before,
+  .lg *::after { animation: none !important; transition: none !important; }
 }

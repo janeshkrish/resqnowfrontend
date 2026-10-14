@@ -134,4 +134,4 @@ export async function subscribeToForegroundMessages(
   return onMessage(messaging, onPayload);
 }
 
-export { hasFirebaseConfig };
+export { createFirebaseApp, hasFirebaseConfig };

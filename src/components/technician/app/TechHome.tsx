@@ -74,10 +74,10 @@ export default function TechHome({
           <span className="tp-face" aria-hidden="true">
             {photoUrl ? <img src={photoUrl} alt="" /> : techInitials(name)}
           </span>
-          <span className="tp-who">
+          <div className="tp-who">
             <span>{t("home.hello")}</span>
-            <b>{name}</b>
-          </span>
+            <h1>{name}</h1>
+          </div>
         </Link>
         <button type="button" className="tp-lang tp-press" aria-label={t("lang.change")} onClick={() => setLanguageOpen(true)}>
           <MaterialSymbol name="translate" />

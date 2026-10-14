@@ -153,7 +153,11 @@ export default defineConfig(({ mode }) => {
                   request.destination === "style" ||
                   request.destination === "worker") &&
                 url.hostname !== "checkout.razorpay.com" &&
-                url.hostname !== "api.razorpay.com",
+                url.hostname !== "api.razorpay.com" &&
+                // reCAPTCHA for mobile number login must always be Google's current script.
+                url.hostname !== "www.google.com" &&
+                url.hostname !== "www.gstatic.com" &&
+                url.hostname !== "www.recaptcha.net",
               handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "resqnow-static-cache",
@@ -189,6 +193,11 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+    },
+    // The log in page loads Firebase Auth on demand; bundling it up front stops the dev
+    // server reloading the page the first time someone opens it.
+    optimizeDeps: {
+      include: ["firebase/auth"],
     },
   };
 });

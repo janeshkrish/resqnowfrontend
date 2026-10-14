@@ -19,6 +19,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<any>;
+  loginWithPhone: (idToken: string, name?: string) => Promise<PhoneLoginOutcome>;
   register: (name: string, email: string, password: string) => Promise<any>;
   verifyOtp: (email: string, otp: string, name: string, password: string) => Promise<any>;
   logout: () => Promise<void>;
@@ -26,11 +27,15 @@ interface AuthContextType {
   updateSubscription: (subscription: "free" | "basic" | "premium" | "enterprise" | "none") => Promise<void>;
 }
 
+/** A new number is asked for a name first; otherwise the customer is now logged in. */
+export type PhoneLoginOutcome = { needsName: boolean; isNew: boolean };
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   loading: true,
   login: async () => ({}),
+  loginWithPhone: async () => ({ needsName: false, isNew: false }),
   register: async () => ({}),
   verifyOtp: async () => ({}),
   logout: async () => { },
@@ -57,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser({
               id: String(userData.id),
               name: userData.name,
-              email: userData.email,
+              email: userData.email || "",
               subscription: "free",
               isVerified: userData.isVerified,
               googleId: userData.googleId,
@@ -144,6 +149,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Login error:", error);
       throw error;
     }
+  };
+
+  // The mobile number was checked by Firebase; the server swaps its ID token for ours.
+  const loginWithPhone = async (idToken: string, name?: string): Promise<PhoneLoginOutcome> => {
+    const res = await apiFetch("/api/users/phone-login", {
+      method: "POST",
+      body: JSON.stringify(name ? { idToken, name } : { idToken }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Login failed. Please try again.");
+    }
+    if (data.needsName) {
+      return { needsName: true, isNew: false };
+    }
+
+    setAdminToken(null);
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    setUserToken(data.token);
+    setUserProfile(data.user);
+    setUser({
+      id: String(data.user.id),
+      name: data.user.name,
+      email: data.user.email || "",
+      phone: data.user.phone || "",
+      subscription: "free",
+      isVerified: true
+    });
+    localStorage.setItem('isAuthenticated', 'true');
+    return { needsName: false, isNew: !!data.isNew };
   };
 
   const register = async (name: string, email: string, password: string) => {
@@ -283,6 +318,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         loading,
         login,
+        loginWithPhone,
         register,
         verifyOtp,
         logout,

@@ -37,17 +37,8 @@ const ConfirmationStep = ({
   formData,
   paymentData,
   onInputChange,
-  estimatedBaseAmount,
-  currency = "INR",
   technicianName = "Rajesh Kumar",
 }: ConfirmationStepProps) => {
-  const numericBaseAmount = Number(estimatedBaseAmount);
-  const normalizedCurrency = String(currency || "INR").toUpperCase();
-  const formattedBaseAmount =
-    Number.isFinite(numericBaseAmount) && numericBaseAmount > 0
-      ? `${normalizedCurrency} ${numericBaseAmount.toFixed(2)}`
-      : "Estimate pending";
-
   const paymentMethodLabel: Record<PaymentData["method"], string> = {
     cash: "Cash",
     card: "Card",
@@ -119,8 +110,7 @@ const ConfirmationStep = ({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold text-orange-600">{formattedBaseAmount}</div>
-              <div className="text-[11px] text-muted-foreground">Base charge</div>
+              <div className="text-sm font-semibold text-orange-600">Price shown after a technician accepts</div>
             </div>
           </div>
         </CardContent>
@@ -238,7 +228,7 @@ const ConfirmationStep = ({
       <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
         <p className="text-xs leading-relaxed text-amber-800">
-          By placing this request, you agree to the terms of service and privacy policy. Final charges are shared transparently after technician inspection.
+          By placing this request, you agree to the terms of service and privacy policy. Service pricing is shown after a technician accepts. Additional repairs and parts are discussed before work starts.
         </p>
       </div>
     </div>

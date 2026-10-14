@@ -14,6 +14,7 @@ import { JobKeyStrip, JobLocationBox, JobSays } from "./JobCardParts";
 
 export interface JobRequest {
     id: string; // Job ID / Service Request ID
+    offerId?: string;
     isTowing?: boolean;
     customerName: string;
     serviceType: string;
@@ -49,7 +50,7 @@ interface TechnicianJobModalProps {
     onRetryAcceptance?: () => void;
     isUnavailable?: boolean;
     unavailableMessage?: string;
-    onAccept: (jobId: string) => void;
+    onAccept: (jobId: string, offerId?: string) => void;
     onReject: (jobId: string) => void;
     onDismissUnavailable?: (jobId: string) => void;
 }
@@ -86,7 +87,7 @@ export function TechnicianJobModal({
             }, 1000);
             return () => clearInterval(timer);
         }
-    }, [isOpen, isUnavailable, isProcessing]);
+    }, [isOpen, isUnavailable, isProcessing, job?.id, job?.offerId]);
 
     useEffect(() => {
         if (!isOpen || isUnavailable || isProcessing || !job) return;
@@ -198,7 +199,7 @@ export function TechnicianJobModal({
                                 busyText={processingMessage ? "Checking acceptance…" : "Accepting…"}
                                 busy={isProcessing}
                                 urgent={Boolean(details?.urgent)}
-                                onSend={() => onAccept(job.id)}
+                                onSend={() => job.offerId ? onAccept(job.id, job.offerId) : onAccept(job.id)}
                             />
                             <button type="button" className="tj-ghost rq-press" onClick={() => onReject(job.id)} disabled={isProcessing}>
                                 <MaterialSymbol name="close" />

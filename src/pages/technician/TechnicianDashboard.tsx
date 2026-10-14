@@ -325,11 +325,11 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     activeJobIdRef.current = activeJob?.id ? String(activeJob.id) : null;
     activeJobStatusRef.current = activeJob?.status ? normalizeTechnicianStatus(activeJob.status) : "";
-    activeJobAmountRef.current = Number(activeJob?.amount || 0);
+    activeJobAmountRef.current = Number(activeJob?.technicianEstimatedEarning ?? activeJob?.technician_estimated_earning ?? activeJob?.estimatedEarnings ?? activeJob?.amount ?? 0);
     if (activeJob) {
       activeJobSnapshotRef.current = activeJob;
     }
-  }, [activeJob?.id, activeJob?.status, activeJob?.amount]);
+  }, [activeJob?.id, activeJob?.status, activeJob?.amount, activeJob?.technicianEstimatedEarning, activeJob?.technician_estimated_earning, activeJob?.estimatedEarnings]);
 
   useEffect(() => {
     if (activeJob?.id && !isCancelledStatus(activeJob?.status)) {
@@ -543,6 +543,7 @@ const TechnicianDashboard = () => {
       const dropLocation = offerData?.dropLocation || {};
       const jobRequest: JobRequest = {
         id: requestId,
+        offerId: offerData.offerId != null || offerData.offer_id != null ? String(offerData.offerId ?? offerData.offer_id) : undefined,
         isTowing: Boolean(offerData?.isTowing),
         customerName: String(offerData?.customerName || "Customer"),
         serviceType: String(offerData?.serviceType || offerData?.service_type || "Service"),
@@ -725,7 +726,7 @@ const TechnicianDashboard = () => {
         (acceptedJobIdRef.current && acceptedJobIdRef.current === requestId);
 
       if (matchesTrackedJob && isTechnicianCompletionStatus(normalizedStatus)) {
-        const earnedAmount = Number(data?.amount ?? activeJobAmountRef.current ?? 0);
+        const earnedAmount = Number(data?.technicianEstimatedEarning ?? data?.technician_estimated_earning ?? data?.estimatedEarnings ?? activeJobAmountRef.current ?? data?.amount ?? 0);
         triggerCompletionCelebration(requestId, earnedAmount, "Customer payment received. Job completed.");
         stopLocationTracking();
         if (isOnlineRef.current) {
@@ -959,7 +960,7 @@ const TechnicianDashboard = () => {
   const updateJobStatus = async (
     status: string,
     jobId: string,
-    options?: { useAcceptEndpoint?: boolean }
+    options?: { useAcceptEndpoint?: boolean; offerId?: string }
   ) => {
     try {
       const normalizedJobId = String(jobId || "").trim();
@@ -969,7 +970,7 @@ const TechnicianDashboard = () => {
 
       const useAcceptEndpoint =
         status === "accepted" && options?.useAcceptEndpoint !== false;
-      if (useAcceptEndpoint) return await acceptJob(normalizedJobId);
+      if (useAcceptEndpoint) return await acceptJob(normalizedJobId, options?.offerId ?? (incomingJobRef.current?.id === normalizedJobId ? incomingJobRef.current.offerId : undefined) ?? activeJob?.offerId ?? activeJob?.offer_id);
       const endpoint = useAcceptEndpoint
         ? "/api/jobs/accept"
         : `/api/service-requests/${encodeURIComponent(normalizedJobId)}/technician-status`;
@@ -1021,6 +1022,8 @@ const TechnicianDashboard = () => {
       acceptedJobId?: string;
       jobId?: string;
       alertAction?: string;
+      offerId?: string;
+      offer_id?: string;
     };
 
     const routeJobId = String(
@@ -1032,11 +1035,12 @@ const TechnicianDashboard = () => {
       params.get("alert_action") ||
       ""
     ).trim().toLowerCase();
+    const routeOfferId = String(routeState.offerId || routeState.offer_id || params.get("offerId") || params.get("offer_id") || "").trim();
 
     const normalizedJobId = routeJobId || String(acceptedJobId || "").trim();
     if (!normalizedJobId || normalizedJobId === "undefined") return;
 
-    const handledKey = `${routeAction}:${normalizedJobId}`;
+    const handledKey = `${routeAction}:${normalizedJobId}:${routeOfferId}`;
     if (handledRouteJobRef.current === handledKey) return;
     handledRouteJobRef.current = handledKey;
     let finished = false;
@@ -1058,10 +1062,11 @@ const TechnicianDashboard = () => {
       const parsedDistance = Number.parseFloat(
         String(offerRequest?.distance ?? offerRequest?.locationDistance ?? 0)
       );
-      const parsedAmount = Number(offerRequest?.amount ?? 0);
+      const parsedAmount = Number(offerRequest?.technicianEstimatedEarning ?? offerRequest?.technician_estimated_earning ?? offerRequest?.estimatedEarnings ?? offerRequest?.amount ?? 0);
 
       const fallbackJob: JobRequest = {
         id: normalizedJobId,
+        offerId: offerRequest.offerId != null || offerRequest.offer_id != null ? String(offerRequest.offerId ?? offerRequest.offer_id) : undefined,
         isTowing: Boolean(offerRequest?.isTowing),
         customerName: String(offerRequest?.customerName || "Customer"),
         serviceType: String(offerRequest?.serviceType || offerRequest?.service_type || "Service"),
@@ -1107,9 +1112,13 @@ const TechnicianDashboard = () => {
         ["accepted", "en-route", "arrived", "in-progress", "payment_pending", "paid", "completed"].includes(currentStatus);
 
       if (routeAction === "accept" && !isAlreadyAccepted) {
+        if (!routeOfferId) {
+          await hydrateIncomingJobFromDeepLink();
+          return;
+        }
         try {
           stopAlertSound();
-          await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+          await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true, offerId: routeOfferId });
           if (shouldStop()) return;
           playAcceptConfirmationSound();
           toast.success("Job Accepted!");
@@ -1214,7 +1223,7 @@ const TechnicianDashboard = () => {
       cancelled = true;
       // A re-render cut the offer lookup short: let the next run show it. Accept and
       // reject links keep their guard so the action is never sent twice.
-      if (!finished && !routeAction && handledRouteJobRef.current === handledKey) {
+      if (!finished && (!routeAction || (routeAction === "accept" && !routeOfferId)) && handledRouteJobRef.current === handledKey) {
         handledRouteJobRef.current = null;
       }
     };
@@ -1231,7 +1240,7 @@ const TechnicianDashboard = () => {
     updateJobStatus,
   ]);
 
-  const handleAcceptJob = async (jobId: string) => {
+  const handleAcceptJob = async (jobId: string, offerId?: string) => {
     if (isJobActionLoading || pendingAcceptanceId) return;
     const normalizedJobId = String(jobId || "").trim();
     if (!normalizedJobId || normalizedJobId === "undefined") {
@@ -1242,7 +1251,22 @@ const TechnicianDashboard = () => {
     try {
       setIsJobActionLoading(true);
       stopAlertSound();
-      await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true });
+      const displayedOfferId = offerId
+        ?? (incomingJobRef.current?.id === normalizedJobId ? incomingJobRef.current.offerId : undefined)
+        ?? (String(activeJob?.id) === normalizedJobId ? activeJob?.offerId ?? activeJob?.offer_id : undefined);
+      if (!displayedOfferId) {
+        const latest = await fetchTechnicianOffer(normalizedJobId);
+        if (!isMountedRef.current) return;
+        if (!latest.available || !latest.job?.offerId) {
+          toast.error('This offer is no longer available.');
+          return;
+        }
+        setIncomingJob(latest.job);
+        setIncomingJobUnavailable(false);
+        setShowJobModal(true);
+        return;
+      }
+      await updateJobStatus("accepted", normalizedJobId, { useAcceptEndpoint: true, offerId: String(displayedOfferId) });
       if (!isMountedRef.current) return;
       playAcceptConfirmationSound();
       toast.success("Job Accepted!");
@@ -1365,7 +1389,7 @@ const TechnicianDashboard = () => {
       const data = await updateJobStatus(newStatus, activeJob.id);
       const resolvedStatus = normalizeTechnicianStatus(data?.status ?? newStatus);
       if (isTechnicianCompletionStatus(resolvedStatus)) {
-        const earned = Number(data?.request?.amount ?? activeJob?.amount ?? 0);
+        const earned = Number(data?.request?.technicianEstimatedEarning ?? data?.request?.technician_estimated_earning ?? activeJob?.technicianEstimatedEarning ?? activeJob?.technician_estimated_earning ?? activeJob?.estimatedEarnings ?? activeJob?.amount ?? data?.request?.amount ?? 0);
         triggerCompletionCelebration(String(activeJob.id || ""), earned);
         clearAcceptedJobId();
         setActiveJob(null);
@@ -1581,7 +1605,7 @@ const TechnicianDashboard = () => {
   const computeJobAmount = (job: any, tech: any) => {
     if (!job) return null;
     // Prefer explicit amount fields
-    const a = job.amount ?? job.service_charge ?? job.serviceCharge;
+    const a = job.technicianEstimatedEarning ?? job.technician_estimated_earning ?? job.estimatedEarnings ?? job.amount ?? job.service_charge ?? job.serviceCharge;
     if (a && Number(a) > 0) return Number(a);
 
     // Try technician pricing structures
@@ -1656,10 +1680,11 @@ const TechnicianDashboard = () => {
     navigate(activeJobNavigation.path, { state: activeJobNavigation.state });
   };
 
-  const activeAmountDisplay = activeJob && (activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge) != null
-    ? (Number.isNaN(Number(activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge))
+  const activeEarning = activeJob?.technicianEstimatedEarning ?? activeJob?.technician_estimated_earning ?? activeJob?.estimatedEarnings ?? activeJob?.amount ?? activeJob?.service_charge ?? activeJob?.serviceCharge;
+  const activeAmountDisplay = activeJob && activeEarning != null
+    ? (Number.isNaN(Number(activeEarning))
       ? null
-      : Number(activeJob.amount ?? activeJob.service_charge ?? activeJob.serviceCharge))
+      : Number(activeEarning))
     : null;
   const activeJobDialablePhone = String(
     activeJob?.contact_phone ?? activeJob?.phoneNumber ?? activeJob?.user?.phone ?? ""
@@ -2007,7 +2032,7 @@ const TechnicianDashboard = () => {
 
               {/* Action Buttons with Bottom Sheet flow feel */}
               <div className="tj-foot">
-                {activeJob.status !== 'pending' && activeJob.status !== 'paid' && (
+                {!['pending', 'assigned', 'paid'].includes(activeJobStatus) && !pendingAcceptanceId && (
                   <div className={`tj-pair ${activeJobDialablePhone ? "" : "is-single"}`}>
                     {activeJobDialablePhone && (
                       <a href={`tel:${activeJobDialablePhone}`} className="tj-act">
@@ -2022,7 +2047,7 @@ const TechnicianDashboard = () => {
                   </div>
                 )}
 
-                {activeJob.status === 'pending' && (
+                {['pending', 'assigned'].includes(activeJobStatus) && (
                   <div className="tj-pair">
                     <button
                       type="button"
@@ -2044,7 +2069,7 @@ const TechnicianDashboard = () => {
                   </div>
                 )}
 
-                {activeJobIsTowing && activeJobTowingAction && (
+                {activeJobIsTowing && activeJobTowingAction && !['pending', 'assigned'].includes(activeJobStatus) && !pendingAcceptanceId && (
                   <button type="button" className="tj-cta" onClick={() => handleStatusChange(activeJobTowingAction.status)}>
                     {sentenceCase(activeJobTowingAction.label)}
                   </button>
@@ -2057,7 +2082,7 @@ const TechnicianDashboard = () => {
                   </div>
                 )}
 
-                {!activeJobIsTowing && (activeJobStatus === 'accepted' || activeJobStatus === 'assigned') && (
+                {!activeJobIsTowing && activeJobStatus === 'accepted' && !pendingAcceptanceId && (
                   <button type="button" className="tj-cta" onClick={() => handleStatusChange('en-route')}>
                     Start journey
                   </button>

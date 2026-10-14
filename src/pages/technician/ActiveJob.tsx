@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bike, Car, Loader2, Truck } from 'lucide-react';
 import { useSocket } from '@/contexts/SocketContext';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
+import { useTechnicianJob } from '@/contexts/TechnicianJobContext';
 import { toast } from 'sonner';
 import ActiveJobMap, { type ActiveJobRouteState } from '@/components/technician/ActiveJobMap';
 import TechnicianJobCompletion from '@/components/technician/TechnicianJobCompletion';
@@ -32,6 +33,7 @@ import { JobKeyStrip, JobLocationBox, JobSays, JobVehicleRow } from '@/component
 import { NavigationJobPanel, type NavigationArriveAction } from '@/components/technician/NavigationJobPanel';
 import { formatKm, formatMinutes, formatRupees, sentenceCase } from '@/lib/technicianJobCard';
 import { readJobDetails } from '@/lib/technicianJobDetails';
+import { fetchTechnicianOffer } from '@/lib/technicianJobOffer';
 import {
   getTechnicianActiveJobPath,
   selectMatchingActiveJobNavigationState,
@@ -128,6 +130,7 @@ const ActiveJob = () => {
   const navigate = useNavigate();
   const { socket, isConnected: isSocketConnected } = useSocket();
   const { token, technician } = useTechnicianAuth();
+  const { acceptedJobId, acceptJob, pendingAcceptanceId, acceptanceMessage, canRetryAcceptance, retryAcceptance } = useTechnicianJob();
 
   const { activeJob, dues, setDues, refreshActiveJob, refreshDues } = useTechnicianActiveJob(technician?.id, 15000);
   const trafficArrival = useTechnicianLiveEta({
@@ -154,6 +157,8 @@ const ActiveJob = () => {
   const [lastEarned, setLastEarned] = useState(0);
   const [cancelledJob, setCancelledJob] = useState<CancelledJobDetails | null>(null);
   const [hasResolvedActiveJob, setHasResolvedActiveJob] = useState(false);
+  const [assignedOffer, setAssignedOffer] = useState<{ id: string; offerId: string; amount: number } | null>(null);
+  const [isRefreshingAssignedOffer, setIsRefreshingAssignedOffer] = useState(false);
   const celebratedCompletionJobIdRef = useRef<string | null>(null);
   const jobSnapshotRef = useRef<any | null>(stateJob);
   const previousLocationRef = useRef<TechnicianLocationFix | null>(null);
@@ -168,11 +173,70 @@ const ActiveJob = () => {
   refreshActiveJobRef.current = refreshActiveJob;
   locationSocketRef.current = socket;
   const job = activeJob ?? (!hasResolvedActiveJob ? stateJob : null);
+  const assignedOfferJobRef = useRef(job);
+  assignedOfferJobRef.current = job;
+  const assignedOfferMountedRef = useRef(true);
+  const assignedOfferGenerationRef = useRef(0);
+  const assignedOfferInFlightRef = useRef<string | null>(null);
   const navigationTarget = useMemo(
     () => resolveActiveJobNavigationTarget(job, status),
     [job, status],
   );
   const activeRequestId = job?.requestId || job?.id;
+  const observedPendingAcceptanceRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    assignedOfferMountedRef.current = true;
+    return () => {
+      assignedOfferMountedRef.current = false;
+      assignedOfferGenerationRef.current += 1;
+      assignedOfferInFlightRef.current = null;
+    };
+  }, []);
+
+  const refreshAssignedOffer = useCallback(async () => {
+    const source = assignedOfferJobRef.current;
+    const id = String(source?.requestId || source?.id || '');
+    if (!id || normalizeTechnicianStatus(source?.status) !== 'assigned' || pendingAcceptanceId || assignedOfferInFlightRef.current === id) return;
+    const generation = ++assignedOfferGenerationRef.current;
+    assignedOfferInFlightRef.current = id;
+    setIsRefreshingAssignedOffer(true);
+    try {
+      const offer = await fetchTechnicianOffer(id);
+      const current = assignedOfferJobRef.current;
+      if (!assignedOfferMountedRef.current || generation !== assignedOfferGenerationRef.current || String(current?.requestId || current?.id || '') !== id || normalizeTechnicianStatus(current?.status) !== 'assigned') return;
+      if (offer.available && offer.job?.id === id && offer.job.offerId) {
+        setAssignedOffer({ id, offerId: offer.job.offerId, amount: offer.job.amount });
+        await refreshActiveJobRef.current();
+      } else {
+        setAssignedOffer(null);
+        toast.error('This offer is no longer available. Refresh to check the latest offer.');
+      }
+    } catch {
+      if (assignedOfferMountedRef.current && generation === assignedOfferGenerationRef.current) toast.error('Unable to refresh the offer. Please try again.');
+    } finally {
+      if (assignedOfferMountedRef.current && generation === assignedOfferGenerationRef.current) {
+        assignedOfferInFlightRef.current = null;
+        setIsRefreshingAssignedOffer(false);
+      }
+    }
+  }, [pendingAcceptanceId]);
+
+  useEffect(() => {
+    if (status === 'assigned' && activeRequestId && !pendingAcceptanceId) void refreshAssignedOffer();
+  }, [activeRequestId, status, pendingAcceptanceId, refreshAssignedOffer]);
+
+  useEffect(() => {
+    const currentId = String(activeRequestId || '');
+    if (pendingAcceptanceId === currentId) {
+      observedPendingAcceptanceRef.current = currentId;
+      return;
+    }
+    if (!pendingAcceptanceId && observedPendingAcceptanceRef.current === currentId && acceptedJobId === currentId) {
+      observedPendingAcceptanceRef.current = null;
+      void refreshActiveJob();
+    }
+  }, [acceptedJobId, activeRequestId, pendingAcceptanceId, refreshActiveJob]);
 
   useEffect(() => {
     if (!vehicleSelectionTouchedRef.current) {
@@ -315,14 +379,18 @@ const ActiveJob = () => {
     const resolvedStatus = normalizeTechnicianStatus(job?.status ?? status);
     if (!isTechnicianCompletionStatus(resolvedStatus)) return;
 
-    const earned = Number(job?.amount ?? stateJob?.amount ?? 0);
+    const earned = Number(job?.technicianEstimatedEarning ?? job?.technician_estimated_earning ?? job?.estimatedEarnings ?? job?.amount ?? stateJob?.technicianEstimatedEarning ?? stateJob?.technician_estimated_earning ?? stateJob?.amount ?? 0);
     openCompletionModal(completionJobId, earned);
   }, [
     job?.amount,
+    job?.technicianEstimatedEarning,
+    job?.technician_estimated_earning,
     job?.id,
     job?.requestId,
     job?.status,
     stateJob?.amount,
+    stateJob?.technicianEstimatedEarning,
+    stateJob?.technician_estimated_earning,
     stateJob?.id,
     stateJob?.requestId,
     status,
@@ -736,7 +804,7 @@ const ActiveJob = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ status: normalizedNextStatus })
+        body: JSON.stringify({ status: normalizedNextStatus, ...(normalizedNextStatus === 'accepted' ? { offerId: job.offerId ?? job.offer_id } : {}) })
       });
 
       const data = await response.json();
@@ -744,7 +812,7 @@ const ActiveJob = () => {
         const resolvedStatus = normalizeTechnicianStatus(data?.status ?? normalizedNextStatus);
         setStatus(resolvedStatus);
         if (isTechnicianCompletionStatus(resolvedStatus)) {
-          const earned = Number(data?.request?.amount ?? job?.amount ?? 0);
+          const earned = Number(data?.request?.technicianEstimatedEarning ?? data?.request?.technician_estimated_earning ?? job?.technicianEstimatedEarning ?? job?.technician_estimated_earning ?? job?.estimatedEarnings ?? job?.amount ?? data?.request?.amount ?? 0);
           openCompletionModal(String(idToUse || ''), earned, 'Job completed successfully.');
         } else {
           toast.success(`Status updated to: ${formatTechnicianStatus(resolvedStatus)}`);
@@ -782,6 +850,10 @@ const ActiveJob = () => {
   }, []);
 
   const openNavigation = async () => {
+    if (status === 'assigned' || pendingAcceptanceId) {
+      toast.error('Accept this offer before starting the journey.');
+      return;
+    }
     if (!navigationTarget) {
       toast.error('Customer location coordinates are missing.');
       return;
@@ -794,7 +866,7 @@ const ActiveJob = () => {
       toast.error('Wait for the road route to finish calculating.');
       return;
     }
-    if (status === 'accepted' || status === 'assigned') {
+    if (status === 'accepted') {
       await startJourneyAndNavigate(updateStatus, setIsNavigationActive);
       return;
     }
@@ -845,7 +917,9 @@ const ActiveJob = () => {
   const displayVehicle = jobDetails?.vehicleLine || buildVehicleDetails(job);
   const displayPhoneText = toOptionalString(job.phoneNumber ?? job.contact_phone ?? job.user?.phone);
   const dialablePhone = toOptionalPhone(displayPhoneText);
-  const displayAmount = toOptionalNumber(job.amount ?? job.service_charge ?? job.serviceCharge);
+  const refreshedAssignedOffer = status === 'assigned' && assignedOffer?.id === String(activeRequestId) ? assignedOffer : null;
+  const assignedOfferId = refreshedAssignedOffer?.offerId ?? job.offerId ?? job.offer_id;
+  const displayAmount = toOptionalNumber(refreshedAssignedOffer?.amount ?? job.technicianEstimatedEarning ?? job.technician_estimated_earning ?? job.estimatedEarnings ?? job.amount ?? job.service_charge ?? job.serviceCharge);
   const customerLat = toOptionalNumber(job.pickupLatitude ?? job.location?.lat ?? job.location_lat);
   const customerLng = toOptionalNumber(job.pickupLongitude ?? job.location?.lng ?? job.location_lng);
   const hasCustomerLocation = Number.isFinite(customerLat) && Number.isFinite(customerLng);
@@ -876,7 +950,7 @@ const ActiveJob = () => {
     towingAction && ['en_route_pickup', 'enroute_drop'].includes(towingAction.status),
   );
   const handleTowingAction = async () => {
-    if (!towingAction) return;
+    if (!towingAction || status === 'assigned' || pendingAcceptanceId) return;
     if (towingStartsNavigation) {
       if (!navigationStartReady) {
         toast.error('Accurate GPS and a ready road route are required to start navigation.');
@@ -887,6 +961,23 @@ const ActiveJob = () => {
       return;
     }
     await updateStatus(towingAction.status);
+  };
+  const acceptAssignedJob = async () => {
+    const jobId = String(job.requestId || job.id);
+    const offerId = assignedOfferId;
+    if (!offerId || isLoading || isRefreshingAssignedOffer || pendingAcceptanceId) return;
+    setIsLoading(true);
+    try {
+      const result = await acceptJob(jobId, String(offerId));
+      setStatus(normalizeTechnicianStatus(result.job.status || 'accepted'));
+      await refreshActiveJob();
+      toast.success('Job accepted.');
+    } catch (error: any) {
+      if (error?.code !== 'acceptance_unknown') {
+        toast.error(error?.message || 'Unable to accept this offer.');
+        await refreshActiveJob();
+      }
+    } finally { setIsLoading(false); }
   };
   // With no live fix, the map keeps the last good position and the route drawn from it.
   const heldLocation = hasUsableCurrentLocation ? null : lastUsableLocationRef.current;
@@ -1143,7 +1234,19 @@ const ActiveJob = () => {
               </div>
             ) : null}
 
-            {isTowingActiveJob && towingAction && (
+            {status === 'assigned' ? (
+              <>
+                <button type="button" className="tj-cta" onClick={() => void acceptAssignedJob()} disabled={isLoading || isRefreshingAssignedOffer || Boolean(pendingAcceptanceId) || !assignedOfferId}>
+                  {isLoading || pendingAcceptanceId ? <Loader2 className="h-5 w-5 animate-spin" /> : <MaterialSymbol name="check_circle" />}
+                  Accept job
+                </button>
+                <button type="button" className="tj-ghost" onClick={() => void refreshAssignedOffer()} disabled={isRefreshingAssignedOffer || Boolean(pendingAcceptanceId)}>Refresh offer</button>
+              </>
+            ) : null}
+            {pendingAcceptanceId && acceptanceMessage ? <p role="status" className="tj-note">{acceptanceMessage}</p> : null}
+            {pendingAcceptanceId && canRetryAcceptance ? <button type="button" className="tj-ghost" onClick={() => void retryAcceptance().then(() => refreshActiveJob()).catch(() => {})}>Retry acceptance</button> : null}
+
+            {isTowingActiveJob && towingAction && status !== 'assigned' && !pendingAcceptanceId && (
               <button
                 type="button"
                 className="tj-cta"
@@ -1162,7 +1265,7 @@ const ActiveJob = () => {
               </div>
             )}
 
-            {!isTowingActiveJob && (status === 'accepted' || status === 'assigned') && (
+            {!isTowingActiveJob && status === 'accepted' && !pendingAcceptanceId && (
               <button
                 type="button"
                 className="tj-cta"

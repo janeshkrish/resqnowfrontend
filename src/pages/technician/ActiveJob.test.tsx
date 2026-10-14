@@ -7,6 +7,10 @@ import ActiveJob from "./ActiveJob";
 const capture = vi.hoisted(() => ({ mapProps: null as Record<string, unknown> | null }));
 const refreshActiveJob = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const activeJobState = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+const acceptance = vi.hoisted(() => ({ acceptJob: vi.fn(), acceptedJobId: null as string | null, pendingAcceptanceId: null as string | null, acceptanceMessage: null as string | null, retryAcceptance: vi.fn(), canRetryAcceptance: false }));
+const assignedOffers = vi.hoisted(() => ({ fetch: vi.fn() }));
+vi.mock("@/lib/technicianJobOffer", () => ({ fetchTechnicianOffer: assignedOffers.fetch }));
+vi.mock("@/contexts/TechnicianJobContext", () => ({ useTechnicianJob: () => acceptance }));
 
 vi.mock("@/components/technician/ActiveJobMap", () => ({
   default: (props: Record<string, unknown>) => {
@@ -16,7 +20,7 @@ vi.mock("@/components/technician/ActiveJobMap", () => ({
 }));
 
 vi.mock("@/components/technician/TechnicianJobCompletion", () => ({
-  default: () => null,
+  default: (props: any) => <div data-testid="completed-earning">{props.amount}</div>,
 }));
 
 vi.mock("@/components/technician/CancelledJobCard", () => ({
@@ -102,6 +106,7 @@ vi.mock("@/lib/nativeBackgroundTracking", () => ({
 
 describe("technician active-job navigation", () => {
   beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) }));
     capture.mapProps = null;
     platform.native = false;
     refreshActiveJob.mockClear();
@@ -113,6 +118,11 @@ describe("technician active-job navigation", () => {
       pickupLongitude: 77.59,
       amount: 500,
     };
+    acceptance.acceptJob.mockReset();
+    acceptance.pendingAcceptanceId = null;
+    acceptance.acceptedJobId = null;
+    acceptance.acceptanceMessage = null;
+    assignedOffers.fetch.mockReset().mockResolvedValue({ available: true, job: { id: "request-42", offerId: "81", amount: 1200 } });
     Object.defineProperty(navigator, "geolocation", {
       configurable: true,
       value: undefined,
@@ -132,6 +142,99 @@ describe("technician active-job navigation", () => {
     expect(capture.mapProps?.technicianLocation).toBeUndefined();
     expect(screen.getByText(/acquiring accurate location/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start navigation/i })).toBeDisabled();
+  });
+
+  it("shows the accepted technician earnings instead of a different customer charge", async () => {
+    activeJobState.value = { ...activeJobState.value, amount: 999, technicianEstimatedEarning: 500 };
+    render(<MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>);
+    expect(screen.getByText("You earn").nextSibling).toHaveTextContent("₹500");
+  });
+
+  it("uses the promised earnings when celebrating completion", async () => {
+    activeJobState.value = { ...activeJobState.value, status: "completed", amount: 1260, technicianEstimatedEarning: 1200 };
+    render(<MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>);
+    expect(await screen.findByTestId("completed-earning")).toHaveTextContent("1200");
+  });
+
+  it.each([false, true])("requires explicit priced acceptance before an assigned job can start (towing=%s)", async (isTowing) => {
+    activeJobState.value = { ...activeJobState.value, status: "assigned", isTowing, offerId: "81", technicianEstimatedEarning: 1200 };
+    acceptance.acceptJob.mockResolvedValue({ success: true, job: { id: "request-42", status: "accepted", technicianEstimatedEarning: 1200 } });
+    render(<MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>);
+    expect(screen.queryByRole("button", { name: /start navigation|on the way/i })).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Accept job" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Accept job" }));
+    await waitFor(() => expect(acceptance.acceptJob).toHaveBeenCalledWith("request-42", "81"));
+    expect(refreshActiveJob).toHaveBeenCalled();
+  });
+
+  it("refreshes an assigned job immediately when its lost-response acceptance is recovered", async () => {
+    activeJobState.value = { ...activeJobState.value, status: "assigned", offerId: "81" };
+    acceptance.pendingAcceptanceId = "request-42";
+    acceptance.acceptanceMessage = "Checking whether your job was accepted";
+    const page = () => <MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>;
+    const view = render(page());
+    expect(screen.getByRole("button", { name: "Accept job" })).toBeDisabled();
+    expect(screen.getByText("Checking whether your job was accepted")).toBeInTheDocument();
+    refreshActiveJob.mockClear();
+    acceptance.pendingAcceptanceId = null;
+    acceptance.acceptedJobId = "request-42";
+    view.rerender(page());
+    await waitFor(() => expect(refreshActiveJob).toHaveBeenCalled());
+  });
+
+  it("regenerates a priced offer for a legacy assigned job and requires acceptance of that exact offer", async () => {
+    activeJobState.value = { ...activeJobState.value, status: "assigned", amount: 0, technicianEstimatedEarning: null, offerId: null };
+    assignedOffers.fetch.mockResolvedValue({ available: true, job: { id: "request-42", offerId: "92", amount: 1250 } });
+    acceptance.acceptJob.mockImplementation(async () => {
+      activeJobState.value = { ...activeJobState.value, status: "accepted", offerId: "92", technicianEstimatedEarning: 1250 };
+      return { success: true, job: activeJobState.value };
+    });
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
+      watchPosition: vi.fn((success: PositionCallback) => {
+        success({ coords: { latitude: 12.97, longitude: 77.59, accuracy: 12, altitude: null, altitudeAccuracy: null, heading: 45, speed: 8 }, timestamp: Date.now() } as GeolocationPosition);
+        return 7;
+      }), clearWatch: vi.fn(),
+    } });
+    render(<MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>);
+    await waitFor(() => expect(assignedOffers.fetch).toHaveBeenCalledWith("request-42"));
+    await waitFor(() => expect(screen.getByText("You earn").nextSibling).toHaveTextContent("₹1,250"));
+    expect(acceptance.acceptJob).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /start navigation/i })).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Accept job" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Accept job" }));
+    await waitFor(() => expect(acceptance.acceptJob).toHaveBeenCalledWith("request-42", "92"));
+    act(() => { (capture.mapProps?.onRouteStateChange as ((value: unknown) => void))({ status: "ready", distanceKm: 2.4, durationMinutes: 8 }); });
+    expect(await screen.findByRole("button", { name: /start navigation/i })).toBeEnabled();
+  });
+
+  it("ignores a priced offer that resolves after the assigned screen unmounts", async () => {
+    activeJobState.value = { ...activeJobState.value, status: "assigned", offerId: null };
+    let resolveOffer!: (offer: any) => void;
+    assignedOffers.fetch.mockImplementation(() => new Promise(resolve => { resolveOffer = resolve; }));
+    const view = render(<MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>);
+    await waitFor(() => expect(assignedOffers.fetch).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Refresh offer" })).toBeDisabled();
+    refreshActiveJob.mockClear();
+    view.unmount();
+    await act(async () => { resolveOffer({ available: true, job: { id: "request-42", offerId: "92", amount: 1250 } }); });
+    expect(refreshActiveJob).not.toHaveBeenCalled();
+    expect(acceptance.acceptJob).not.toHaveBeenCalled();
+  });
+
+  it("does not apply an older job's pending quote to a different assigned request", async () => {
+    activeJobState.value = { ...activeJobState.value, status: "assigned", offerId: null };
+    let resolveOld!: (offer: any) => void;
+    assignedOffers.fetch.mockImplementation((id: string) => id === "request-42" ? new Promise(resolve => { resolveOld = resolve; }) : Promise.resolve({ available: true, job: { id, offerId: "93", amount: 1500 } }));
+    const page = () => <MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>;
+    const view = render(page());
+    await waitFor(() => expect(assignedOffers.fetch).toHaveBeenCalledWith("request-42"));
+    activeJobState.value = { ...activeJobState.value, id: "request-43", requestId: "request-43" };
+    view.rerender(page());
+    await waitFor(() => expect(assignedOffers.fetch).toHaveBeenCalledWith("request-43"));
+    await waitFor(() => expect(screen.getByText("You earn").nextSibling).toHaveTextContent("₹1,500"));
+    await act(async () => { resolveOld({ available: true, job: { id: "request-42", offerId: "92", amount: 1250 } }); });
+    expect(screen.getByText("You earn").nextSibling).toHaveTextContent("₹1,500");
+    expect(acceptance.acceptJob).not.toHaveBeenCalled();
   });
 
   it("starts the journey only after accurate GPS and a road route are ready", async () => {

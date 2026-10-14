@@ -93,6 +93,24 @@ describe("the new-request card", () => {
     expect(onReject).toHaveBeenCalledWith("6101");
   });
 
+  it("sends the priced offer identity when accepting", () => {
+    const { onAccept, card } = show(job({ offerId: 81 }));
+    fireEvent.keyDown(within(card).getByRole("button", { name: "Slide to accept" }), { key: "Enter" });
+    expect(onAccept).toHaveBeenCalledWith("6101", "81");
+  });
+
+  it("restarts the countdown when a replacement priced offer is shown for the same job", () => {
+    vi.useFakeTimers();
+    const onAccept = vi.fn();
+    const onReject = vi.fn();
+    const view = render(<TechnicianJobModal job={job({ offerId: 81 })} isOpen onAccept={onAccept} onReject={onReject} />);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByRole("timer")).toHaveTextContent("20 sec");
+    view.rerender(<TechnicianJobModal job={job({ offerId: 82, technicianEstimatedEarning: 400 })} isOpen onAccept={onAccept} onReject={onReject} />);
+    expect(screen.getByRole("timer")).toHaveTextContent("30 sec");
+    expect(screen.getByText("You earn").nextSibling).toHaveTextContent("₹400");
+  });
+
   it("counts down 30 seconds and then lets the request go", () => {
     vi.useFakeTimers();
     const { onReject, card } = show(job());

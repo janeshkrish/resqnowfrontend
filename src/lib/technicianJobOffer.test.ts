@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readOfferNumber, toJobRequest } from "./technicianJobOffer";
 
 describe("the offer card's job", () => {
+  it("retains the priced offer identity from socket and REST payloads", () => {
+    expect(toJobRequest({ requestId: 6101, offerId: 81, technicianEstimatedEarning: 820 })).toMatchObject({ id: "6101", offerId: "81", amount: 820 });
+    expect(toJobRequest({ id: 6101, offer_id: "82", technician_estimated_earning: 830, amount: 999 })).toMatchObject({ offerId: "82", amount: 830 });
+  });
   it("reads a socket offer", () => {
     const job = toJobRequest({
       requestId: "6101",

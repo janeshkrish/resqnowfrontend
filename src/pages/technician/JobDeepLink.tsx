@@ -9,6 +9,7 @@ const JobDeepLink = () => {
   const alertAction = String(
     params.get("alertAction") || params.get("alert_action") || ""
   ).trim().toLowerCase();
+  const offerId = String(params.get("offerId") || params.get("offer_id") || "").trim();
 
   if (!jobId) {
     return <Navigate to="/technician/dashboard" replace />;
@@ -17,6 +18,7 @@ const JobDeepLink = () => {
   if (isAuthenticated) {
     const dashboardParams = new URLSearchParams();
     dashboardParams.set("jobId", String(jobId));
+    if (offerId) dashboardParams.set("offerId", offerId);
     if (alertAction) {
       dashboardParams.set("alertAction", alertAction);
     }
@@ -24,13 +26,15 @@ const JobDeepLink = () => {
       <Navigate
         to={`/technician/dashboard?${dashboardParams.toString()}`}
         replace
-        state={{ jobId, alertAction: alertAction || undefined }}
+        state={{ jobId, alertAction: alertAction || undefined, offerId: offerId || undefined }}
       />
     );
   }
 
   if (typeof window !== "undefined") {
     sessionStorage.setItem("resqnow_pending_job_deeplink", String(jobId));
+    if (offerId) sessionStorage.setItem("resqnow_pending_job_offer_id", offerId);
+    else sessionStorage.removeItem("resqnow_pending_job_offer_id");
     if (alertAction) {
       sessionStorage.setItem("resqnow_pending_job_alert_action", alertAction);
     } else {

@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 
 type PaymentBreakdown = {
   baseAmount: number;
+  technicianCharge?: number;
+  taxAmount?: number;
   platformFeePercent: number;
   originalPlatformFee: number;
   discountAmount: number;
@@ -106,6 +108,10 @@ export function PaymentSummaryDialog({
   const resolvedBase = Number.isFinite(Number(breakdown?.baseAmount))
     ? Number(breakdown?.baseAmount)
     : numericBaseAmount;
+  const resolvedTax = Math.max(0, Number(breakdown?.taxAmount || 0));
+  const resolvedTechnicianCharge = breakdown?.technicianCharge != null && Number.isFinite(Number(breakdown.technicianCharge))
+    ? Number(breakdown.technicianCharge)
+    : Math.max(0, resolvedBase - resolvedTax);
   const resolvedFeePercent = Number.isFinite(Number(breakdown?.platformFeePercent))
     ? Number(breakdown?.platformFeePercent)
     : feePercent;
@@ -188,8 +194,14 @@ export function PaymentSummaryDialog({
           <div className="rounded-2xl border border-border bg-muted/30 p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Technician amount</span>
-              <span className="font-medium">{formatAmount(resolvedBase)}</span>
+              <span className="font-medium">{formatAmount(resolvedTechnicianCharge)}</span>
             </div>
+            {resolvedTax > 0 ? (
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Taxes</span>
+                <span className="font-medium">{formatAmount(resolvedTax)}</span>
+              </div>
+            ) : null}
             <div className="mt-2 flex items-start justify-between text-sm">
               <div>
                 <p className="text-muted-foreground">Platform fee</p>

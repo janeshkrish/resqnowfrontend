@@ -114,7 +114,7 @@ const isNonBlockingTowingEstimateEndpointFailure = (error: unknown) => {
 };
 
 const TOWING_ESTIMATE_UNAVAILABLE_MESSAGE =
-  "Live fare preview is temporarily unavailable. Continue and the verified fare will be confirmed when booking is created.";
+  "Route preview is temporarily unavailable. Price will be shown after a technician accepts.";
 
 export function useUnifiedServiceRequestFlow({
   serviceId,

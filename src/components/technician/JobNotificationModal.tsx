@@ -74,7 +74,8 @@ const JobNotificationModal = () => {
     if (!requestId || acceptedJobIdRef.current === requestId) return;
     // JOB_ALERT, job_offer and the push are the same offer: keep the card that is open.
     const current = jobRef.current;
-    if (current && String(current.id) === requestId && !unavailableRef.current) return;
+    const incomingOfferId = raw.offerId ?? raw.offer_id;
+    if (current && String(current.id) === requestId && !unavailableRef.current && (!incomingOfferId || String(incomingOfferId) === current.offerId)) return;
 
     try {
       const activeJobRes = await apiFetch('/api/technicians/me/active-job', { technician: true });
@@ -140,7 +141,7 @@ const JobNotificationModal = () => {
     if (isDashboardRoute) close();
   }, [isDashboardRoute, close]);
 
-  const handleAccept = async (jobId: string) => {
+  const handleAccept = async (jobId: string, offerId?: string) => {
     const requestId = String(jobId || '').trim();
     if (!requestId || isSubmitting || pendingAcceptanceId) return;
     if (isUnavailable) {
@@ -155,7 +156,7 @@ const JobNotificationModal = () => {
     try {
       setIsSubmitting(true);
       siren().stop();
-      const data = await acceptJob(requestId);
+      const data = await acceptJob(requestId, offerId ?? jobRef.current?.offerId);
       if (!isMountedRef.current) return;
 
       const acceptedRequest = data.request || data.job || null;

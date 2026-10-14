@@ -24,6 +24,8 @@ const trackingHarness = vi.hoisted(() => ({
 }));
 
 const viewportHarness = vi.hoisted(() => ({ isMobile: false }));
+const paymentHarness = vi.hoisted(() => ({ apiFetch: vi.fn(), success: vi.fn(), info: vi.fn(), error: vi.fn(), warning: vi.fn(), gatewayOptions: null as any, summaryProps: null as any }));
+vi.mock("sonner", () => ({ toast: { success: paymentHarness.success, info: paymentHarness.info, error: paymentHarness.error, warning: paymentHarness.warning } }));
 
 const nearbyHarness = vi.hoisted(() => ({
   options: null as Record<string, unknown> | null,
@@ -77,7 +79,14 @@ vi.mock("@/components/user/LiveTrackingMap", () => ({
 }));
 
 vi.mock("@/components/payments/PaymentSummaryDialog", () => ({
-  PaymentSummaryDialog: () => null,
+  PaymentSummaryDialog: (props: any) => {
+    paymentHarness.summaryProps = props;
+    return props.isOpen ? <button onClick={props.onConfirm} disabled={props.isProcessing}>Confirm online payment</button> : null;
+  },
+}));
+
+vi.mock("@/lib/api", () => ({
+  apiFetch: paymentHarness.apiFetch,
 }));
 
 beforeAll(() => {
@@ -91,6 +100,9 @@ describe("RequestTracking live metrics", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    paymentHarness.apiFetch.mockReset().mockResolvedValue(new Response(JSON.stringify({ error: "No payment fixture for this tracking test" }), { status: 400 }));
+    paymentHarness.success.mockClear(); paymentHarness.info.mockClear(); paymentHarness.error.mockClear(); paymentHarness.warning.mockClear();
+    paymentHarness.gatewayOptions = null; paymentHarness.summaryProps = null;
     viewportHarness.isMobile = false;
     nearbyHarness.options = null;
     nearbyHarness.result = undefined;
@@ -148,6 +160,41 @@ describe("RequestTracking live metrics", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    delete (window as any).Razorpay;
+    vi.useRealTimers();
+  });
+
+  it("keeps an authorized payment pending until the server confirms capture through polling", async () => {
+    trackingHarness.request = { ...trackingHarness.request, status: "payment_pending", amount: 1200, pricing_status: "confirmed", pricing_finalized: true };
+    let resolveCapture!: (value: Response) => void;
+    const capture = new Promise<Response>(resolve => { resolveCapture = resolve; });
+    paymentHarness.apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/payments/create-order") return new Response(JSON.stringify({ id: "order-1", key_id: "rzp_test_simulated", amount: 132200, total_amount: 1322, currency: "INR" }), { status: 200 });
+      if (path === "/api/payments/confirm") return new Response(JSON.stringify({ success: true, immediateFinalization: false, request: { status: "payment_pending", payment_status: "pending" } }), { status: 200 });
+      if (path === "/api/service-requests/request-1") return capture;
+      return new Response(JSON.stringify({ error: "No quote fixture" }), { status: 400 });
+    });
+    (window as any).Razorpay = function(options: any) { paymentHarness.gatewayOptions = options; this.open = vi.fn(); };
+    await renderTracking();
+    fireEvent.click(screen.getByRole("button", { name: /pay.*online/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm online payment" }));
+    await waitFor(() => expect(paymentHarness.gatewayOptions).not.toBeNull());
+    let gatewayHandler!: Promise<void>;
+    await act(async () => {
+      gatewayHandler = paymentHarness.gatewayOptions.handler({ razorpay_order_id: "order-1", razorpay_payment_id: "payment-1", razorpay_signature: "simulated-signature" });
+      await Promise.resolve(); await Promise.resolve();
+    });
+    await waitFor(() => expect(paymentHarness.apiFetch).toHaveBeenCalledWith("/api/service-requests/request-1", expect.objectContaining({ method: "GET", cache: "no-store" })));
+    expect(paymentHarness.success).not.toHaveBeenCalledWith("Payment successful", expect.anything());
+    expect(paymentHarness.summaryProps.isProcessing).toBe(true);
+    expect(trackingHarness.refresh).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveCapture(new Response(JSON.stringify({ status: "paid", payment_status: "completed" }), { status: 200 }));
+      await gatewayHandler;
+    });
+    expect(paymentHarness.success).toHaveBeenCalledWith("Payment successful", expect.objectContaining({ description: "INR 1322.00" }));
+    expect(trackingHarness.refresh).toHaveBeenCalledTimes(1);
+    expect(paymentHarness.summaryProps.isProcessing).toBe(false);
   });
 
   describe("while a technician is being found", () => {
@@ -190,6 +237,32 @@ describe("RequestTracking live metrics", () => {
       // The service is named on its own: the row beneath already says what kind of vehicle it is.
       expect(within(screen.getByTestId("tracking-request")).getByText("Towing")).toBeInTheDocument();
       expect(within(card).getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+    });
+
+    it.each(["pending", "assigned", "technician_assigned"])("hides request-specific prices before acceptance in %s", async (status) => {
+      search({ status, technician_id: 21, amount: 1200, base_amount: 1200, final_amount: 1322 });
+      await renderTracking();
+      expect(screen.getByTestId("tracking-request")).not.toHaveTextContent("₹");
+      expect(screen.queryByRole("button", { name: /price details/i })).toBeNull();
+      expect(container).not.toHaveTextContent("1,322");
+      expect(screen.getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+    });
+
+    it("uses accepted pricing and keeps cancellation available without asking for price confirmation", async () => {
+      trackingHarness.request = { ...trackingHarness.request, status: "accepted", pricing_status: "confirmed", pricing_finalized: true, amount: 1200, base_amount: 1200, final_amount: 1322 };
+      await renderTracking();
+      expect(screen.getByTestId("tracking-request")).toHaveTextContent("₹1,322");
+      expect(screen.getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /confirm price/i })).toBeNull();
+    });
+
+    it("shows towing taxes separately from the technician's promised charge", async () => {
+      trackingHarness.request = { ...trackingHarness.request, isTowing: true, status: "accepted", pricing_status: "confirmed", pricing_finalized: true, amount: 1260, base_amount: 1260, platform_fee: 126, final_amount: 1388, pricing_snapshot: { technician_earning: 1200, pricing_breakdown: { tax_amount: 60 } } };
+      await renderTracking();
+      const charge = screen.getByText("Technician charge");
+      expect(charge.parentElement).toHaveTextContent("₹1,200.00");
+      expect(screen.getByText("Taxes").parentElement).toHaveTextContent("₹60.00");
+      expect(screen.getByTestId("tracking-request")).toHaveTextContent("₹1,388");
     });
 
     it("leaves where help is going to the details beside the card on a wide screen", async () => {

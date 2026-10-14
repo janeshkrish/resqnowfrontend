@@ -10,7 +10,7 @@ type TechnicianJobContextType = {
   acceptedJobId: string | null;
   setAcceptedJobId: (jobId: string | null) => void;
   clearAcceptedJobId: () => void;
-  acceptJob: (jobId: string) => Promise<AcceptanceResult>;
+  acceptJob: (jobId: string, offerId?: string) => Promise<AcceptanceResult>;
   pendingAcceptanceId: string | null;
   acceptanceMessage: string | null;
   checkAcceptance: () => Promise<AcceptanceResult | null>;

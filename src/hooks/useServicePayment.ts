@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { isServicePaymentFinalized } from "@/utils/serviceRequestPayment";
 
 type ProcessPaymentOptions = {
   requestId: number | string;
@@ -51,6 +52,10 @@ export const useServicePayment = () => {
             const verifyBody = await verifyRes.json().catch(() => ({}));
             if (!verifyRes.ok) {
               throw new Error(verifyBody?.error || "Payment verification failed.");
+            }
+            if (!isServicePaymentFinalized(verifyBody)) {
+              toast.info("Payment is being verified. Please check the request for its final payment status.");
+              return;
             }
             options.onSuccess?.({
               order: orderBody,

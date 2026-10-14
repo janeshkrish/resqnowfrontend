@@ -215,13 +215,13 @@ export default function QuestionField({ question, context, answers, onPick, onSw
       <div className="rqf-sec">
         <div className="rqf-calc" aria-label="Fuel cost">
           <div className="rqf-calc-row">
-            <span>{kind} {litres} L{price ? ` × ${rupees(price, true)}` : ""}</span>
-            <b>{price ? rupees(litres * price) : "Pump price"}</b>
+            <span>{kind} · {litres} L requested</span>
+            <b>{price ? `${rupees(price, true)} / L` : "Pump price"}</b>
           </div>
           <div className="rqf-calc-row"><span>Delivery</span><b>{fee ? `from ${rupees(fee)}` : "Told before we start"}</b></div>
           <div className="rqf-calc-row total">
-            <span>You pay about</span>
-            <b>{price && fee ? rupees(litres * price + fee) : "After delivery"}</b>
+            <span>Service price</span>
+            <b>Price shown after a technician accepts</b>
           </div>
         </div>
         <p className="rqf-note">

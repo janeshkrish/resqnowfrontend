@@ -232,13 +232,6 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
     .filter((station) => Number.isFinite(station.distance))
     .sort((a, b) => Number(a.distance) - Number(b.distance))[0];
 
-  // ---------------------------------------------------------------- towing fare
-  const estimateQuote = flow.towingEstimate?.quote || flow.towingEstimate;
-  const fareTotal = Number(estimateQuote?.final_estimated_price ?? flow.towingEstimate?.finalEstimatedPrice);
-  const fareReady = isTowing && Number.isFinite(fareTotal) && fareTotal > 0 && !flow.towingEstimateError;
-  const litres = Number(answers.qty || 0);
-  const fuelTotal = fuelPrice && litres && startingPrice ? litres * fuelPrice + startingPrice : null;
-
   // ---------------------------------------------------------------- the dock
   const missing = currentStep === 1 ? missingOnStep1(formData) : null;
   const stepTwoReady = currentStep === 2 ? flow.canProceed() : true;
@@ -247,14 +240,10 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   if (spec.key === "mechanical" && startingPrice) dockText = `Inspection from ${rupees(startingPrice)} · repair cost told first`;
   if (spec.key === "battery" && answers.need === "new" && startingPrice) dockText = `Starts from ${rupees(startingPrice)} + battery cost`;
   if (spec.key === "winching" && answers.upright === "no" && startingPrice) dockText = `Starts from ${rupees(startingPrice)} · crane costs extra`;
-  if (spec.key === "fuel") dockText = answers.fuel === "cng" ? "CNG can’t be delivered · try towing" : fuelTotal ? `About ${rupees(fuelTotal)} · today’s fuel price` : dockText;
+  if (spec.key === "fuel" && answers.fuel === "cng") dockText = "CNG can’t be delivered · try towing";
   if (isTowing) {
     dockIcon = "local_shipping";
-    dockText = fareReady
-      ? `About ${rupees(fareTotal)} · pay after the drop`
-      : currentStep === 1 && !(hasVehicle(formData) && formData.vehicleSubtype)
-        ? `Choose your ${word} to see the fare`
-        : "Fare shows once pick up and drop are set";
+    dockText = "Price shown after a technician accepts · pay after the drop";
   }
   if (isSos) { dockIcon = "support_agent"; dockText = "No payment now · we’ll call you to confirm"; }
   if (currentStep === 2 && !isTowing && !isSos) { dockIcon = "location_on"; dockText = "Help comes to this spot"; }
@@ -263,8 +252,8 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   const stepTwoNeed = !text(formData.location)
     ? (isTowing ? "Choose where to pick up" : "Choose your location")
     : isTowing && !text(formData.dropLocation) ? "Choose where to take it"
-    : isTowing && flow.isEstimatingTowing ? "Working out the fare…"
-    : isTowing ? "Waiting for the fare" : "Choose your location";
+    : isTowing && flow.isEstimatingTowing ? "Checking the towing route…"
+    : isTowing ? "Checking the route" : "Choose your location";
   const ctaLabel = missing ? `Choose ${missing}` : currentStep === 2 && !stepTwoReady ? stepTwoNeed : "Continue";
   const ctaOff = Boolean(missing) || !stepTwoReady;
 
@@ -339,9 +328,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   let priceLabel = "Starts from";
   let priceValue = startingPrice ? rupees(startingPrice) : "Told before work starts";
   if (isSos) { priceLabel = "Payment"; priceValue = "Nothing now"; }
-  if (isTowing) { priceLabel = "Fare estimate"; priceValue = fareReady ? rupees(fareTotal) : "—"; }
   if (spec.key === "mechanical") priceLabel = "Inspection from";
-  if (spec.key === "fuel" && fuelTotal) { priceLabel = "You pay about"; priceValue = rupees(fuelTotal); }
   const urgent = isUrgent(answers);
   const stepNames = isSos ? ["What happened", "Location", "Confirm"] : ["Vehicle & problem", "Location", "Confirm"];
   const vehicleStep = isSos ? 3 : 1;

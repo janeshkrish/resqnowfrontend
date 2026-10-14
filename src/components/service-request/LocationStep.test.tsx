@@ -186,7 +186,7 @@ describe("service request Mappls location step", () => {
     );
     expect(screen.getByRole("combobox", { name: "Pick up from" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Take it to" })).toBeInTheDocument();
-    expect(screen.getByText("Set pick up and drop to see the fare")).toBeInTheDocument();
+    expect(screen.getByText("Set pick up and drop to check the route")).toBeInTheDocument();
   });
 
   it("does not bias Mappls search to the display fallback before coordinates are acquired", async () => {

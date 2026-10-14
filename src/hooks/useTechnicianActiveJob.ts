@@ -13,6 +13,7 @@ const toOptionalString = (value: any) => {
 };
 
 const toOptionalNumber = (value: any) => {
+  if (value == null || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 };
@@ -78,9 +79,7 @@ const normalizeJob = (job: any) => {
       job.estimated_earnings
   );
   const amount = toOptionalNumber(
-    isTowingJob
-      ? technicianEstimatedEarning ?? job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
-      : job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
+    technicianEstimatedEarning ?? job.amount ?? job.service_charge ?? job.serviceCharge ?? paymentDetails.baseAmount
   );
   const cancellationReason = toOptionalString(job.cancellation_reason ?? job.reason);
   const cancelledAt = toOptionalString(job.cancelled_at ?? job.cancelledAt);
@@ -249,7 +248,7 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
         const previousRequestId = String(prev.requestId || prev.id || "");
         if (previousRequestId !== requestId) return prev;
         const nextStatus = normalizeTechnicianStatus(data?.status);
-        const nextAmount = toOptionalNumber(data?.amount ?? data?.service_charge ?? data?.serviceCharge);
+        const nextAmount = toOptionalNumber(data?.technicianEstimatedEarning ?? data?.technician_estimated_earning ?? data?.estimatedEarnings ?? prev.technicianEstimatedEarning ?? data?.amount ?? data?.service_charge ?? data?.serviceCharge);
         const nextAddress = toOptionalString(data?.address ?? data?.location?.address);
         const nextLat = toOptionalNumber(data?.location?.lat ?? data?.location_lat);
         const nextLng = toOptionalNumber(data?.location?.lng ?? data?.location_lng);

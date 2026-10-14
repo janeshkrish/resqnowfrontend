@@ -44,10 +44,13 @@ const TechnicianLogin = () => {
       const pendingAlertAction = String(
         sessionStorage.getItem("resqnow_pending_job_alert_action") || ""
       ).trim();
+      const pendingOfferId = sessionStorage.getItem("resqnow_pending_job_offer_id");
       sessionStorage.removeItem("resqnow_pending_job_deeplink");
       sessionStorage.removeItem("resqnow_pending_job_alert_action");
+      sessionStorage.removeItem("resqnow_pending_job_offer_id");
       const pendingParams = new URLSearchParams();
       pendingParams.set("jobId", pendingJobId);
+      if (pendingOfferId) pendingParams.set("offerId", pendingOfferId);
       if (pendingAlertAction) {
         pendingParams.set("alertAction", pendingAlertAction);
       }

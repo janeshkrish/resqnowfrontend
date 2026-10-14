@@ -56,6 +56,8 @@ import { formatClockTime } from "@/lib/technicianArrival";
 import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
 import {
   resolveServiceRequestPaymentDetails,
+  isServicePaymentFinalized,
+  hasAcceptedCustomerPricing,
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
   normalizeServiceRequestPaymentMode,
 } from "@/utils/serviceRequestPayment";
@@ -187,6 +189,7 @@ type PaymentQuoteResponse = {
     currency?: string;
     payment_mode?: "cash" | "upi" | null;
     base_amount?: number;
+    tax_amount?: number;
     platform_fee_percent?: number;
     original_platform_fee?: number;
     discount_amount?: number;
@@ -480,14 +483,7 @@ const RequestTracking = () => {
             cache: "no-store",
           });
           const statusBody = await statusRes.json().catch(() => ({}));
-          const latestPaymentStatus = String(statusBody?.payment_status || "").toLowerCase();
-          const latestRequestStatus = String(statusBody?.status || "").toLowerCase();
-
-          if (
-            latestPaymentStatus === "completed" ||
-            latestRequestStatus === "paid" ||
-            latestRequestStatus === "completed"
-          ) {
+          if (isServicePaymentFinalized(statusBody)) {
             return true;
           }
         } catch (pollError) {
@@ -560,13 +556,7 @@ const RequestTracking = () => {
             const verifyBody = await verifyRes.json().catch(() => ({}));
 
             if (verifyRes.ok) {
-              const requestStatus = String(verifyBody?.request?.status || "").toLowerCase();
-              const paymentStatus = String(verifyBody?.request?.payment_status || "").toLowerCase();
-              const isImmediatelyConfirmed =
-                verifyBody?.success === true ||
-                verifyBody?.alreadyPaid === true ||
-                requestStatus === "paid" ||
-                paymentStatus === "completed";
+              const isImmediatelyConfirmed = isServicePaymentFinalized(verifyBody);
 
               if (!isImmediatelyConfirmed) {
                 toast.info("Payment received. Verifying final status...");
@@ -797,6 +787,7 @@ const RequestTracking = () => {
       {
         paymentMode,
         baseAmount: quoteBreakdown.base_amount ?? selectedMethodPaymentDetails.baseAmount,
+        taxAmount: quoteBreakdown.tax_amount ?? selectedMethodPaymentDetails.taxAmount,
         platformFee: quoteBreakdown.platform_fee,
         razorpayFee: quoteBreakdown.razorpay_fee ?? quoteBreakdown.payment_fee,
         finalAmount: quoteBreakdown.final_amount ?? quoteBreakdown.total_amount,
@@ -805,7 +796,7 @@ const RequestTracking = () => {
       },
       paymentMode
     );
-  }, [quoteBreakdown, selectedBackendPaymentMode, selectedMethodPaymentDetails.baseAmount]);
+  }, [quoteBreakdown, selectedBackendPaymentMode, selectedMethodPaymentDetails.baseAmount, selectedMethodPaymentDetails.taxAmount]);
   const amountCardDetails = quotePaymentDetails ?? requestPaymentDetails;
   const summaryPaymentDetails = quotePaymentDetails ?? selectedMethodPaymentDetails;
 
@@ -1012,7 +1003,7 @@ const RequestTracking = () => {
     : null;
 
   const billTotal = Number(amountCardDetails.finalAmount ?? finalAmount);
-  const hasBillTotal = Boolean(amountCardDetails.hasPricing) && Number.isFinite(billTotal) && billTotal > 0;
+  const hasBillTotal = hasAcceptedCustomerPricing(request) && Boolean(amountCardDetails.hasPricing) && Number.isFinite(billTotal) && billTotal > 0;
   const requestRow = {
     title: serviceOf(requestServiceType) ? serviceName(requestServiceType) : formatDisplayLabel(requestServiceType) || "Service request",
     line:
@@ -1027,7 +1018,8 @@ const RequestTracking = () => {
     shouldShowAmount && hasBillTotal
       ? {
           rows: [
-            { label: "Technician charge", value: money(amountCardDetails.baseAmount) },
+            { label: "Technician charge", value: money(amountCardDetails.technicianCharge) },
+            ...(amountCardDetails.taxAmount > 0 ? [{ label: "Taxes", value: money(amountCardDetails.taxAmount) }] : []),
             { label: "Platform fee", value: money(amountCardDetails.platformFee) },
             ...(amountCardDetails.paymentMode === "upi" && amountCardDetails.razorpayFee > 0
               ? [{ label: "Payment fee", value: money(amountCardDetails.razorpayFee) }]
@@ -1131,6 +1123,8 @@ const RequestTracking = () => {
         currency: String(quoteBreakdown?.currency || currency).toUpperCase(),
         paymentMode: summaryPaymentDetails.paymentMode ?? selectedBackendPaymentMode,
         baseAmount: summaryPaymentDetails.baseAmount,
+        technicianCharge: summaryPaymentDetails.technicianCharge,
+        taxAmount: summaryPaymentDetails.taxAmount,
         platformFeePercent: Number(
           quoteBreakdown?.platform_fee_percent ?? SERVICE_REQUEST_PLATFORM_FEE_PERCENT
         ),

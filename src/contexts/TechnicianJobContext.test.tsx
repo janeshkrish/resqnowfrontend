@@ -24,6 +24,30 @@ beforeEach(() => { localStorage.clear(); sessionStorage.clear(); api.token = tok
 afterEach(() => vi.useRealTimers());
 
 describe('authoritative job acceptance', () => {
+  it('does not replace an omitted or stale offer identity with a newly priced offer', async () => {
+    api.fetch.mockResolvedValue(response({ code: 'offer_required', error: 'Open the latest offer to review your earnings.' }, 409));
+    const { result } = show();
+    await act(async () => { await expect(result.current.acceptJob('101')).rejects.toMatchObject({ code: 'offer_required' }); });
+    expect(result.current.pendingAcceptanceId).toBeNull();
+    expect(result.current.acceptanceMessage).toMatch(/latest offer/);
+    expect(api.fetch.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1);
+  });
+  it('retains the original priced offer across a disconnect and explicit retry after restart', async () => {
+    api.fetch.mockRejectedValue(new TypeError('Offline'));
+    const first = show();
+    await act(async () => { await first.result.current.acceptJob('101', '81').catch(() => {}); });
+    expect(JSON.parse(api.fetch.mock.calls.find(([, options]) => options?.method === 'POST')![1].body)).toEqual({ jobId: '101', offerId: '81' });
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual({ jobId: '101', offerId: '81' });
+    first.unmount();
+    api.fetch.mockResolvedValue(response({ state: 'available' }));
+    const restored = show();
+    await waitFor(() => expect(restored.result.current.canRetryAcceptance).toBe(true));
+    api.fetch.mockResolvedValue(response({ success: true, job: accepted }));
+    await act(async () => { await restored.result.current.retryAcceptance(); });
+    const posts = api.fetch.mock.calls.filter(([, options]) => options?.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[1][1].body)).toEqual({ jobId: '101', offerId: '81' });
+  });
   it('retains an uncertain acceptance instead of treating a lost response as failure', async () => {
     api.fetch.mockRejectedValue(new TypeError('Network disconnected'));
     const { result } = show();

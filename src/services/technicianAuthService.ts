@@ -207,6 +207,7 @@ export const technicianAuthService = {
       sessionStorage.removeItem("resqnow_tech_last_accepted_job_id");
       sessionStorage.removeItem("resqnow_pending_job_deeplink");
       sessionStorage.removeItem("resqnow_pending_job_alert_action");
+      sessionStorage.removeItem("resqnow_pending_job_offer_id");
       sessionStorage.removeItem("technicianReturnUrl");
     }
     return true;

@@ -20,6 +20,8 @@ type JobHistoryItem = {
     status?: string | null;
     created_at?: string | null;
     amount?: number | null;
+    technicianEstimatedEarning?: number | null;
+    technician_estimated_earning?: number | null;
 };
 
 type Filter = "all" | "completed" | "cancelled";
@@ -57,7 +59,7 @@ const TechnicianHistoryPage = () => {
             if (res.ok) {
                 const historyData = await res.json();
                 if (Array.isArray(historyData)) {
-                    setJobHistory(historyData);
+                    setJobHistory(historyData.map((job: JobHistoryItem) => ({ ...job, amount: job.technicianEstimatedEarning ?? job.technician_estimated_earning ?? job.amount })));
                 }
             } else {
                 console.error("Failed to fetch history:", res.status);

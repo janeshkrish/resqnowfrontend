@@ -29,6 +29,7 @@ export function toJobRequest(raw: Row | null | undefined): JobRequest | null {
   const drop = (raw.dropLocation || {}) as Row;
   const job: JobRequest = {
     id,
+    offerId: raw.offerId != null || raw.offer_id != null ? String(raw.offerId ?? raw.offer_id) : undefined,
     isTowing: Boolean(raw.isTowing),
     customerName: String(raw.customerName || raw.contact_name || "Customer"),
     serviceType: String(raw.serviceType || raw.service_type || "Service"),
@@ -51,7 +52,7 @@ export function toJobRequest(raw: Row | null | undefined): JobRequest | null {
     vehicleCategory: String(raw.vehicleCategory || raw.vehicle_category || "").trim() || null,
     details: readJobDetails(raw),
     amount:
-      money(raw.technicianEstimatedEarning) ?? money(raw.estimatedEarnings) ?? money(raw.amount) ?? money(raw.priceAmount) ?? 0,
+      money(raw.technicianEstimatedEarning) ?? money(raw.technician_estimated_earning) ?? money(raw.estimatedEarnings) ?? money(raw.amount) ?? money(raw.priceAmount) ?? 0,
     eta: (raw.eta as JobRequest["eta"]) ?? null,
   };
   return job;

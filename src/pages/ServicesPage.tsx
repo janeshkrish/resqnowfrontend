@@ -224,7 +224,7 @@ export default function ServicesPage() {
           <img src="/images/vehicles/car.webp" alt="" draggable={false} loading="lazy" />
         </aside>
 
-        <p className="rq-gh-promise"><MaterialSymbol name="verified_user" />You see the price before you confirm, and pay only after the work is done.</p>
+        <p className="rq-gh-promise"><MaterialSymbol name="verified_user" />Your service price appears after a technician accepts. Pay after the work is done.</p>
       </div>
     </div>
   );

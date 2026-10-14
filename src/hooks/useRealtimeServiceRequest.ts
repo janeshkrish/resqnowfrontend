@@ -14,7 +14,7 @@ import {
   parseLiveEta,
   type LiveEta,
 } from '@/lib/liveEta';
-import { resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayment';
+import { hasAcceptedCustomerPricing, resolveServiceRequestPaymentDetails } from '@/utils/serviceRequestPayment';
 
 interface RequestData {
   id: string;
@@ -23,6 +23,8 @@ interface RequestData {
   status: string;
   service_type: string;
   serviceType?: string;
+  pricing_status?: "pending" | "confirmed";
+  pricing_finalized?: boolean;
   vehicle_type?: string;
   vehicle_model?: string;
   address?: string;
@@ -48,7 +50,7 @@ interface RequestData {
   payment_status: string;
   started_at?: string | null;
   completed_at?: string | null;
-  price?: number;
+  price?: number | null;
   amount?: number | string | null;
   service_charge?: number | string | null;
   payment_method?: string | null;
@@ -108,6 +110,27 @@ const REQUEST_STATUS_POLL_MS = 10_000;
 
 const normalizeRequestData = (data: any): RequestData => {
   const paymentDetails = resolveServiceRequestPaymentDetails(data);
+  if (!hasAcceptedCustomerPricing(data)) {
+    return {
+      ...data,
+      isTowing: Boolean(data?.isTowing),
+      pricing_status: "pending",
+      pricing_finalized: false,
+      price: null,
+      amount: null,
+      service_charge: null,
+      baseAmount: null,
+      base_amount: null,
+      platformFee: null,
+      platform_fee: null,
+      razorpayFee: null,
+      razorpay_fee: null,
+      finalAmount: null,
+      final_amount: null,
+      dueAmount: null,
+      due_amount: null,
+    };
+  }
 
   return {
     ...data,

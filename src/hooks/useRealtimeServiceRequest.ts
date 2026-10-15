@@ -26,6 +26,9 @@ interface RequestData {
   pricing_status?: "pending" | "confirmed";
   pricing_finalized?: boolean;
   vehicle_type?: string;
+  vehicle_subtype?: string | null;
+  vehicle_brand?: string | null;
+  details?: Record<string, unknown> | string | null;
   vehicle_model?: string;
   address?: string;
   location_lat?: number;

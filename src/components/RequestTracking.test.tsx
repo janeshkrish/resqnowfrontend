@@ -298,6 +298,13 @@ describe("RequestTracking live metrics", () => {
       expect(screen.queryByTestId("tracking-finding-lines")).toBeNull();
     });
 
+    it("keeps the EV request scope available to nearby discovery", async () => {
+      search();
+      trackingHarness.request = { ...trackingHarness.request, service_type: "ev-mechanical", vehicle_type: "ev", vehicle_subtype: "electric-scooter", vehicle_brand: "Ather", details: { answers: [{ id: "mechanical_scope", value: "chassis" }] } };
+      await renderTracking();
+      expect(nearbyHarness.options).toMatchObject({ vehicleType: "ev", vehicleSubtype: "electric-scooter", vehicleBrand: "Ather", details: { answers: [{ id: "mechanical_scope", value: "chassis" }] } });
+    });
+
     it("plays the request-sent moment once, and only when the page was opened by sending a request", async () => {
       search();
       await renderFrom({ pathname: "/requests/request-1", state: { requestSent: true } });

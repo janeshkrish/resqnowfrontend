@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { VehicleArt } from '@/components/request-form/art';
 import { canonicalizeServiceKey, canonicalizeVehicleKey } from '@/config/technicianNormalization';
-import { SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, type SignupVehicle } from '@/utils/technicianSignupPricing';
+import { SIGNUP_EV_CONNECTORS, SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, signupCsvTokens, type SignupVehicle } from '@/utils/technicianSignupPricing';
 
 export interface PricingRow {
   service_id: number;
@@ -41,7 +41,7 @@ export default function DynamicPricingStep({ services, categories, subcategories
       const subtype = vehicleId ? SIGNUP_SUBTYPES[vehicleId as SignupVehicle]?.find(item => item.id === subtypeId) : undefined;
       const row = savedRows.find(item => item.pricing_json.vehicle_subtype === subtypeId);
       const isOpen = openService === serviceId;
-      const updateRow = (nextSubtype: { id: string; label: string }, fieldKey?: string, fieldValue?: string) => {
+      const updateRow = (nextSubtype: { id: string; label: string }, fields: Record<string, string | number> = {}) => {
         if (!service || !vehicle) return;
         const previous = value.find(item => item.service_id === service.id && item.vehicle_category_id === vehicle.id && item.pricing_json.vehicle_subtype === nextSubtype.id);
         // Unseeded subtype names are preserved in the existing JSON column.
@@ -51,8 +51,7 @@ export default function DynamicPricingStep({ services, categories, subcategories
           service_id: service.id, vehicle_category_id: vehicle.id,
           vehicle_subcategory_id: masterSubtype?.id || null,
           pricing_json: { ...previous?.pricing_json, service_domain: serviceId, vehicle_type: vehicleId,
-            vehicle_subtype: nextSubtype.id, vehicle_subtype_label: nextSubtype.label,
-            ...(fieldKey ? { [fieldKey]: fieldValue === '' ? '' : Number(fieldValue) } : {}) },
+            vehicle_subtype: nextSubtype.id, vehicle_subtype_label: nextSubtype.label, ...fields },
         };
         onChange(previous ? value.map(item => item === previous ? updated : item) : [...value, updated]);
       };
@@ -88,9 +87,30 @@ export default function DynamicPricingStep({ services, categories, subcategories
                 const isDistance = /distance|free_km/i.test(field.field_key);
                 return <div className="rq-field" key={field.id}><Label htmlFor={id}>{field.field_label}{field.required ? ' *' : ''}</Label>
                   <div className="rq-price-input"><span>{isDistance ? 'km' : '₹'}</span><Input id={id} type="number" inputMode="decimal" min="0" step={isDistance ? '0.1' : '0.01'}
-                    placeholder="0" value={row?.pricing_json[field.field_key] ?? ''} onChange={event => updateRow(subtype, field.field_key, event.target.value)} /></div>
+                    placeholder="0" value={row?.pricing_json[field.field_key] ?? ''} onChange={event => updateRow(subtype, { [field.field_key]: event.target.value === '' ? '' : Number(event.target.value) })} /></div>
                 </div>;
               })}</div>
+              {serviceId === 'ev-charging' && <>
+                <fieldset className="rq-field">
+                  <legend className="rq-signup-label">Supported charging connectors *</legend>
+                  <div className="rq-subtype-grid">{SIGNUP_EV_CONNECTORS.map(connector => {
+                    const selected = signupCsvTokens(row?.pricing_json.supported_connectors);
+                    const checked = selected.includes(connector.id);
+                    return <label key={connector.id} className={`rq-subtype ${checked ? 'is-selected' : ''}`}>
+                      <input type="checkbox" checked={checked} onChange={() => updateRow(subtype, {
+                        supported_connectors: (checked ? selected.filter(item => item !== connector.id) : [...selected, connector.id]).join(','),
+                      })} />
+                      <span>{connector.label}</span>
+                    </label>;
+                  })}</div>
+                </fieldset>
+                {signupCsvTokens(row?.pricing_json.supported_connectors).includes('brand') && <div className="rq-field">
+                  <Label htmlFor={`charging-brands-${service.id}-${vehicle?.id}-${subtype.id}`}>Supported EV brands *</Label>
+                  <Input id={`charging-brands-${service.id}-${vehicle?.id}-${subtype.id}`} value={row?.pricing_json.supported_ev_brands ?? ''}
+                    placeholder="e.g. Ather, Ola, TVS" onChange={event => updateRow(subtype, { supported_ev_brands: event.target.value })} />
+                </div>}
+                <p className="rq-signup-hint">Choose only connectors and brands your equipment supports for this vehicle subtype.</p>
+              </>}
               <p className="rq-signup-hint">Select another subtype to set its rates. Your entered prices stay saved in this form.</p>
             </div>}
           </>}

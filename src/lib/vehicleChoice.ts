@@ -1,6 +1,6 @@
 import { CATALOG_BRANDS, VEHICLE_CATALOG, type CatalogBrand, type CatalogModel } from "@/data/indianVehicles";
 import { formatPlate, shortMake, vehicleTypeOf, type Vehicle } from "@/lib/garage";
-import { vehicleClassInfo, type VehicleClassId, type VehicleFamily } from "@/lib/vehicleClasses";
+import { baseClassesForEv, vehicleClassInfo, type VehicleClassId, type VehicleFamily } from "@/lib/vehicleClasses";
 
 /** What the request form keeps about the chosen vehicle (inside the flow's form data). */
 export type VehicleChoice = {
@@ -16,6 +16,8 @@ export type VehicleChoice = {
   vehicleModel?: string;
   /** Class id sent as vehicle_subtype. */
   vehicleSubtype?: string;
+  /** Known physical body/tier retained separately from the electric subtype. */
+  vehicleBaseSubtype?: string;
   plate?: string;
 };
 
@@ -28,16 +30,27 @@ export const classOf = (model: CatalogModel, family: VehicleFamily): VehicleClas
 
 export function catalogFor(family: VehicleFamily): CatalogModel[] {
   if (family === "ev") return VEHICLE_CATALOG.filter((model) => model.evClass);
-  return VEHICLE_CATALOG.filter((model) => model.family === family);
+  return VEHICLE_CATALOG.filter((model) => model.family === family && !model.evClass);
 }
 
 export function brandsFor(family: VehicleFamily): CatalogBrand[] {
   if (family === "ev") return CATALOG_BRANDS.filter((brand) => brand.hasEv);
-  return CATALOG_BRANDS.filter((brand) => brand.family === family);
+  const ordinaryBrandIds = new Set(catalogFor(family).map(model => model.brandId));
+  return CATALOG_BRANDS.filter((brand) => brand.family === family && ordinaryBrandIds.has(brand.id));
 }
 
 export const brandById = (id?: string | null) => CATALOG_BRANDS.find((brand) => brand.id === id) ?? null;
 export const modelById = (id?: string | null) => VEHICLE_CATALOG.find((model) => model.id === id) ?? null;
+
+/** Recover catalog bodies in old drafts, validate manual bodies, and never guess a bike/car tier. */
+export function baseSubtypeFor(choice: VehicleChoice, family: VehicleFamily): string {
+  if (family !== "ev") return "";
+  const allowed = baseClassesForEv(choice.vehicleSubtype);
+  const model = modelById(choice.catalogModelId);
+  if (model && model.evClass === choice.vehicleSubtype && allowed.some(entry => entry.id === model.vehicleClass)) return model.vehicleClass;
+  if (allowed.some(entry => entry.id === choice.vehicleBaseSubtype)) return choice.vehicleBaseSubtype!;
+  return choice.vehicleSubtype === "electric-scooter" ? "scooter" : "";
+}
 
 /** "Maruti Suzuki Swift", without repeating a brand the model name already has ("Yezdi Roadster"). */
 export function fullName(model: CatalogModel) {
@@ -50,6 +63,19 @@ export function shortName(model: CatalogModel) {
 }
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Recognize known pure EVs in drafts created before they had a dedicated form. */
+export function isKnownElectricChoice(choice: VehicleChoice): boolean {
+  if (String(choice.vehicleSubtype || "").startsWith("electric-")) return true;
+  if (modelById(choice.catalogModelId)?.evClass) return true;
+  const name = normalize(String(choice.vehicleModel || ""));
+  const brand = normalize(String(choice.vehicleBrand || ""));
+  if (!name) return false;
+  const exactModels = VEHICLE_CATALOG.filter(model => normalize(model.model) === name);
+  if (exactModels.length && exactModels.every(model => model.evClass)) return true;
+  return catalogFor("ev").some(model => name === normalize(fullName(model)) || name === normalize(shortName(model))
+    || (Boolean(brand) && name === normalize(model.model) && [model.brand, model.short, model.brandId].some(value => normalize(value) === brand)));
+}
 
 /**
  * Models matching every word typed, across brand and model ("hero honda splendor", "rx 100").
@@ -78,6 +104,7 @@ export function findCatalogModel(make: string, model: string, family: VehicleFam
   return (
     pool.find((entry) => normalize(entry.brand) === brandKey && normalize(entry.model) === modelKey) ??
     pool.find((entry) => normalize(entry.short) === normalize(shortMake(make)) && normalize(entry.model) === modelKey) ??
+    pool.find((entry) => normalize(fullName(entry)) === modelKey || normalize(shortName(entry)) === modelKey) ??
     null
   );
 }
@@ -86,7 +113,8 @@ export function findCatalogModel(make: string, model: string, family: VehicleFam
 export function garageForFamily(vehicles: Vehicle[], family: VehicleFamily): Vehicle[] {
   if (family === "commercial") return [];
   if (family === "ev") return vehicles.filter((vehicle) => findCatalogModel(vehicle.make, vehicle.model, "ev"));
-  return vehicles.filter((vehicle) => vehicleTypeOf(vehicle.type) === family);
+  return vehicles.filter((vehicle) => vehicleTypeOf(vehicle.type) === family
+    && !/^(ev|electric)$/i.test(String(vehicle.type || "")) && !findCatalogModel(vehicle.make, vehicle.model, "ev"));
 }
 
 export function choiceFromGarage(vehicle: Vehicle, family: VehicleFamily): VehicleChoice {
@@ -97,11 +125,12 @@ export function choiceFromGarage(vehicle: Vehicle, family: VehicleFamily): Vehic
     vehicleSource: "garage",
     garageVehicleId: vehicle.id,
     catalogBrandId: null,
-    catalogModelId: null,
+    catalogModelId: family === "ev" ? match?.id ?? null : null,
     manualName: "",
     vehicleBrand: vehicle.make,
     vehicleModel: name,
     vehicleSubtype: match ? classOf(match, family) : "",
+    vehicleBaseSubtype: family === "ev" ? match?.vehicleClass ?? "" : "",
     plate: vehicle.license_plate ? formatPlate(vehicle.license_plate) : "",
   };
 }
@@ -117,11 +146,12 @@ export function choiceFromCatalog(model: CatalogModel, family: VehicleFamily): V
     vehicleBrand: model.brand,
     vehicleModel: fullName(model),
     vehicleSubtype: classOf(model, family),
+    vehicleBaseSubtype: family === "ev" ? model.vehicleClass : "",
     plate: "",
   };
 }
 
-export function manualChoice(name: string): VehicleChoice {
+export function manualChoice(name: string, brand = ""): VehicleChoice {
   const clean = name.replace(/\s+/g, " ").trimStart().slice(0, 80);
   return {
     vehicleTab: "choose",
@@ -130,9 +160,10 @@ export function manualChoice(name: string): VehicleChoice {
     catalogBrandId: null,
     catalogModelId: null,
     manualName: clean,
-    vehicleBrand: "",
+    vehicleBrand: brand.replace(/\s+/g, " ").trim().slice(0, 80),
     vehicleModel: clean.trim(),
     vehicleSubtype: "",
+    vehicleBaseSubtype: "",
     plate: "",
   };
 }
@@ -147,6 +178,7 @@ export const clearedChoice = (tab: "garage" | "choose"): VehicleChoice => ({
   vehicleBrand: "",
   vehicleModel: "",
   vehicleSubtype: "",
+  vehicleBaseSubtype: "",
   plate: "",
 });
 

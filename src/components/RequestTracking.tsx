@@ -890,6 +890,9 @@ const RequestTracking = () => {
     location: requestMapLocation,
     serviceType: requestServiceType,
     vehicleType: request?.vehicle_type,
+    vehicleSubtype: request?.vehicle_subtype,
+    vehicleBrand: request?.vehicle_brand,
+    details: request?.details,
   });
   const sheet = useTrackingSheet({
     enabled: isMobile,

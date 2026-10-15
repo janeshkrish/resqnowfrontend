@@ -48,6 +48,22 @@ describe("useNearbySearchTechnicians", () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
+  it("passes the EV subtype, brand and service scope to discovery and refreshes when scope changes", async () => {
+    const { result, rerender } = renderHook(({ scope }) => useNearbySearchTechnicians({
+      enabled: true, location: SPOT, serviceType: "ev-mechanical", vehicleType: "ev",
+      vehicleSubtype: "electric-scooter", vehicleBrand: "Ather",
+      details: { answers: [{ id: "mechanical_scope", value: scope }] },
+    }), { wrapper, initialProps: { scope: "chassis" } });
+    await waitFor(() => expect(result.current).toEqual([{ id: "21", lat: 11.02, lng: 76.96 }]));
+    const asked = new URL(apiFetch.mock.calls[0][0], "https://api.test");
+    expect(asked.searchParams.get("vehicle_subtype")).toBe("electric-scooter");
+    expect(asked.searchParams.get("vehicle_brand")).toBe("Ather");
+    expect(JSON.parse(asked.searchParams.get("details") || "null")).toEqual({ answers: [{ id: "mechanical_scope", value: "chassis" }] });
+    rerender({ scope: "ev-system" });
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(new URL(apiFetch.mock.calls[1][0], "https://api.test").searchParams.get("details") || "null")).toEqual({ answers: [{ id: "mechanical_scope", value: "ev-system" }] });
+  });
+
   it("gives nothing, quietly, when the list cannot be loaded", async () => {
     apiFetch.mockImplementation(async () => json({ error: "down" }, 500));
     const { result } = renderHook(() => useNearbySearchTechnicians({ enabled: true, location: SPOT }), { wrapper });

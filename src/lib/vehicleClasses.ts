@@ -62,6 +62,15 @@ export const vehicleClassInfo = (id?: string | null): VehicleClass | null =>
 
 export const classesFor = (family: VehicleFamily) => VEHICLE_CLASSES[family];
 
+/** Physical classes that can describe an EV without changing its electric identity. */
+export function baseClassesForEv(classId?: string | null): VehicleClass[] {
+  const ids: string[] = classId === "electric-car" ? ["hatchback", "sedan"]
+    : classId === "electric-suv" ? ["compact-suv", "big-suv"]
+    : classId === "electric-bike" ? ["commuter-bike", "sports-bike", "premium-bike"]
+    : classId === "electric-scooter" ? ["scooter"] : [];
+  return [...VEHICLE_CLASSES.car, ...VEHICLE_CLASSES.bike].filter(entry => ids.includes(entry.id));
+}
+
 /** The electric class for a car or bike class, used when an EV is picked from the car or bike lists. */
 export function electricClassFor(id: VehicleClassId): VehicleClassId {
   if (id.startsWith("electric-")) return id;

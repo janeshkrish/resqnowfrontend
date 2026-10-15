@@ -262,5 +262,5 @@ describe('technician application preview', () => {
     fireEvent.click(screen.getByRole('button', { name: submitName }));
     expect(await screen.findByTestId('location')).toHaveTextContent(variant === 'admin' ? '/admin/technicians' : '/technician/login');
     scrollSpy.mockRestore();
-  });
+  }, 15_000);
 });

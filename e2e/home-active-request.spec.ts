@@ -277,10 +277,11 @@ test("opens live tracking when the map is tapped, and the map itself cannot be d
   await expect(technician(page)).toBeVisible();
 
   // Whatever is touched on the map, the touch lands on the cover, not on the map under it.
+  // (Polled: the app's launch splash still covers the page for a moment while it fades.)
   const area = (await map(page).boundingBox())!;
   for (const [fx, fy] of [[0.5, 0.5], [0.15, 0.8], [0.85, 0.3]]) {
-    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.className ?? "", [area.x + area.width * fx, area.y + area.height * fy]);
-    expect(hit).toBe("rq-h-map-open");
+    const hit = () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.className ?? "", [area.x + area.width * fx, area.y + area.height * fy]);
+    await expect.poll(hit).toBe("rq-h-map-open");
   }
   // A swipe across it scrolls the page as anywhere else; nothing is sent to the map.
   await page.mouse.move(area.x + 60, area.y + 40);

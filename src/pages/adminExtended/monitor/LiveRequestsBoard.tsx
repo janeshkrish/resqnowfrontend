@@ -93,12 +93,12 @@ function Row({ request, now, pinned, selected, onPin, onOpen }: { request: Monit
   );
 }
 
-export default function LiveRequestsBoard() {
+export default function LiveRequestsBoard({ initialOpenId = null }: { initialOpenId?: number | null } = {}) {
   const queryClient = useQueryClient();
   const now = useNow(1000);
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(initialOpenId);
   const watch = useWatchList();
 
   const live = useQuery({ queryKey: LIVE_KEY, queryFn: getLiveRequests, refetchInterval: 15_000, refetchIntervalInBackground: true });

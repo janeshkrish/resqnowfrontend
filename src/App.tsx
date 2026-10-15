@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TechnicianAuthProvider } from "@/contexts/TechnicianAuthContext";
-import { AdminAuthProvider, AdminProtectedRoute } from "@/contexts/AdminAuthContext";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { ThemeProvider } from "@/components/item-providers/ThemeProvider";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { TechnicianJobProvider } from "@/contexts/TechnicianJobContext";
@@ -20,7 +20,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { App as CapacitorApp } from '@capacitor/app';
 import { Suspense, useEffect } from "react";
 import { setupGlobalErrorHandlers } from "./lib/globalErrors"; // install once at startup
-import { adminExtendedLazyRoutes } from "./pages/adminExtended/adminExtendedLazyRoutes";
+import { adminPortalRoutes } from "./pages/adminPortal/adminPortalRoutes";
 import AppLayout from "./components/AppLayout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -28,9 +28,6 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 type AppNavigateEventDetail = { path?: string; replace?: boolean; state?: unknown };
 
-const adminExtendedRouteFallback = (
-  <div className="p-4 text-sm text-muted-foreground">Loading admin tools...</div>
-);
 
 const routeFallback = (
   <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-muted-foreground">
@@ -79,22 +76,6 @@ const TechnicianReviewsPage = lazyWithReload(() => import("./pages/technician/Te
 const TechnicianProfile = lazyWithReload(() => import("./pages/technician/TechnicianProfile"));
 const TechnicianSettings = lazyWithReload(() => import("./pages/technician/TechnicianSettings"));
 const JobDeepLink = lazyWithReload(() => import("./pages/technician/JobDeepLink"));
-const AdminLogin = lazyWithReload(() => import("./pages/admin/AdminLogin"));
-const AdminDashboardLayout = lazyWithReload(() => import("./components/admin/AdminDashboardLayout"));
-const AdminDashboard = lazyWithReload(() => import("./pages/admin/AdminDashboard"));
-const TechnicianManagement = lazyWithReload(() => import("./pages/admin/TechnicianManagement"));
-const UserManagement = lazyWithReload(() => import("./pages/admin/UserManagement"));
-const AddUser = lazyWithReload(() => import("./pages/admin/AddUser"));
-const AdminAnalytics = lazyWithReload(() => import("./pages/admin/AdminAnalytics"));
-const AdminPaymentLogs = lazyWithReload(() => import("./pages/admin/AdminPaymentLogs"));
-const AdminPayouts = lazyWithReload(() => import("./pages/admin/AdminPayouts"));
-const AdminSettings = lazyWithReload(() => import("./pages/admin/AdminSettings"));
-const EmailTemplates = lazyWithReload(() => import("./pages/admin/EmailTemplates"));
-const TechnicianApplications = lazyWithReload(() => import("./pages/admin/TechnicianApplications"));
-const TechnicianDetails = lazyWithReload(() => import("./pages/admin/TechnicianDetails"));
-const AddTechnician = lazyWithReload(() => import("./pages/admin/AddTechnician"));
-const ApproveTechnician = lazyWithReload(() => import("./pages/admin/ApproveTechnician"));
-const RejectTechnician = lazyWithReload(() => import("./pages/admin/RejectTechnician"));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -292,72 +273,8 @@ const App = () => {
                               <Route path="settings" element={<TechnicianProtectedRoute><TechnicianSettings /></TechnicianProtectedRoute>} />
                             </Route>
 
-                            {/* Admin login route */}
-                            <Route path="/admin/login" element={<AdminLogin />} />
-
-                            {/* Admin routes with separate Layout */}
-                            <Route path="/admin" element={
-                              <AdminProtectedRoute>
-                                <AdminDashboardLayout />
-                              </AdminProtectedRoute>
-                            }>
-                              <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                              <Route path="dashboard" element={<AdminDashboard />} />
-                              <Route path="technicians" element={<TechnicianManagement />} />
-                              {/* AddTechnician moved to standalone route below to remove sidebar */}
-                              <Route path="users" element={<UserManagement />} />
-                              <Route path="users/add" element={<AddUser />} />
-                              <Route path="applications" element={<TechnicianApplications />} />
-                              <Route path="analytics" element={<AdminAnalytics />} />
-                              <Route path="payments" element={<AdminPaymentLogs />} />
-                              <Route path="payouts" element={<AdminPayouts />} />
-                              <Route path="email-templates" element={<EmailTemplates />} />
-                              <Route path="settings" element={<AdminSettings />} />
-                              <Route path="technician/:technicianId" element={<TechnicianDetails />} />
-                            </Route>
-
-                            {/* Standalone Add Technician Page (No Sidebar) */}
-                            <Route path="/admin/technicians/add" element={
-                              <AdminProtectedRoute>
-                                <AddTechnician />
-                              </AdminProtectedRoute>
-                            } />
-
-                            {/* Admin Approval Routes */}
-                            <Route path="/admin/approve-technician/:technicianId" element={
-                              <AdminProtectedRoute>
-                                <ApproveTechnician />
-                              </AdminProtectedRoute>
-                            } />
-                            <Route path="/admin/reject-technician/:technicianId" element={
-                              <AdminProtectedRoute>
-                                <RejectTechnician />
-                              </AdminProtectedRoute>
-                            } />
-
-                            {/* Admin Extended Routes */}
-                            {adminExtendedLazyRoutes.map((route, i) => (
-                              <Route
-                                key={`extended-${i}`}
-                                path={route.path}
-                                element={
-                                  <AdminProtectedRoute>
-                                    <Suspense fallback={adminExtendedRouteFallback}>{route.element ?? null}</Suspense>
-                                  </AdminProtectedRoute>
-                                }
-                              >
-                                {route.children?.map((child, j) => (
-                                  <Route
-                                    key={`extended-child-${j}`}
-                                    index={child.index}
-                                    path={child.path}
-                                    element={
-                                      <Suspense fallback={adminExtendedRouteFallback}>{child.element ?? null}</Suspense>
-                                    }
-                                  />
-                                ))}
-                              </Route>
-                            ))}
+                            {/* Admin portal: one side bar for everything; old addresses redirect */}
+                            {adminPortalRoutes}
 
                             {/* 404 page */}
                             <Route path="*" element={<NotFound />} />

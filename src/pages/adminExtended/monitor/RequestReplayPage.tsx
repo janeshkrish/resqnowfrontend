@@ -46,7 +46,7 @@ export default function RequestReplayPage() {
   return (
     <section className="am" data-testid="request-replay">
       <header className="am-replay-head">
-        <Link to="/admin/extended/requests" className="am-btn"><MaterialSymbol name="arrow_back" />Requests</Link>
+        <Link to="/admin/requests" className="am-btn"><MaterialSymbol name="arrow_back" />All requests</Link>
         <div>
           <h1>#{requestId}{data ? ` · ${service(data.serviceType)} · replay` : ""}</h1>
           <p>{data ? [data.customer.name, data.technician?.name, data.address].filter(Boolean).join(" · ") : replay.isLoading ? "Loading…" : ""}</p>

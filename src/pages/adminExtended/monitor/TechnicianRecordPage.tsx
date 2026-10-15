@@ -8,7 +8,7 @@ import { useAdminEvents } from "./adminLive";
 import { clock, dayAndTime, initials, money, PHASE_LABEL, service } from "./monitorFormat";
 import RequestMonitorPanel from "./RequestMonitorPanel";
 
-type Tab = "overview" | "jobs" | "reliability" | "reviews";
+export type Tab = "overview" | "jobs" | "reliability" | "reviews";
 
 const pct = (value: number | null | undefined) => (value == null ? "—" : `${Math.round(value * 100)}%`);
 const stars = (n: number | null | undefined) => (n == null ? "" : "★".repeat(Math.round(n)) + "☆".repeat(Math.max(0, 5 - Math.round(n))));
@@ -34,7 +34,7 @@ function Bar({ label, n, of, cls = "", suffix }: { label: string; n: number; of:
   );
 }
 
-function Overview({ record, go }: { record: TechnicianRecord; go: (tab: Tab) => void }) {
+export function Overview({ record, go }: { record: TechnicianRecord; go: (tab: Tab) => void }) {
   const k = record.kpis;
   const max = Math.max(5, ...record.weekly.map((w) => w.jobs));
   const top = Math.ceil(max / 5) * 5;
@@ -85,7 +85,7 @@ function Overview({ record, go }: { record: TechnicianRecord; go: (tab: Tab) => 
   );
 }
 
-function Jobs({ technicianId, onOpen }: { technicianId: number; onOpen: (id: number) => void }) {
+export function Jobs({ technicianId, onOpen }: { technicianId: number; onOpen: (id: number) => void }) {
   const [page, setPage] = useState(1);
   const [days, setDays] = useState<number | null>(30);
   const [status, setStatus] = useState("all");
@@ -119,7 +119,7 @@ function Jobs({ technicianId, onOpen }: { technicianId: number; onOpen: (id: num
           return (
             <div key={j.id} className="at-tr is-jobs" role="row">
               <span className="is-faint">{dayAndTime(j.createdAt)}</span>
-              <span className="is-strong is-num">{active ? <button type="button" className="at-link" onClick={() => onOpen(j.id)}>#{j.id}</button> : <Link to={`/admin/extended/requests/${j.id}/replay`}>#{j.id}</Link>}</span>
+              <span className="is-strong is-num">{active ? <button type="button" className="at-link" onClick={() => onOpen(j.id)}>#{j.id}</button> : <Link to={`/admin/requests/${j.id}/replay`}>#{j.id}</Link>}</span>
               <span>{j.customer}</span>
               <span>{service(j.serviceType)}</span>
               <span className="is-num">{j.distanceKm != null ? `${j.distanceKm} km` : "—"}</span>
@@ -148,7 +148,7 @@ function Jobs({ technicianId, onOpen }: { technicianId: number; onOpen: (id: num
   );
 }
 
-function Reliability({ record, onOpen }: { record: TechnicianRecord; onOpen: (id: number) => void }) {
+export function Reliability({ record, onOpen }: { record: TechnicianRecord; onOpen: (id: number) => void }) {
   const r = record.reliability;
   const sent = r.offers.sent;
   const judged = r.arrivalsJudged;
@@ -174,7 +174,7 @@ function Reliability({ record, onOpen }: { record: TechnicianRecord; onOpen: (id
             .map((c) => (
               <div key={`${c.who}-${c.requestId}`} className="at-tr is-cancel" role="row">
                 <span className="is-faint">{dayAndTime(c.at)}</span>
-                <span className="is-strong is-num"><Link to={`/admin/extended/requests/${c.requestId}/replay`}>#{c.requestId}</Link></span>
+                <span className="is-strong is-num"><Link to={`/admin/requests/${c.requestId}/replay`}>#{c.requestId}</Link></span>
                 <span><span className={`at-pill${c.who === "Admin" ? " is-bad" : ""}`}>{c.who}</span></span>
                 <span>{c.reason || "No reason given"}</span>
               </div>
@@ -212,7 +212,7 @@ function Reliability({ record, onOpen }: { record: TechnicianRecord; onOpen: (id
   );
 }
 
-function Reviews({ record, technicianId }: { record: TechnicianRecord; technicianId: number }) {
+export function Reviews({ record, technicianId }: { record: TechnicianRecord; technicianId: number }) {
   const [page, setPage] = useState(1);
   const reviews = useQuery({ queryKey: ["admin", "monitor", "tech-reviews", technicianId, page], queryFn: () => getTechnicianReviews(technicianId, { page, limit: 10 }) });
   const total = record.reviews.count;
@@ -290,7 +290,7 @@ export default function TechnicianRecordPage() {
             <div className="at-btns">
               {t.currentRequestId ? <button type="button" className="at-btn" onClick={() => setOpenId(t.currentRequestId)}><MaterialSymbol name="monitoring" />Live job</button> : null}
               {t.phone ? <a className="at-btn" href={`tel:${t.phone.replace(/\s+/g, "")}`}><MaterialSymbol name="call" />Call</a> : null}
-              <Link className="at-btn" to={`/admin/extended/technicians/${t.id}/activity`}><MaterialSymbol name="schedule" />Log-in activity</Link>
+              <Link className="at-btn" to={`/admin/technicians/${t.id}?tab=activity`}><MaterialSymbol name="schedule" />Log-in activity</Link>
             </div>
           </div>
           <nav className="at-tabs" aria-label="Technician record">

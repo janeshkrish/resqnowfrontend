@@ -73,14 +73,14 @@ export function useAdminSocketConnected() {
  * Calls `onEvent` for admin events, at most once per `waitMs`: a burst of updates becomes
  * one refresh.
  */
-export function useAdminEvents(onEvent: (event: string, data: unknown) => void, waitMs = 600) {
+export function useAdminEvents(onEvent: (event: string, data: unknown) => void, waitMs = 600, events: readonly string[] = ADMIN_LIVE_EVENTS) {
   const handlerRef = useRef(onEvent);
   handlerRef.current = onEvent;
   useEffect(() => {
     const socket = acquireSocket();
     let timer: number | null = null;
     let last: { event: string; data: unknown } | null = null;
-    const listeners = ADMIN_LIVE_EVENTS.map((event) => {
+    const listeners = events.map((event) => {
       const listener = (data: unknown) => {
         last = { event, data };
         if (timer != null) return;
@@ -97,7 +97,8 @@ export function useAdminEvents(onEvent: (event: string, data: unknown) => void, 
       listeners.forEach(([event, listener]) => socket.off(event, listener));
       releaseSocket();
     };
-  }, [waitMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the list is a module constant at every call site
+  }, [waitMs, events.join(",")]);
 }
 
 export type LivePoint = { lat: number; lng: number; at: number; speedKmh: number | null; heading: number | null; sequenceId: number | null };

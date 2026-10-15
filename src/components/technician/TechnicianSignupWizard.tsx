@@ -21,14 +21,11 @@ import {
     Globe, Briefcase, Smartphone, Bus, Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-    normalizeSpecialtiesForApi,
-    normalizeVehicleTypesForApi,
-} from "@/config/technicianNormalization";
+import { buildTechnicianSignupPayload } from "@/utils/technicianSignupPayload";
 import { apiFetch, apiUrl } from "@/lib/api";
 import {
     getSelectedSignupVehicleTypes,
-    buildLegacySignupPricingConfig, filterSignupPricing, getSignupPricingError,
+    filterSignupPricing, getSignupPricingError,
     SIGNUP_VEHICLES, SIGNUP_SERVICES,
 } from "@/utils/technicianSignupPricing";
 
@@ -325,30 +322,7 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
         setIsSubmitting(true);
         try {
             if (data.password !== data.confirmPassword) { toast.error("Password mismatch"); return; }
-            const normalizedSpecialties = normalizeSpecialtiesForApi(data.specialties);
-            const normalizedVehicleTypes = normalizeVehicleTypesForApi(data.vehicle_types);
-            const filteredPricing = pricingTemplate ? filterSignupPricing(data.pricing_config, pricingTemplate, normalizedSpecialties, getSelectedSignupVehicleTypes(normalizedVehicleTypes)) : [];
-            const legacyPricing = buildLegacySignupPricingConfig(filteredPricing).map(entry => entry.service_domain === "towing" ? { ...entry, towing_fleet_types: towingFleetTypes } : entry);
-            const payload = {
-                ...data,
-                specialties: normalizedSpecialties,
-                vehicle_types: normalizedVehicleTypes,
-                pricing_config: legacyPricing,
-                dynamic_pricing_config: filteredPricing,
-                technician_agreement_accepted: hasAcceptedTechnicianAgreement,
-                working_hours: data.working_hours.is_24x7 ? { is_24x7: true, opening_time: "", closing_time: "", weekly_off: "None" } : data.working_hours,
-                address: data.location.address,
-                latitude: data.location.latitude,
-                longitude: data.location.longitude,
-                region: data.location.city,
-                locality: data.location.locality,
-                district: data.location.district,
-                state: data.location.state,
-                service_type: data.specialties[0] || "other",
-                service_costs: legacyPricing,
-                pricing: {},
-                whatsapp_number: data.phone
-            };
+            const payload = buildTechnicianSignupPayload({ ...data, towing_fleet_types: towingFleetTypes }, pricingTemplate, hasAcceptedTechnicianAgreement);
 
             if (isAdmin) {
                 await technicianAdminService.createTechnician({ ...payload, status: "pending" });

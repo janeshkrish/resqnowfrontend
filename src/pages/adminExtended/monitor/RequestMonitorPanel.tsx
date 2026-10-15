@@ -228,7 +228,7 @@ export default function RequestMonitorPanel({ requestId, onClose }: { requestId:
                       <span className="am-av">{initials(tech.name)}</span>
                       <div>
                         <b>
-                          <Link to={`/admin/extended/technicians/${tech.id}/record`}>{tech.name}</Link>
+                          <Link to={`/admin/technicians/${tech.id}`}>{tech.name}</Link>
                         </b>
                         <span>{[tech.rating != null ? `★ ${Number(tech.rating).toFixed(1)}` : null, tech.jobsCompleted != null ? `${tech.jobsCompleted} jobs` : null, tech.phoneMasked].filter(Boolean).join(" · ")}</span>
                       </div>
@@ -330,7 +330,7 @@ export default function RequestMonitorPanel({ requestId, onClose }: { requestId:
           <div className="am-pfoot">
             <span>{data.updatedAt ? `Updated ${ago(data.updatedAt, now)}` : ""}</span>
             {phase === "done" || phase === "cancelled" ? (
-              <Link className="am-btn" to={`/admin/extended/requests/${requestId}/replay`}>
+              <Link className="am-btn" to={`/admin/requests/${requestId}/replay`}>
                 <MaterialSymbol name="replay" />
                 Replay
               </Link>

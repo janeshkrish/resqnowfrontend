@@ -90,7 +90,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAdminUser(admin);
       localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(admin));
       toast.success("Admin login successful");
-      navigate("/admin/dashboard");
+      navigate("/admin/today");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Admin login failed";
       toast.error(message);
@@ -104,8 +104,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAdminToken(null);
     localStorage.removeItem(ADMIN_STORAGE_KEY);
     setAdminUser(null);
-    toast.success("Admin logged out");
-    navigate("/");
+    toast.success("Signed out");
+    navigate("/admin/login", { replace: true });
   };
 
   const checkAdminAccess = async (): Promise<boolean> => {

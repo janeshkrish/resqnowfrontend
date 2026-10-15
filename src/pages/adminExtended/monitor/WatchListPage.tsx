@@ -137,7 +137,7 @@ export default function WatchListPage() {
   return (
     <div className="am" data-testid="watch-list">
       <div className="am-bar">
-        <p className="am-lead">{watch.list.length} of {WATCH_LIMIT} pinned. Pin jobs from <Link to="/admin/extended/requests">Requests</Link>.</p>
+        <p className="am-lead">{watch.list.length} of {WATCH_LIMIT} pinned. Pin jobs from <Link to="/admin/live">Live requests</Link>.</p>
         <button type="button" className={`am-btn${sound ? " is-pinned" : ""}`} aria-pressed={sound} onClick={toggleSound}>
           <MaterialSymbol name={sound ? "volume_up" : "volume_off"} />
           {sound ? "Sound on for new alerts" : "Sound off"}

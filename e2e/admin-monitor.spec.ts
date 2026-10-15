@@ -183,7 +183,7 @@ async function openAdmin(page: Page, path: string) {
   return { w, socket, errors };
 }
 
-const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 const shot = async (page: Page, name: string) => {
   if (!SHOTS) return;
   // The app's launch splash covers every page for a moment after loading.
@@ -223,10 +223,10 @@ test("Live requests: each job's live line, the day's numbers, tabs and search, a
   await expect(page.getByTestId("live-row-5503")).toBeVisible();
   await expect(page.getByTestId("live-row-5502")).toHaveCount(0);
   await page.getByRole("tab", { name: /^All live/ }).click();
-  await page.getByLabel("Search requests").fill("priya");
+  await page.getByLabel("Search requests", { exact: true }).fill("priya");
   await expect(page.getByTestId("live-row-5499")).toBeVisible();
   await expect(page.getByTestId("live-row-5502")).toHaveCount(0);
-  await page.getByLabel("Search requests").fill("");
+  await page.getByLabel("Search requests", { exact: true }).fill("");
 
   // The server moves #5502 on and says so: the row changes without a reload.
   w.live = { ...w.live, requests: w.live.requests.map((r) => (r.id === 5502 ? { ...r, status: "arrived", phase: "arrived", steps: { done: 2, now: 2 }, arrivedAt: iso(-5_000) } : r)) };
@@ -234,7 +234,7 @@ test("Live requests: each job's live line, the day's numbers, tabs and search, a
   await expect(page.getByTestId("live-row-5502").locator(".am-chip")).toHaveText(/Arrived/);
   await expect(page.getByTestId("live-row-5502")).toContainText("At the vehicle");
 
-  await expect(page.getByRole("tab", { name: "All requests" })).toBeVisible();
+  await expect(page.locator('nav[aria-label="Admin"] a[href="/admin/requests"]')).toHaveCount(1);
   expect(await noSideScroll(page)).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -265,7 +265,7 @@ test("Monitor: one job on its live map, the live feed moves the ETA, and the tim
   await expect(timeline).toContainText("Offered to Ravi N");
   await expect(timeline).toContainText("Promised arrival");
   await expect(panel.locator(".am-offers")).toContainText("Declined");
-  await expect(panel.getByRole("link", { name: "Arun Kumar", exact: true })).toHaveAttribute("href", "/admin/extended/technicians/7/record");
+  await expect(panel.getByRole("link", { name: "Arun Kumar", exact: true })).toHaveAttribute("href", "/admin/technicians/7");
   await expect(panel.getByRole("link", { name: "Call Asha Raman" })).toHaveAttribute("href", "tel:9876543210");
   await expect(panel.locator(".am-kv")).toContainText("₹110");
   await shot(page, "monitor");
@@ -331,9 +331,9 @@ test("Replay: a finished job's route, what happened and how long it took", async
 });
 
 test("Technician record: the numbers, job history, cancellations and delays, and reviews", async ({ page }) => {
-  const { w, socket, errors } = await openAdmin(page, "/admin/extended/technicians/42/record");
-  const record = page.getByTestId("technician-record");
-  await expect(record.getByRole("heading", { name: "Selvam R" })).toBeVisible();
+  const { w, socket, errors } = await openAdmin(page, "/admin/technicians/42");
+  const record = page.getByTestId("technician-page");
+  await expect(record.locator(".pp-name")).toContainText("Selvam R");
   await expect(record).toContainText("On duty · on job #5502");
   const kpi = (label: string) => record.locator(".at-kpi").filter({ hasText: label });
   await expect(kpi("Jobs completed")).toContainText("207");

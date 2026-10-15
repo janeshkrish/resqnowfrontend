@@ -54,7 +54,7 @@ export type Question = {
   options?: QuestionOption[];
   byType?: Partial<Record<OptionSet, QuestionOption[]>>;
   extra?: QuestionOption;
-  only?: "four-wheeler" | "two-wheeler";
+  only?: "four-wheeler" | "two-wheeler" | "ev" | "non-ev";
   hideIf?: { q: string; is: string };
   callouts?: Callout[];
 };
@@ -209,9 +209,23 @@ export const SERVICE_SPECS: Record<ServiceKey, ServiceSpec> = {
     tip: DEFAULT_TIP,
     questions: [
       {
+        id: "battery_scope",
+        label: "Which EV battery needs help?",
+        kind: "list",
+        only: "ev",
+        need: "the EV battery scope",
+        helper: "An EV-support technician follows the model-specific procedure. Never jump-start the main-drive battery.",
+        options: [
+          { v: "auxiliary", label: "Low-voltage / auxiliary battery", sub: "Help with the small battery powering controls and accessories", icon: "battery_alert" },
+          { v: "traction", label: "Main-drive / traction battery", sub: "Specialist inspection of the battery that drives the vehicle", icon: "electric_car" },
+          { v: "unknown", label: "Not sure", sub: "An EV-support technician will assess it", icon: "help", chip: "EV battery scope not sure" },
+        ],
+      },
+      {
         id: "symptom",
         label: "When you start it, what happens?",
         kind: "cards",
+        only: "non-ev",
         need: "what happens",
         options: [
           { v: "dead", label: "Nothing at all", sub: "No lights, no sound", icon: "power_off" },
@@ -224,6 +238,7 @@ export const SERVICE_SPECS: Record<ServiceKey, ServiceSpec> = {
         id: "need",
         label: "What do you need?",
         kind: "seg",
+        only: "non-ev",
         need: "what you need",
         options: [
           { v: "jump", label: "Jump-start" },
@@ -264,9 +279,22 @@ export const SERVICE_SPECS: Record<ServiceKey, ServiceSpec> = {
         callouts: [{ when: "tow", tone: "info", icon: "local_shipping", text: "We’ll move you to towing so you can pick the garage.", switchTo: "towing" }],
       },
       {
+        id: "mechanical_scope",
+        label: "What needs inspection on your EV?",
+        kind: "list",
+        only: "ev",
+        need: "the EV mechanical scope",
+        options: [
+          { v: "chassis", label: "Wheels, suspension or brakes", sub: "Chassis inspection of wheels, suspension and brakes", icon: "car_repair" },
+          { v: "ev-system", label: "Motor, controller or electrical faults", sub: "An EV-support technician checks the electric drive system", icon: "electric_bolt" },
+          { v: "unknown", label: "Not sure", sub: "An EV-support technician will assess the problem", icon: "help", chip: "EV mechanical scope not sure" },
+        ],
+      },
+      {
         id: "issue",
         label: "What do you notice?",
         kind: "chips",
+        only: "non-ev",
         multi: true,
         optional: true,
         scroll: true,
@@ -450,7 +478,8 @@ export const SERVICE_SPECS: Record<ServiceKey, ServiceSpec> = {
             { v: "brand", label: "Brand’s own plug", sub: "Ather, Ola, TVS or Bajaj charger", art: "brand" },
           ],
         },
-        extra: { v: "dk", label: "Don’t know? Add a photo of the socket on the last step", icon: "photo_camera", chip: "Socket not known" },
+        extra: { v: "dk", label: "Not sure · use towing to a charger", icon: "help", chip: "Socket not known" },
+        callouts: [{ when: "dk", tone: "info", icon: "local_shipping", text: "A known socket is required to arrange compatible charging. Choose towing to a charger if you’re unsure.", switchTo: "towing" }],
       },
       {
         id: "plan",
@@ -461,6 +490,7 @@ export const SERVICE_SPECS: Record<ServiceKey, ServiceSpec> = {
           { v: "charge", label: "Charge it here", icon: "ev_station", chip: "Charge here" },
           { v: "tow", label: "Tow to a charger", icon: "local_shipping", chip: "Tow to charger" },
         ],
+        callouts: [{ when: "tow", tone: "info", icon: "local_shipping", text: "Go to towing to arrange a vehicle carrier to a charger.", switchTo: "towing" }],
       },
     ],
   },

@@ -9,6 +9,7 @@ import {
   isUrgent,
   optionsFor,
   toggleAnswer,
+  shownQuestions,
   type Answers,
 } from "./requestForm";
 
@@ -60,6 +61,59 @@ describe("request questions", () => {
     answers = toggleAnswer(answers, question(flat, "tyretype"), "tube");
     answers = toggleAnswer(answers, question(flat, "tyretype"), "tubeless");
     expect(answers.tyretype).toBe("tubeless");
+  });
+});
+
+describe("EV service scope", () => {
+  const ev = { family: "ev" as const, classId: "electric-scooter" };
+  const car = { family: "car" as const, classId: "sedan" };
+
+  it("requires a mechanical scope for EVs while ordinary vehicles keep their questions", () => {
+    const answers = { help: "inspect", drive: "no" };
+    expect(firstMissingAnswer(SERVICE_SPECS.mechanical, answers, ev)).toBe("the EV mechanical scope");
+    expect(firstMissingAnswer(SERVICE_SPECS.mechanical, answers, car)).toBeNull();
+    expect(shownQuestions(SERVICE_SPECS.mechanical, answers, car).map(entry => entry.id)).toEqual(["help", "issue", "drive"]);
+    expect(shownQuestions(SERVICE_SPECS.mechanical, answers, ev).map(entry => entry.id)).toEqual(["help", "mechanical_scope", "drive"]);
+  });
+
+  it.each(["chassis", "ev-system", "unknown"])("sends EV mechanical scope %s through details.answers", (scope) => {
+    const answers = { help: "inspect", drive: "no", mechanical_scope: scope, issue: ["heat"] };
+    expect(firstMissingAnswer(SERVICE_SPECS.mechanical, answers, ev)).toBeNull();
+    const details = buildRequestDetails({ spec: SERVICE_SPECS.mechanical, answers, context: ev });
+    expect(details.answers).toContainEqual(expect.objectContaining({ id: "mechanical_scope", value: scope, label: expect.any(String) }));
+    expect(details.answers.some(entry => entry.id === "issue")).toBe(false);
+  });
+
+  it("requires the EV battery scope instead of ordinary starting questions", () => {
+    expect(firstMissingAnswer(SERVICE_SPECS.battery, {}, ev)).toBe("the EV battery scope");
+    expect(firstMissingAnswer(SERVICE_SPECS.battery, { symptom: "slow", need: "jump" }, car)).toBeNull();
+    expect(shownQuestions(SERVICE_SPECS.battery, {}, car).map(entry => entry.id)).toEqual(["symptom", "need", "age"]);
+    expect(shownQuestions(SERVICE_SPECS.battery, {}, ev).map(entry => entry.id)).toEqual(["battery_scope", "age"]);
+  });
+
+  it.each(["auxiliary", "traction", "unknown"])("sends EV battery scope %s without legacy jump-start answers", (scope) => {
+    const answers = { battery_scope: scope, symptom: "slow", need: "jump" };
+    expect(firstMissingAnswer(SERVICE_SPECS.battery, answers, ev)).toBeNull();
+    expect(buildRequestDetails({ spec: SERVICE_SPECS.battery, answers, context: ev }).answers).toEqual([
+      expect.objectContaining({ id: "battery_scope", value: scope, label: expect.any(String) }),
+    ]);
+  });
+});
+
+describe("EV physical body details", () => {
+  it.each([
+    ["electric-car", "hatchback"], ["electric-car", "sedan"], ["electric-bike", "sports-bike"],
+    ["electric-suv", "compact-suv"], ["electric-suv", "big-suv"], ["electric-scooter", "scooter"],
+  ])("sends physical class %s / %s as structured details", (classId, baseSubtype) => {
+    const details = buildRequestDetails({ spec: flat, answers: {}, context: { family: "ev", classId, baseSubtype } });
+    expect(details).toMatchObject({ vehicle_base_subtype: baseSubtype, answers: [] });
+  });
+
+  it.each([
+    ["electric-car", "sports-bike"], ["electric-suv", "sedan"], ["electric-bike", "hatchback"],
+    ["electric-scooter", "premium-bike"], ["electric-car", ""], ["unknown", "sedan"],
+  ])("omits missing or contradictory body %s / %s", (classId, baseSubtype) => {
+    expect(buildRequestDetails({ spec: flat, answers: {}, context: { family: "ev", classId, baseSubtype } })).not.toHaveProperty("vehicle_base_subtype");
   });
 });
 

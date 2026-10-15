@@ -5,9 +5,10 @@ import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { VehiclePhoto } from "@/components/garage/GarageParts";
 import type { CatalogBrand, CatalogModel } from "@/data/indianVehicles";
 import { formatPlate, initialsOf, shortMake, type Vehicle } from "@/lib/garage";
-import { classesFor, vehicleClassInfo, type VehicleFamily } from "@/lib/vehicleClasses";
+import { baseClassesForEv, classesFor, vehicleClassInfo, type VehicleFamily } from "@/lib/vehicleClasses";
 import {
   brandById,
+  baseSubtypeFor,
   brandsFor,
   catalogFor,
   choiceFromCatalog,
@@ -97,10 +98,13 @@ export default function VehiclePicker({ family, choice, garage, onChange, showCl
 
   const close = () => { setSheet(null); setQuery(""); setBrandQuery(""); };
   const pickModel = (entry: CatalogModel) => { onChange(choiceFromCatalog(entry, family)); close(); };
-  const startManual = (name: string) => { onChange(manualChoice(name)); close(); };
+  const startManual = (name: string, manualBrand = "") => { onChange(manualChoice(name, family === "ev" ? manualBrand : "")); close(); };
   const sentence = classSentence(choice);
   const classHelp = sentence ?? (classSetsPrice ? "Sets the towing price" : "Pick the closest");
   const classes = classesFor(family);
+  const bodyClasses = family === "ev" ? baseClassesForEv(choice.vehicleSubtype) : [];
+  const baseSubtype = baseSubtypeFor(choice, family);
+  const knownBody = model && model.evClass === choice.vehicleSubtype && bodyClasses.some(entry => entry.id === model.vehicleClass);
 
   return (
     <>
@@ -166,12 +170,19 @@ export default function VehiclePicker({ family, choice, garage, onChange, showCl
               <input
                 type="text"
                 value={choice.manualName ?? ""}
-                onChange={(event) => onChange(manualChoice(event.target.value))}
+                onChange={(event) => onChange(manualChoice(event.target.value, family === "ev" ? choice.vehicleBrand : ""))}
                 placeholder={`Type your ${word}’s name, e.g. ${family === "bike" ? "Yamaha RX 100" : "Opel Astra"}`}
                 aria-label={`Name of your ${word}`}
                 autoComplete="off"
               />
             </label>
+            {family === "ev" ? (
+              <label className="rqf-search">
+                <MaterialSymbol name="electric_car" />
+                <input type="text" value={choice.vehicleBrand ?? ""} aria-label="EV brand" placeholder="Brand, e.g. Ather or Ola"
+                  autoComplete="off" maxLength={80} onChange={event => onChange({ vehicleBrand: event.target.value })} />
+              </label>
+            ) : null}
             {garage.length ? (
               <button type="button" className="rqf-type-link rq-press" onClick={() => onChange(clearedChoice("choose"))}>
                 <MaterialSymbol name="list" />Pick from list
@@ -217,7 +228,8 @@ export default function VehiclePicker({ family, choice, garage, onChange, showCl
                   role="radio"
                   aria-checked={on}
                   className={cn("rqf-class-tile rq-press", on && "is-on")}
-                  onClick={() => onChange({ vehicleSubtype: entry.id })}
+                  onClick={() => onChange({ vehicleSubtype: entry.id,
+                    ...(family === "ev" ? { vehicleBaseSubtype: entry.id === choice.vehicleSubtype ? baseSubtype : "" } : {}) })}
                 >
                   <span className="rqf-class-pic"><VehicleArt art={entry.art} electric={entry.electric} /></span>
                   <b>{entry.label}</b>
@@ -226,6 +238,22 @@ export default function VehiclePicker({ family, choice, garage, onChange, showCl
               );
             })}
           </div>
+        </div>
+      ) : null}
+
+      {showClasses && bodyClasses.length > 1 ? (
+        <div className="rqf-sec">
+          <p className="rqf-lbl" id="rqf-lbl-ev-body"><span>EV body type</span><small>{knownBody ? "From the selected model" : "If known"}</small></p>
+          {knownBody ? <p className="rqf-help">{vehicleClassInfo(baseSubtype)?.label}</p> : (
+            <div className={cn("rqf-class-grid", `n${bodyClasses.length + 1}`)} role="radiogroup" aria-labelledby="rqf-lbl-ev-body">
+              {bodyClasses.map(entry => <button key={entry.id} type="button" role="radio" aria-checked={baseSubtype === entry.id}
+                className={cn("rqf-class-tile rq-press", baseSubtype === entry.id && "is-on")} onClick={() => onChange({ vehicleBaseSubtype: entry.id })}>
+                <span className="rqf-class-pic"><VehicleArt art={entry.art} electric /></span><b>{entry.label}</b>
+              </button>)}
+              <button type="button" role="radio" aria-checked={!baseSubtype} className={cn("rqf-class-tile rq-press", !baseSubtype && "is-on")}
+                onClick={() => onChange({ vehicleBaseSubtype: "" })}><b>Not sure</b></button>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -301,7 +329,7 @@ export default function VehiclePicker({ family, choice, garage, onChange, showCl
                   </button>
                 ))}
                 {!allBrands.length ? (
-                  <button type="button" className="rqf-place rqf-place-add" onClick={() => startManual(brandQuery.trim())}>
+                  <button type="button" className="rqf-place rqf-place-add" onClick={() => startManual(brandQuery.trim(), brandQuery.trim())}>
                     <span className="rqf-row-ic"><MaterialSymbol name="add" /></span>
                     <span className="rqf-row-id"><b>Not in the list? Type the name</b><small>Then tap the closest {family === "car" ? "size" : "type"}</small></span>
                   </button>
@@ -328,7 +356,7 @@ export default function VehiclePicker({ family, choice, garage, onChange, showCl
                     ))}
                   </div>
                 ) : null))}
-                <button type="button" className="rqf-place rqf-place-add" onClick={() => startManual(`${brand.name} `)}>
+                <button type="button" className="rqf-place rqf-place-add" onClick={() => startManual(`${brand.name} `, brand.name)}>
                   <span className="rqf-row-ic"><MaterialSymbol name="add" /></span>
                   <span className="rqf-row-id"><b>Model not listed? Type the name</b><small>Then tap the closest {family === "car" ? "size" : "type"}</small></span>
                 </button>

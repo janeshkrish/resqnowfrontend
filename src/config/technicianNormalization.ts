@@ -61,6 +61,8 @@ export function canonicalizeServiceKey(input: unknown): string {
 export function canonicalizeVehicleKey(input: unknown): string {
   const n = normalizeText(input);
   if (!n) return "";
+  // Electric labels retain their family even when they also contain bike/car aliases.
+  if (toTokens(n).some(token => token === "ev" || token === "electric")) return "ev";
   for (const [key, aliases] of Object.entries(VEHICLE_ALIASES)) {
     if (aliases.some((a) => aliasMatch(n, normalizeText(a)))) {
       return key;

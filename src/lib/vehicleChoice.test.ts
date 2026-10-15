@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Vehicle } from "@/lib/garage";
 import {
   catalogFor,
+  brandsFor,
   choiceFromCatalog,
   choiceFromGarage,
   classSentence,
@@ -44,6 +45,16 @@ describe("searchCatalog", () => {
     expect(searchCatalog("ev", "ather 450x")[0]).toMatchObject({ evClass: "electric-scooter" });
     expect(searchCatalog("ev", "swift")).toEqual([]);
   });
+
+  it("keeps pure EV models and brands out of ordinary choices without removing combustion or hybrid models", () => {
+    expect(searchCatalog("car", "tiago ev")).toEqual([]);
+    expect(searchCatalog("bike", "ather 450x")).toEqual([]);
+    expect(brandsFor("bike").map(brand => brand.id)).not.toContain("ather");
+    expect(brandsFor("car").map(brand => brand.id)).toContain("tata");
+    expect(searchCatalog("car", "grand vitara").some(model => model.model === "Grand Vitara")).toBe(true);
+    expect(searchCatalog("car", "swift").some(model => model.model === "Swift")).toBe(true);
+    expect(catalogFor("ev").some(model => model.model === "450X")).toBe(true);
+  });
 });
 
 describe("choices", () => {
@@ -53,6 +64,23 @@ describe("choices", () => {
     expect(choice).toMatchObject({ vehicleBrand: "Maruti Suzuki", vehicleModel: "Maruti Suzuki Swift", vehicleSubtype: "hatchback", vehicleSource: "catalog" });
     expect(displayName(choice)).toBe("Maruti Swift");
     expect(classSentence(choice)).toBe("Swift is a hatchback");
+  });
+
+  it.each([
+    ["tiago ev", "Tiago EV", "electric-car", "hatchback"],
+    ["tigor ev", "Tigor EV", "electric-car", "sedan"],
+    ["nexon ev", "Nexon EV", "electric-suv", "compact-suv"],
+    ["ioniq 5", "Ioniq 5", "electric-suv", "big-suv"],
+    ["revolt rv400", "RV400", "electric-bike", "commuter-bike"],
+    ["ultraviolette f77", "F77", "electric-bike", "sports-bike"],
+  ])("preserves the physical body for catalogue EV %s", (query, name, evClass, baseClass) => {
+    const model = searchCatalog("ev", query).find(entry => entry.model === name)!;
+    expect(choiceFromCatalog(model, "ev")).toMatchObject({ vehicleSubtype: evClass, vehicleBaseSubtype: baseClass });
+  });
+
+  it("preserves a saved EV's known body and clears it for a newly typed vehicle", () => {
+    expect(choiceFromGarage(vehicle(8, "car", "Tata Motors", "Tiago EV"), "ev")).toMatchObject({ vehicleSubtype: "electric-car", vehicleBaseSubtype: "hatchback" });
+    expect(manualChoice("Prototype EV")).toMatchObject({ vehicleSubtype: "", vehicleBaseSubtype: "" });
   });
 
   it("finds a saved garage vehicle in the catalogue so its class fills in", () => {
@@ -66,10 +94,10 @@ describe("choices", () => {
   });
 
   it("offers garage vehicles that fit the request", () => {
-    const garage = [vehicle(1, "car", "Tata Motors", "Nexon EV"), vehicle(2, "bike", "Ather Energy", "450X"), vehicle(3, "car", "Maruti Suzuki", "Swift")];
-    expect(garageForFamily(garage, "car").map((entry) => entry.id)).toEqual([1, 3]);
-    expect(garageForFamily(garage, "bike").map((entry) => entry.id)).toEqual([2]);
-    expect(garageForFamily(garage, "ev").map((entry) => entry.id)).toEqual([1, 2]);
+    const garage = [vehicle(1, "car", "Tata Motors", "Nexon EV"), vehicle(2, "bike", "Ather Energy", "450X"), vehicle(3, "car", "Maruti Suzuki", "Swift"), vehicle(4, "car", "Tata Motors", "Tata Motors Tiago EV")];
+    expect(garageForFamily(garage, "car").map((entry) => entry.id)).toEqual([3]);
+    expect(garageForFamily(garage, "bike").map((entry) => entry.id)).toEqual([]);
+    expect(garageForFamily(garage, "ev").map((entry) => entry.id)).toEqual([1, 2, 4]);
     expect(garageForFamily(garage, "commercial")).toEqual([]);
   });
 
@@ -77,5 +105,12 @@ describe("choices", () => {
     const choice = manualChoice("  Opel   Astra");
     expect(choice).toMatchObject({ vehicleModel: "Opel Astra", vehicleBrand: "", vehicleSubtype: "", vehicleSource: "manual" });
     expect(classSentence({ ...choice, vehicleSubtype: "sedan" })).toBeNull();
+  });
+
+  it("accepts an explicit manual brand while clearing catalog and physical-class identity", () => {
+    expect(manualChoice(" Prototype   X ", " Ather Energy ")).toMatchObject({
+      vehicleModel: "Prototype X", vehicleBrand: "Ather Energy", vehicleSource: "manual",
+      catalogBrandId: null, catalogModelId: null, vehicleSubtype: "", vehicleBaseSubtype: "",
+    });
   });
 });

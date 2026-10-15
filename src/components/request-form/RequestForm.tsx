@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -25,7 +25,7 @@ import {
   type Attachment,
   type FormContext,
 } from "@/lib/requestForm";
-import { choiceFromGarage, displayName, garageForFamily, hasVehicle, vehicleWord, type VehicleChoice } from "@/lib/vehicleChoice";
+import { baseSubtypeFor, choiceFromGarage, displayName, garageForFamily, hasVehicle, isKnownElectricChoice, vehicleWord, type VehicleChoice } from "@/lib/vehicleChoice";
 import { isTwoWheeler, vehicleClassInfo, type VehicleFamily } from "@/lib/vehicleClasses";
 import { cn } from "@/lib/utils";
 import { ContactBlock, NotesBlock, PlateAndSave, RequestSummary } from "./ConfirmStep";
@@ -64,8 +64,17 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
 
   const garageQuery = useQuery({ queryKey: GARAGE_QUERY_KEY, queryFn: listVehicles, staleTime: 60_000 });
   const garage = useMemo(() => garageForFamily(garageQuery.data ?? [], family), [family, garageQuery.data]);
+  const requiresEvForm = (data: FormData) => family !== "ev" && (data.vehicleType === "ev" || isKnownElectricChoice(data));
+
+  const chargingRequirement = (data: FormData): string | null => {
+    if (spec.key !== "ev-charging") return null;
+    if (!["ccs2", "type2", "home", "brand"].includes(String(data.answers?.port || ""))) return "a known charging socket";
+    if (data.answers?.port === "brand" && !text(data.vehicleBrand)) return "your vehicle brand";
+    return null;
+  };
 
   const missingOnStep1 = (data: FormData): string | null => {
+    if (requiresEvForm(data)) return "EV services for this vehicle";
     const answers = data.answers ?? {};
     const context: FormContext = { family, classId: data.vehicleSubtype };
     if (isSos) return firstMissingAnswer(spec, answers, context);
@@ -73,7 +82,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
     if (first) return first;
     if (!hasVehicle(data)) return `your ${word}`;
     if (!data.vehicleSubtype) return family === "car" ? "the car size" : "the type";
-    return firstMissingAnswer(spec, answers, context);
+    return firstMissingAnswer(spec, answers, context) ?? chargingRequirement(data);
   };
 
   const saveToGarage = async (data: FormData) => {
@@ -99,6 +108,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
     createInitialFormData: (techId) => ({
       vehicleType: family,
       vehicleSubtype: "",
+      vehicleBaseSubtype: "",
       vehicleModel: "",
       vehicleBrand: "",
       location: "",
@@ -120,13 +130,14 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
     buildDescription: () => "",
     buildRequestExtras: (raw) => {
       const data = raw as FormData;
+      if (requiresEvForm(data)) throw new Error("Use EV services for this electric vehicle.");
       return {
         vehicle_brand: text(data.vehicleBrand) || null,
         vehicle_subtype: text(data.vehicleSubtype) || null,
         details: buildRequestDetails({
           spec,
           answers: data.answers ?? {},
-          context: { family, classId: data.vehicleSubtype },
+          context: { family, classId: data.vehicleSubtype, baseSubtype: baseSubtypeFor(data, family) },
           landmark: data.landmark,
           plate: data.plate,
           note: data.note,
@@ -136,10 +147,12 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
     },
     buildEstimateExtras: (raw) => {
       const data = raw as FormData;
+      const baseSubtype = baseSubtypeFor(data, family);
       return {
         vehicleBrand: text(data.vehicleBrand) || null,
         vehicleSubtype: text(data.vehicleSubtype) || null,
         canRoll: typeof data.answers?.roll === "string" ? data.answers.roll : null,
+        ...(baseSubtype ? { details: { vehicle_base_subtype: baseSubtype } } : {}),
       };
     },
     onSubmitted: (data) => saveToGarage(data as FormData),
@@ -149,6 +162,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
 
   const { currentStep, isSubmitting, setFormData } = flow;
   const formData = flow.formData as FormData;
+  const evFormRequired = requiresEvForm(formData);
   const setForm = useCallback(
     (patch: Partial<FormData>) => setFormData((previous: ServiceRequestFormData) => ({ ...previous, ...patch })),
     [setFormData],
@@ -234,6 +248,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
 
   // ---------------------------------------------------------------- the dock
   const missing = currentStep === 1 ? missingOnStep1(formData) : null;
+  const chargingMissing = chargingRequirement(formData);
   const stepTwoReady = currentStep === 2 ? flow.canProceed() : true;
   let dockIcon = "payments";
   let dockText = startingPrice ? `Starts from ${rupees(startingPrice)} · you pay after the work is done` : "You pay after the work is done";
@@ -248,6 +263,11 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   if (isSos) { dockIcon = "support_agent"; dockText = "No payment now · we’ll call you to confirm"; }
   if (currentStep === 2 && !isTowing && !isSos) { dockIcon = "location_on"; dockText = "Help comes to this spot"; }
   if (missing) { dockIcon = "info"; dockText = "Answer above to continue"; }
+  if (chargingMissing) {
+    dockIcon = "info";
+    dockText = chargingMissing === "your vehicle brand" ? "Choose your vehicle brand for its charging connector" : "Choose a known socket or use towing to a charger";
+  }
+  if (evFormRequired) { dockIcon = "info"; dockText = "Use EV services for this electric vehicle"; }
 
   const stepTwoNeed = !text(formData.location)
     ? (isTowing ? "Choose where to pick up" : "Choose your location")
@@ -266,6 +286,14 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   };
 
   const onSend = () => {
+    if (evFormRequired) {
+      toast.error("Use EV services for this electric vehicle.");
+      return false;
+    }
+    if (chargingMissing) {
+      toast.error(`Choose ${chargingMissing}`, { description: "If you don’t know the socket, use towing to a charger." });
+      return false;
+    }
     if (mediaBusy) {
       toast.message("Wait a moment", { description: "Your photo or voice note is still uploading." });
       return false;
@@ -292,7 +320,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
     const vehicle: VehicleChoice = {
       vehicleTab: formData.vehicleTab, vehicleSource: formData.vehicleSource, garageVehicleId: formData.garageVehicleId,
       catalogBrandId: formData.catalogBrandId, catalogModelId: formData.catalogModelId, manualName: formData.manualName,
-      vehicleBrand: formData.vehicleBrand, vehicleModel: formData.vehicleModel, vehicleSubtype: formData.vehicleSubtype, plate: formData.plate,
+      vehicleBrand: formData.vehicleBrand, vehicleModel: formData.vehicleModel, vehicleSubtype: formData.vehicleSubtype, vehicleBaseSubtype: formData.vehicleBaseSubtype, plate: formData.plate,
     };
     try {
       localStorage.setItem(draftKey, JSON.stringify({
@@ -324,7 +352,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   const vehicleLine = hasVehicle(formData)
     ? [displayName(formData), classInfo?.label].filter(Boolean).join(" · ")
     : isSos ? "Vehicle not added" : "Vehicle not chosen";
-  const chips = answerChips(spec, answers, context);
+  const chips = evFormRequired ? [] : answerChips(spec, answers, context);
   let priceLabel = "Starts from";
   let priceValue = startingPrice ? rupees(startingPrice) : "Told before work starts";
   if (isSos) { priceLabel = "Payment"; priceValue = "Nothing now"; }
@@ -335,7 +363,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
   const firstQuestions = spec.questions.filter((question) => question.first);
   const otherQuestions = spec.questions.filter((question) => !question.first);
   const renderQuestion = (question: Question) =>
-    isQuestionShown(question, answers, context) ? (
+    !evFormRequired && isQuestionShown(question, answers, context) ? (
       <QuestionField
         key={question.id}
         question={question}
@@ -378,6 +406,10 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
         </div>
 
         <div className="rqf-body">
+          {family !== "ev" ? <p className="rqf-note rqf-sec">
+            {evFormRequired ? "This vehicle is electric. " : "Have an electric vehicle? "}
+            <Link to={`/request-service/${spec.key === "fuel" ? "ev-charging" : serviceId}/ev`}>Use EV services</Link>
+          </p> : null}
           {currentStep === 1 ? (
             isSos ? (
               spec.questions.map(renderQuestion)

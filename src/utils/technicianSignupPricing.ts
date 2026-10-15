@@ -300,6 +300,15 @@ export const SIGNUP_SERVICES = [
   { id: 'ev-charging', label: 'EV charging', description: 'Portable charging' },
 ] as const;
 
+export const SIGNUP_EV_CONNECTORS = [
+  { id: 'ccs2', label: 'CCS2' },
+  { id: 'type2', label: 'Type 2' },
+  { id: 'home', label: 'Home plug' },
+  { id: 'brand', label: 'Brand’s own plug' },
+] as const;
+
+export const signupCsvTokens = (value: unknown): string[] => uniqueStrings(String(value || '').split(',').map(token => token.trim().toLowerCase()));
+
 const REQUEST_SUBTYPE_ALIASES: Record<string, Record<string, string[]>> = {
   bike: { bike: ['commuter-bike', 'sports-bike', 'premium-bike'], scooter: ['scooter'] },
   car: { sedan: ['sedan'], hatchback: ['hatchback'], suv: ['compact-suv', 'big-suv'], mpv: ['mpv'] },
@@ -343,7 +352,13 @@ export function buildLegacySignupPricingConfig(rows: PricingRow[]) {
         subcategories }];
     }));
     const key = domain === 'flat-tire' ? 'flat_tire_vehicle_pricing' : domain === 'towing' ? 'towing_vehicle_pricing' : 'vehicle_pricing';
-    return { service_domain: domain, service_name: domain, vehicle_categories: [...vehicles.keys()], [key]: vehiclePricing };
+    const chargingRows = domain === 'ev-charging' ? [...vehicles.values()].flat() : [];
+    const metadata = chargingRows.length ? {
+      supported_connectors: uniqueStrings(chargingRows.flatMap(row => signupCsvTokens(row.pricing_json.supported_connectors))).join(','),
+      supported_ev_brands: uniqueStrings(chargingRows.flatMap(row => signupCsvTokens(row.pricing_json.supported_ev_brands))).join(','),
+    } : undefined;
+    return { service_domain: domain, service_name: domain, vehicle_categories: [...vehicles.keys()], [key]: vehiclePricing,
+      ...(metadata ? { metadata } : {}) };
   });
 }
 
@@ -368,6 +383,15 @@ export function getSignupPricingError(rows: PricingRow[], template: PricingTempl
       const relevantRows = rows.filter(row => row.service_id === service.id && row.vehicle_category_id === vehicle?.id);
       if (!vehicle || !relevantRows.length) return `Choose a ${vehicleId} subtype and set its ${SIGNUP_SERVICES.find(s => s.id === serviceId)?.label || serviceId} prices.`;
       for (const row of relevantRows) {
+        if (serviceId === 'ev-charging') {
+          const connectors = signupCsvTokens(row.pricing_json.supported_connectors);
+          if (!connectors.length || connectors.some(connector => !SIGNUP_EV_CONNECTORS.some(option => option.id === connector))) {
+            return `Choose at least one supported charging connector for ${row.pricing_json.vehicle_subtype_label}.`;
+          }
+          if (connectors.includes('brand') && !signupCsvTokens(row.pricing_json.supported_ev_brands).length) {
+            return `Enter the supported EV brands for ${row.pricing_json.vehicle_subtype_label}.`;
+          }
+        }
         for (const field of fields) {
           const raw = row.pricing_json[field.field_key];
           if ((field.required && (raw === '' || raw == null)) || (raw !== '' && raw != null && (!Number.isFinite(Number(raw)) || Number(raw) < 0))) {

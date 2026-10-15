@@ -10,6 +10,9 @@ type Options = {
   location: { lat: number; lng: number } | null;
   serviceType?: string | null;
   vehicleType?: string | null;
+  vehicleSubtype?: string | null;
+  vehicleBrand?: string | null;
+  details?: Record<string, unknown> | string | null;
 };
 
 /**
@@ -17,16 +20,20 @@ type Options = {
  * the Map tab uses, for this service and kind of vehicle, and asked again every half minute while the search runs.
  * Nothing is returned once the search is over, or if the list cannot be loaded.
  */
-export function useNearbySearchTechnicians({ enabled, location, serviceType, vehicleType }: Options): NearbyPoint[] | undefined {
+export function useNearbySearchTechnicians({ enabled, location, serviceType, vehicleType, vehicleSubtype, vehicleBrand, details }: Options): NearbyPoint[] | undefined {
   const lat = location?.lat;
   const lng = location?.lng;
   const searching = enabled && lat != null && lng != null;
+  const detailsJson = details ? (typeof details === "string" ? details : JSON.stringify(details)) : "";
   const query = useQuery({
-    queryKey: ["finding", "nearby", lat, lng, serviceType ?? "", vehicleType ?? ""],
+    queryKey: ["finding", "nearby", lat, lng, serviceType ?? "", vehicleType ?? "", vehicleSubtype ?? "", vehicleBrand ?? "", detailsJson],
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
       if (serviceType) params.set("service_type", String(serviceType));
       if (vehicleType) params.set("vehicle_type", String(vehicleType));
+      if (vehicleSubtype) params.set("vehicle_subtype", vehicleSubtype);
+      if (vehicleBrand) params.set("vehicle_brand", vehicleBrand);
+      if (detailsJson) params.set("details", detailsJson);
       const res = await apiFetch(`/api/technicians/nearby?${params.toString()}`, { signal });
       if (!res.ok) throw new Error(`Nearby technicians failed (${res.status})`);
       return nearbyAvailable(await res.json());

@@ -1,12 +1,12 @@
 import type { OptionSet, Question, QuestionOption, ServiceSpec } from "@/config/requestQuestions";
-import { isTwoWheeler, type VehicleFamily } from "@/lib/vehicleClasses";
+import { baseClassesForEv, isTwoWheeler, type VehicleFamily } from "@/lib/vehicleClasses";
 
 export type AnswerValue = string | string[];
 export type Answers = Record<string, AnswerValue>;
 
 export type Attachment = { type: "photo" | "voice"; url: string; name?: string };
 
-export type FormContext = { family: VehicleFamily; classId?: string | null };
+export type FormContext = { family: VehicleFamily; classId?: string | null; baseSubtype?: string | null };
 
 /** Which tyres the "Which tyre is flat?" picture offers. */
 export const TYRES: Record<"car" | "bike", QuestionOption[]> = {
@@ -53,6 +53,8 @@ export function toggleAnswer(answers: Answers, question: Question, value: string
 }
 
 export function isQuestionShown(question: Question, answers: Answers, context: FormContext) {
+  if (question.only === "ev" && context.family !== "ev") return false;
+  if (question.only === "non-ev" && context.family === "ev") return false;
   if (question.only) {
     const twoWheeler = isTwoWheeler(context.family, context.classId);
     if (question.only === "four-wheeler" && twoWheeler) return false;
@@ -111,7 +113,10 @@ export function buildRequestDetails({
   attachments?: Attachment[];
 }) {
   const shown = shownQuestions(spec, answers, context).filter((question) => hasAnswer(answers, question.id));
+  const baseSubtype = context.family === "ev" && baseClassesForEv(context.classId).some(entry => entry.id === context.baseSubtype)
+    ? context.baseSubtype : null;
   return {
+    ...(baseSubtype ? { vehicle_base_subtype: baseSubtype } : {}),
     answers: shown.map((question) => ({
       id: question.id,
       question: question.label,

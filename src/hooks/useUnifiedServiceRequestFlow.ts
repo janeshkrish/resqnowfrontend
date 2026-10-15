@@ -22,7 +22,7 @@ type UnifiedRequestFlowOptions = {
   /** More fields for POST /api/service-requests (vehicle_brand, vehicle_subtype, details). */
   buildRequestExtras?: (formData: ServiceRequestFormData) => Record<string, unknown>;
   /** More fields for the towing fare preview (vehicleSubtype, canRoll), and the key that changes when they do. */
-  buildEstimateExtras?: (formData: ServiceRequestFormData) => Record<string, string | null | undefined>;
+  buildEstimateExtras?: (formData: ServiceRequestFormData) => Record<string, unknown>;
   /** Runs after the request is created, before moving to tracking (e.g. saving the vehicle to My garage). */
   onSubmitted?: (formData: ServiceRequestFormData) => Promise<unknown> | void;
   successTitle?: string;
@@ -64,6 +64,13 @@ const normalizeCoordinateKey = (value: unknown) => {
   return parsed !== null ? parsed.toFixed(6) : "";
 };
 
+const normalizeEstimateExtra = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(normalizeEstimateExtra);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right)).map(([key, entry]) => [key, normalizeEstimateExtra(entry)]));
+  return typeof value === "string" ? value.trim().toLowerCase() : value ?? "";
+};
+
 const buildTowingEstimateInputKey = ({
   formData,
   serviceId,
@@ -73,10 +80,10 @@ const buildTowingEstimateInputKey = ({
   formData: ServiceRequestFormData;
   serviceId?: string;
   vehicleType: string;
-  extras?: Record<string, string | null | undefined>;
+  extras?: Record<string, unknown>;
 }) =>
   [
-    ...Object.keys(extras || {}).sort().map((key) => `${key}=${String(extras?.[key] ?? "").trim().toLowerCase()}`),
+    ...Object.keys(extras || {}).sort().map((key) => `${key}=${JSON.stringify(normalizeEstimateExtra(extras?.[key]))}`),
     String(serviceId || "").trim().toLowerCase(),
     String(vehicleType || "").trim().toLowerCase(),
     normalizeAddressValue(formData.location).toLowerCase(),

@@ -117,5 +117,7 @@ export const DISPATCH_REASON: Record<string, string> = {
   missing_location: "No shop location", service_profile_missing: "No services set", service_mismatch: "Doesn't do this service",
   vehicle_profile_missing: "No vehicles set", vehicle_mismatch: "Doesn't do this vehicle", out_of_range: "Too far",
   invalid_job_location: "The request has no location", invalid_service_domain: "Unknown service", invalid_vehicle_type: "Unknown vehicle",
+  ev_charging_compatibility_missing: "No charging connectors set", ev_connector_required: "The request has no connector",
+  ev_brand_required: "The request has no car brand", ev_connector_mismatch: "Doesn't have this connector", ev_brand_mismatch: "Doesn't charge this brand",
 };
 export const dispatchReason = (code: string) => DISPATCH_REASON[code] || code.replace(/_/g, " ");

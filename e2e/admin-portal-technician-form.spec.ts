@@ -63,7 +63,8 @@ test("add a technician: every step checks like the app sign-up, and the saved bo
   // 4 · Operations
   await next(page);
   await expect(f.getByText("Choose working hours or 24/7 availability").first()).toBeVisible();
-  await f.getByLabel("Available 24 × 7").check({ force: true });
+  await f.getByText("Available 24 × 7", { exact: true }).click();
+  await expect(f.getByLabel("Available 24 × 7")).toBeChecked();
   await f.getByLabel("Preferred language").selectOption("Tamil");
   await next(page);
 
@@ -107,8 +108,10 @@ test("add a technician: every step checks like the app sign-up, and the saved bo
   await expect(f).toContainText("2 price sets · 1 of 4 photos · Aadhaar given");
   await f.getByRole("button", { name: "Add technician" }).click();
   await expect(f.getByText("Confirm the details and the Terms.")).toBeVisible();
-  await f.getByLabel("The details are correct and they agree to the Terms").check({ force: true });
-  await f.getByLabel("They have read and agreed to the Technician Agreement").check({ force: true });
+  await f.getByText("The details are correct, and Prakash V agrees to the Terms *").click();
+  await f.getByText("Prakash V has read and agreed to the ResQNow Technician Agreement *").click();
+  await expect(f.getByLabel("The details are correct and they agree to the Terms")).toBeChecked();
+  await expect(f.getByLabel("They have read and agreed to the Technician Agreement")).toBeChecked();
   await f.getByText("Approve now").click();
   await shot(page, "add-tech-finish", info.project.name);
   await f.getByRole("button", { name: "Add technician" }).click();

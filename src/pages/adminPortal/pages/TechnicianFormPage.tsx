@@ -10,7 +10,7 @@ import { searchLocations, type LocationSearchResult } from "@/lib/geo";
 import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
 import { technicianSchema } from "@/services/technicianAuthService";
 import { buildTechnicianSignupPayload } from "@/utils/technicianSignupPayload";
-import { filterSignupPricing, getSelectedSignupVehicleTypes, getSignupPricingError, SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, type SignupVehicle } from "@/utils/technicianSignupPricing";
+import { filterSignupPricing, getSelectedSignupVehicleTypes, getSignupPricingError, SIGNUP_EV_CONNECTORS, SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, signupCsvTokens, type SignupVehicle } from "@/utils/technicianSignupPricing";
 import { createTechnician, getPriceMedians, getPricingTemplate, getTechnicianProfile, getTechnicianServicePricing, updateTechnicianProfile } from "../api/portalApi";
 import { rupees } from "../format";
 import { Btn, Check, ErrorState, Icon, Loading, Note, Pill, Radio, usePortalHeader } from "../ui";
@@ -550,6 +550,11 @@ function Pricing({ form, set, template, medians, problem }: { form: FormState; s
     const clean = value.replace(/[^\d.]/g, "");
     set("pricing_config", form.pricing_config.map((item) => (item === row ? { ...item, pricing_json: { ...item.pricing_json, [key]: clean === "" ? "" : Number(clean) } } : item)));
   };
+  /** Text kept as typed, like the app sign-up's connector and brand fields for EV charging. */
+  const setText = (row: PricingRow, key: string, value: string) => {
+    set("pricing_config", form.pricing_config.map((item) => (item === row ? { ...item, pricing_json: { ...item.pricing_json, [key]: value } } : item)));
+  };
+  const chargingRows = serviceKey === "ev-charging" ? rowsFor(service?.id, category?.id) : [];
   if (!form.specialties.length || !vehicles.length) return <Note tone="warn" icon="info">Pick at least one vehicle and one service in step 2 first.</Note>;
   const grid = `34px 150px repeat(${Math.max(1, fields.length)}, minmax(96px, 1fr))`;
   return (
@@ -610,6 +615,31 @@ function Pricing({ form, set, template, medians, problem }: { form: FormState; s
             })}
           </div>
         )}
+        {chargingRows.length ? (
+          <div className="ad-connectors" data-testid="ev-connectors">
+            <p className="ap-cap">Supported charging connectors *</p>
+            {chargingRows.map((row) => {
+              const label = String(row.pricing_json.vehicle_subtype_label || row.pricing_json.vehicle_subtype);
+              const chosen = signupCsvTokens(row.pricing_json.supported_connectors);
+              return (
+                <div key={String(row.pricing_json.vehicle_subtype)} className="ad-connector" role="group" aria-label={`Connectors for ${label}`}>
+                  <b>{label}</b>
+                  <div className="ad-connector-list">
+                    {SIGNUP_EV_CONNECTORS.map((connector) => {
+                      const on = chosen.includes(connector.id);
+                      return <Check key={connector.id} on={on} label={`${label} ${connector.label}`} onChange={() => setText(row, "supported_connectors", (on ? chosen.filter((item) => item !== connector.id) : [...chosen, connector.id]).join(","))}>{connector.label}</Check>;
+                    })}
+                  </div>
+                  {chosen.includes("brand") ? (
+                    <div className="ad-field"><label htmlFor={`brands-${row.pricing_json.vehicle_subtype}`}>Supported EV brands *</label>
+                      <input id={`brands-${row.pricing_json.vehicle_subtype}`} className="ad-in" value={String(row.pricing_json.supported_ev_brands ?? "")} placeholder="For example: Ather, Ola, TVS" onChange={(event) => setText(row, "supported_ev_brands", event.target.value)} /></div>
+                  ) : null}
+                </div>
+              );
+            })}
+            <p className="ad-hint"><Icon name="info" />Only the connectors and brands their equipment supports for each vehicle type, as in the app sign-up.</p>
+          </div>
+        ) : null}
         <Note icon="info">Types left unticked are not offered: a customer with one of them is not matched to this technician for this service. At least one type per vehicle is needed.</Note>
         {problem ? <Note tone="bad" icon="error"><b>{problem}</b> The same message the app shows; Continue stays blocked until it is fixed.</Note> : null}
       </section>

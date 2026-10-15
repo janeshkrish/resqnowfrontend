@@ -103,7 +103,7 @@ export function portalWorld() {
     verification_status: "verified", status: "approved", admin_hidden: false, is_active: true,
   };
   const template = {
-    services: [{ id: 1, service_name: "Flat Tire Repair", service_slug: "flat_tire_repair" }, { id: 3, service_name: "Towing Services", service_slug: "towing_services" }, { id: 8, service_name: "Winching Services", service_slug: "winching_services" }],
+    services: [{ id: 1, service_name: "Flat Tire Repair", service_slug: "flat_tire_repair" }, { id: 3, service_name: "Towing Services", service_slug: "towing_services" }, { id: 8, service_name: "Winching Services", service_slug: "winching_services" }, { id: 9, service_name: "EV Portable Charger", service_slug: "ev_portable_charger" }],
     categories: [{ id: 1, category_name: "Bike" }, { id: 2, category_name: "Car" }, { id: 3, category_name: "Commercial" }, { id: 4, category_name: "EV" }],
     subcategories: [{ id: 5, vehicle_category_id: 2, subcategory_name: "Hatchback" }, { id: 6, vehicle_category_id: 2, subcategory_name: "Sedan" }, { id: 7, vehicle_category_id: 2, subcategory_name: "SUV" }],
     pricingFields: [
@@ -113,6 +113,7 @@ export function portalWorld() {
       { id: 6, service_id: 3, field_key: "base_charge", field_label: "Base Charge", required: 1 }, { id: 7, service_id: 3, field_key: "free_distance", field_label: "Free Distance", required: 1 },
       { id: 8, service_id: 3, field_key: "cost_per_km", field_label: "Cost Per KM", required: 1 },
       { id: 9, service_id: 8, field_key: "recovery_fee", field_label: "Recovery Fee", required: 1 }, { id: 10, service_id: 8, field_key: "visit_charge", field_label: "Visit Charge", required: 1 },
+      { id: 11, service_id: 9, field_key: "charging_support_fee", field_label: "Charging Support Fee", required: 1 }, { id: 12, service_id: 9, field_key: "visit_charge", field_label: "Visit Charge", required: 1 },
     ],
     fleets: [{ id: 1, fleet_name: "Flatbed Trucks" }, { id: 2, fleet_name: "Front Lift Trucks" }, { id: 3, fleet_name: "Heavy Duty Wreckers" }],
   };

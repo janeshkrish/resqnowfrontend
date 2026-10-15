@@ -158,3 +158,41 @@ test("edit a technician: loads the saved record, keeps the same rules, and saves
   expect(body.dynamic_pricing_config).toHaveLength(2);
   expect(errors).toEqual([]);
 });
+
+test("EV charging asks for the supported connectors, and brands for a brand's own plug, as the app sign-up does", async ({ page }) => {
+  const { w, errors } = await openPortal(page, "/admin/technicians/42/edit");
+  const f = form(page);
+  await expect(f.getByLabel("Owner's name")).toHaveValue("Selvam Rajendran");
+  await f.getByRole("button", { name: /Services/ }).first().click();
+  for (const name of ["Bike", "Car", "EV", "Towing", "Winching", "EV charging"]) await f.getByRole("button", { name, exact: true }).click();
+  await f.getByRole("button", { name: /Pricing/ }).first().click();
+  const prices = f.getByTestId("pricing-step");
+  await prices.getByRole("row", { name: "Scooter" }).locator(".ap-check").click();
+  await prices.getByLabel("Scooter Charging Support Fee").fill("300");
+  await prices.getByLabel("Scooter Visit Charge").fill("150");
+  await f.getByRole("button", { name: /Preview/ }).first().click();
+  await f.getByRole("button", { name: "Save changes" }).click();
+  await expect(f).toContainText("Choose at least one supported charging connector for Scooter.");
+
+  await f.getByRole("button", { name: /Pricing/ }).first().click();
+  const connectors = prices.getByRole("group", { name: "Connectors for Scooter" });
+  await connectors.getByText("CCS2", { exact: true }).click();
+  await connectors.getByText("Brand’s own plug", { exact: true }).click();
+  await f.getByRole("button", { name: /Preview/ }).first().click();
+  await f.getByRole("button", { name: "Save changes" }).click();
+  await expect(f).toContainText("Enter the supported EV brands for Scooter.");
+
+  await f.getByRole("button", { name: /Pricing/ }).first().click();
+  await connectors.getByLabel("Supported EV brands *").fill("Ather, Ola");
+  await f.getByRole("button", { name: /Preview/ }).first().click();
+  await f.getByRole("button", { name: "Save changes" }).click();
+  await expect(page).toHaveURL(/\/admin\/technicians\/42\?tab=profile$/);
+  const body = w.calls.find((call) => call.method === "PUT" && call.path === "/api/technicians/42/profile")?.body as Record<string, unknown> & { dynamic_pricing_config: unknown[]; pricing_config: Record<string, unknown>[] };
+  expect(body).toMatchObject({ specialties: ["ev-charging"], vehicle_types: { ev: true } });
+  expect(body.dynamic_pricing_config).toEqual([{ service_id: 9, vehicle_category_id: 4, vehicle_subcategory_id: null, pricing_json: {
+    service_domain: "ev-charging", vehicle_type: "ev", vehicle_subtype: "scooter", vehicle_subtype_label: "Scooter",
+    charging_support_fee: 300, visit_charge: 150, supported_connectors: "ccs2,brand", supported_ev_brands: "Ather, Ola",
+  } }]);
+  expect(body.pricing_config[0]).toMatchObject({ service_domain: "ev-charging", metadata: { supported_connectors: "ccs2,brand", supported_ev_brands: "ather,ola" } });
+  expect(errors).toEqual([]);
+});

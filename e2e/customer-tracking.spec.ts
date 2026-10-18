@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
+import { openInAndroidApp } from "./fixtures/technicianPortal";
 
 const fakeMappls = readFileSync(new URL("./fixtures/fakeMapplsSdk.js", import.meta.url), "utf8");
 const SHOTS = process.env.TRACKING_SHOTS_DIR;
@@ -706,4 +707,96 @@ test("towing shows the pickup, the drop and the tow's own steps", async ({ page 
   await expect(details).toContainText("Drop · 4.2 km");
   await expect(details).toContainText("Ganapathy workshop, Sathy Road");
   await shot(page, "towing-details");
+});
+
+/** What the tracking page asked the Android app's TripUpdatesPlugin to show, oldest first. */
+const liveUpdates = (page: Page) =>
+  page.evaluate(() =>
+    (window as unknown as { __android: { calls: Array<{ plugin: string; method: string; options: Record<string, unknown> }> } }).__android.calls
+      .filter((call) => call.plugin === "TripUpdates" && call.method === "update")
+      .map((call) => call.options),
+  );
+const lastLiveUpdate = async (page: Page) => (await liveUpdates(page)).at(-1);
+
+test.describe("the Android app keeps the request at the top of the phone (Live Update)", () => {
+  test("follows the request from accepted to arrived, with the minutes in the chip", async ({ page }) => {
+    await openInAndroidApp(page);
+    const { state, seen, socket } = await openTracking(page, request({ status: "accepted" }));
+
+    await expect.poll(async () => (await lastLiveUpdate(page))?.title).toBe("Arun accepted your request");
+    expect(await lastLiveUpdate(page)).toMatchObject({
+      requestId: "5502",
+      phase: "accepted",
+      chip: "Found",
+      progress: 25,
+      tracker: "bike",
+      technicianName: "Arun Kumar",
+      technicianPhone: "9876500000",
+      service: "lockout",
+      alertTitle: "Arun accepted your request",
+      deepLinkPath: "/service-tracking/5502",
+    });
+
+    state.request = { ...state.request, status: "en-route" };
+    socket.send("job:status_update", { requestId: "5502", status: "en-route" });
+    await expect.poll(async () => (await lastLiveUpdate(page))?.phase).toBe("way");
+
+    // The backend's ETA reaches the card, and the same minutes reach the notification.
+    await expect.poll(async () => { socket.send("tracking:location:v1", fix()); return (await lastLiveUpdate(page))?.chip; }).toBe("5 min");
+    const onTheWay = await lastLiveUpdate(page);
+    expect(onTheWay).toMatchObject({ title: "Arun arrives in 5 min", tone: "", tracker: "bike" });
+    expect(String(onTheWay?.text)).toMatch(/^Arrives by \d{1,2}:\d{2} [ap]m · 1\.6 km away$/);
+    expect(Number(onTheWay?.arrivalAt)).toBeGreaterThan(Date.now());
+
+    // The same position again says nothing new, so nothing more is sent.
+    const sent = (await liveUpdates(page)).length;
+    socket.send("tracking:location:v1", fix({ sequenceId: 13 }));
+    await page.waitForTimeout(600);
+    expect((await liveUpdates(page)).length).toBe(sent);
+
+    state.request = { ...state.request, status: "arrived" };
+    socket.send("job:status_update", { requestId: "5502", status: "arrived" });
+    await expect.poll(async () => (await lastLiveUpdate(page))?.title).toBe("Arun is here");
+    expect(await lastLiveUpdate(page)).toMatchObject({ phase: "arrived", chip: "Here", tone: "ok", progress: 50, tracker: "check", alertTitle: "Arun is here" });
+
+    // One update for each change, not one for every render.
+    const phases = (await liveUpdates(page)).map((update) => update.phase);
+    expect(phases.filter((phase) => phase === "accepted")).toHaveLength(1);
+    expect(phases.filter((phase) => phase === "arrived")).toHaveLength(1);
+    expect(seen.errors).toEqual([]);
+  });
+
+  test("asks for the amount due, and thanks the customer once it is paid", async ({ page }) => {
+    await openInAndroidApp(page);
+    const { state, seen, socket } = await openTracking(page, request({ status: "payment_pending" }));
+
+    await expect.poll(async () => (await lastLiveUpdate(page))?.phase).toBe("pay");
+    const pay = await lastLiveUpdate(page);
+    expect(pay).toMatchObject({ tone: "hot", text: "Pay online, or give cash to Arun." });
+    expect(String(pay?.title)).toMatch(/^Work done · ₹11\d(\.\d\d)? to pay$/);
+    expect(pay?.chip).toBe(pay?.amountLabel);
+
+    state.request = { ...state.request, status: "paid", payment_status: "completed" };
+    socket.send("job:status_update", { requestId: "5502", status: "paid" });
+    await expect.poll(async () => (await lastLiveUpdate(page))?.title).toBe("Paid · thank you");
+    expect(await lastLiveUpdate(page)).toMatchObject({ phase: "rate", text: "How was Arun? One tap is enough.", alertTitle: "" });
+    expect(seen.errors).toEqual([]);
+  });
+
+  test("leaves a request that was already over alone", async ({ page }) => {
+    await openInAndroidApp(page);
+    const { seen } = await openTracking(page, request({ status: "paid", payment_status: "completed" }));
+    await expect(page.getByTestId("tracking-big")).toHaveText("How was Arun?");
+    await page.waitForTimeout(800);
+    expect(await liveUpdates(page)).toEqual([]);
+    expect(seen.errors).toEqual([]);
+  });
+
+  test("the website itself sends nothing to a phone", async ({ page }) => {
+    const { seen } = await openTracking(page, request({ status: "accepted" }));
+    await expect(card(page).locator(".lt-say")).toHaveText("Arun accepted your request");
+    const bridge = await page.evaluate(() => "__android" in window);
+    expect(bridge).toBe(false);
+    expect(seen.errors).toEqual([]);
+  });
 });

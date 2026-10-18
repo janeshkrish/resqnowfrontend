@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { apiFetch, setAdminToken, getAdminToken } from "@/lib/api";
+import { ADMIN_SESSION_ENDED, adminTokenExpired, rememberAdminPage, takeAdminPage } from "@/lib/adminSession";
 
 interface AdminUser {
   id: string;
@@ -17,6 +18,8 @@ interface AdminAuthContextType {
   loginAdmin: (email: string, password: string) => Promise<void>;
   logoutAdmin: () => Promise<void>;
   checkAdminAccess: () => Promise<boolean>;
+  /** True when the last sign-in ran out (it lasts a day), so the sign-in page can say so. */
+  sessionEnded: boolean;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType>({
@@ -26,6 +29,7 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   loginAdmin: async () => {},
   logoutAdmin: async () => {},
   checkAdminAccess: async () => false,
+  sessionEnded: false,
 });
 
 const ADMIN_STORAGE_KEY = "resqnow_admin_user";
@@ -46,18 +50,20 @@ const hasAdminRoleToken = (token: string | null): boolean => {
   if (!token) return false;
   const payload = decodeJwtPayload(token);
   const role = String(payload?.role || payload?.type || "").trim().toLowerCase();
-  return role === "admin";
+  return role === "admin" && !adminTokenExpired(token);
 };
 
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const stored = localStorage.getItem(ADMIN_STORAGE_KEY);
     const token = getAdminToken();
     const hasAdminToken = hasAdminRoleToken(token);
+    if (token && adminTokenExpired(token)) setSessionEnded(true);
     if (stored && hasAdminToken) {
       try {
         const user = JSON.parse(stored) as AdminUser;
@@ -72,6 +78,22 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     setIsLoading(false);
   }, []);
+
+  // The server refused the sign-in while the portal was open: back to the sign-in page, and
+  // back to this page afterwards, instead of "Unauthorized" on every card.
+  useEffect(() => {
+    const ended = () => {
+      if (!getAdminToken() && !localStorage.getItem(ADMIN_STORAGE_KEY)) return;
+      setAdminToken(null);
+      localStorage.removeItem(ADMIN_STORAGE_KEY);
+      setAdminUser(null);
+      setSessionEnded(true);
+      rememberAdminPage(window.location.pathname + window.location.search);
+      navigate("/admin/login", { replace: true });
+    };
+    window.addEventListener(ADMIN_SESSION_ENDED, ended);
+    return () => window.removeEventListener(ADMIN_SESSION_ENDED, ended);
+  }, [navigate]);
 
   const loginAdmin = async (email: string, password: string) => {
     setIsLoading(true);
@@ -89,8 +111,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const admin = data.admin as AdminUser;
       setAdminUser(admin);
       localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(admin));
+      setSessionEnded(false);
       toast.success("Admin login successful");
-      navigate("/admin/today");
+      navigate(takeAdminPage());
     } catch (err) {
       const message = err instanceof Error ? err.message : "Admin login failed";
       toast.error(message);
@@ -121,6 +144,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         loginAdmin,
         logoutAdmin,
         checkAdminAccess,
+        sessionEnded,
       }}
     >
       {children}
@@ -131,7 +155,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 export const useAdminAuth = () => useContext(AdminAuthContext);
 
 export const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAdminAuthenticated, isLoading, checkAdminAccess } = useAdminAuth();
+  const { isAdminAuthenticated, isLoading, checkAdminAccess, sessionEnded } = useAdminAuth();
   const navigate = useNavigate();
   const [verified, setVerified] = useState<boolean | null>(null);
 
@@ -141,13 +165,15 @@ export const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ c
         const hasAccess = await checkAdminAccess();
         setVerified(hasAccess);
         if (!hasAccess) {
-          toast.error("Admin access required");
+          rememberAdminPage(window.location.pathname + window.location.search);
+          // An ended sign-in is explained on the sign-in page itself.
+          if (!sessionEnded) toast.error("Admin access required");
           navigate("/admin/login");
         }
       }
     };
     verify();
-  }, [isLoading, isAdminAuthenticated, navigate, checkAdminAccess]);
+  }, [isLoading, isAdminAuthenticated, navigate, checkAdminAccess, sessionEnded]);
 
   if (isLoading || verified === null) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;

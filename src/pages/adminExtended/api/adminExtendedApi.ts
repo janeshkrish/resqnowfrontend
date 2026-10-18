@@ -1,5 +1,6 @@
 import axios from "axios";
 import { apiFetch, apiUrl, readJsonSafely } from "@/lib/api";
+import { announceAdminSessionEnded } from "@/lib/adminSession";
 
 export const adminApi = axios.create({
   baseURL: apiUrl("/api/admin"),
@@ -29,6 +30,8 @@ adminApi.interceptors.request.use((config) => {
 adminApi.interceptors.response.use(
   (response) => response,
   (error) => {
+    // The admin sign-in ran out: the portal goes back to the sign-in page.
+    if (error?.response?.status === 401) announceAdminSessionEnded();
     const message =
       error?.response?.data?.error ||
       error?.response?.data?.message ||

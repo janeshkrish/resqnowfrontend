@@ -53,7 +53,7 @@ export async function fakeSocketServer(page: Page) {
 
 /**
  * Stands in for the Android app's native side: Capacitor's bridge, with the push
- * notification, app, splash screen, location and JobAlerts plugins.
+ * notification, app, splash screen, location, JobAlerts and TripUpdates plugins.
  */
 export async function openInAndroidApp(page: Page, jobAlerts = { notificationsEnabled: true, fullScreenAllowed: true, ignoringBatteryOptimizations: true }) {
   await page.addInitScript((status) => {
@@ -64,6 +64,7 @@ export async function openInAndroidApp(page: Page, jobAlerts = { notificationsEn
       Geolocation: ["getCurrentPosition", "watchPosition", "clearWatch", "checkPermissions", "requestPermissions"],
       JobAlerts: ["getStatus", "openSettings"],
       TechnicianTracking: ["start", "stop", "addListener", "removeListener"],
+      TripUpdates: ["update", "end", "getStatus"],
     };
     const callbacks = new Set(["addListener", "watchPosition"]);
     const listeners: Record<string, Array<(data: unknown) => void>> = {};

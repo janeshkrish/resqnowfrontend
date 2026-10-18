@@ -1,90 +1,179 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The job offer on a locked phone (JobAlertActivity): the job and the earning, a ring that
+     empties over the 30 seconds, one big Accept, and Silence. Design canvas: board 12. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212"
-    android:gravity="center"
+    android:background="@color/resq_page"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingLeft="20dp"
+    android:paddingTop="56dp"
+    android:paddingRight="20dp"
+    android:paddingBottom="28dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_offer_bell">
+
+            <ImageView
+                android:id="@+id/alertBell"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_offer_bell" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/alertBadge"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="New job · ResQNow Partner"
+            android:textColor="@color/resq_text"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/alertSilence"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_offer_pill"
+            android:clickable="true"
+            android:drawablePadding="6dp"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="Silence"
+            android:textColor="@color/resq_ink"
+            android:textSize="13.5sp"
+            android:textStyle="bold"
+            app:drawableStartCompat="@drawable/ic_offer_silence" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="212dp"
+        android:layout_height="212dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp">
+
+        <com.resqnow1.app.CountdownRingView
+            android:id="@+id/alertRing"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ImageView
+            android:id="@+id/alertPicture"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            tools:src="@drawable/svc_flat_tire" />
+
+        <TextView
+            android:id="@+id/alertSeconds"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="@drawable/bg_offer_seconds"
+            android:gravity="center"
+            android:minWidth="88dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="0:30"
+            android:textColor="#FFFFFF"
+            android:textSize="13.5sp"
+            android:textStyle="bold"
+            android:translationY="6dp" />
+    </FrameLayout>
 
     <TextView
-        android:id="@+id/alertBadge"
-        android:layout_width="wrap_content"
+        android:id="@+id/alertBody"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:background="#C62828"
-        android:paddingLeft="14dp"
-        android:paddingTop="8dp"
-        android:paddingRight="14dp"
-        android:paddingBottom="8dp"
-        android:text="EMERGENCY"
-        android:textAllCaps="true"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
+        android:layout_marginTop="30dp"
+        android:gravity="center"
+        android:text="Flat tyre · 2.1 km away"
+        android:textColor="@color/resq_muted"
+        android:textSize="15sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/alertTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:gravity="center"
-        android:text="Emergency Job Alert"
-        android:textColor="#FFFFFF"
-        android:textSize="28sp"
+        android:letterSpacing="-0.02"
+        android:text="₹350"
+        android:textColor="@color/resq_text"
+        android:textSize="46sp"
         android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/alertBody"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:gravity="center"
-        android:text="A technician response is required immediately."
-        android:textColor="#EEEEEE"
-        android:textSize="18sp" />
 
     <TextView
         android:id="@+id/alertJobMeta"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
         android:gravity="center"
-        android:text="Immediate response required"
-        android:textColor="#BDBDBD"
-        android:textSize="14sp" />
+        android:text="for you"
+        android:textColor="@color/resq_muted"
+        android:textSize="14sp"
+        android:textStyle="bold" />
 
-    <LinearLayout
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/alertAcceptButton"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@drawable/bg_offer_accept"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="Accept job"
+        android:textColor="#FFFFFF"
+        android:textSize="19sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/alertRejectButton"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_offer_skip"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="Not this one"
+        android:textColor="@color/resq_ink"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/alertHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="36dp"
-        android:orientation="horizontal"
-        android:weightSum="2">
-
-        <Button
-            android:id="@+id/alertRejectButton"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:backgroundTint="#D32F2F"
-            android:text="Reject"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/alertAcceptButton"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:backgroundTint="#2E7D32"
-            android:text="Accept"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="Rings like a phone call · the volume button silences it"
+        android:textColor="@color/resq_muted"
+        android:textSize="12sp" />
 
 </LinearLayout>

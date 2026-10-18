@@ -126,6 +126,40 @@ test.describe("web app", () => {
     expect(errors).toEqual([]);
   });
 
+  test("the request card rings the landline ring that ships with the app", async ({ page }) => {
+    // Records what the page plays; a headless browser may refuse to make the sound itself.
+    await page.addInitScript(() => {
+      const played: string[] = [];
+      Object.assign(window, { __played: played });
+      HTMLMediaElement.prototype.play = function play(this: HTMLMediaElement) {
+        played.push(this.currentSrc || this.src);
+        return Promise.resolve();
+      };
+    });
+    const socket = await fakeSocketServer(page);
+    const { errors } = await signInTechnician(page);
+    await page.goto("/technician/dashboard");
+    await socket.joined(2);
+
+    socket.send("JOB_ALERT", offer);
+    await expect(page.getByRole("dialog")).toBeVisible();
+    const played = () => page.evaluate(() => (window as unknown as { __played: string[] }).__played);
+    await expect.poll(played).toContainEqual(expect.stringMatching(/\/sounds\/job-ring\.wav$/));
+    // Only the ring: nothing streams from another website any more.
+    for (const src of await played()) expect(src).toMatch(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/sounds\/job-ring\.wav$/);
+
+    // The file is part of the app: a 3-second WAV, one cycle of the double ring.
+    const file = await page.request.get("/sounds/job-ring.wav");
+    expect(file.status()).toBe(200);
+    const bytes = await file.body();
+    expect(bytes.subarray(0, 4).toString("latin1")).toBe("RIFF");
+    expect(bytes.subarray(8, 12).toString("latin1")).toBe("WAVE");
+    const rate = bytes.readUInt32LE(24);
+    const dataBytes = bytes.length - 44;
+    expect(dataBytes / (rate * 2)).toBeCloseTo(3, 2);
+    expect(errors).toEqual([]);
+  });
+
   test("other technician pages: a new request pops up the same card (it used to show only on the dashboard)", async ({ page }) => {
     const socket = await fakeSocketServer(page);
     const { errors, calls } = await signInTechnician(page);

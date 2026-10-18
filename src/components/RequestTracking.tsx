@@ -54,6 +54,7 @@ import { distanceMeters, etaBasisLabel, formatEtaDuration, usableLiveEta } from 
 import { serviceName, serviceOf } from "@/lib/services";
 import { formatClockTime } from "@/lib/technicianArrival";
 import { trackingMapModeFromSheetSnap } from "@/lib/trackingMapMode";
+import { useTripLiveUpdate } from "@/lib/tripUpdates";
 import {
   resolveServiceRequestPaymentDetails,
   isServicePaymentFinalized,
@@ -960,6 +961,24 @@ const RequestTracking = () => {
     fallback: statusMeta,
   };
   const headline = trackingHeadline(headlineInput);
+  // In the Android app, the same stage and minutes stay at the top of the phone (Live Update).
+  useTripLiveUpdate(
+    request
+      ? {
+          requestId: String(request.id ?? requestId),
+          phase,
+          isTowing: isTowingRequest,
+          technicianName: technician?.name,
+          technicianPhone: technician?.phone,
+          serviceType: requestServiceType,
+          liveEta,
+          distanceLabel,
+          amountLabel,
+          startedAt: request.started_at,
+          dropAddress,
+        }
+      : null,
+  );
   const findingText = findingLines(finding);
   const stripHeadline =
     phase === "search"

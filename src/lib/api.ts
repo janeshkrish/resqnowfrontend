@@ -4,6 +4,7 @@ import {
   SERVICE_REQUEST_PLATFORM_FEE_PERCENT,
   SERVICE_REQUEST_RAZORPAY_FEE,
 } from "@/utils/serviceRequestPayment";
+import { announceAdminSessionEnded } from "@/lib/adminSession";
 
 const normalizeBaseUrl = (value: string | undefined): string => {
   const trimmed = (value ?? "").trim();
@@ -1885,7 +1886,10 @@ export async function apiFetch(
   }
 
   try {
-    return await fetch(apiUrl(path), { ...rest, headers: h });
+    const response = await fetch(apiUrl(path), { ...rest, headers: h });
+    // An admin call refused for an ended sign-in sends the portal back to the sign-in page.
+    if (admin && response.status === 401 && path !== "/api/admin/login") announceAdminSessionEnded();
+    return response;
   } catch (networkError) {
     const errorName =
       typeof networkError === "object" && networkError !== null && "name" in networkError

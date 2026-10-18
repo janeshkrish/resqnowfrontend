@@ -1,9 +1,14 @@
-export const JOB_ALERT_SOUND_URL = "https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3";
+/**
+ * The job ring: an old landline phone, the Indian double ring, one 3-second cycle that loops.
+ * Bundled with the app (public/sounds), so it plays offline and inside the Android app; the
+ * Android notification rings the same file (res/raw/job_ring.wav).
+ */
+export const JOB_ALERT_SOUND_URL = "/sounds/job-ring.wav";
 
 const onScreen = () => typeof document === "undefined" || document.visibilityState === "visible";
 
 /**
- * The looping siren for an offer card. It sounds only while the page is on screen: with the
+ * The looping ring for an offer card. It sounds only while the page is on screen: with the
  * app in the background or the screen off, the phone's own alert rings instead (the Android
  * full-screen alarm, or the web push notification).
  */

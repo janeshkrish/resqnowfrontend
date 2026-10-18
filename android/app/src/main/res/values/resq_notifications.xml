@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ResQNow tokens, for notifications and the locked-phone job offer. -->
+    <color name="resq_crimson">#B01F2A</color>
+    <color name="resq_crimson_tint">#FBEEF0</color>
+    <color name="resq_ink">#283048</color>
+    <color name="resq_text">#1D2333</color>
+    <color name="resq_muted">#5B6478</color>
+    <color name="resq_page">#F6F7FB</color>
+    <color name="resq_track">#E9EBF1</color>
+    <color name="resq_button_soft">#EDEFF4</color>
+    <color name="resq_green">#12B76A</color>
+    <color name="resq_amber">#F79009</color>
+    <color name="resq_segment_todo">#E6E9EF</color>
+</resources>

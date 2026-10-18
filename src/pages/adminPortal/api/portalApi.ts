@@ -1,6 +1,7 @@
 import axios from "axios";
 import { apiUrl } from "@/lib/api";
 import { adminApi } from "@/pages/adminExtended/api/adminExtendedApi";
+import { announceAdminSessionEnded } from "@/lib/adminSession";
 
 // The admin portal's reads. Every value comes from the backend; things that are not recorded come back as null.
 
@@ -12,6 +13,7 @@ rootApi.interceptors.request.use((config) => {
   return config;
 });
 rootApi.interceptors.response.use((response) => response, (error) => {
+  if (error?.response?.status === 401) announceAdminSessionEnded();
   const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || "Request failed.";
   return Promise.reject(new Error(message));
 });

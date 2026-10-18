@@ -52,9 +52,9 @@ public class JobAlertsPlugin extends Plugin {
     static boolean notificationsEnabled(Context context) {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true;
-        EmergencyNotificationHelper.ensureEmergencyChannel(context);
+        NotificationChannels.ensureAll(context);
         NotificationManager manager = context.getSystemService(NotificationManager.class);
-        NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(EmergencyNotificationHelper.CHANNEL_ID);
+        NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(NotificationChannels.JOB_OFFERS);
         return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
     }
 

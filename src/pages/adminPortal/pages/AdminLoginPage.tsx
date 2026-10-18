@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { peekAdminPage } from "@/lib/adminSession";
 import { Icon } from "../ui";
 import "../portal.css";
 
@@ -10,13 +11,15 @@ import "../portal.css";
 const FACTS: [string, string][] = [["radar", "Every live job on one map, with its alerts"], ["engineering", "Technicians, applications, payouts and complaints"], ["history", "Every change kept in the audit log"]];
 
 export default function AdminLoginPage() {
-  const { adminUser, loginAdmin } = useAdminAuth();
+  const { adminUser, loginAdmin, sessionEnded } = useAdminAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  if (adminUser) return <Navigate to="/admin/today" replace />;
+  // Where to go once signed in: the page that was open when the sign-in ran out, else Today.
+  const [nextPage] = useState(() => peekAdminPage());
+  if (adminUser) return <Navigate to={nextPage} replace />;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!email.trim() || !password) { setError("Write your work email and password."); return; }
@@ -46,6 +49,9 @@ export default function AdminLoginPage() {
         <form className="li-form" onSubmit={(event) => void submit(event)} aria-label="Admin sign in" noValidate>
           <div><h2 className="pj">Admin sign in</h2></div>
           <p>Use the admin email and password set up for the ResQNow team.</p>
+          {sessionEnded && !error ? (
+            <div className="ap-note" role="status"><Icon name="schedule" /><span>Your sign-in ended (it lasts a day). Sign in again to carry on where you were.</span></div>
+          ) : null}
           <div className="ap-field"><label htmlFor="li-email">Work email</label>
             <span className="ap-input"><Icon name="mail" /><input id="li-email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} /></span></div>
           <div className="ap-field"><label htmlFor="li-pass">Password</label>

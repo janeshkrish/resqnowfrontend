@@ -33,7 +33,13 @@ public class MyFirebaseMessagingService extends MessagingService {
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
-        EmergencyNotificationHelper.ensureEmergencyChannel(this);
+        NotificationChannels.ensureAll(this);
+
+        // A customer's request moved on: update its Live Update, whether or not the app is open.
+        if (TripUpdateNotifier.isTripPush(remoteMessage.getData())) {
+            TripUpdateNotifier.fromPush(this, remoteMessage.getData(), MainActivity.isOnScreen());
+            return;
+        }
 
         if (isRevocationPayload(remoteMessage)) {
             dismissEmergencyAlert(remoteMessage);
@@ -121,6 +127,11 @@ public class MyFirebaseMessagingService extends MessagingService {
         serviceIntent.putExtra(JobAlertForegroundService.EXTRA_BODY, body);
         serviceIntent.putExtra(JobAlertForegroundService.EXTRA_JOB_ID, jobId);
         serviceIntent.putExtra(JobAlertForegroundService.EXTRA_DEEP_LINK_PATH, deepLinkPath);
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_SERVICE_TYPE, value(remoteMessage.getData(), "serviceType"));
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_PRICE_AMOUNT, value(remoteMessage.getData(), "priceAmount"));
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_DISTANCE, value(remoteMessage.getData(), "locationDistance"));
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_CUSTOMER_NAME, value(remoteMessage.getData(), "customerName"));
+        serviceIntent.putExtra(JobAlertForegroundService.EXTRA_EXPIRES_AT, offerExpiresAt(remoteMessage));
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -162,9 +173,38 @@ public class MyFirebaseMessagingService extends MessagingService {
         JobAlertActivity.dismissActiveAlertForJob(jobId);
     }
 
+    /** When the offer closes: the push's own expiry when it has one, else 30 seconds from now. */
+    private long offerExpiresAt(RemoteMessage remoteMessage) {
+        long now = System.currentTimeMillis();
+        String raw = value(remoteMessage.getData(), "expiresAt");
+        if (raw.isEmpty()) raw = value(remoteMessage.getData(), "offerExpiresAt");
+        long at = 0L;
+        try {
+            at = Long.parseLong(raw.trim());
+        } catch (NumberFormatException notEpoch) {
+            try {
+                at = java.time.Instant.parse(raw.trim()).toEpochMilli();
+            } catch (Exception notIso) {
+                at = 0L;
+            }
+        }
+        boolean usable = at > now + 3000L && at <= now + JobAlertForegroundService.ALERT_TIMEOUT_MS * 4;
+        return usable ? at : now + JobAlertForegroundService.ALERT_TIMEOUT_MS;
+    }
+
     private void postEmergencyFullScreenNotification(RemoteMessage remoteMessage, String jobId) {
         String title = resolveTitle(remoteMessage);
         String body = resolveBody(remoteMessage);
+        JobOffer offer = new JobOffer(
+            value(remoteMessage.getData(), "serviceType"),
+            value(remoteMessage.getData(), "priceAmount"),
+            value(remoteMessage.getData(), "locationDistance"),
+            value(remoteMessage.getData(), "customerName")
+        );
+        if (!offer.serviceType.isEmpty() || !offer.priceLabel().isEmpty()) {
+            title = offer.title();
+            body = offer.text();
+        }
         int notificationId = resolveNotificationId(remoteMessage, jobId);
 
         Intent alertIntent = buildAlertIntent(remoteMessage, title, body, notificationId, jobId);
@@ -204,8 +244,9 @@ public class MyFirebaseMessagingService extends MessagingService {
             pendingIntentFlags()
         );
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, EmergencyNotificationHelper.CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationChannels.JOB_OFFERS)
             .setSmallIcon(resolveSmallIcon())
+            .setColor(ContextCompat.getColor(this, R.color.resq_crimson))
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -214,14 +255,15 @@ public class MyFirebaseMessagingService extends MessagingService {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setTimeoutAfter(JobAlertForegroundService.ALERT_TIMEOUT_MS)
             .setFullScreenIntent(fullScreenIntent, true)
             .setContentIntent(fullScreenIntent)
-            .addAction(resolveSmallIcon(), "Accept", acceptPendingIntent)
-            .addAction(resolveSmallIcon(), "Reject", rejectPendingIntent)
-            .setVibrate(new long[] { 0L, 500L, 250L, 500L, 250L, 500L });
+            .addAction(0, "Accept", acceptPendingIntent)
+            .addAction(0, "Not this one", rejectPendingIntent)
+            .setVibrate(NotificationChannels.RING_VIBRATION);
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            builder.setSound(EmergencyNotificationHelper.getEmergencySoundUri(this));
+            builder.setSound(NotificationChannels.jobRingUri(this), android.media.AudioManager.STREAM_ALARM);
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
@@ -229,7 +271,10 @@ public class MyFirebaseMessagingService extends MessagingService {
             return;
         }
 
-        NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+        // Without the service to loop it, the channel's ring repeats until the offer is answered.
+        android.app.Notification notification = builder.build();
+        notification.flags |= android.app.Notification.FLAG_INSISTENT;
+        NotificationManagerCompat.from(this).notify(notificationId, notification);
 
         if (isAppInForeground()) {
             startActivity(alertIntent);
@@ -244,22 +289,17 @@ public class MyFirebaseMessagingService extends MessagingService {
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, intent, pendingIntentFlags());
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, EmergencyNotificationHelper.CHANNEL_ID)
+        // Receipts, ratings and messages: an ordinary notification, not the job ring.
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationChannels.UPDATES)
             .setSmallIcon(resolveSmallIcon())
+            .setColor(ContextCompat.getColor(this, R.color.resq_crimson))
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .setDefaults(NotificationCompat.DEFAULT_VIBRATE)
-            .setVibrate(new long[] { 0L, 500L, 250L, 500L });
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            builder.setSound(EmergencyNotificationHelper.getEmergencySoundUri(this));
-        }
+            .setContentIntent(pendingIntent);
 
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
@@ -341,8 +381,7 @@ public class MyFirebaseMessagingService extends MessagingService {
     }
 
     private int resolveSmallIcon() {
-        int applicationIcon = getApplicationInfo().icon;
-        return applicationIcon != 0 ? applicationIcon : android.R.drawable.ic_dialog_alert;
+        return R.drawable.ic_stat_resqnow;
     }
 
     private String resolveTitle(RemoteMessage remoteMessage) {

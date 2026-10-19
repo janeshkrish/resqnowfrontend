@@ -21,15 +21,17 @@ const firebaseConfig = {
   appId: String(import.meta.env.VITE_FIREBASE_APP_ID || "").trim(),
 };
 
-const hasFirebaseConfig = [
+const hasFirebaseAppConfig = [
   firebaseConfig.apiKey,
   firebaseConfig.projectId,
-  firebaseConfig.messagingSenderId,
   firebaseConfig.appId,
 ].every((value) => Boolean(value));
 
+const hasFirebaseAuthConfig = hasFirebaseAppConfig && Boolean(firebaseConfig.authDomain);
+const hasFirebaseConfig = hasFirebaseAppConfig && Boolean(firebaseConfig.messagingSenderId);
+
 function createFirebaseApp() {
-  if (!hasFirebaseConfig) return null;
+  if (!hasFirebaseAppConfig) return null;
   return getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 }
 
@@ -134,4 +136,4 @@ export async function subscribeToForegroundMessages(
   return onMessage(messaging, onPayload);
 }
 
-export { createFirebaseApp, hasFirebaseConfig };
+export { createFirebaseApp, hasFirebaseConfig, hasFirebaseAuthConfig };

@@ -9,7 +9,7 @@ import {
   type User,
 } from "firebase/auth";
 
-import { createFirebaseApp } from "@/lib/firebase";
+import { createFirebaseApp, hasFirebaseAuthConfig } from "@/lib/firebase";
 
 // Firebase sends the SMS code and checks it. Its session is kept in memory only: once the
 // app has its own ResQNow login token, the Firebase side is no longer needed.
@@ -25,6 +25,7 @@ function notConfigured() {
 
 function getPhoneAuth() {
   if (phoneAuth) return phoneAuth;
+  if (!hasFirebaseAuthConfig) throw notConfigured();
   const app = createFirebaseApp();
   if (!app) throw notConfigured();
   phoneAuth = initializeAuth(app, { persistence: inMemoryPersistence });

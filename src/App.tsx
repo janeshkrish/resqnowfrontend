@@ -60,6 +60,7 @@ const MyRequests = lazyWithReload(() => import("./pages/MyRequests"));
 const Notifications = lazyWithReload(() => import("./pages/Notifications"));
 const Marketplace = lazyWithReload(() => import("./pages/Marketplace"));
 const MyGaragePage = lazyWithReload(() => import("./pages/MyGaragePage"));
+const VoiceThozhanPage = lazyWithReload(() => import("./pages/VoiceThozhanPage"));
 const ProductDetail = lazyWithReload(() => import("./pages/ProductDetail"));
 const ServiceCommunicationPage = lazyWithReload(() => import("./pages/ServiceCommunicationPage"));
 const MapPage = lazyWithReload(() => import("./pages/MapPage"));
@@ -221,6 +222,8 @@ const App = () => {
                             <Route path="/otp-verify" element={<OTPVerify />} />
                             <Route path="/confirm-email" element={<ConfirmEmail />} />
                             <Route path="/auth/success" element={<AuthSuccess />} />
+                            {/* ResQNow-Thozhan: a full-screen conversation that fills the request form */}
+                            <Route path="/thozhan" element={<ProtectedRoute><VoiceThozhanPage /></ProtectedRoute>} />
 
                             {/* Main app routes with AppLayout */}
                             <Route path="/" element={<AppLayout />}>

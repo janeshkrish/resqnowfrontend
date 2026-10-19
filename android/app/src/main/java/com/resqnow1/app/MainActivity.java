@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TechnicianTrackingPlugin.class);
         registerPlugin(JobAlertsPlugin.class);
         registerPlugin(TripUpdatesPlugin.class);
+        registerPlugin(VoiceThozhanPlugin.class);
         super.onCreate(savedInstanceState);
         ensureFirebaseInitialized();
         NotificationChannels.ensureAll(this);

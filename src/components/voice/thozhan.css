@@ -1,0 +1,272 @@
+/* ResQNow-Thozhan, the voice way to send a service request (pages/VoiceThozhanPage.tsx).
+   ResQNow logo palette only: navy #283048, crimson #B01F2A (#D21E33 lighter, #8E1822 deeper), muted #667085, tile #F2F4F7, page #F6F7FB. */
+
+.vt {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  background: #f6f7fb;
+  color: #283048;
+  font-family: "Manrope", "Noto Sans Tamil", system-ui, sans-serif;
+}
+.vt button { font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer; }
+.vt :where(p, h1, h2) { margin: 0; }
+.vt-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  height: 100%;
+  overflow: hidden;
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+}
+@media (min-width: 640px) {
+  .vt-frame { box-shadow: 0 0 0 1px rgba(40, 48, 72, 0.06), 0 30px 80px -40px rgba(40, 48, 72, 0.35); }
+}
+.vt-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.vt-aurora i { position: absolute; display: block; border-radius: 50%; filter: blur(64px); }
+.vt-aurora .a1 { width: 300px; height: 240px; left: -100px; top: 10px; background: rgba(210, 30, 51, 0.16); animation: vtDrift1 13s ease-in-out infinite alternate; }
+.vt-aurora .a2 { width: 280px; height: 260px; right: -120px; top: 300px; background: rgba(40, 48, 72, 0.1); animation: vtDrift2 15s ease-in-out infinite alternate; }
+.vt-aurora .a3 { width: 300px; height: 240px; left: 20px; bottom: -60px; background: rgba(176, 31, 42, 0.09); animation: vtDrift3 17s ease-in-out infinite alternate; }
+@keyframes vtDrift1 { to { transform: translate(60px, 40px); } }
+@keyframes vtDrift2 { to { transform: translate(-50px, 60px); } }
+@keyframes vtDrift3 { to { transform: translate(40px, -50px); } }
+
+/* The screen edge glows while listening. */
+@property --vtA { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes vtSpinA { to { --vtA: 360deg; } }
+.vt-edge { position: absolute; inset: 0; z-index: 5; pointer-events: none; padding: 2.5px; background: conic-gradient(from var(--vtA), #b01f2a, #d21e33, #283048, #667085, #b01f2a); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: 0; transition: opacity 0.6s ease; animation: vtSpinA 3.2s linear infinite; }
+.vt.is-listening .vt-edge { opacity: 1; }
+
+/* Top bar */
+.vt-top { position: relative; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 12px 16px 0; }
+.vt-name { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+.vt-name b { font-family: "Plus Jakarta Sans", "Manrope", sans-serif; font-size: 18px; line-height: 22px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.vt-name b span { color: #b01f2a; }
+.vt-name small { display: flex; align-items: center; gap: 6px; color: #667085; font-size: 12px; line-height: 16px; font-weight: 700; }
+.vt-name small i { display: block; width: 7px; height: 7px; border-radius: 4px; background: #12b76a; box-shadow: 0 0 0 3px rgba(18, 183, 106, 0.15); }
+.vt-name small.is-live i { background: #b01f2a; box-shadow: 0 0 0 3px rgba(176, 31, 42, 0.18); }
+.vt-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border: 0; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px rgba(40, 48, 72, 0.1); color: #283048; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.vt-chip .rq-symbol { font-size: 16px; }
+.vt-round { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; border: 0; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px rgba(40, 48, 72, 0.1); color: #283048; }
+.vt-round .rq-symbol { font-size: 18px; }
+
+/* The character: big while it says hello, small once the conversation starts. */
+.vt-charbox { position: relative; z-index: 2; flex-shrink: 0; height: 236px; transition: height 0.85s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.vt.is-talking-phase .vt-charbox { height: 112px; }
+.vt-charbtn { position: absolute; left: 50%; top: 50%; width: 160px; height: 160px; margin: -80px 0 0 -80px; padding: 0; border: 0; border-radius: 50%; background: transparent; scale: 0.92; transition: scale 0.85s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.vt.is-talking-phase .vt-charbtn { scale: 0.56; }
+.vt-charbtn > .thz { animation: thzEnter 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s both; }
+.vt-nod { position: absolute; left: calc(50% + 40px); top: 6px; z-index: 3; display: inline-flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 15px 15px 15px 4px; background: #fff; box-shadow: 0 12px 22px -12px rgba(40, 48, 72, 0.5); color: #b01f2a; font-size: 13.5px; font-weight: 800; white-space: nowrap; animation: vtPop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Hello */
+.vt-hello { position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 0 20px 12px; overflow-y: auto; }
+.vt-hi { text-align: center; font-family: "Plus Jakarta Sans", "Manrope", sans-serif; font-size: 26px; line-height: 33px; font-weight: 800; letter-spacing: -0.025em; text-wrap: balance; }
+.vt-hi .is-name { color: #b01f2a; }
+.vt-hi-sub { text-align: center; color: #667085; font-size: 15px; line-height: 22px; font-weight: 600; animation: vtIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s both; }
+.vt-trust { align-self: center; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 12px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px rgba(40, 48, 72, 0.08); font-size: 11.5px; font-weight: 800; animation: vtIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s both; }
+.vt-trust .rq-symbol { font-size: 15px; color: #12b76a; }
+.vt-try { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-top: 4px; }
+.vt-try > small { color: #98a2b3; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+.vt-try button { display: flex; align-items: center; gap: 8px; max-width: 92%; min-height: 38px; padding: 6px 12px; border: 0; border-radius: 18px 18px 5px 18px; background: rgba(255, 255, 255, 0.8); box-shadow: inset 0 0 0 1px rgba(40, 48, 72, 0.08); color: #283048; font-size: 13.5px; line-height: 18px; font-weight: 700; text-align: left; animation: vtRep 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-try .rq-symbol { font-size: 16px; color: #b01f2a; }
+.vt-try em { flex-shrink: 0; font-style: normal; color: #98a2b3; font-size: 10.5px; font-weight: 800; }
+
+/* The conversation */
+.vt-thread { position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 8px 18px 6px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 34px); mask-image: linear-gradient(180deg, transparent 0, #000 34px); }
+.vt-thread > * { flex-shrink: 0; }
+.vt-you { align-self: flex-end; max-width: 84%; padding: 9px 14px 11px; border-radius: 22px 22px 6px 22px; background: #fff; box-shadow: 0 12px 26px -18px rgba(40, 48, 72, 0.45), 0 0 0 1px rgba(40, 48, 72, 0.06); transform-origin: 100% 100%; animation: vtYou 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; transition: opacity 0.5s, scale 0.5s; }
+.vt-you small { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; color: #98a2b3; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.vt-you small .rq-symbol { font-size: 14px; color: #b01f2a; }
+.vt-you p { font-size: 16.5px; line-height: 24px; font-weight: 700; overflow-wrap: anywhere; }
+.vt-you .uw { display: inline-block; padding: 0 2px; border-radius: 6px; background-image: linear-gradient(90deg, rgba(176, 31, 42, 0.1), rgba(176, 31, 42, 0.14)); background-repeat: no-repeat; background-size: 0% 100%; transition: background-size 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.4s; animation: vtWord 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-you .uw.is-key { background-size: 100% 100%; color: #b01f2a; }
+.vt-you.is-live { box-shadow: 0 0 0 1.5px rgba(176, 31, 42, 0.4), 0 14px 30px -16px rgba(176, 31, 42, 0.45); }
+.vt-you.is-tap { box-shadow: 0 12px 26px -18px rgba(40, 48, 72, 0.45), inset 0 0 0 1px rgba(176, 31, 42, 0.16); }
+.vt-you.is-old { opacity: 0.5; scale: 0.94; }
+.vt-caret { display: inline-block; width: 3px; height: 19px; margin-left: 1px; vertical-align: -3px; border-radius: 2px; background: #b01f2a; animation: vtBlink 1s steps(2) infinite; }
+.vt-say { align-self: flex-start; max-width: 96%; font-family: "Plus Jakarta Sans", "Manrope", "Noto Sans Tamil", sans-serif; font-size: 21px; line-height: 32px; font-weight: 700; letter-spacing: -0.012em; color: #283048; transition: font-size 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), line-height 0.5s, color 0.5s; }
+.vt-say.is-old { font-size: 15px; line-height: 22px; color: #98a2b3; }
+.vt-say .kw { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 2px; }
+.vt-say .kw > span { display: inline-block; animation: vtRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: inherit; }
+.vt-say .kwrap { display: inline-block; white-space: nowrap; }
+.vt-say .kc { position: relative; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px 0 4px; margin: 0 1px; border-radius: 15px; background: #fff; box-shadow: 0 0 0 1px rgba(176, 31, 42, 0.16), 0 10px 20px -12px rgba(176, 31, 42, 0.45); color: #b01f2a; font-size: 15.5px; line-height: 30px; font-weight: 800; vertical-align: 1px; animation: vtChip 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-say .kc::after { content: ""; position: absolute; inset: -3px; border-radius: 18px; border: 2px solid rgba(176, 31, 42, 0.45); opacity: 0; animation: vtRing 0.9s ease-out both; animation-delay: inherit; pointer-events: none; }
+.vt-say .kc img { width: 28px; height: 24px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(40, 48, 72, 0.25)); }
+.vt-say .kc .rq-symbol { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 12px; background: #fcedee; font-size: 15px; color: #b01f2a; }
+.vt-say.is-old .kc { height: 22px; padding: 0 8px 0 3px; font-size: 12px; line-height: 22px; color: #98a2b3; box-shadow: 0 0 0 1px rgba(40, 48, 72, 0.08); }
+.vt-say.is-old .kc img { width: 20px; height: 16px; }
+.vt-say.is-old .kc .rq-symbol { width: 16px; height: 16px; font-size: 11px; }
+.vt-typing { align-self: flex-start; display: flex; gap: 6px; padding: 8px 2px; animation: vtIn 0.4s both; }
+.vt-typing i { display: block; width: 9px; height: 9px; border-radius: 50%; background: #b01f2a; animation: vtDot 1.1s ease-in-out infinite; }
+.vt-typing i:nth-child(2) { animation-delay: 0.15s; background: #283048; }
+.vt-typing i:nth-child(3) { animation-delay: 0.3s; background: #667085; }
+.vt-call { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 20px; background: #b01f2a; color: #fff; font-size: 14px; font-weight: 800; text-decoration: none; box-shadow: 0 12px 22px -12px rgba(176, 31, 42, 0.8); animation: vtRep 0.5s both; }
+.vt-place { align-self: flex-start; display: flex; align-items: center; gap: 10px; width: 90%; padding: 12px 14px; border-radius: 20px; background: #fff; box-shadow: 0 24px 44px -26px rgba(40, 48, 72, 0.5), 0 0 0 1px rgba(40, 48, 72, 0.06); animation: vtCard 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-place > .rq-symbol { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 18px; background: #fcedee; color: #b01f2a; font-size: 20px; }
+.vt-place span { display: flex; flex-direction: column; min-width: 0; }
+.vt-place b { font-size: 14.5px; font-weight: 800; }
+.vt-place small { font-size: 12px; line-height: 16px; font-weight: 600; color: #667085; }
+.vt-replies { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: 100%; }
+.vt-replies > small { color: #98a2b3; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; animation: vtRep 0.5s both; }
+.vt-reps { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.vt-rep { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 4px 16px; border: 0; border-radius: 21px 21px 6px 21px; background: #fff; box-shadow: inset 0 0 0 1.5px rgba(40, 48, 72, 0.14); color: #283048; font-size: 14px; font-weight: 800; text-align: left; transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s; animation: vtRep 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-rep:active { transform: scale(0.95); }
+.vt-rep.has-art { padding-left: 6px; }
+.vt-rep img { width: 30px; height: 26px; object-fit: contain; }
+.vt-rep.is-main { background: #b01f2a; color: #fff; box-shadow: 0 12px 22px -12px rgba(176, 31, 42, 0.8); }
+.vt-rep.is-on { background: #fcedee; color: #b01f2a; box-shadow: inset 0 0 0 2px #b01f2a; }
+.vt-rep.is-danger { box-shadow: inset 0 0 0 1.5px rgba(176, 31, 42, 0.5); color: #b01f2a; }
+.vt-rep:disabled { background: #e4e7ec; color: #98a2b3; box-shadow: none; cursor: default; }
+
+/* What ResQNow-Thozhan has so far: the four parts of the form, filling as you talk. */
+.vt-strip { position: relative; z-index: 2; flex-shrink: 0; height: 86px; margin: 0 12px 8px; border-radius: 24px; background: rgba(255, 255, 255, 0.88); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 18px 36px -24px rgba(40, 48, 72, 0.45), 0 0 0 1px rgba(40, 48, 72, 0.06); overflow: hidden; animation: vtIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both; }
+.vt-strip-bar { position: absolute; left: 0; top: 0; height: 3px; border-radius: 0 2px 2px 0; background: #b01f2a; transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.vt-toks { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 10px 6px 8px; list-style: none; margin: 0; }
+.vt-tok { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; text-align: center; }
+.vt-tok-pic { position: relative; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: #f2f4f7; transition: background-color 0.4s, box-shadow 0.4s; }
+.vt-tok-pic img { width: 34px; height: 30px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(40, 48, 72, 0.25)); animation: vtTok 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-tok-pic > .rq-symbol { font-size: 19px; color: #98a2b3; }
+.vt-tok.is-filled .vt-tok-pic { background: #fcedee; box-shadow: inset 0 0 0 1.5px rgba(176, 31, 42, 0.22); animation: vtBurst 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-tok.is-filled .vt-tok-pic > .rq-symbol { color: #b01f2a; }
+.vt-tok.is-active .vt-tok-pic { background: #fff; }
+.vt-tok.is-active .vt-tok-pic::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px dashed rgba(176, 31, 42, 0.55); animation: thzSpin 7s linear infinite; }
+.vt-tok-tick { position: absolute; right: -3px; bottom: -2px; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 8px; background: #283048; color: #fff; box-shadow: 0 0 0 2px #fff; animation: vtTok 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s both; }
+.vt-tok-tick .rq-symbol { font-size: 12px; }
+.vt-tok b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11.5px; line-height: 14px; font-weight: 800; }
+.vt-tok:not(.is-filled) b { color: #98a2b3; }
+.vt-tok small { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 10px; line-height: 12px; font-weight: 700; color: #98a2b3; }
+.vt-tok.is-filled small, .vt-tok.is-active small { color: #b01f2a; }
+
+/* The dock: the two voices drawn as one wave, and the mic */
+.vt-dock { position: relative; z-index: 2; flex-shrink: 0; height: 118px; }
+.vt-wave { position: absolute; left: 0; top: 0; width: 100%; height: 100px; pointer-events: none; }
+.vt-mic { position: absolute; left: 50%; top: 14px; display: flex; align-items: center; justify-content: center; width: 68px; height: 68px; margin-left: -34px; padding: 0; border: 0; border-radius: 50%; background: #b01f2a; color: #fff; box-shadow: 0 14px 28px -12px rgba(176, 31, 42, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.25); transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s; }
+.vt-mic:active { transform: scale(0.94); }
+.vt-mic .rq-symbol { font-size: 30px; }
+.vt-mic.is-live { background: #fff; color: #b01f2a; box-shadow: 0 0 0 7px rgba(176, 31, 42, 0.12), 0 14px 28px -12px rgba(176, 31, 42, 0.5); }
+.vt-mic:disabled { background: #e4e7ec; color: #98a2b3; box-shadow: none; }
+.vt-stop { display: block; width: 22px; height: 22px; border-radius: 7px; background: #b01f2a; }
+.vt-side { position: absolute; top: 25px; display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border: 0; border-radius: 23px; background: #fff; box-shadow: inset 0 0 0 1px rgba(40, 48, 72, 0.1); color: #283048; }
+.vt-side .rq-symbol { font-size: 21px; }
+.vt-cap { position: absolute; left: 44px; right: 44px; bottom: 8px; text-align: center; color: #667085; font-size: 12px; line-height: 15px; font-weight: 700; }
+.vt-type { position: absolute; left: 14px; right: 14px; bottom: 28px; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; border-radius: 26px; background: #fff; box-shadow: 0 0 0 1.5px rgba(176, 31, 42, 0.3), 0 16px 30px -16px rgba(40, 48, 72, 0.5); animation: vtIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.vt-type input { flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: #283048; font: inherit; font-size: 16px; font-weight: 600; outline: none; }
+.vt-type input::placeholder { color: #98a2b3; }
+.vt-send { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border: 0; border-radius: 20px; background: #b01f2a; color: #fff; }
+.vt-send .rq-symbol { font-size: 20px; }
+
+/* Hand-over: the conversation folds into the character, then the form opens. */
+.vt.is-handing .vt-thread, .vt.is-handing .vt-strip { animation: vtFold 0.9s cubic-bezier(0.55, 0, 0.2, 1) forwards; }
+
+/* Home card and request-form link */
+.vt-home-card { position: relative; display: flex; align-items: center; gap: 16px; width: 100%; padding: 16px 18px; border: 0; border-radius: 24px; background: #fff; color: #283048; text-align: left; overflow: hidden; box-shadow: 0 16px 34px -18px rgba(176, 31, 42, 0.45), 0 0 0 1px rgba(40, 48, 72, 0.05); }
+.vt-home-card::before { content: ""; position: absolute; top: -60px; right: -40px; width: 180px; height: 150px; border-radius: 999px; background: #f3b9bf; opacity: 0.5; filter: blur(40px); pointer-events: none; }
+.vt-home-card > span { position: relative; }
+.vt-home-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.vt-home-text b { font-family: "Plus Jakarta Sans", "Manrope", sans-serif; font-size: 18px; line-height: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.vt-home-text b span { color: #b01f2a; }
+.vt-home-text small { color: #667085; font-size: 12.5px; line-height: 17px; font-weight: 600; }
+.vt-form-link { display: inline-flex; align-items: center; gap: 8px; color: #b01f2a; font-weight: 800; text-decoration: none; }
+.vt-form-link .thz { flex-shrink: 0; }
+
+@keyframes vtIn { from { opacity: 0; transform: translateY(12px); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes vtWord { from { opacity: 0; transform: translateY(10px); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes vtRise { from { opacity: 0; transform: translateY(110%) rotate(5deg); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes vtChip { 0% { opacity: 0; transform: scale(0.3) rotate(-12deg); filter: blur(6px); } 60% { opacity: 1; transform: scale(1.06) rotate(1deg); filter: none; } 100% { opacity: 1; transform: none; } }
+@keyframes vtRing { 0% { opacity: 0.8; transform: scale(0.85); } 100% { opacity: 0; transform: scale(1.55); } }
+@keyframes vtYou { from { opacity: 0; transform: translateY(16px) scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes vtRep { from { opacity: 0; transform: translateY(10px) scale(0.9); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes vtCard { from { opacity: 0; transform: translateY(24px) scale(0.97); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes vtDot { 0%, 100% { translate: 0 0; opacity: 0.45; } 40% { translate: 0 -6px; opacity: 1; } }
+@keyframes vtPop { from { opacity: 0; transform: translateY(8px) scale(0.5); } to { opacity: 1; transform: none; } }
+@keyframes vtTok { 0% { opacity: 0; transform: scale(0.3) rotate(-14deg); } 65% { opacity: 1; transform: scale(1.1); } 100% { opacity: 1; transform: none; } }
+@keyframes vtBurst { 0% { box-shadow: 0 0 0 0 rgba(176, 31, 42, 0.5); } 100% { box-shadow: inset 0 0 0 1.5px rgba(176, 31, 42, 0.22), 0 0 0 18px rgba(176, 31, 42, 0); } }
+@keyframes vtBlink { to { opacity: 0; } }
+@keyframes vtFold { to { opacity: 0; transform: translateY(-80px) scale(0.6); filter: blur(6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .vt *, .vt *::before, .vt *::after, .vt-home-card *, .vt-form-link * { animation: none !important; transition: none !important; }
+}
+
+/* ---------------------------------------------------------------- the character */
+@keyframes thzSpin{to{transform:rotate(360deg)}}
+@keyframes thzBob{0%,100%{translate:0 0}50%{translate:0 -3.5%}}
+@keyframes thzShadow{0%,100%{scale:1;opacity:.9}50%{scale:.86;opacity:.6}}
+@keyframes thzNod{0%,100%{translate:0 0}28%{translate:0 3.5%}56%{translate:0 -1%}}
+@keyframes thzGlow{0%,100%{opacity:.7;scale:.95}50%{opacity:1;scale:1.05}}
+@keyframes thzTalk{from{scale:1 1}to{scale:1.022 .978}}
+@keyframes thzBlink{0%,92%,100%{scale:1 1}95%{scale:1 .08}}
+@keyframes thzLook{0%,18%,100%{translate:0 0}24%,44%{translate:-11% 3%}52%,70%{translate:10% -2%}78%{translate:0 0}}
+@keyframes thzSheen{0%,62%{transform:translateX(-140%) skewX(-20deg)}86%,100%{transform:translateX(420%) skewX(-20deg)}}
+@keyframes thzScan{from{transform:translateX(-110%)}to{transform:translateX(340%)}}
+@keyframes thzVoice{0%,100%{scale:1 1;opacity:.85}22%{scale:2.1 1;opacity:1}46%{scale:1.3 1}72%{scale:2.6 1;opacity:1}}
+@keyframes thzBreath{0%,100%{opacity:.5;scale:.85 1}50%{opacity:.95;scale:1.15 1}}
+@keyframes thzRipple{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.8);opacity:0}}
+@keyframes thzBurstRing{0%{transform:scale(.92);opacity:.85}100%{transform:scale(2.3);opacity:0}}
+@keyframes thzSpark{0%{opacity:0;transform:rotate(var(--r)) translateX(calc(var(--thz)*.3)) scale(.4)}20%{opacity:1}100%{opacity:0;transform:rotate(var(--r)) translateX(calc(var(--thz)*1.1)) scale(.2)}}
+@keyframes thzEnter{0%{scale:.3;opacity:0;filter:blur(12px)}60%{opacity:1;filter:blur(0)}100%{scale:1;opacity:1;filter:none}}
+.thz{position:relative;display:block;width:var(--thz);height:var(--thz);flex-shrink:0}
+.thz-float{position:absolute;inset:0;animation:thzBob 5s ease-in-out infinite}
+.thz-aura{position:absolute;inset:-48%;border-radius:50%;background:radial-gradient(circle,var(--a1,rgba(210,30,51,.2)) 0%,var(--a2,rgba(40,48,72,.07)) 42%,rgba(255,255,255,0) 70%);animation:thzGlow 4s ease-in-out infinite;pointer-events:none}
+.thz-tilt{position:absolute;inset:0;transition:rotate .7s cubic-bezier(.2,.8,.2,1)}
+.thz-body{position:absolute;left:3%;right:3%;top:9%;bottom:7%;border-radius:40%/44%;overflow:hidden;isolation:isolate;background:radial-gradient(130% 110% at 28% 14%,#FFFFFF 0%,#F4F5F9 46%,#D7DCE5 100%);box-shadow:0 calc(var(--thz)*.1) calc(var(--thz)*.2) calc(var(--thz)*-.07) rgba(40,48,72,.36),inset 0 calc(var(--thz)*-.05) calc(var(--thz)*.09) rgba(40,48,72,.15),inset 0 calc(var(--thz)*.02) calc(var(--thz)*.025) rgba(255,255,255,.95),0 0 0 1px rgba(40,48,72,.07)}
+.thz-visor{position:absolute;left:12%;right:12%;top:15%;height:54%;border-radius:36%/44%;overflow:hidden;background:radial-gradient(120% 140% at 50% 0%,#4A5474 0%,#283048 44%,#121725 100%);box-shadow:inset 0 calc(var(--thz)*.015) calc(var(--thz)*.04) rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.9),0 0 0 calc(var(--thz)*.008) rgba(40,48,72,.22);transition:box-shadow .5s}
+.thz-glare{position:absolute;left:9%;right:9%;top:5%;height:34%;border-radius:50% 50% 40% 40%/80% 80% 30% 30%;background:linear-gradient(180deg,rgba(255,255,255,.26),rgba(255,255,255,0));pointer-events:none}
+.thz-scan{position:absolute;top:0;bottom:0;left:0;width:30%;background:linear-gradient(90deg,rgba(210,30,51,0),rgba(210,30,51,.5),rgba(210,30,51,0));opacity:0;transform:translateX(-110%);transition:opacity .3s}
+.thz-light{position:absolute;left:43%;right:43%;bottom:10%;height:calc(var(--thz)*.03);min-height:2px;border-radius:999px;background:#D21E33;box-shadow:0 0 calc(var(--thz)*.04) rgba(210,30,51,.85),0 0 calc(var(--thz)*.1) rgba(210,30,51,.4);animation:thzBreath 3.2s ease-in-out infinite}
+.thz-sheen{position:absolute;top:-10%;bottom:-10%;left:0;width:18%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.3),rgba(255,255,255,0));animation:thzSheen 7.5s ease-in-out infinite;pointer-events:none}
+.thz-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:calc(var(--thz)*.13);filter:drop-shadow(0 0 calc(var(--thz)*.03) rgba(255,255,255,.7));transition:translate .55s cubic-bezier(.2,.8,.2,1)}
+.thz-eye{position:relative;box-sizing:border-box;display:block;width:calc(var(--thz)*.085);height:calc(var(--thz)*.16);border:0 solid #FFFFFF;border-radius:999px;background:#FFFFFF;animation:thzBlink 5.2s infinite;transition:height .35s cubic-bezier(.2,.8,.2,1),width .35s,border-radius .35s,background-color .3s,border-width .3s,transform .35s,translate .35s}
+.thz-eye.r{animation-delay:.05s}
+.thz-brow{position:absolute;top:calc(50% - var(--thz)*.14);display:block;width:calc(var(--thz)*.11);height:calc(var(--thz)*.026);border-radius:999px;background:#FFFFFF;opacity:0;transition:opacity .35s,rotate .35s,translate .35s}
+.thz-brow.l{left:calc(50% - var(--thz)*.1625)}
+.thz-brow.r{left:calc(50% + var(--thz)*.0525)}
+.thz-shadow{position:absolute;left:18%;right:18%;bottom:-6%;height:9%;border-radius:50%;background:radial-gradient(closest-side,rgba(40,48,72,.3),rgba(40,48,72,0));filter:blur(3px);animation:thzShadow 5s ease-in-out infinite}
+.thz-ring{position:absolute;left:3%;right:3%;top:9%;bottom:7%;border-radius:40%/44%;border:2px solid rgba(176,31,42,.35);opacity:0;pointer-events:none}
+.thz-orbit{display:none}
+.thz-burst{position:absolute;inset:0;pointer-events:none}
+.thz-wave{position:absolute;left:3%;right:3%;top:9%;bottom:7%;border-radius:40%/44%;border:3px solid rgba(176,31,42,.5);opacity:0}
+.thz-spark{position:absolute;left:calc(50% - 4px);top:calc(50% - 4px);display:block;width:8px;height:8px;border-radius:4px;background:#B01F2A;opacity:0}
+.thz-spark:nth-child(even){background:#283048}
+.is-burst .thz-wave{animation:thzBurstRing 1.2s cubic-bezier(.2,.8,.2,1) both}
+.is-burst .thz-wave.w2{animation-delay:.18s;border-color:rgba(40,48,72,.3)}
+.is-burst .thz-spark{animation:thzSpark 1.2s cubic-bezier(.2,.8,.2,1) both}
+.is-burst .thz-light{animation:none;scale:2.8 1;opacity:1}
+/* Moods change the eyes, the visor glow and the voice light; the colours stay ResQNow's */
+.thz-listen{--a1:rgba(210,30,51,.3);--a2:rgba(210,30,51,.08)}
+.thz-think{--a1:rgba(40,48,72,.2);--a2:rgba(176,31,42,.08)}
+.thz-concern{--a1:rgba(176,31,42,.16);--a2:rgba(40,48,72,.07)}
+.thz-curious{--a1:rgba(210,30,51,.22);--a2:rgba(40,48,72,.08)}
+.thz-happy{--a1:rgba(210,30,51,.28);--a2:rgba(210,30,51,.08)}
+.thz-idle .thz-face{animation:thzLook 10s ease-in-out infinite}
+.thz-listen .thz-float{animation:thzNod 1.3s ease-in-out infinite}
+.thz-listen .thz-face{translate:0 8%}
+.thz-listen .thz-eye{height:calc(var(--thz)*.18)}
+.thz-listen .thz-visor{box-shadow:inset 0 calc(var(--thz)*.015) calc(var(--thz)*.04) rgba(0,0,0,.55),inset 0 calc(var(--thz)*-.03) calc(var(--thz)*.09) rgba(210,30,51,.5),0 1px 0 rgba(255,255,255,.9),0 0 0 calc(var(--thz)*.008) rgba(40,48,72,.22)}
+.thz-listen .thz-light{animation:thzVoice .9s ease-in-out infinite}
+.thz-listen .thz-ring{animation:thzRipple 2.1s cubic-bezier(.2,.8,.2,1) infinite}
+.thz-listen .thz-ring.r2{animation-delay:.7s}
+.thz-listen .thz-ring.r3{animation-delay:1.4s}
+.thz-think .thz-face{translate:12% -12%}
+.thz-think .thz-eye{height:calc(var(--thz)*.11)}
+.thz-think .thz-scan{opacity:1;animation:thzScan 1.3s ease-in-out infinite alternate}
+.thz-think .thz-light{animation-duration:1.2s}
+.thz-curious .thz-tilt{rotate:-8deg}
+.thz-curious .thz-eye.r{transform:scale(1.15)}
+.thz-curious .thz-brow.r{opacity:1;translate:0 -30%;rotate:-12deg}
+.thz-concern .thz-face{translate:0 6%}
+.thz-concern .thz-eye{height:calc(var(--thz)*.13)}
+.thz-concern .thz-brow{opacity:1}
+.thz-concern .thz-brow.l{rotate:-18deg}
+.thz-concern .thz-brow.r{rotate:18deg}
+.thz-happy .thz-face{translate:0 -2%}
+.thz-happy .thz-eye{width:calc(var(--thz)*.11);height:calc(var(--thz)*.06);background-color:transparent;border-width:calc(var(--thz)*.026) calc(var(--thz)*.026) 0;border-radius:calc(var(--thz)*.11) calc(var(--thz)*.11) 0 0;animation:none}
+.thz-happy .thz-light{animation:none;scale:1.7 1;opacity:1}
+.is-talking .thz-tilt{animation:thzTalk .42s ease-in-out infinite alternate}
+.is-talking .thz-light{animation:thzVoice .55s ease-in-out infinite}
+

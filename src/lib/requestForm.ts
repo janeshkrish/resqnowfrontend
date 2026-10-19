@@ -102,7 +102,7 @@ export const isUrgent = (answers: Answers) => answers.inside === "yes" || answer
 
 /** `details` for POST /api/service-requests (read by resqnowbackend/services/requestDetails.js). */
 export function buildRequestDetails({
-  spec, answers, context, landmark, plate, note, attachments,
+  spec, answers, context, landmark, plate, note, attachments, channel,
 }: {
   spec: ServiceSpec;
   answers: Answers;
@@ -111,6 +111,8 @@ export function buildRequestDetails({
   plate?: string;
   note?: string;
   attachments?: Attachment[];
+  /** "voice" when ResQNow-Thozhan filled the form. */
+  channel?: string;
 }) {
   const shown = shownQuestions(spec, answers, context).filter((question) => hasAnswer(answers, question.id));
   const baseSubtype = context.family === "ev" && baseClassesForEv(context.classId).some(entry => entry.id === context.baseSubtype)
@@ -128,5 +130,6 @@ export function buildRequestDetails({
     note: String(note || "").trim(),
     urgent: isUrgent(answers),
     attachments: (attachments ?? []).map(({ type, url }) => ({ type, url })),
+    ...(channel === "voice" ? { channel: "voice" } : {}),
   };
 }

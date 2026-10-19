@@ -9,6 +9,7 @@ import { GarageCard, OffersRail, PartnerCard, ReviewsRail } from "@/components/h
 import VehicleShowcase from "@/components/home/VehicleShowcase";
 import LiveNetwork from "@/components/home/LiveNetwork";
 import ActiveRequestCard from "@/components/home/ActiveRequestCard";
+import { ThozhanHomeCard } from "@/components/voice/ThozhanEntry";
 
 const EnterpriseDesktopHome = lazyWithReload(() => import("@/components/desktop/EnterpriseDesktopHome"));
 
@@ -20,6 +21,7 @@ const MobileDashboard = () => (
     <div className="rq-home-stack">
       <HomeSearch />
       <ActiveRequestCard />
+      <ThozhanHomeCard />
       <HomeBanners />
       <HomeServices />
       <FuelPricesCard />

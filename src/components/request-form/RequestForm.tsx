@@ -32,6 +32,7 @@ import { ContactBlock, NotesBlock, PlateAndSave, RequestSummary } from "./Confir
 import QuestionField from "./QuestionField";
 import SlideToSend from "./SlideToSend";
 import VehiclePicker from "./VehiclePicker";
+import { ThozhanFormLink } from "@/components/voice/ThozhanEntry";
 
 const SUPPORT_PHONE = "+919566510080";
 const FAMILY_LABEL: Record<VehicleFamily, string> = { car: "Car", bike: "Bike", commercial: "Commercial vehicle", ev: "EV" };
@@ -142,6 +143,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
           plate: data.plate,
           note: data.note,
           attachments: data.attachments,
+          channel: data.channel,
         }),
       };
     },
@@ -410,6 +412,7 @@ export default function RequestForm({ family }: { family: VehicleFamily }) {
             {evFormRequired ? "This vehicle is electric. " : "Have an electric vehicle? "}
             <Link to={`/request-service/${spec.key === "fuel" ? "ev-charging" : serviceId}/ev`}>Use EV services</Link>
           </p> : null}
+          {currentStep === 1 && !isSos ? <ThozhanFormLink serviceId={spec.key} family={family} /> : null}
           {currentStep === 1 ? (
             isSos ? (
               spec.questions.map(renderQuestion)

@@ -16,6 +16,19 @@
     <!-- Required (API 34+) for the job-scoped live tracking service. No background-location
          permission: the service starts from the foreground and keeps while-in-use access. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- ResQNow-Thozhan: the customer can say what happened instead of filling in the form.
+         The phone's own recogniser turns speech into text; the app keeps no recording. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Android 11+ only lets the app see the phone's speech recogniser and voices when it asks for them. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"

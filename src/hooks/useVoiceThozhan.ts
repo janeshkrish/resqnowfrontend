@@ -9,9 +9,11 @@ import {
   aiContext, applyReply, calloutFor, detectLang, emptyDraft, formHandoff, hear, isMulti, mergeAi, mergeHeard, nextStep, understandReply,
   type Said, type Step, type Via, type VoiceDraft,
 } from "@/lib/voice/engine";
-import { LINES, NOD, SERVICE_TALK, type Lang } from "@/lib/voice/lexicon";
-import { listen, silence, speak, type Listening } from "@/lib/voice/speech";
-import { placeChip, serviceChip, spokenText, vehicleChip, type Line } from "@/lib/voice/talk";
+import { LINES, NOD, type L3, type Lang } from "@/lib/voice/lexicon";
+import {
+  explainMicError, listen, prepareSpeech, setNaturalVoice, silence, speak, speechReady, unlockAudio, type Listening, type MicProblem,
+} from "@/lib/voice/speech";
+import { placeChip, reactChip, serviceChip, spokenText, vehicleChip, type Line } from "@/lib/voice/talk";
 import type { ServiceKey } from "@/config/requestQuestions";
 import type { VehicleFamily } from "@/lib/vehicleClasses";
 
@@ -22,7 +24,7 @@ export type Status = "idle" | "listening" | "thinking" | "talking";
 type NewTurn = Turn extends infer T ? (T extends Turn ? Omit<T, "id"> : never) : never;
 export type Phase = "hello" | "convo" | "handing";
 export type FoundPlace = { address: string; lat: number; lng: number; title: string; subtitle: string };
-export type MicTrouble = null | "permission" | "unavailable" | "unheard";
+export type MicTrouble = null | MicProblem;
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const MUTE_KEY = "resqnow_thozhan_muted";
@@ -49,9 +51,11 @@ function locate(): Promise<FoundPlace | null> {
 
 const stepName = (step: Step | null) => (!step ? "" : step.kind === "question" ? step.id : step.kind);
 
-export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
+export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHandoff }: {
   garage: Vehicle[];
   ai: boolean;
+  /** The server has a natural, human-sounding voice; else the phone's own voice speaks. */
+  naturalVoice?: boolean;
   preset?: { service?: ServiceKey | null; family?: VehicleFamily | null };
   onHandoff: (path: string) => void;
 }) {
@@ -92,6 +96,8 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
     return () => { alive.current = false; clearTimeout(calm); listening.current?.stop(); silence(); };
   }, []);
 
+  useEffect(() => { setNaturalVoice(naturalVoice); }, [naturalVoice]);
+
   const commit = useCallback((next: VoiceDraft) => { refs.current.draft = next; setDraft(next); }, []);
   const addTurn = useCallback((turn: NewTurn) => { ids.current += 1; const id = ids.current; setTurns((prev) => [...prev, { ...turn, id } as Turn]); }, []);
 
@@ -100,15 +106,19 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
     const run = async () => {
       if (!alive.current) return;
       setStatus("thinking");
-      await wait(420);
-      if (!alive.current) return;
       const asks = line.kind === "question" || (line.kind === "line" && line.key.startsWith("ask") && line.key !== "askModel");
       const shown: Line = answered.current && asks ? { ...line, ack: acks.current++ } : line;
       answered.current = false;
+      const words = spokenText(shown, refs.current.lang);
+      // The natural voice is made while Thozhan "thinks", and the words appear as it starts to speak.
+      const aloud = !refs.current.muted;
+      if (aloud) prepareSpeech(words, refs.current.lang);
+      await wait(420);
+      if (aloud) await speechReady(words, refs.current.lang, 2500);
+      if (!alive.current) return;
       addTurn({ who: "thozhan", line: shown, call });
       setMood(nextMood);
       setStatus("talking");
-      const words = spokenText(shown, refs.current.lang);
       const least = 500 + words.split(/\s+/).length * 110;
       if (refs.current.muted) await wait(least);
       else await Promise.all([speak(words, refs.current.lang), wait(least)]);
@@ -124,7 +134,7 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
     const l = refs.current.lang;
     for (const item of said) {
       if (item.line === "understood" && d.service) {
-        const chips = { react: { text: SERVICE_TALK[d.service].react[l] }, svc: serviceChip(d.service, l), ...(d.family ? { veh: vehicleChip(d.family, l, vehicleName(d)) } : {}) };
+        const chips = { react: reactChip(d.service, l), svc: serviceChip(d.service, l), ...(d.family ? { veh: vehicleChip(d.family, l, vehicleName(d)) } : {}) };
         await say({ kind: "line", key: d.family ? "understood" : "understoodNoVeh", chips }, "concern");
       } else if (item.line === "evSwitch" || item.line === "safetyHighway") {
         await say({ kind: "line", key: item.line }, "concern");
@@ -170,7 +180,8 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
       case "switch": {
         const callout = calloutFor(d, next.question, next.value);
         const ask = LINES.askSwitch;
-        const text = callout ? { en: ask.en.replace("[[callout]]", callout.line.en), tg: ask.tg.replace("[[callout]]", callout.line.tg), ta: ask.ta.replace("[[callout]]", callout.line.ta) } : ask;
+        const fill = (lang: keyof L3) => (ask[lang] ?? "").replace("[[callout]]", callout?.line[lang] ?? callout?.line.ta ?? "");
+        const text: L3 = callout ? { en: fill("en"), tg: fill("tg"), ta: fill("ta"), ...(ask.say ? { say: fill("say") } : {}) } : ask;
         await say({ kind: "text", text }, "concern");
         return;
       }
@@ -210,6 +221,7 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
   const handleInput = useCallback(async (raw: string, via: Via) => {
     const text = raw.trim();
     if (!text) return;
+    if (via !== "voice") unlockAudio();
     const detected = detectLang(text);
     if (detected) { setLastLang(detected); refs.current.lang = langPref === "auto" ? detected : langPref; }
     setPhase("convo");
@@ -266,6 +278,7 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
   const choose = useCallback((value: string, label: string) => {
     const current = refs.current.step;
     if (!current || status === "thinking") return;
+    unlockAudio();
     if (isMulti(current, refs.current.draft)) {
       setPicks((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
       return;
@@ -299,6 +312,7 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
     if (status === "listening") { listening.current?.stop(); return; }
     if (phase === "handing") return;
     silence();
+    unlockAudio();
     setTrouble(null);
     setStatus("listening");
     setMood("listen");
@@ -320,9 +334,8 @@ export function useVoiceThozhan({ garage, ai, preset, onHandoff }: {
         setStatus("idle");
         setMood("idle");
         if (said) { void handleInput(said, "voice"); return; }
-        if (error === "permission") setTrouble("permission");
-        else if (error === "unavailable" || error === "language" || error === "not-allowed" || error === "service-not-allowed") setTrouble("unavailable");
-        else setTrouble("unheard");
+        if (!error) { setTrouble("unheard"); return; }
+        void explainMicError(error).then((problem) => { if (alive.current) setTrouble(problem); });
       },
     });
   }, [backchannel, handleInput, phase, status]);

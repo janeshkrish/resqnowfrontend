@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SERVICE_SPECS, type ServiceKey } from "@/config/requestQuestions";
 import { TYRES } from "@/lib/requestForm";
-import { ANSWER_WORDS, CALLOUT_LINES, LITRE_QUESTIONS, QUESTION_PROMPTS, SERVICE_TALK } from "./lexicon";
+import { ANSWER_WORDS, CALLOUT_LINES, FAMILY_TALK, LINES, LITRE_QUESTIONS, QUESTION_PROMPTS, SERVICE_TALK, type L3 } from "./lexicon";
 
 // The voice agent must cover the form exactly: when the form gains a question, an option or a
 // callout, these tests fail until ResQNow-Thozhan can ask it, hear it and say it.
@@ -48,6 +48,22 @@ describe("ResQNow-Thozhan covers the request form", () => {
           for (const lang of ["en", "tg", "ta"] as const) expect(line![lang]).not.toBe("");
         }
       }
+    }
+  });
+
+  it("has a Tamil-script reading of every Tanglish line, with the same holes", () => {
+    // Tanglish is spoken by a Tamil voice from these; an English voice reading "Enna aachu" sounds wrong.
+    const spoken: Array<[string, L3]> = [
+      ...Object.entries(LINES),
+      ...Object.entries(CALLOUT_LINES),
+      ...Object.entries(FAMILY_TALK),
+      ...Object.entries(SERVICE_TALK).flatMap(([service, talk]) => [[`${service}.label`, talk.label], [`${service}.react`, talk.react]] as Array<[string, L3]>),
+      ...Object.entries(QUESTION_PROMPTS).flatMap(([service, prompts]) => Object.entries(prompts).map(([id, line]) => [`${service}.${id}`, line] as [string, L3])),
+    ];
+    const holes = (text: string) => (text.match(/\[\[\w+\]\]/g) ?? []).sort().join(" ");
+    for (const [name, line] of spoken) {
+      expect(line.say ?? "", `${name} has no Tamil-script reading`).toMatch(/[\u0B80-\u0BFF]/);
+      expect(holes(line.say!), `${name} holes`).toBe(holes(line.tg));
     }
   });
 });

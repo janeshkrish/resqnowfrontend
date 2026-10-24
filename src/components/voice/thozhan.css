@@ -154,6 +154,8 @@
 .vt-side { position: absolute; top: 25px; display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border: 0; border-radius: 23px; background: #fff; box-shadow: inset 0 0 0 1px rgba(40, 48, 72, 0.1); color: #283048; }
 .vt-side .rq-symbol { font-size: 21px; }
 .vt-cap { position: absolute; left: 44px; right: 44px; bottom: 8px; text-align: center; color: #667085; font-size: 12px; line-height: 15px; font-weight: 700; }
+/* Why the microphone didn't work, above the typing box it opened. */
+.vt-cap.is-top { top: 4px; bottom: auto; left: 16px; right: 16px; color: #8e1822; }
 .vt-type { position: absolute; left: 14px; right: 14px; bottom: 28px; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; border-radius: 26px; background: #fff; box-shadow: 0 0 0 1.5px rgba(176, 31, 42, 0.3), 0 16px 30px -16px rgba(40, 48, 72, 0.5); animation: vtIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .vt-type input { flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: #283048; font: inherit; font-size: 16px; font-weight: 600; outline: none; }
 .vt-type input::placeholder { color: #98a2b3; }

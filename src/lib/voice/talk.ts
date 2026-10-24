@@ -3,10 +3,11 @@
  * line names the service, the vehicle or a place ("Note pannitten: unga [bike]-ku [Puncture]").
  */
 import { serviceSpecFor, type ServiceKey } from "@/config/requestQuestions";
-import { ACK, FAMILY_TALK, LINES, QUESTION_PROMPTS, SERVICE_TALK, type L3, type Lang } from "./lexicon";
+import { ACK, ACK_SAY, FAMILY_TALK, LINES, QUESTION_PROMPTS, SERVICE_TALK, type L3, type Lang } from "./lexicon";
 import type { VehicleFamily } from "@/lib/vehicleClasses";
 
-export type Chip = { text: string; art?: string | null; icon?: string };
+/** `say` is how a Tamil voice should read the chip in a Tanglish line. */
+export type Chip = { text: string; art?: string | null; icon?: string; say?: string };
 export type Segment = { chip: false; text: string } | { chip: true; text: string; art: string | null; icon: string; after: string };
 
 export type LineKey = keyof typeof LINES;
@@ -19,9 +20,21 @@ const VEHICLE_ART: Record<VehicleFamily, string> = {
   bike: "/images/vehicles/bike.webp", car: "/images/vehicles/car.webp", commercial: "/images/vehicles/truck.webp", ev: "/images/vehicles/ev.webp",
 };
 
-export const serviceChip = (service: ServiceKey, lang: Lang): Chip => ({ text: SERVICE_TALK[service].label[lang], art: serviceSpecFor(service).art, icon: "build" });
-export const vehicleChip = (family: VehicleFamily, lang: Lang, name?: string): Chip => ({ text: name || FAMILY_TALK[family][lang], art: VEHICLE_ART[family] });
-export const placeChip = (text: string): Chip => ({ text, icon: "location_on" });
+export const serviceChip = (service: ServiceKey, lang: Lang): Chip => {
+  const label = SERVICE_TALK[service].label;
+  return { text: label[lang], art: serviceSpecFor(service).art, icon: "build", say: label.say ?? label.ta };
+};
+/** A vehicle's name as a voice should say it: "Splendor+" is "Splendor plus". */
+const spokenName = (name: string) => name.replace(/\s*\+/g, " plus");
+export const vehicleChip = (family: VehicleFamily, lang: Lang, name?: string): Chip => {
+  const word = FAMILY_TALK[family];
+  return { text: name || word[lang], art: VEHICLE_ART[family], say: name ? spokenName(name) : word.say || word.ta };
+};
+export const placeChip = (text: string): Chip => ({ text, icon: "location_on", say: text });
+export const reactChip = (service: ServiceKey, lang: Lang): Chip => {
+  const react = SERVICE_TALK[service].react;
+  return { text: react[lang], say: react.say ?? react.ta };
+};
 export const vehicleArt = (family: VehicleFamily) => VEHICLE_ART[family];
 
 /** The words of a line in the chosen language, with [[name]] holes still in. */
@@ -63,7 +76,25 @@ export function segments(line: Line, lang: Lang): Segment[] {
   return out;
 }
 
-/** The line read aloud: chips become their words. */
+/** The Tanglish line in Tamil script, for a Tamil voice; null when it has none. */
+function sayTemplate(line: Line): string | null {
+  let template: string | undefined;
+  if (line.kind === "line") template = LINES[line.key].say;
+  else if (line.kind === "question") template = QUESTION_PROMPTS[line.service]?.[line.id]?.say;
+  else template = line.text.say;
+  if (!template) return null;
+  return line.ack != null ? `${ACK_SAY[line.ack % ACK_SAY.length]} ${template}` : template;
+}
+
+/**
+ * The line read aloud. English and Tamil are read as written. Tanglish (Tamil words in English
+ * letters) sounds wrong in any voice, so it is read from its Tamil-script form by a Tamil voice;
+ * a Tanglish line without one is not read at all.
+ */
 export function spokenText(line: Line, lang: Lang): string {
-  return segments(line, lang).map((s) => (s.chip ? s.text + s.after : s.text)).join(" ");
+  if (lang !== "tg") return segments(line, lang).map((s) => (s.chip ? s.text + s.after : s.text)).join(" ");
+  const template = sayTemplate(line);
+  if (!template) return "";
+  const chips = line.kind === "line" ? line.chips ?? {} : {};
+  return template.replace(/\[\[(\w+)\]\]/g, (_hole, name: string) => chips[name]?.say ?? chips[name]?.text ?? "").replace(/\s+/g, " ").trim();
 }

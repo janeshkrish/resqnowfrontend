@@ -7,11 +7,13 @@ import { toast } from "sonner";
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVoiceEnabled } from "@/hooks/useVoiceEnabled";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { apiFetch } from "@/lib/api";
 import { GARAGE_QUERY_KEY, listVehicles } from "@/lib/garage";
 import { MONTHS, MY_REQUESTS_KEY, fetchMyRequests, requestTime, type MyRequest } from "@/lib/myRequests";
 import { cn } from "@/lib/utils";
+import { onWakeWordChange, setWakeWord, wakeWordOn } from "@/lib/voice/wake";
 
 type ThemeMode = "light" | "dark" | "system";
 
@@ -39,7 +41,7 @@ const mergeUserSettings = (base: UserSettings, patch?: DeepPartial<UserSettings>
 });
 
 // The pages inside Account, by the ?tab= each one has always had.
-const VIEWS = { profile: "details", stats: "numbers", notifications: "alerts", appearance: "look", privacy: "security" } as const;
+const VIEWS = { profile: "details", stats: "numbers", notifications: "alerts", appearance: "look", privacy: "security", voice: "voice" } as const;
 type View = "main" | (typeof VIEWS)[keyof typeof VIEWS];
 type Field = "name" | "phone" | "birthday" | "gender";
 
@@ -158,6 +160,12 @@ const SettingsPage = () => {
   // Back from a page inside Account: to where the customer came from, or to Account when this was the first page opened.
   const back = () => (location.key !== "default" ? navigate(-1) : setSearchParams({}, { replace: true }));
 
+  const voiceOn = useVoiceEnabled();
+  const [heyOn, setHeyOn] = useState(wakeWordOn);
+  const [heyBusy, setHeyBusy] = useState(false);
+  const [micRefused, setMicRefused] = useState(false);
+  useEffect(() => onWakeWordChange(setHeyOn), []);
+
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -254,6 +262,22 @@ const SettingsPage = () => {
     }
   };
   const openSupport = () => setSupport({ title: "Contact support", sub: "Pick how you’d like to reach us." });
+  // "Hey ResQNow" belongs to this phone, so it is kept here rather than in the account's settings.
+  const flipHey = async (next: boolean) => {
+    if (!next) { setWakeWord(false); return; }
+    setHeyBusy(true);
+    try {
+      // Ask for the microphone now, while the customer is looking at why.
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mic.getTracks().forEach((track) => track.stop());
+      setMicRefused(false);
+      setWakeWord(true);
+    } catch {
+      setMicRefused(true);
+    } finally {
+      setHeyBusy(false);
+    }
+  };
   const askAssistant = () => {
     setSupport(null);
     window.dispatchEvent(new Event("resqnow:open-chat"));
@@ -332,6 +356,15 @@ const SettingsPage = () => {
           <Switch name="Show the bottom bar" say="Home, Map, Get help, Activity, Account" on={!!settings.navigation.mobile_bottom_nav_enabled} disabled={disabled} onFlip={(mobile_bottom_nav_enabled) => updateSettings({ navigation: { mobile_bottom_nav_enabled } })} />
           <Switch name="Hide it while scrolling" say="It comes back when you scroll up" on={!!settings.navigation.auto_hide_bottom_nav && !!settings.navigation.mobile_bottom_nav_enabled} disabled={disabled || !settings.navigation.mobile_bottom_nav_enabled} onFlip={(auto_hide_bottom_nav) => updateSettings({ navigation: { auto_hide_bottom_nav } })} />
         </div>
+      </Inner>
+    );
+  } else if (view === "voice") {
+    body = (
+      <Inner title="Hey ResQNow" sub="Open ResQNow-Thozhan by saying it, without touching the phone." onBack={back}>
+        <div className="rq-ac-group rq-ac-first">
+          <Switch name="Say “Hey ResQNow”" say={micRefused ? "Allow the microphone for ResQNow first" : "Opens Thozhan from any ResQNow screen"} on={heyOn} disabled={heyBusy} onFlip={flipHey} />
+        </div>
+        <p className="rq-ac-note">It listens only while ResQNow is open on your screen, and only on this phone: nothing is recorded or sent until Thozhan opens. Turning it on downloads about 15 MB once. A small “Hey ResQNow” badge shows whenever it is listening.</p>
       </Inner>
     );
   } else if (view === "security") {
@@ -428,6 +461,12 @@ const SettingsPage = () => {
             <MaterialSymbol name="contrast" /><span className="rq-ac-row-text"><b>Appearance</b></span>
             <span className="rq-ac-val">{settingsLoading ? "" : THEME_NAMES[settings.appearance.theme] ?? ""}</span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />
           </button>
+          {voiceOn ? (
+            <button type="button" className="rq-ac-row" onClick={() => open("voice")}>
+              <MaterialSymbol name="mic" /><span className="rq-ac-row-text"><b>Hey ResQNow</b><span>Open Thozhan by voice</span></span>
+              <span className="rq-ac-val">{heyOn ? "On" : "Off"}</span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />
+            </button>
+          ) : null}
           <button type="button" className="rq-ac-row" onClick={() => open("privacy")}>
             <MaterialSymbol name="lock" /><span className="rq-ac-row-text"><b>Privacy and security</b></span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />
           </button>

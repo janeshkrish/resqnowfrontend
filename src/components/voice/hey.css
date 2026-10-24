@@ -1,0 +1,33 @@
+/* "Hey ResQNow" is listening: a small pill above the bottom bar, quiet, in ResQNow navy. */
+.hey-badge {
+  position: fixed;
+  left: 12px;
+  bottom: calc(14px + 66px + 10px + env(safe-area-inset-bottom, 0px));
+  z-index: 49;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 9px;
+  border-radius: 15px;
+  background: rgba(40, 48, 72, 0.92);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 22px -14px rgba(40, 48, 72, 0.8);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  animation: heyIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hey-badge .rq-symbol { font-size: 16px; color: #ff8a93; animation: heyBreathe 2.4s ease-in-out infinite; }
+.hey-badge.is-blocked { background: rgba(142, 24, 34, 0.94); }
+.hey-badge.is-blocked .rq-symbol { color: #fff; animation: none; }
+@media (min-width: 1024px) {
+  .hey-badge { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 18px; }
+}
+@keyframes heyIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes heyBreathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .hey-badge, .hey-badge .rq-symbol { animation: none; }
+}

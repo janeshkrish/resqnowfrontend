@@ -61,6 +61,7 @@ const Notifications = lazyWithReload(() => import("./pages/Notifications"));
 const Marketplace = lazyWithReload(() => import("./pages/Marketplace"));
 const MyGaragePage = lazyWithReload(() => import("./pages/MyGaragePage"));
 const VoiceThozhanPage = lazyWithReload(() => import("./pages/VoiceThozhanPage"));
+const HeyResQNow = lazyWithReload(() => import("./components/voice/HeyResQNow"));
 const ProductDetail = lazyWithReload(() => import("./pages/ProductDetail"));
 const ServiceCommunicationPage = lazyWithReload(() => import("./pages/ServiceCommunicationPage"));
 const MapPage = lazyWithReload(() => import("./pages/MapPage"));
@@ -214,6 +215,7 @@ const App = () => {
                         <TooltipProvider>
                           <Sonner />
                           <LoadingAnimation />
+                          <Suspense fallback={null}><HeyResQNow /></Suspense>
                           <Suspense fallback={routeFallback}>
                             <Routes>
                             {/* Auth routes */}

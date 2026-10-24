@@ -8,6 +8,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.speech.tts.Voice;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -18,8 +19,10 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * ResQNow-Thozhan's ears and voice (src/lib/voice/speech.ts): the phone's own speech recogniser,
@@ -155,6 +158,10 @@ public class VoiceThozhanPlugin extends Plugin {
                 release(call);
                 return;
             }
+            Voice voice = bestVoice(lang);
+            if (voice != null) tts.setVoice(voice);
+            // A touch slower than the default reads Tamil more clearly.
+            tts.setSpeechRate(0.95f);
             String id = "thozhan-" + (++utterances);
             speaking.put(id, call);
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id);
@@ -192,6 +199,26 @@ public class VoiceThozhanPlugin extends Plugin {
             });
             ready.run();
         });
+    }
+
+    /** The phone's clearest installed voice for the language (VoicePick), or null to keep the engine's own choice. */
+    private Voice bestVoice(String lang) {
+        try {
+            Set<Voice> all = tts.getVoices();
+            if (all == null) return null;
+            List<Voice> voices = new ArrayList<>(all);
+            List<VoicePick.Option> options = new ArrayList<>();
+            for (Voice voice : voices) {
+                Set<String> features = voice.getFeatures();
+                boolean installed = features == null || !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED);
+                options.add(new VoicePick.Option(voice.getLocale().toLanguageTag(), voice.getQuality(), voice.isNetworkConnectionRequired(), installed));
+            }
+            int best = VoicePick.best(options, lang);
+            return best < 0 ? null : voices.get(best);
+        } catch (RuntimeException error) {
+            // Some speech engines fail to list their voices; the default voice still speaks.
+            return null;
+        }
     }
 
     private void release(PluginCall call) {

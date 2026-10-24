@@ -90,7 +90,8 @@ export default defineConfig(({ mode }) => {
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
-          globIgnores: ["**/firebase-messaging-sw.js"],
+          // "Hey ResQNow" (about 15 MB) is fetched only by customers who turn it on, never precached for everyone.
+          globIgnores: ["**/firebase-messaging-sw.js", "**/hey-resqnow/**"],
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [

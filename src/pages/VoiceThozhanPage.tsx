@@ -1,6 +1,7 @@
-import { Fragment, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Capacitor } from "@capacitor/core";
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 import Thozhan from "@/components/voice/Thozhan";
 import VoiceWave from "@/components/voice/VoiceWave";
@@ -15,6 +16,9 @@ import { fetchVoiceStatus, VOICE_STATUS_KEY } from "@/lib/voice/api";
 import { answerChips, contextOf, FAMILIES, FAMILY_TITLES, isMulti, questionOf, repliesFor, type VoiceDraft } from "@/lib/voice/engine";
 import { LINES, NOD, UI } from "@/lib/voice/lexicon";
 import { segments, vehicleArt } from "@/lib/voice/talk";
+
+/** Inside the Android app the microphone is allowed in phone Settings, not the browser. */
+const inApp = Capacitor.isNativePlatform();
 
 const SAMPLES = [
   { text: "Ennoda bike puncture aayiduchu", tag: "Tanglish" },
@@ -66,11 +70,22 @@ export default function VoiceThozhanPage() {
   const vt = useVoiceThozhan({
     garage: garageQuery.data ?? [],
     ai: Boolean(status.data?.ai),
+    naturalVoice: Boolean(status.data?.voice),
     preset,
     onHandoff: (path) => navigate(path, { replace: true }),
   });
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
+
+  // Opened by "Hey ResQNow": listen straight away, once the wake listener has let go of the microphone.
+  const woke = params.get("wake") === "1";
+  const startListening = useRef(vt.toggleMic);
+  startListening.current = vt.toggleMic;
+  useEffect(() => {
+    if (!woke) return;
+    const timer = setTimeout(() => void startListening.current(), 700);
+    return () => clearTimeout(timer);
+  }, [woke]);
 
   if (status.data && !status.data.enabled) return <Navigate to="/" replace />;
 
@@ -84,15 +99,18 @@ export default function VoiceThozhanPage() {
   const optionalMulti = multi && step?.kind === "question" && Boolean(questionOf(draft.service, step.id)?.optional);
   const tokens = tokensFor(draft, step?.kind, step?.kind === "question" ? step.id : undefined, place?.title ?? null);
   const doneCount = tokens.filter((t) => t.done).length;
-  const showTyping = typing || vt.trouble === "permission" || vt.trouble === "unavailable";
+  const showTyping = typing || vt.trouble === "blocked" || vt.trouble === "nomic" || vt.trouble === "unsupported";
   const lastThozhan = turns.reduce((last, t, i) => (t.who === "thozhan" ? i : last), -1);
   const lastLength = lastThozhan >= 0 ? segments((turns[lastThozhan] as Extract<Turn, { who: "thozhan" }>).line, lang).length : 0;
   const after = lastLength * 0.075 + 0.35;
 
   let caption = "Tap the mic and say what happened · or type";
   if (phase === "handing") caption = "Opening your request…";
-  else if (vt.trouble === "permission") caption = "Allow the microphone to talk, or type instead";
-  else if (vt.trouble === "unavailable") caption = "This phone can’t listen right now. Type instead.";
+  // Blocked, no microphone and unsupported open the typing box, so these say "type here".
+  else if (vt.trouble === "blocked") caption = inApp ? "Allow the microphone for ResQNow in phone Settings, or type here." : "Microphone blocked. Tap the lock by the web address to allow it, or type here.";
+  else if (vt.trouble === "nomic") caption = "No microphone found. Type here instead.";
+  else if (vt.trouble === "offline") caption = "Listening needs the internet. Check your connection, or type instead.";
+  else if (vt.trouble === "unsupported") caption = inApp ? "This phone can’t listen right now. Type here instead." : "This browser can’t listen. Use Chrome or the ResQNow app, or type here.";
   else if (vt.trouble === "unheard") caption = "I didn’t catch that. Tap the mic and try again.";
   else if (listening) caption = "Listening · tap when you’re done";
   else if (thinking) caption = "ResQNow-Thozhan is thinking…";
@@ -255,10 +273,13 @@ export default function VoiceThozhanPage() {
         <div className="vt-dock">
           <VoiceWave who={listening ? "you" : talking ? "thozhan" : null} />
           {showTyping ? (
-            <form className="vt-type" onSubmit={submitTyped}>
-              <input value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={UI.typeHere[lang]} aria-label="Type to ResQNow-Thozhan" autoFocus />
-              <button type="submit" className="vt-send" aria-label="Send"><MaterialSymbol name="arrow_forward" /></button>
-            </form>
+            <>
+              {vt.trouble ? <p className="vt-cap is-top" role="status">{caption}</p> : null}
+              <form className="vt-type" onSubmit={submitTyped}>
+                <input value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={UI.typeHere[lang]} aria-label="Type to ResQNow-Thozhan" autoFocus />
+                <button type="submit" className="vt-send" aria-label="Send"><MaterialSymbol name="arrow_forward" /></button>
+              </form>
+            </>
           ) : (
             <>
               <button type="button" className="vt-side" style={{ left: 22 } as CSSProperties} onClick={() => setTyping(true)} aria-label="Type instead"><MaterialSymbol name="keyboard" /></button>

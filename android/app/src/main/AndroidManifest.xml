@@ -19,6 +19,8 @@
     <!-- ResQNow-Thozhan: the customer can say what happened instead of filling in the form.
          The phone's own recogniser turns speech into text; the app keeps no recording. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- "Hey ResQNow" listens in the app's web view; Capacitor asks for this with the microphone. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Android 11+ only lets the app see the phone's speech recogniser and voices when it asks for them. -->
     <queries>

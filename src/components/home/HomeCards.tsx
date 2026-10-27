@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 
 import { apiUrl } from "@/lib/api";
+import {buildTrackedApkDownloadUrl} from '@/lib/appAnalytics/download';
 import MaterialSymbol from "./MaterialSymbol";
 
 const COUPON_CODE = "RESQ10";
@@ -42,7 +43,8 @@ export function OffersRail() {
   const downloadApp = () => {
     if (downloading) return;
     setDownloading(true);
-    window.location.href = apiUrl("/api/public/android-app/download");
+    const url=apiUrl('/api/public/android-app/download');
+    window.location.href=typeof crypto.randomUUID==='function'?buildTrackedApkDownloadUrl(url,crypto.randomUUID()):url;
     window.setTimeout(() => setDownloading(false), 3000);
   };
 

@@ -1,0 +1,6 @@
+import {render,waitFor} from '@testing-library/react';import {it,expect,vi} from 'vitest';import {AppAnalyticsBridge} from './AppAnalyticsBridge';
+vi.mock('@/contexts/AuthContext',()=>({useAuth:()=>({user:{id:'customer'},isAuthenticated:true})}));
+vi.mock('@/contexts/TechnicianAuthContext',()=>({useTechnicianAuth:()=>({technician:null,isAuthenticated:false})}));
+vi.mock('@/lib/api',()=>({apiUrl:(s:string)=>s,getUserToken:()=> 'synthetic-current-user',getTechnicianToken:()=>null}));
+vi.mock('@/lib/appAnalytics/native',()=>({ANALYTICS_CONSENT_EVENT:'consent',getNativeInstallation:()=>({getIdentity:async()=>({installationId:'id',installationSecret:'a'.repeat(64),consentGranted:true,consentRevision:1,consentPolicyVersion:'2026-10-27',appId:'com.resqnow1.app',versionName:'1.3',versionCode:4}),acknowledge:async()=>{}})}));
+it('uses current explicit customer authentication without delaying render',async()=>{const fetch=vi.fn<(input:RequestInfo|URL,init?:RequestInit)=>Promise<{status:number}>>(async()=>({status:200}));vi.stubGlobal('fetch',fetch);const {unmount}=render(<AppAnalyticsBridge enabled />);await waitFor(()=>expect(fetch).toHaveBeenCalledTimes(2));expect((fetch.mock.calls[1][1]?.headers as Record<string,string>).Authorization).toBe('Bearer synthetic-current-user');unmount();vi.unstubAllGlobals();});

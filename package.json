@@ -10,6 +10,7 @@
     "build:dev": "vite build --mode development",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:analytics": "playwright test --config=playwright.analytics.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.js",

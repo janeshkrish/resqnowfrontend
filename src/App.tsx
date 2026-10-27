@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TechnicianAuthProvider } from "@/contexts/TechnicianAuthContext";
+import { AppAnalyticsBridge } from '@/components/AppAnalyticsBridge';
+import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { ThemeProvider } from "@/components/item-providers/ThemeProvider";
 import { SocketProvider } from "@/contexts/SocketContext";
@@ -209,6 +211,8 @@ const App = () => {
             <AdminAuthProvider>
               <AuthProvider>
                 <TechnicianAuthProvider>
+                  <AppAnalyticsBridge />
+                  <AppAnalyticsConsent mode="prompt" />
                   <SocketProvider>
                     <TechnicianJobProvider>
                       <FCMWrapper>

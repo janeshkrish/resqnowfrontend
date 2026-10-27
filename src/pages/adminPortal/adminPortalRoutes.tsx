@@ -21,6 +21,7 @@ const CustomerPage = lazyWithReload(() => import("./pages/CustomerPage"));
 const PaymentsPage = lazyWithReload(() => import("./pages/PaymentsPage"));
 const PayoutsPage = lazyWithReload(() => import("./pages/PayoutsPage"));
 const ReportsPage = lazyWithReload(() => import("./pages/ReportsPage"));
+const AppInstallsPage = lazyWithReload(() => import('./pages/AppInstallsPage'));
 const ComplaintsPage = lazyWithReload(() => import("./pages/ComplaintsPage"));
 const MessagesPage = lazyWithReload(() => import("./pages/MessagesPage"));
 const ServicesPage = lazyWithReload(() => import("./pages/ServicesPage"));
@@ -57,6 +58,7 @@ export const adminPortalRoutes = [
     <Route path="payments" element={lazy(<PaymentsPage />)} />
     <Route path="payouts" element={lazy(<PayoutsPage />)} />
     <Route path="reports" element={lazy(<ReportsPage />)} />
+    <Route path="app-installs" element={lazy(<AppInstallsPage />)} />
     <Route path="complaints/:complaintId?" element={lazy(<ComplaintsPage />)} />
     <Route path="messages" element={lazy(<MessagesPage />)} />
     <Route path="services" element={lazy(<ServicesPage />)} />

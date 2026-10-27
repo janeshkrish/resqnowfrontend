@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { TechBack, TechLanguageSheet, TechPage, TechSwitch } from "@/components/technician/app/TechUi";
 import { useSocket } from "@/contexts/SocketContext";
@@ -586,7 +587,7 @@ const TechnicianProfile = () => {
         }
     };
 
-    return <TechPage tab="me" testId="technician-profile">{renderContent()}</TechPage>;
+    return <TechPage tab="me" testId="technician-profile">{renderContent()}<AppAnalyticsConsent /></TechPage>;
 };
 
 export default TechnicianProfile;

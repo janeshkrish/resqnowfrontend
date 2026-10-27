@@ -1,4 +1,5 @@
 import React from "react";
+import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -10,6 +11,11 @@ const PrivacyPolicy = () => {
                 <p className="text-muted-foreground">Last updated: {new Date().toLocaleDateString()}</p>
             </div>
 
+            <AppAnalyticsConsent />
+            <section className="mb-8 rounded-xl border p-4" aria-label="APK analytics disclosure">
+                <h2 className="font-semibold">Optional Android app analytics — policy 2026-10-27</h2>
+                <p>With your permission, Android reports an installation identifier, app version, activity dates and verified account associations. Turning analytics off removes those associations and activity details after reconnecting; minimal deduplication/withdrawal records and anonymous totals remain. APK delivery sessions are counted separately without account or persistent browser identifiers; raw download-session IDs are retained for 30 days. These reports do not include microphone audio, GPS, contacts or hardware identifiers.</p>
+            </section>
             <Card className="mb-8">
                 <CardContent className="p-6 md:p-8 space-y-6">
                     <section>

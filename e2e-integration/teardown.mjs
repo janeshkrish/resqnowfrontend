@@ -1,0 +1,1 @@
+export default async function(){await Promise.all([[5192,'/__test/shutdown'],[5191,'/__test/stop-vite']].map(async([port,path])=>{try{await fetch(`http://127.0.0.1:${port}${path}`,{method:'POST',signal:AbortSignal.timeout(3000)});}catch{/* an owned server may already be stopped */}}));}

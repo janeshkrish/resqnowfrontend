@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoiceEnabled } from "@/hooks/useVoiceEnabled";
@@ -477,6 +478,7 @@ const SettingsPage = () => {
             <MaterialSymbol name="logout" /><span className="rq-ac-row-text"><b>Log out</b></span>
           </button>
         </div>
+        <AppAnalyticsConsent />
         <p className="rq-ac-foot"><Link to="/terms-of-service">Terms of service</Link>·<Link to="/privacy-policy">Privacy policy</Link></p>
       </>
     );

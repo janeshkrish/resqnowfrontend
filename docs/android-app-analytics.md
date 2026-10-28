@@ -23,3 +23,5 @@ Use a disposable emulator, targeting its explicit adb serial (never an attached 
 A debug-signed emulator update does not prove compatibility with the distributed release APK. Before publication compare the public signing certificate of the current distributed APK with the intended release certificate, confirm the same application ID com.resqnow1.app, and choose a versionCode higher than every distributed build. Do not read/copy keystore passwords into Git/logs and never silently require users to uninstall. Current source version metadata is not automatically bumped by analytics implementation.
 
 Backend must complete its additive migration and canary rollout first. Download sessions, reported first opens and distinct linked accounts are deliberately separate. Opted-out/offline/old-release users are not fully covered, and no historical/current physical-install total can be inferred. Backend docs cover retention, independent collection/retention flags, proxy/rate limits, kill switch and production approval gates.
+
+Implementation verification, independent review fixes, deferred minors and release gates: [28 October handoff](analytics-acceptance-2026-10-28.md).

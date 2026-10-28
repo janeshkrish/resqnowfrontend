@@ -22,8 +22,16 @@ export function createAppAnalyticsClient({native,transport,enabled,isOnline=()=>
    if(!isOnline()||!isVisible())throw Error('Wait for foreground connectivity');
    const id=await native.getIdentity();if(!running||epoch!==generation)return;
    const proof={installationId:id.installationId,installationSecret:id.installationSecret,consentRevision:id.consentRevision};
+   const withdrawalRevision=id.pendingWithdrawalRevision??(!id.consentGranted&&id.everConsented&&id.consentRevision>id.acknowledgedRevision?id.consentRevision:0);
+   if(withdrawalRevision>0){
+    const status=await send('/installations/withdraw',{...proof,consentRevision:withdrawalRevision});
+    if(!running||epoch!==generation)return;
+    if(status===204){schedule(5000);return;}
+    await native.acknowledge({revision:withdrawalRevision,withdrawal:true});
+    if(!running||epoch!==generation)return;
+    lastReportKey='';lastAccountsKey='';lastReportAt=-Infinity;
+   }
    if(!id.consentGranted){
-    if(id.everConsented&&id.consentRevision>id.acknowledgedRevision){const status=await send('/installations/withdraw',proof);if(status!==204&&running&&epoch===generation)await native.acknowledge({revision:id.consentRevision});}
     attempt=0;return;
    }
    if(!enabled)return;

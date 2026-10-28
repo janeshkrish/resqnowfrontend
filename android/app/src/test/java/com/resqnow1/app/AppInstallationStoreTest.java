@@ -34,4 +34,12 @@ public class AppInstallationStoreTest {
   Disk d=new Disk();AppInstallationStore s=new AppInstallationStore(d);s.get();d.data.setProperty("installationSecret","bad");
   try{s.get();fail("Corrupt identity should disable analytics");}catch(IOException expected){assertFalse(expected.getMessage().contains("bad"));}
  }
+ @Test public void offlineReconsentRetainsWithdrawalUntilItsOwnAcknowledgement() throws Exception {
+  Disk d=new Disk();AppInstallationStore s=new AppInstallationStore(d);s.setConsent(true,"2026-10-27");s.acknowledge(1);
+  s.setConsent(false,"2026-10-27");s.setConsent(true,"2026-10-27");
+  Properties afterRestart=new AppInstallationStore(d).get();assertEquals("3",afterRestart.getProperty("consentRevision"));assertEquals("2",afterRestart.getProperty("pendingWithdrawalRevision"));
+  s.acknowledge(3);assertEquals("2",s.get().getProperty("pendingWithdrawalRevision"));
+  s.setConsent(false,"2026-10-27");s.setConsent(true,"2026-10-27");s.acknowledge(2,true);assertEquals("4",s.get().getProperty("pendingWithdrawalRevision"));
+  s.acknowledge(4,true);assertEquals("0",new AppInstallationStore(d).get().getProperty("pendingWithdrawalRevision"));assertEquals("true",s.get().getProperty("consentGranted"));
+ }
 }

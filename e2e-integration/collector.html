@@ -2,16 +2,17 @@
 import {createAppAnalyticsClient} from '/src/lib/appAnalytics/client.ts';
 const api='http://127.0.0.1:5192';const session=await (await fetch(api+'/__test/session')).json();
 const secret=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
-const state={installationId:crypto.randomUUID(),installationSecret:secret,appId:'com.resqnow1.app',versionName:'1.3',versionCode:4,consentRevision:0,consentPolicyVersion:'2026-10-27',consentGranted:false,consentDecided:false,everConsented:false,acknowledgedRevision:0};
-const native={getIdentity:async()=>({...state}),acknowledge:async({revision})=>{state.acknowledgedRevision=Math.max(state.acknowledgedRevision,revision);}};
+const state={installationId:crypto.randomUUID(),installationSecret:secret,appId:'com.resqnow1.app',versionName:'1.3',versionCode:4,consentRevision:0,consentPolicyVersion:'2026-10-27',consentGranted:false,consentDecided:false,everConsented:false,acknowledgedRevision:0,pendingWithdrawalRevision:0};
+const native={getIdentity:async()=>({...state}),acknowledge:async({revision,withdrawal})=>{state.acknowledgedRevision=Math.max(state.acknowledgedRevision,revision);if(withdrawal&&state.pendingWithdrawalRevision===revision)state.pendingWithdrawalRevision=0;}};
 const transport=(path,body,token,signal)=>fetch(api+'/api/app-analytics'+path,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body),signal});
 let accounts={customer:null,technician:null};let client;
 function start(){client=createAppAnalyticsClient({native,transport,enabled:true,isOnline:()=>navigator.onLine});client.setAccounts(accounts);client.start();}
 start();window.addEventListener('online',()=>client.resume());
 document.getElementById('allow').onclick=()=>{state.consentRevision++;state.consentGranted=true;state.consentDecided=true;state.everConsented=true;client.resume();document.getElementById('status').textContent='Consent granted';};
-document.getElementById('withdraw').onclick=()=>{state.consentRevision++;state.consentGranted=false;client.resume();document.getElementById('status').textContent='Consent withdrawn';};
+document.getElementById('withdraw').onclick=()=>{state.consentRevision++;state.consentGranted=false;if(state.everConsented)state.pendingWithdrawalRevision=state.consentRevision;client.resume();document.getElementById('status').textContent='Consent withdrawn';};
 document.getElementById('customer').onclick=()=>{accounts={...accounts,customer:{id:session.customerId,getToken:()=>session.customerToken}};client.setAccounts(accounts);};
 document.getElementById('technician').onclick=()=>{accounts={...accounts,technician:{id:session.technicianId,getToken:()=>session.technicianToken}};client.setAccounts(accounts);};
+const guest=document.createElement('button');guest.textContent='Sign out';guest.onclick=()=>{accounts={customer:null,technician:null};client.setAccounts(accounts);};document.body.append(guest);
 document.getElementById('version').onclick=()=>{state.versionName='1.4';state.versionCode=5;client.resume();};
 document.getElementById('restart').onclick=()=>{client.stop();start();};
 document.getElementById('admin').onclick=()=>{localStorage.setItem('resqnow_admin_token',session.adminToken);localStorage.setItem('resqnow_admin_user',JSON.stringify({id:session.adminId,email:'synthetic@example.invalid',name:'Test admin',role:'admin'}));location.href='/admin/app-installs';};

@@ -28,10 +28,10 @@ public class AppInstallationPlugin extends Plugin {
  private JSObject snapshot(Properties p) throws Exception {
   JSObject out=new JSObject();for(String key:new String[]{"installationId","installationSecret","consentPolicyVersion"})out.put(key,p.getProperty(key));
   for(String key:new String[]{"consentGranted","consentDecided","everConsented"})out.put(key,Boolean.parseBoolean(p.getProperty(key)));
-  for(String key:new String[]{"consentRevision","acknowledgedRevision"})out.put(key,Long.parseLong(p.getProperty(key)));
+  for(String key:new String[]{"consentRevision","acknowledgedRevision","pendingWithdrawalRevision"})out.put(key,Long.parseLong(p.getProperty(key)));
   PackageInfo info=getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0);out.put("appId",getContext().getPackageName());out.put("versionName",info.versionName);out.put("versionCode",Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode);return out;
  }
  @PluginMethod public void getIdentity(PluginCall call){try{call.resolve(snapshot(store.get()));}catch(Exception e){call.reject("App analytics identity unavailable");}}
  @PluginMethod public void setConsent(PluginCall call){try{Boolean granted=call.getBoolean("granted");if(granted==null)throw new IOException();call.resolve(snapshot(store.setConsent(granted,call.getString("policyVersion"))));}catch(Exception e){call.reject("Could not save app analytics preference");}}
- @PluginMethod public void acknowledge(PluginCall call){try{Integer revision=call.getInt("revision");if(revision==null)throw new IOException();store.acknowledge(revision);call.resolve();}catch(Exception e){call.reject("Could not acknowledge analytics report");}}
+ @PluginMethod public void acknowledge(PluginCall call){try{Integer revision=call.getInt("revision");if(revision==null)throw new IOException();store.acknowledge(revision,Boolean.TRUE.equals(call.getBoolean("withdrawal")));call.resolve();}catch(Exception e){call.reject("Could not acknowledge analytics report");}}
 }

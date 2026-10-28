@@ -3,6 +3,15 @@ const api='http://127.0.0.1:5192';
 test.beforeEach(async({request,context})=>{await context.route('**/*',route=>{const host=new URL(route.request().url()).hostname;return host==='127.0.0.1'||host==='localhost'?route.continue():route.abort();});expect((await request.post(api+'/__test/reset')).ok()).toBeTruthy();});
 async function session(request:any){return (await request.get(api+'/__test/session')).json();}
 async function totals(request:any,adminToken:string){const r=await request.get(api+'/api/admin/portal/app-installs/summary?days=30',{headers:{Authorization:`Bearer ${adminToken}`}});expect(r.status()).toBe(200);return r.json();}
+
+test('offline withdrawal survives re-consent and collector restart, removing historical account links',async({page,context,request})=>{
+ const auth=await session(request);await page.goto('/e2e-integration/collector.html');await page.getByRole('button',{name:'Allow app analytics',exact:true}).click();await page.getByRole('button',{name:'Sign in customer',exact:true}).click();
+ await expect.poll(async()=>(await totals(request,auth.adminToken)).totals.customers).toBe(1);
+ await context.setOffline(true);await page.getByRole('button',{name:'Withdraw consent',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByRole('button',{name:'Allow app analytics',exact:true}).click();await page.getByRole('button',{name:'Restart collector',exact:true}).click();await context.setOffline(false);
+ await expect.poll(async()=>(await totals(request,auth.adminToken)).totals.customers).toBe(0);
+ await expect.poll(async()=>(await totals(request,auth.adminToken)).period.active).toBe(1);
+ expect((await totals(request,auth.adminToken)).totals.installations).toBe(1);
+});
 test('mobile-web APK action persists one real download session; HEAD and ranges do not inflate it',async({page,request})=>{
  // The existing download control belongs to the mobile customer layout, not the desktop marketing landing page.
  const auth=await session(request);await page.setViewportSize({width:390,height:844});await page.goto('/');

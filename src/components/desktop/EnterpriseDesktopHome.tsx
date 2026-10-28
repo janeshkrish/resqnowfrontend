@@ -1,14 +1,14 @@
 import React, { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import AppDemoContainer from "./app-demo/AppDemoContainer";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Activity, ArrowRight, CheckCircle2, Clock3, Navigation, ShieldCheck,
   Smartphone, Sparkles, Truck, Wrench, IndianRupee, Map, Zap
 } from "lucide-react";
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
 };

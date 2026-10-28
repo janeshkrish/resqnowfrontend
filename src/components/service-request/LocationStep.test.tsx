@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -76,8 +76,8 @@ function LocationHarness({
   onLocationSelect,
   initialData = formData,
 }: {
-  onInputChange: ReturnType<typeof vi.fn>;
-  onLocationSelect: ReturnType<typeof vi.fn>;
+  onInputChange: ComponentProps<typeof LocationStep>["onInputChange"];
+  onLocationSelect: NonNullable<ComponentProps<typeof LocationStep>["onLocationSelect"]>;
   initialData?: ServiceRequestFormData;
 }) {
   const [data, setData] = useState(initialData);

@@ -1,10 +1,11 @@
 
-import { LucideIcon } from "lucide-react";
+import type { ComponentType } from "react";
+import type { LucideIcon, LucideProps } from "lucide-react";
 
 export type ServiceDetails = {
   id: string;
   name: string;
-  icon: LucideIcon;
+  icon: ComponentType<LucideProps>;
   description: string;
   details: string;
   features: string[];

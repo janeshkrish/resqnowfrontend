@@ -25,20 +25,20 @@ const editedRows = (): PricingRow[] => JSON.parse(screen.getByTestId("rows").tex
 describe("charging capability registration", () => {
   it("stores connector and proprietary-brand CSV per subtype while preserving prices", () => {
     render(<PricingEditor />);
-    fireEvent.click(screen.getByRole("button", { name: "EV", exact: true }));
-    fireEvent.click(screen.getByRole("button", { name: "Scooter", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "EV" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scooter" }));
     fireEvent.change(screen.getByLabelText("Charging support fee *"), { target: { value: "500" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "Home plug" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Brand’s own plug" }));
     fireEvent.change(screen.getByLabelText("Supported EV brands *"), { target: { value: "Ather, Ola" } });
     expect(editedRows()[0].pricing_json).toMatchObject({ vehicle_subtype: "scooter", charging_support_fee: 500, supported_connectors: "home,brand", supported_ev_brands: "Ather, Ola" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Sedan", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Sedan" }));
     expect(screen.queryByLabelText("Supported EV brands *")).toBeNull();
     expect(screen.getByRole("checkbox", { name: "Home plug" })).not.toBeChecked();
     fireEvent.click(screen.getByRole("checkbox", { name: "CCS2" }));
     expect(editedRows()[1].pricing_json).toMatchObject({ vehicle_subtype: "sedan", supported_connectors: "ccs2" });
-    fireEvent.click(screen.getByRole("button", { name: "Scooter", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Scooter" }));
     expect(screen.getByRole("checkbox", { name: "Home plug" })).toBeChecked();
     expect(screen.getByLabelText("Supported EV brands *")).toHaveValue("Ather, Ola");
     expect(screen.getByLabelText("Charging support fee *")).toHaveValue(500);

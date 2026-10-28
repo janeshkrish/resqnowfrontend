@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MapplsPlaceInput from "./MapplsPlaceInput";
@@ -28,7 +28,7 @@ function result(name: string): MapplsPlaceSearchResult {
   };
 }
 
-function Harness({ onPlaceSelect = vi.fn() }: { onPlaceSelect?: ReturnType<typeof vi.fn> }) {
+function Harness({ onPlaceSelect = vi.fn() }: { onPlaceSelect?: ComponentProps<typeof MapplsPlaceInput>["onPlaceSelect"] }) {
   const [value, setValue] = useState("");
   return (
     <MapplsPlaceInput

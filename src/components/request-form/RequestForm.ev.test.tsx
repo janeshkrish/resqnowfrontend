@@ -50,13 +50,13 @@ describe("EV request UI", () => {
     expect(screen.getByRole("radio", { name: /main-drive.*traction/i })).toBeInTheDocument();
     expect(container).toHaveTextContent(/model-specific/i);
     expect(container).not.toHaveTextContent(/engine/i);
-    expect(screen.queryByRole("radio", { name: "Jump-start", exact: true })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Jump-start" })).toBeNull();
   });
 
   it("preserves ordinary battery starting questions", () => {
     state.data = { ...state.data, vehicleType: "car", vehicleSubtype: "sedan", vehicleBrand: "Maruti Suzuki", vehicleModel: "Swift" };
     const { container } = show("battery", "car");
-    expect(screen.getByRole("radio", { name: "Jump-start", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Jump-start" })).toBeInTheDocument();
     expect(container).toHaveTextContent("Engine tries, then stops");
     expect(screen.queryByRole("radio", { name: /main-drive.*traction/i })).toBeNull();
     expect(screen.getByRole("link", { name: "Use EV services" })).toHaveAttribute("href", "/request-service/battery/ev");
@@ -76,7 +76,7 @@ describe("EV request UI", () => {
     expect(state.options.validateStep1(state.data)).toBe(false);
     expect(() => state.options.buildRequestExtras(state.data)).toThrow(/EV services/i);
     expect(screen.getByRole("link", { name: "Use EV services" })).toHaveAttribute("href", "/request-service/battery/ev");
-    expect(screen.queryByRole("radio", { name: "Jump-start", exact: true })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Jump-start" })).toBeNull();
     if (step === 3) fireEvent.keyDown(screen.getByRole("button", { name: "Slide to find technician" }), { key: "Enter" });
     expect(state.submit).not.toHaveBeenCalled();
   });

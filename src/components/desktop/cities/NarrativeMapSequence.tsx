@@ -15,7 +15,7 @@ const COLORS = {
   pinDark: '#B31412'
 };
 
-const cinematicEase = [0.25, 1, 0.35, 1];
+const cinematicEase: [number, number, number, number] = [0.25, 1, 0.35, 1];
 
 // Procedural 3D CSS Building Block
 const Block3D = ({ x, y, w, h, d }) => (

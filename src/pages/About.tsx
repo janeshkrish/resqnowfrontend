@@ -2,10 +2,10 @@ import { Shield, Clock, CheckSquare, MapPin, User, Users, Car, Award, Target, Ey
 import AnimatedCounter from "@/components/AnimatedCounter";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, type Variants } from "framer-motion";
 import msmeLogo from "../../assets/msme-logo.png";
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 50 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
 };

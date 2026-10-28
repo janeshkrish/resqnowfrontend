@@ -70,7 +70,65 @@ const writeStore = (key: string, value: unknown) => {
   }
 };
 
-const defaultTechnicians = () => [
+// Demo persistence evolves independently of the two seed rows. Keep absent
+// profile/payment/session fields optional instead of inferring a closed union
+// from those seeds or fabricating values that the UI would treat as real data.
+type DemoTechnician = {
+  id: string;
+  role: string;
+  account_role: string;
+  operational_role: string;
+  service_type: string;
+  name: string;
+  email: string;
+  phone: string;
+  documents: { profile_photo?: string; [key: string]: unknown };
+  verification_status: string;
+  specialties: string[];
+  vehicle_types: Record<string, boolean>;
+  pricing?: Record<string, number>;
+  rating: number;
+  jobs_completed: number;
+  total_earnings: number;
+  total_paid_out?: number | string | null;
+  latitude: number;
+  longitude: number;
+  is_active: boolean;
+  address?: string;
+  experience?: number;
+  serviceAreaRange?: number;
+  payment_details?: { upi_id?: string | null } | null;
+  upi_id?: string | null;
+  updated_at?: string;
+  is_logged_in?: boolean;
+  last_login_at?: string | null;
+  last_logout_at?: string | null;
+  last_seen_at?: string | null;
+  login_reminder_sent_at?: string | null;
+};
+
+type DemoServiceRequest = Record<string, unknown> & {
+  id: string;
+  service_type?: string;
+  vehicle_type?: string;
+  vehicle_model?: string;
+  address?: string;
+  status?: string;
+  payment_status?: string;
+  amount?: number | string | null;
+  service_charge?: number | string | null;
+  location_lat?: number;
+  location_lng?: number;
+  technician_id?: string | null;
+  has_review?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  payment_method?: string | null;
+  is_settled?: boolean;
+  applied_coupon_code?: string | null;
+};
+
+const defaultTechnicians = (): DemoTechnician[] => [
   {
     id: "tech-101",
     role: "towing",
@@ -118,7 +176,7 @@ const defaultTechnicians = () => [
   },
 ];
 
-const defaultRequests = () => [
+const defaultRequests = (): DemoServiceRequest[] => [
   {
     id: "req-1001",
     service_type: "flat-tire",
@@ -419,7 +477,7 @@ const mockPaymentById = (paymentId: number) => {
   };
 };
 
-const upsertRequest = (request: AnyRecord) => {
+const upsertRequest = (request: DemoServiceRequest) => {
   const requests = getRequests();
   const idx = requests.findIndex((item) => String(item.id) === String(request.id));
   if (idx >= 0) requests[idx] = { ...requests[idx], ...request, updated_at: nowIso() };
@@ -1163,7 +1221,7 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     const requestedRegion = String(q.get("region") || "").trim().toLowerCase();
     const requestedStatus = String(q.get("status") || "").trim().toLowerCase();
 
-    const mapSpecialtyToCategory = (specialty: string) => {
+    const mapSpecialtyToCategory = (specialty: string): string => {
       const normalized = String(specialty || "").trim().toLowerCase();
       if (normalized.includes("tow")) return "towing";
       if (normalized.includes("battery")) return "battery_jumpstart";

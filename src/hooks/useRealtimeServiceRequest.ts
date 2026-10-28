@@ -23,6 +23,7 @@ interface RequestData {
   status: string;
   service_type: string;
   serviceType?: string;
+  technician?: Record<string, unknown> | null;
   pricing_status?: "pending" | "confirmed";
   pricing_finalized?: boolean;
   vehicle_type?: string;

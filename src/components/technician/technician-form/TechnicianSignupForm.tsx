@@ -14,16 +14,29 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import { RegisterFormValues, serviceTypeOptions, vehicleTypeOptions } from "@/types/technician-registration";
+import { specialtiesOptions as serviceTypeOptions } from "@/types/technician-registration";
+import { ADMIN_VEHICLE_TYPES as vehicleTypeOptions } from "@/config/adminTechnicianServicePricingCatalog";
 import { toast } from "@/components/ui/sonner";
 
+// This retained quick form predates the full registration wizard/schema.
+export interface QuickTechnicianSignupValues {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  serviceType?: string;
+  serviceArea: string;
+  vehicleType: string[];
+  termsAccepted?: boolean;
+}
+
 interface TechnicianSignupFormProps {
-  onSubmit: (data: RegisterFormValues, resumeFile: File | null) => Promise<void>;
+  onSubmit: (data: QuickTechnicianSignupValues, resumeFile: File | null) => Promise<void>;
   isSubmitting: boolean;
 }
 
 export function TechnicianSignupForm({ onSubmit, isSubmitting }: TechnicianSignupFormProps) {
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<RegisterFormValues>({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<QuickTechnicianSignupValues>({
     defaultValues: {
       vehicleType: []
     }
@@ -40,7 +53,7 @@ export function TechnicianSignupForm({ onSubmit, isSubmitting }: TechnicianSignu
     }
   };
 
-  const onFormSubmit = async (data: RegisterFormValues) => {
+  const onFormSubmit = async (data: QuickTechnicianSignupValues) => {
     if (!acceptedTerms) {
       toast.error("You must accept the terms and conditions.");
       return;

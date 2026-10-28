@@ -46,7 +46,7 @@ const formatLabel = (value: string) =>
 const serviceLabel = (value: string) =>
   ADMIN_SERVICE_LABELS[value] || formatLabel(value);
 
-const getVehiclePricingMapKey = (serviceDomain: string) => {
+const getVehiclePricingMapKey = (serviceDomain: string): "towing_vehicle_pricing" | "flat_tire_vehicle_pricing" | "vehicle_pricing" => {
   if (serviceDomain === "towing") return "towing_vehicle_pricing";
   if (serviceDomain === "flat-tire") return "flat_tire_vehicle_pricing";
   return "vehicle_pricing";

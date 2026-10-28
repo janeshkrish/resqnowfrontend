@@ -487,7 +487,7 @@ const ServiceRequest = () => {
                     Continue
                   </Button>
                 ) : step === 6 ? (
-                  <Button type="submit" className={`h-12 rounded-xl font-semibold text-base shadow-md ${step === 1 ? 'w-full' : 'flex-[2]'}`}>
+                  <Button type="submit" className="h-12 rounded-xl font-semibold text-base shadow-md flex-[2]">
                     Confirm Request
                   </Button>
                 ) : null}

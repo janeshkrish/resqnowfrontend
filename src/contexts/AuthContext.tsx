@@ -18,7 +18,7 @@ interface AuthContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<any>;
+  login: (email: string, password: string, options?: { signal?: AbortSignal }) => Promise<any>;
   loginWithPhone: (idToken: string, name?: string) => Promise<PhoneLoginOutcome>;
   register: (name: string, email: string, password: string) => Promise<any>;
   verifyOtp: (email: string, otp: string, name: string, password: string) => Promise<any>;

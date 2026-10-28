@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RegisterFormValues } from "@/types/technician-registration";
 import { validateResumeFile } from "@/utils/resumeUploadUtils";
 
 export const useTechnicianRegistrationForm = () => {
@@ -40,7 +39,7 @@ export const useTechnicianRegistrationForm = () => {
     path: ["confirmPassword"]
   });
   
-  const form = useForm<RegisterFormValues>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",

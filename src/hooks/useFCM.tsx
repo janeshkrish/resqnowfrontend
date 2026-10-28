@@ -10,6 +10,7 @@ import {
 } from "@/lib/jobOfferEvents";
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from "@capacitor/push-notifications";
 import { Capacitor } from "@capacitor/core";
+import type { PluginListenerHandle } from "@capacitor/core";
 import { navigateWithinApp } from "@/lib/appNavigation";
 
 type UseFcmOptions = {
@@ -98,6 +99,22 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
     let cancelled = false;
     let listeners: Array<() => void> = [];
 
+    const removeNativeListener = async (handle: PluginListenerHandle) => {
+      try {
+        await handle.remove();
+      } catch {
+        console.warn("[Native Push] listener cleanup failed");
+      }
+    };
+    const ownNativeListener = (pending: Promise<PluginListenerHandle>) => {
+      void pending.then((handle) => {
+        if (cancelled) void removeNativeListener(handle);
+        else listeners.push(() => { void removeNativeListener(handle); });
+      }).catch(() => {
+        console.warn("[Native Push] listener registration failed");
+      });
+    };
+
     // run registration async after the current render cycle so that
     // any pending navigation/cleanup from login page has a chance to run
     const startTimeout = setTimeout(() => {
@@ -143,12 +160,12 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
               console.error("[Native Push] failed to sync token", error);
             }
           });
-          listeners.push(() => onRegister.remove());
+          ownNativeListener(onRegister);
 
           const onRegError = PushNotifications.addListener('registrationError', (error: any) => {
             console.error('[Native Push] registrationError', error);
           });
-          listeners.push(() => onRegError.remove());
+          ownNativeListener(onRegError);
 
           // 4. Foreground notifications
           const onPush = PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
@@ -172,7 +189,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
               },
             });
           });
-          listeners.push(() => onPush.remove());
+          ownNativeListener(onPush);
 
           // 5. Background action
           const onAction = PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
@@ -186,7 +203,7 @@ export const useFCM = ({ isUserAuthenticated, isTechnicianAuthenticated }: UseFc
               }
             }
           });
-          listeners.push(() => onAction.remove());
+          ownNativeListener(onAction);
 
           console.log("[Native Push] listeners attached", listeners.length);
         } catch (err) {

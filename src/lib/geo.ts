@@ -81,7 +81,7 @@ export async function searchLocations(query: string, limit = 6): Promise<Locatio
   }
 
   return (data?.results || [])
-    .map((item) => {
+    .map((item): LocationSearchResult | null => {
       const point = toFinitePoint(item.lat, item.lng);
       const address = String(item.address || item.label || item.name || "").trim();
       if (!point || !address) return null;

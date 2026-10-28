@@ -4,11 +4,10 @@ import { Link } from "react-router-dom";
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormLabel } from "@/components/ui/form";
-import { UseFormReturn } from "react-hook-form";
-import { RegisterFormValues } from "@/types/technician-registration";
+import type { useTechnicianRegistrationForm } from "@/hooks/useTechnicianRegistrationForm";
 
 interface TermsAcceptanceProps {
-  form: UseFormReturn<RegisterFormValues>;
+  form: ReturnType<typeof useTechnicianRegistrationForm>["form"];
 }
 
 const TermsAcceptance = ({ form }: TermsAcceptanceProps) => {

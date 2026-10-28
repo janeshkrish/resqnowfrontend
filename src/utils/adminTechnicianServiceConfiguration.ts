@@ -10,7 +10,12 @@ import {
 import { buildSignupPricingPayload } from "@/utils/technicianSignupPricing";
 
 type UnknownRecord = Record<string, unknown>;
-type VehiclePricingMap = Record<string, UnknownRecord>;
+type VehiclePricing = UnknownRecord & {
+  fleet_pricing?: Record<string, UnknownRecord>;
+  subcategories?: Record<string, UnknownRecord>;
+  selected_subcategories?: string[];
+};
+type VehiclePricingMap = Record<string, VehiclePricing>;
 
 export type AdminServicePricingEntry = UnknownRecord & {
   service_name: string;

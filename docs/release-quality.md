@@ -19,11 +19,18 @@ The command requires, in order:
 2. Every scripts/*.test.mjs Node test, with no skipped/todo/cancelled cases.
 3. Every application unit test under src, with fresh JSON evidence and no skipped cases.
 4. The complete default e2e suite, phone and desktop, no filtering or retries.
-5. A production Vite build using synthetic settings, never a distributable production APK.
+5. A static production Vite build using synthetic provider settings and the approved
+   public Railway API origin, never a distributable production APK. Only this final
+   build receives that public origin so production URL validation remains enabled;
+   building does not contact the API. Executable unit/browser gates retain the
+   synthetic API origin and app updates stay disabled in every gate.
 
 The Vite global setup owns its server directly on localhost5193 and closes it at teardown.
 It refuses an occupied port instead of reusing or terminating another server.
 This avoids the Windows shell-process teardown hang without changing app behavior.
+The isolated Chrome configuration also fails external Google font DNS lookups
+locally, so public font/CDN availability cannot stall navigation. Application
+styles and fonts are unchanged; browser checks use the CSS fallback fonts.
 The only permitted browser skips are existing explicitly documented viewport-inapplicable
 cases in the runner. Each requires a passing counterpart on the other project.
 Unexpected skips, missing reports, worker errors, flaky/expected-failure results,

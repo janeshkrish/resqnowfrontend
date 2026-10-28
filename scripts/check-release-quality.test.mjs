@@ -64,8 +64,19 @@ test('runs every required gate with synthetic settings and no test-name/project 
     assert.ok(calls[4].args.includes('build'));
     assert.equal(calls[3].env.CI,'true');
     assert.equal(calls[4].env.VITE_FRONTEND_ONLY,'false');
-    assert.equal(calls[4].env.VITE_API_URL,'http://api.e2e.test');
+    assert.equal(calls[4].env.VITE_API_URL,'https://resqnowbackend-production-c392.up.railway.app');
     assert.ok(!calls.some(x=>x.args.some(a=>/^--(?:grep|project|passWithNoTests|update)/.test(a))));
+  });
+});
+test('keeps executable tests synthetic and uses the approved origin only for the static production bundle',async()=>{
+  await fixture(async({cwd,calls,adapter})=>{
+    await runChecks({cwd,env:{...settings},run:adapter});
+    assert.equal(calls.length,5);
+    for(const call of calls.slice(0,4))assert.equal(call.env.VITE_API_URL,'http://api.e2e.test');
+    assert.equal(calls[4].env.VITE_API_URL,'https://resqnowbackend-production-c392.up.railway.app');
+    assert.equal(calls[4].env.VITE_FIREBASE_API_KEY,'e2e-firebase-key');
+    assert.equal(calls[4].env.VITE_APP_UPDATES_ENABLED,'false');
+    assert.equal(calls[4].env.NODE_ENV,'production');
   });
 });
 for(const failedIndex of [0,2,4])test('a failing child gate '+failedIndex+' prevents all later gates',async()=>{
@@ -101,7 +112,8 @@ test('an example env file is permitted but never supplies missing verification s
   await fixture(async({cwd,put,calls,adapter})=>{
     await put('.env.example','VITE_API_URL=https://not-used.example.test');
     await runChecks({cwd,env:{...settings},run:adapter});
-    assert.equal(calls[4].env.VITE_API_URL,'http://api.e2e.test');
+    for(const call of calls.slice(0,4))assert.equal(call.env.VITE_API_URL,'http://api.e2e.test');
+    assert.equal(calls[4].env.VITE_API_URL,'https://resqnowbackend-production-c392.up.railway.app');
   });
 });
 for(const directory of ['src','e2e','scripts'])test('an empty '+directory+' test inventory fails before execution',async()=>{

@@ -175,7 +175,11 @@ export async function runReleaseChecks({run,env,cwd=process.cwd()}){
   const browserPath=path.join(reports,'browser.json');
   await gate('browser',[path.join(cwd,'node_modules/@playwright/test/cli.js'),'test','--forbid-only','--trace=off','--retries=0','--workers=2','--reporter=line,json'],{PLAYWRIGHT_JSON_OUTPUT_FILE:browserPath});
   const browser=assertBrowserReport(await readReport(browserPath,'Browser report'),browserFiles,cwd);
-  await gate('production build',[path.join(cwd,'node_modules/vite/bin/vite.js'),'build'],{NODE_ENV:'production'});
+  // Production validates its public API origin. Building a static bundle does
+  // not contact it; executable unit/browser tests keep their synthetic origin.
+  await gate('production build',[path.join(cwd,'node_modules/vite/bin/vite.js'),'build'],{
+    NODE_ENV:'production',VITE_API_URL:'https://resqnowbackend-production-c392.up.railway.app',
+  });
   await fs.writeFile(path.join(reports,'summary.json'),JSON.stringify({completedAt:new Date().toISOString(),node,unit,browser,stages:['typecheck','Node scripts','unit','browser','production build']},null,2));
   console.log('[release-quality] All checks passed. Evidence: '+path.relative(cwd,reports));
 }

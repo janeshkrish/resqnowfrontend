@@ -17,6 +17,12 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     channel: "chrome",
+    // Synthetic browser checks must not wait for public font/CDN availability.
+    // Keep application fonts unchanged; only this isolated Chrome run resolves
+    // the external font hosts locally as unavailable.
+    launchOptions: {
+      args: ["--host-resolver-rules=MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND"],
+    },
     serviceWorkers: "block",
     trace: "retain-on-failure",
   },

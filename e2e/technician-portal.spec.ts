@@ -588,7 +588,8 @@ test.describe("technician app", () => {
 
     await me.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/$/);
-    expect(await page.evaluate(() => localStorage.getItem("resqnow_technician"))).toBeNull();
+    // Navigation is immediate; sign-out clears storage after the logout reply.
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("resqnow_technician"))).toBeNull();
     expect(errors).toEqual([]);
   });
 

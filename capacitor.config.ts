@@ -7,7 +7,8 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: true,
-    allowNavigation: ['resqnowbackend.onrender.com', '*.onrender.com']
+    // Keep backend callback navigation scoped to the current production host.
+    allowNavigation: ['resqnowbackend-production-c392.up.railway.app']
   },
   plugins: {
     SplashScreen: {

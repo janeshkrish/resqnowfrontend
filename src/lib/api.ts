@@ -5,28 +5,19 @@ import {
   SERVICE_REQUEST_RAZORPAY_FEE,
 } from "@/utils/serviceRequestPayment";
 import { announceAdminSessionEnded } from "@/lib/adminSession";
-
-const normalizeBaseUrl = (value: string | undefined): string => {
-  const trimmed = (value ?? "").trim();
-  const unquoted = trimmed.replace(/^["']|["']$/g, "");
-  return unquoted.replace(/\/+$/, "");
-};
+import { DEVELOPMENT_API_BASE_URL, resolveApiConfiguration } from "./apiConfig";
 
 const isBrowser = typeof window !== "undefined";
 const runtimeOrigin = () => (isBrowser ? window.location.origin : "");
 
-const FRONTEND_ONLY_ENV = String(import.meta.env.VITE_FRONTEND_ONLY ?? "")
-  .trim()
-  .toLowerCase();
-
-const DEFAULT_API_BASE_URL = "https://resqnowbackend.onrender.com";
-const ENV_API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
-
-export const FRONTEND_ONLY_MODE =
-  FRONTEND_ONLY_ENV === "true" || FRONTEND_ONLY_ENV === "1";
-export const API_BASE_URL = FRONTEND_ONLY_MODE
-  ? ENV_API_BASE_URL
-  : ENV_API_BASE_URL || DEFAULT_API_BASE_URL;
+const configuration = resolveApiConfiguration({
+  apiUrl: import.meta.env.VITE_API_URL,
+  frontendOnly: import.meta.env.VITE_FRONTEND_ONLY,
+  production: import.meta.env.PROD && import.meta.env.MODE !== "development",
+});
+const DEFAULT_API_BASE_URL = DEVELOPMENT_API_BASE_URL;
+export const FRONTEND_ONLY_MODE = configuration.frontendOnlyMode;
+export const API_BASE_URL = configuration.apiBaseUrl;
 
 const DEMO_USER_TOKEN = "demo-user-token";
 const DEMO_TECH_TOKEN = "demo-tech-token";

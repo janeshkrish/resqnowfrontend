@@ -3,19 +3,16 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { resolveApiConfiguration } from "./src/lib/apiConfig";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiBaseUrl = (env.VITE_API_URL || "").replace(/\/+$/, "");
-  const frontendOnlyEnv = String(env.VITE_FRONTEND_ONLY || "").trim().toLowerCase();
-  const frontendOnlyMode = frontendOnlyEnv === "true" || frontendOnlyEnv === "1";
-
-  if (mode === "production" && !frontendOnlyMode && !apiBaseUrl) {
-    throw new Error(
-      "Missing VITE_API_URL for production build. Set it in Netlify environment variables."
-    );
-  }
+  const { apiBaseUrl } = resolveApiConfiguration({
+    apiUrl: env.VITE_API_URL,
+    frontendOnly: env.VITE_FRONTEND_ONLY,
+    production: mode !== "development" && (command === "build" || mode === "production"),
+  });
 
   const escapedApiBaseUrl = apiBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const apiRuntimePattern = escapedApiBaseUrl

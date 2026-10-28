@@ -7,6 +7,7 @@ const offer = {
   id: "6101",
   requestId: "6101",
   jobId: "6101",
+  offerId: "7101",
   isTowing: false,
   customerName: "Asha",
   serviceType: "flat-tyre",
@@ -26,6 +27,7 @@ const offerPush = {
   type: "EMERGENCY_JOB",
   requestId: "6101",
   jobId: "6101",
+  offerId: "7101",
   serviceType: "flat-tyre",
   customerName: "Asha",
   locationDistance: "2.4 km",
@@ -66,6 +68,9 @@ async function signInTechnician(page: Page, options: { onJob?: boolean } = {}) {
       return reply(200, { available: true, request: { ...offer, eta: undefined, distance: 2.4, locationDistance: "2.4 km", status: "pending", offer_status: "pending" } });
     }
     if (path === "/api/jobs/accept") {
+      if (request.method() !== "POST" || request.postDataJSON().jobId !== offer.requestId || request.postDataJSON().offerId !== offer.offerId) {
+        return reply(409, { code: "stale_offer", error: "The acceptance must identify the current offer." });
+      }
       accepted = true;
       return reply(200, { success: true, request: { id: "6101", status: "accepted" } });
     }
@@ -122,7 +127,7 @@ test.describe("web app", () => {
 
     await slideToAccept(card);
     await expect(page).toHaveURL(/\/technician\/active-job\/6101$/);
-    expect(calls).toContainEqual({ method: "POST", path: "/api/jobs/accept", body: { jobId: "6101" } });
+    expect(calls).toContainEqual({ method: "POST", path: "/api/jobs/accept", body: { jobId: "6101", offerId: "7101" } });
     expect(errors).toEqual([]);
   });
 

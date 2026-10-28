@@ -178,7 +178,7 @@ test.describe("straight after the slide", () => {
     expect(onScreen.status).toBe("Request sent. Finding a locksmith near you.");
     expect(onScreen.card).toContain("Lockout");
     expect(onScreen.card).toContain("Tata Yodha");
-    expect(onScreen.card).toContain("₹110");
+    expect(onScreen.card).not.toContain("₹110");
     expect(onScreen.pins).toEqual(Array(3).fill("/images/home/services/lockout.webp"));
     // It covers the whole screen.
     expect({ width: onScreen.width, height: onScreen.height }).toEqual(view);
@@ -274,7 +274,7 @@ test.describe("while a technician is being found", () => {
     }
 
     await expect(page.getByTestId("tracking-request")).toContainText("Tata Yodha");
-    await expect(page.getByTestId("tracking-request")).toContainText("₹110");
+    await expect(page.getByTestId("tracking-request")).not.toContainText("₹110");
     // The old search card's time line and four steps are not on this one.
     await expect(card(page).locator(".lt-say")).toHaveCount(0);
     await expect(card(page).getByRole("list", { name: "Progress" })).toHaveCount(0);
@@ -354,7 +354,7 @@ test.describe("while a technician is being found", () => {
       await expect(details).toContainText("Drop · 4.2 km");
       await expect(details).toContainText("Ganapathy workshop, Sathy Road");
     }
-    await expect(page.getByTestId("tracking-request")).toContainText("₹902");
+    await expect(page.getByTestId("tracking-request")).not.toContainText("₹902");
     await expect(nearbyMarkers(page).first().locator(".rq-symbol")).toHaveText("auto_towing");
     await shot(page, "search-towing");
   });

@@ -153,13 +153,13 @@ test("tows a car picked from the brand and model lists, with the fare and a save
   await expect(page.getByLabel("Pick up from")).not.toHaveValue("");
   await page.getByLabel("Take it to").fill("Sri Ranga");
   await page.getByRole("option", { name: /Sri Ranga Motors/ }).click();
-  await expect(page.locator(".rqf-fare-id b")).toHaveText("₹1,014");
-  await expect(page.locator(".rqf-dock-sum")).toContainText("About ₹1,014 · pay after the drop");
-  // The fare was worked out for this car's size and a truck that suits it.
+  await expect(page.locator(".rqf-fare-id b")).toHaveText("Price shown after a technician accepts");
+  await expect(page.locator(".rqf-dock-sum")).toContainText("Price shown after a technician accepts · pay after the drop");
+  await expect(page.locator(".rqf-fare-id small")).toHaveText("Towing route · 7.4 km · Wheel-lift truck");
+  await expect(page.locator(".rqf-fare")).not.toContainText("₹1,014");
+  // Route estimation still uses the selected car and a suitable truck; its
+  // indicative amount is not a technician-confirmed customer fare.
   expect(estimates.at(-1)).toMatchObject({ vehicleType: "car", vehicleSubtype: "hatchback", vehicleBrand: "Maruti Suzuki", canRoll: "yes", vehicleModel: "Maruti Suzuki Swift" });
-  await expect(page.getByText(/Wheel-lift truck/)).toBeVisible();
-  await page.getByRole("button", { name: "Details" }).click();
-  await expect(page.getByText("Hatchback size ×1.05")).toBeVisible();
   await page.getByLabel("Landmark or exact spot").fill("Opposite the petrol bunk");
   await shot(page, "tow-step2");
   await cta(page).click();
@@ -337,9 +337,13 @@ test("marks a lockout with someone inside urgent, and fuel shows today's price a
   await page.getByRole("dialog").getByRole("button", { name: /Astra/ }).first().click();
   await page.getByRole("radio", { name: /Petrol/ }).click();
   await page.getByRole("radio", { name: "3 litres" }).click();
-  await expect(page.locator(".rqf-calc")).toContainText("Petrol 3 L × ₹101.94");
-  await expect(page.locator(".rqf-calc")).toContainText("₹306");
-  await expect(page.locator(".rqf-dock-sum")).toContainText("About ₹605");
+  await expect(page.locator(".rqf-calc")).toContainText("Petrol · 3 L requested");
+  await expect(page.locator(".rqf-calc")).toContainText("₹101.94 / L");
+  await expect(page.locator(".rqf-calc")).toContainText("from ₹299");
+  await expect(page.locator(".rqf-calc")).toContainText("Price shown after a technician accepts");
+  await expect(page.locator(".rqf-calc")).not.toContainText("₹306");
+  await expect(page.locator(".rqf-dock-sum")).toContainText("Starts from ₹299");
+  await expect(page.locator(".rqf-dock-sum")).not.toContainText("₹605");
   await shot(page, "fuel-step1");
 
   await page.getByRole("radio", { name: /CNG/ }).click();

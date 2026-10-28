@@ -89,7 +89,7 @@ test("a customer's saved vehicles come first, with prices and links for the one 
   await expect(soon).toContainText("Coming soon");
   await expect(soon).toContainText("AI Vehicle Health");
   await expect(soon.locator("a, button")).toHaveCount(0);
-  await expect(page.getByText("You see the price before you confirm, and pay only after the work is done.")).toBeAttached();
+  await expect(page.getByText("Your service price appears after a technician accepts. Pay after the work is done.")).toBeAttached();
 
   expect(await noSideScroll(page)).toBe(true);
   if (isMobile) {

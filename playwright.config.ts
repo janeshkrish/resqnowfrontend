@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 5179;
+const PORT = 5193;
 
 // End-to-end tests run the real app on the Vite dev server in the installed
 // Chrome. Every backend call is answered by the test, and the Mappls SDK is
@@ -13,6 +13,7 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
+  globalSetup: "./scripts/e2e-server.mjs",
   use: {
     baseURL: `http://localhost:${PORT}`,
     channel: "chrome",
@@ -23,26 +24,4 @@ export default defineConfig({
     { name: "phone", use: { ...devices["Pixel 7"], channel: "chrome" } },
     { name: "desktop", use: { ...devices["Desktop Chrome"], channel: "chrome", viewport: { width: 1366, height: 860 } } },
   ],
-  webServer: {
-    command: `npx vite --host localhost --port ${PORT} --strictPort`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: {
-      VITE_FRONTEND_ONLY: "false",
-      VITE_API_URL: "http://api.e2e.test",
-      // As in a build whose settings do not mention it: the tests see the app's own
-      // default, whatever the developer's local .env says.
-      VITE_NATIVE_BACKGROUND_TRACKING: "",
-      // A made-up Firebase project: mobile number login talks to Google, and the tests
-      // answer those calls themselves (e2e/customer-login.spec.ts). Push stays off.
-      VITE_FIREBASE_API_KEY: "e2e-firebase-key",
-      VITE_FIREBASE_AUTH_DOMAIN: "resqnow-e2e.firebaseapp.com",
-      VITE_FIREBASE_PROJECT_ID: "resqnow-e2e",
-      VITE_FIREBASE_STORAGE_BUCKET: "",
-      VITE_FIREBASE_MESSAGING_SENDER_ID: "100000000000",
-      VITE_FIREBASE_APP_ID: "1:100000000000:web:e2e",
-      VITE_FIREBASE_VAPID_KEY: "",
-    },
-  },
 });

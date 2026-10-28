@@ -11,7 +11,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    exclude: [...configDefaults.exclude, 'e2e/**', 'e2e-integration/**'],
+    // Node-script tests use node:test; release:check runs all of them as a
+    // separate required gate rather than silently omitting them.
+    exclude: [...configDefaults.exclude, 'e2e/**', 'e2e-integration/**', 'scripts/**/*.test.mjs'],
   },
   resolve: {
     alias: {

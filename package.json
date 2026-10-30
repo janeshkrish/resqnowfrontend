@@ -10,7 +10,7 @@
     "build:dev": "vite build --mode development",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "test:scripts": "node --test scripts/check-release-quality.test.mjs scripts/e2e-server.test.mjs scripts/android-release.test.mjs",
+    "test:scripts": "node --test scripts/check-release-quality.test.mjs scripts/e2e-server.test.mjs scripts/android-release.test.mjs scripts/android-release-github.test.mjs scripts/android-release-build.test.mjs",
     "release:check": "node scripts/check-release-quality.mjs",
     "test:e2e": "playwright test",
     "test:e2e:analytics": "playwright test --config=playwright.analytics.config.ts",

@@ -42,3 +42,26 @@ test('unknown/inaccessible history, tag reuse and unconfirmed distribution ident
   const variations=[{settings:{...releaseSettings,distributionConfirmed:false}},{list:async()=>null},{list:async()=>{throw Error('offline');}},{list:async()=>[{tag_name:'android-v0110'}]},{list:async()=>[{tag_name:'android-v112'}]},{tag:async()=>true}];
   for(const v of variations)await assert.rejects(()=>api.runAndroidRelease({context,settings:v.settings??releaseSettings,runner,github:{listReleases:v.list??(async()=>[]),tagExists:v.tag??(async()=>false)},dryRun:true}));assert.equal(builds,0);
 }));
+test('PR, non-main, disabled, failed checks and rerun contexts cannot build or publish',async()=>{
+  let touched=false;const options={context,settings:releaseSettings,runner:{build:async()=>{touched=true;}},github:{listReleases:async()=>{touched=true;}}};
+  for(const patch of [{event:'pull_request'},{ref:'refs/heads/friend'},{repository:'fork/frontend'},{checksPassed:false},{attempt:2},{actions:false}])await assert.rejects(()=>api.runAndroidRelease({...options,context:{...context,...patch},enabled:true}));
+  await assert.rejects(()=>api.runAndroidRelease({...options,enabled:false}));assert.equal(touched,false);
+});
+test('reserves a new tag, drafts, uploads and independently checks both assets before stable publication',()=>artifact(async apk=>{
+  const calls=[];const assets=new Map();const github={listReleases:async()=>[],tagExists:async()=>false,
+    reserveTag:async(tag,sha)=>{assert.equal(tag,'android-v112');assert.equal(sha,'c'.repeat(40));calls.push('reserve');},
+    createDraft:async value=>{assert.deepEqual(value,{tag:'android-v112',sha:'c'.repeat(40),versionName:'1.4.112'});calls.push('draft');return {id:123};},
+    upload:async(id,name,bytes)=>{assert.equal(id,123);calls.push('upload:'+name);assets.set(name,bytes);return {id:name,name,size:bytes.length,state:'uploaded'};},
+    readAsset:async id=>{calls.push('read:'+id);return assets.get(id);},publish:async id=>{assert.equal(id,123);calls.push('publish');return {html_url:'https://github.com/janeshkrish/resqnowfrontend/releases/tag/android-v112'};}};
+  const result=await api.runAndroidRelease({context,settings:releaseSettings,enabled:true,github,runner:{build:async()=>apk,tools:{badging:async()=>badging,signature:async()=>signature}}});
+  assert.equal(result.dryRun,false);assert.deepEqual(calls,['reserve','draft','upload:resqnow.apk','read:resqnow.apk','upload:android-release.json','read:android-release.json','publish']);
+  const uploaded=JSON.parse(assets.get('android-release.json').toString());assert.equal(uploaded.sha256,'fa33f24e6a2c7164c08ffd861085fdc5bdae59c424d53944fb8edc4ffb4f756c');
+}));
+test('failed upload, changed remote bytes or wrong remote metadata never publish over the previous release',()=>artifact(async apk=>{
+  for(const fault of ['upload','bytes','metadata']){
+    let published=false,touched=false;const github={listReleases:async()=>[],tagExists:async()=>false,reserveTag:async()=>{},createDraft:async()=>({id:123}),
+      upload:async(_id,name,bytes)=>{touched=true;if(fault==='upload')throw Error('upload disconnected');return {id:name,name,size:bytes.length+(fault==='metadata'?1:0),state:'uploaded'};},
+      readAsset:async()=>fault==='bytes'?Buffer.from('corrupt remote'):await fs.readFile(apk),publish:async()=>{published=true;}};
+    await assert.rejects(()=>api.runAndroidRelease({context,settings:releaseSettings,enabled:true,github,runner:{build:async()=>apk,tools:{badging:async()=>badging,signature:async()=>signature}}}));assert.equal(touched,true);assert.equal(published,false);
+  }
+}));

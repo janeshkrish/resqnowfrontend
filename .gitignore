@@ -1,4 +1,5 @@
 node_modules/
+/android/app/src/debug/google-services.json
 dist/
 dev-dist/
 

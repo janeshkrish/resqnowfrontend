@@ -70,10 +70,33 @@ export async function runAndroidRelease({context,settings,runner,github,dryRun=f
   const expectedManifest={applicationId:APPLICATION,...version,minSdk:24,targetSdk:36,sourceCommit:context.sha,signingCertificateSha256:settings.certificateSha256,publishedAt:now().toISOString(),apkUrl:`https://github.com/${REPOSITORY}/releases/download/${version.tag}/resqnow.apk`};
   const manifest=await verifyAndroidArtifact({apk,expectedManifest,tools:runner.tools});
   if(dryRun)return {dryRun:true,apk,manifest,tag:version.tag};
-  throw Error('Publication orchestration has not been activated');
+  const apkBytes=await fs.readFile(apk);if(apkBytes.length!==manifest.sizeBytes||createHash('sha256').update(apkBytes).digest('hex')!==manifest.sha256)throw Error('APK changed before publication');
+  // Atomic tag creation rejects races; failed drafts never replace the previous stable release.
+  await github.reserveTag(version.tag,context.sha);
+  const draft=await github.createDraft({tag:version.tag,sha:context.sha,versionName:version.versionName});
+  const assets=[['resqnow.apk',apkBytes,'application/vnd.android.package-archive'],['android-release.json',Buffer.from(JSON.stringify(manifest,null,2)+'\n'),'application/json']];
+  for(const [name,bytes,type] of assets){
+    const checksum=createHash('sha256').update(bytes).digest('hex');const uploaded=await github.upload(draft.id,name,bytes,type);
+    if(uploaded.name!==name||uploaded.size!==bytes.length||uploaded.state!=='uploaded'||uploaded.digest!=null&&uploaded.digest!==`sha256:${checksum}`)throw Error('Uploaded Android asset metadata mismatch');
+    const downloaded=await github.readAsset(uploaded.id);
+    if(!Buffer.isBuffer(downloaded)||downloaded.length!==bytes.length||createHash('sha256').update(downloaded).digest('hex')!==checksum)throw Error('Uploaded Android asset failed independent digest verification');
+  }
+  const published=await github.publish(draft.id);
+  return {dryRun:false,apk,manifest,tag:version.tag,url:published.html_url};
 }
 async function main(){
   const dryRun=process.argv.includes('--dry-run');requireTrustedContext({actions:process.env.GITHUB_ACTIONS==='true',repository:process.env.GITHUB_REPOSITORY,ref:process.env.GITHUB_REF,event:process.env.GITHUB_EVENT_NAME,sha:process.env.GITHUB_SHA,checksPassed:process.env.ANDROID_RELEASE_CHECKS_PASSED==='true',attempt:Number(process.env.GITHUB_RUN_ATTEMPT)},{dryRun,enabled:process.env.ANDROID_AUTO_RELEASE_ENABLED==='true'});
-  throw Error('Release orchestration is not enabled until its publication checks are configured');
+  if(process.argv.length!==3||!['--dry-run','--publish'].includes(process.argv[2]))throw Error('Choose explicit --dry-run or --publish mode');
+  const root=fileURLToPath(new URL('../',import.meta.url));
+  if((await fs.readdir(root)).some(name=>/^\.env(?:\.|$)/i.test(name)&&!/^\.env(?:\..+)?\.example$/i.test(name)))throw Error('Release checkout must not contain private dotenv configuration');
+  let googleServices;try{googleServices=JSON.parse(Buffer.from(process.env.ANDROID_GOOGLE_SERVICES_JSON_BASE64??'','base64').toString('utf8'));}catch{throw Error('Approved Android Firebase public configuration is required');}
+  const settings={public:process.env,googleServices,floor:Number(process.env.ANDROID_VERSION_FLOOR),runNumber:Number(process.env.GITHUB_RUN_NUMBER),reviewedMaxVersionCode:Number(process.env.ANDROID_DISTRIBUTED_MAX_VERSION_CODE),distributionConfirmed:process.env.ANDROID_DISTRIBUTION_CONFIRMED==='true',certificateSha256:process.env.ANDROID_DISTRIBUTION_CERT_SHA256};
+  const context={actions:true,repository:process.env.GITHUB_REPOSITORY,ref:process.env.GITHUB_REF,event:process.env.GITHUB_EVENT_NAME,sha:process.env.GITHUB_SHA,checksPassed:process.env.ANDROID_RELEASE_CHECKS_PASSED==='true',attempt:Number(process.env.GITHUB_RUN_ATTEMPT)};
+  validateProductionSettings(settings.public);validateGoogleServices(googleServices,settings.public);
+  const {createReleaseGithubClient}=await import('./android-release-github.mjs');const {createAndroidBuildRunner,withSigningFile}=await import('./android-release-build.mjs');
+  const github=createReleaseGithubClient({token:process.env.GITHUB_TOKEN});
+  const result=await withSigningFile(process.env,async env=>runAndroidRelease({context,settings,runner:createAndroidBuildRunner({root,env}),github,dryRun,enabled:env.ANDROID_AUTO_RELEASE_ENABLED==='true'}));
+  const output=path.join(root,'output/android-release');await fs.mkdir(output,{recursive:true});await fs.copyFile(result.apk,path.join(output,'resqnow.apk'));await fs.writeFile(path.join(output,'android-release.json'),JSON.stringify(result.manifest,null,2)+'\n');
+  console.log(dryRun?'Signed artifact verified; dry-run made no GitHub publication.':`Published verified Android release ${result.tag}.`);
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(error=>{console.error(error.message);process.exitCode=1;});

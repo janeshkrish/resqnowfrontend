@@ -31,3 +31,26 @@ The release verifier independently runs Android badging and signature tools, rej
 - Android: JDK21/SDK36; `android/gradlew.bat -p android :app:testDebugUnitTest :app:compileDebugAndroidTestJavaWithJavac :app:assembleDebug --no-daemon`.
 - Hosted Android acceptance after review/approved push: actual A-to-B in-app download and system installer confirmation, frontend version marker change, retained synthetic settings/installation identity, plus interruption/cancellation/permission/integrity/SDK cases. Local emulator boot failed; compiled instrumentation is not a runtime pass.
 - Owner setup, hosted dry-run, verified production signing continuity, first approved publication and a subsequent main-push update must actually succeed before the feature is called end-to-end complete. No key upload, repository-setting changes, push/publication, production flag changes or business DB migrations are authorized by implementation alone.
+
+## Owner-controlled GitHub setup (not performed by this implementation)
+
+After independent review and an explicitly approved push, deploy the backend main changes before activating the frontend workflow. The real-router browser gate checks out the public backend main; it intentionally fails if that backend feature has not been pushed. Backend update/delivery flags can remain false during these checks.
+
+The existing `Verify frontend` workflow retains one complete frontend gate and adds native compile/unit checks. Optional hosted emulators cover API24/26/36. All verification jobs have read-only permissions, synthetic provider configuration and no signing secrets. Only the trusted main release job has contents-write permissions. Release jobs are serialized and reruns cannot reuse a code.
+
+Native checks put synthetic Firebase configuration in the ignored `android/app/src/debug/google-services.json` source set. The tracked root production configuration is preserved. The clean native rebuild independently confirmed the debug resources select the synthetic project; release builds never run this preparation step.
+
+Repository variables required before a signed dry-run:
+
+- `ANDROID_DISTRIBUTION_CONFIRMED=true` only after reviewing all previously distributed versions and signer continuity.
+- `ANDROID_DISTRIBUTED_MAX_VERSION_CODE`, `ANDROID_VERSION_FLOOR` (floor at least that maximum), and lowercase `ANDROID_DISTRIBUTION_CERT_SHA256`.
+- `ANDROID_GOOGLE_SERVICES_JSON_BASE64`: the approved Android public Firebase configuration, not a Firebase Admin/service-account key.
+- The approved client-safe `VITE_FIREBASE_*`, `VITE_MAPPLS_MAP_SDK_KEY`, `VITE_RAZORPAY_KEY_ID` (live), and optional `VITE_GOOGLE_MAPS_API_KEY`. The API origin and packaged/native feature flags are fixed explicitly by the release job.
+
+Owner-configured repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`. Supply the existing signing key directly to GitHub's secret UI, never through this chat or a commit. The release helper materializes it with exclusive/private access in runner temp, removes it in finally, and never passes it, passwords or the API token as command arguments. Web build children receive neither signing credentials nor GitHub tokens; Gradle alone receives signing configuration. Artifacts contain only the signed public APK and manifest.
+
+For the first hosted check, choose workflow dispatch `verify` with `run_android_acceptance=true`. The final A/B acceptance harness must pass before owner attestation; instrumentation compilation alone is insufficient. Then dispatch `dry-run` with Android acceptance selected: signing/verifying occurs but no tag reservation, draft, upload or publication is allowed. Review the signed APK's certificate/version independently.
+
+Only after acceptance and separate owner publication approval, enable `ANDROID_NATIVE_ACCEPTANCE_ENABLED=true`, `ANDROID_UPDATER_ACCEPTANCE_CONFIRMED=true` and `ANDROID_AUTO_RELEASE_ENABLED=true`. A subsequent approved main push can publish: reserve a new tag atomically, create a draft, upload/read back both assets, compare digests, then mark stable. A failed upload leaves an unpublished draft/reserved tag and never overwrites the previous stable release. Investigate failed drafts manually; never retarget an old version.
+
+After the first approved release is confirmed, separately enable backend `ANDROID_RELEASE_DOWNLOADS_ENABLED` for website bootstrap delivery and `ANDROID_UPDATES_ENABLED` for offers. Install the bootstrap once, then verify an actual later main-push upgrade before declaring rollout complete. Disabling offers is not an uninstall or data-clearing action.

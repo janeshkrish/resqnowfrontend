@@ -5,10 +5,24 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      android_release:
+        description: 'Verify only, or sign/verify without publishing'
+        type: choice
+        options: [verify, dry-run]
+        default: verify
+      run_android_acceptance:
+        description: 'Run disposable GitHub-hosted Android emulators'
+        type: boolean
+        default: false
   workflow_call:
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    working-directory: frontend
 
 jobs:
   release-quality:
@@ -18,12 +32,177 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          path: frontend
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci --ignore-scripts
       - name: Install the browser used by both projects
         run: node node_modules/@playwright/test/cli.js install --with-deps chrome
       - name: Require every release-quality gate
         run: npm run release:check
+      - name: Check out the real public API for updater browser integration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: janeshkrish/resqnowbackend
+          ref: main
+          path: backend
+          persist-credentials: false
+      - run: npm ci --ignore-scripts
+        working-directory: backend
+      - name: Require real-router updater browser integration
+        run: node node_modules/@playwright/test/cli.js test --config=playwright.updates.config.ts
+        env:
+          APP_UPDATES_BACKEND_DIR: ${{ github.workspace }}/backend
+
+  native-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          path: frontend
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --ignore-scripts
+      - name: Prepare explicitly synthetic native checks, never a release build
+        run: node scripts/android-release-build.mjs --prepare-checks
+        env:
+          ANDROID_CHECKS_ONLY: 'true'
+      - run: node node_modules/@capacitor/cli/bin/capacitor sync android
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: bash android/gradlew -p android :app:testDebugUnitTest :app:compileDebugAndroidTestJavaWithJavac :app:assembleDebug --no-daemon
+
+  native-acceptance:
+    if: >-
+      github.repository == 'janeshkrish/resqnowfrontend' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (vars.ANDROID_NATIVE_ACCEPTANCE_ENABLED == 'true' || inputs.run_android_acceptance == true)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [24, 26, 36]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          path: frontend
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --ignore-scripts
+      - run: node scripts/android-release-build.mjs --prepare-checks
+        env:
+          ANDROID_CHECKS_ONLY: 'true'
+      - run: node node_modules/@capacitor/cli/bin/capacitor sync android
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Enable KVM only on this disposable Linux runner
+        run: sudo chmod a+rw /dev/kvm
+      - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          working-directory: frontend
+          disable-animations: true
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -camera-back none -camera-front none
+          script: bash android/gradlew -p android :app:connectedDebugAndroidTest --no-daemon
+      - name: Retain native test reports, never signing intermediates
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-api-${{ matrix.api }}
+          path: frontend/android/app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  android-release:
+    needs: [release-quality, native-verification, native-acceptance]
+    if: >-
+      needs.release-quality.result == 'success' && needs.native-verification.result == 'success' &&
+      needs.native-acceptance.result == 'success' && github.repository == 'janeshkrish/resqnowfrontend' &&
+      github.ref == 'refs/heads/main' && github.run_attempt == 1 &&
+      ((github.event_name == 'push' && vars.ANDROID_AUTO_RELEASE_ENABLED == 'true' && vars.ANDROID_UPDATER_ACCEPTANCE_CONFIRMED == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.android_release == 'dry-run'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    concurrency:
+      group: resqnow-android-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: frontend
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --ignore-scripts
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build, sign, verify and publish only in the explicitly activated mode
+        run: node scripts/android-release.mjs ${{ github.event_name == 'workflow_dispatch' && '--dry-run' || '--publish' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANDROID_RELEASE_CHECKS_PASSED: 'true'
+          ANDROID_AUTO_RELEASE_ENABLED: ${{ vars.ANDROID_AUTO_RELEASE_ENABLED }}
+          ANDROID_DISTRIBUTION_CONFIRMED: ${{ vars.ANDROID_DISTRIBUTION_CONFIRMED }}
+          ANDROID_DISTRIBUTED_MAX_VERSION_CODE: ${{ vars.ANDROID_DISTRIBUTED_MAX_VERSION_CODE }}
+          ANDROID_DISTRIBUTION_CERT_SHA256: ${{ vars.ANDROID_DISTRIBUTION_CERT_SHA256 }}
+          ANDROID_VERSION_FLOOR: ${{ vars.ANDROID_VERSION_FLOOR }}
+          ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ vars.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RESQNOW_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RESQNOW_ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RESQNOW_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VITE_API_URL: https://resqnowbackend-production-c392.up.railway.app
+          VITE_FRONTEND_ONLY: 'false'
+          VITE_NATIVE_BUILD: 'true'
+          VITE_APP_UPDATES_ENABLED: 'true'
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
+          VITE_MAPPLS_MAP_SDK_KEY: ${{ vars.VITE_MAPPLS_MAP_SDK_KEY }}
+          VITE_RAZORPAY_KEY_ID: ${{ vars.VITE_RAZORPAY_KEY_ID }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ vars.VITE_GOOGLE_MAPS_API_KEY }}
+      - name: Retain only public signed dry-run artifacts
+        if: success() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-signed-dry-run
+          path: |
+            frontend/output/android-release/resqnow.apk
+            frontend/output/android-release/android-release.json
+          if-no-files-found: error
+          retention-days: 7

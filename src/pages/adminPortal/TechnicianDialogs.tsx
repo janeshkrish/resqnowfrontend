@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import type { RecordId } from "@/lib/recordId";
 
 import { toggleAdminTechnicianVisibility } from "@/pages/adminExtended/api/adminExtendedApi";
 import { deleteTechnician } from "./api/portalApi";
@@ -11,7 +12,7 @@ import { Btn, Dialog, Icon } from "./ui";
 export function useVisibility() {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const set = async (technicianId: number, name: string, visible: boolean) => {
+  const set = async (technicianId: RecordId, name: string, visible: boolean) => {
     setBusy(true);
     try {
       await toggleAdminTechnicianVisibility({ technicianId, isVisible: visible, note: visible ? "Shown again by admin." : "Hidden from new jobs by admin." });
@@ -27,7 +28,7 @@ export function useVisibility() {
 }
 
 export function DeleteTechnicianDialog({ technician, onClose, onDeleted }: {
-  technician: { id: number; name: string; onJob?: boolean; dues?: number };
+  technician: { id: RecordId; name: string; onJob?: boolean; dues?: number };
   onClose: () => void;
   onDeleted: () => void;
 }) {

@@ -1,4 +1,5 @@
 import { adminApi } from "./adminExtendedApi";
+import type { RecordId } from "@/lib/recordId";
 
 // Live request monitoring and the technician record. Every value comes from the backend;
 // fields that are not recorded yet arrive as null and are shown as such.
@@ -101,7 +102,7 @@ export type ReplayDetail = Omit<MonitorDetail, "trail"> & {
 
 export type TechnicianRecord = {
   technician: {
-    id: number;
+    id: RecordId;
     name: string;
     phone: string | null;
     phoneMasked: string | null;
@@ -190,17 +191,17 @@ export async function addRequestNote(requestId: number, note: string) {
   return data;
 }
 
-export async function getTechnicianRecord(technicianId: number) {
+export async function getTechnicianRecord(technicianId: RecordId) {
   const { data } = await adminApi.get<TechnicianRecord>(`/monitor/technicians/${technicianId}/record`);
   return data;
 }
 
-export async function getTechnicianJobs(technicianId: number, params: { page: number; limit?: number; days?: number | null; status?: string; search?: string }) {
+export async function getTechnicianJobs(technicianId: RecordId, params: { page: number; limit?: number; days?: number | null; status?: string; search?: string }) {
   const { data } = await adminApi.get<Paged<TechnicianJob>>(`/monitor/technicians/${technicianId}/jobs`, { params });
   return data;
 }
 
-export async function getTechnicianReviews(technicianId: number, params: { page: number; limit?: number }) {
+export async function getTechnicianReviews(technicianId: RecordId, params: { page: number; limit?: number }) {
   const { data } = await adminApi.get<Paged<TechnicianReview>>(`/monitor/technicians/${technicianId}/reviews`, { params });
   return data;
 }

@@ -2,6 +2,7 @@ import axios from "axios";
 import { apiUrl } from "@/lib/api";
 import { adminApi } from "@/pages/adminExtended/api/adminExtendedApi";
 import { announceAdminSessionEnded } from "@/lib/adminSession";
+import type { RecordId } from "@/lib/recordId";
 
 // The admin portal's reads. Every value comes from the backend; things that are not recorded come back as null.
 
@@ -70,7 +71,7 @@ export type RequestQuery = { tab?: RequestTab; days?: number; service?: string; 
 export const listRequests = async (params: RequestQuery) => (await adminApi.get<RequestList>("/portal/requests", { params })).data;
 
 export type TechnicianRow = {
-  id: number; name: string; owner: string | null; phoneMasked: string | null; area: string | null; services: string[]; vehicles: string[];
+  id: RecordId; name: string; owner: string | null; phoneMasked: string | null; area: string | null; services: string[]; vehicles: string[];
   now: { state: "on_job"; jobId: number; jobStatus: string | null; jobService: string | null; alert: { code: string; text: string } | null }
     | { state: "free" } | { state: "offline"; lastSeenAt: string | null };
   hidden: boolean; jobs30: number; onTimeRate: number | null; rating: number | null; reviews: number; acceptRate: number | null; offers30: number;
@@ -87,7 +88,7 @@ export type TechnicianPayouts = {
   payouts: { id: number; amount: number; status: string; method: string | null; utr: string | null; to: string | null; at: string | null }[];
   dues: { id: number; requestId: number | null; amount: number; status: string; at: string | null }[];
 };
-export const getTechnicianPayouts = async (id: number) => (await adminApi.get<TechnicianPayouts>(`/portal/technicians/${id}/payouts`)).data;
+export const getTechnicianPayouts = async (id: RecordId) => (await adminApi.get<TechnicianPayouts>(`/portal/technicians/${id}/payouts`)).data;
 
 export type CustomerRow = {
   id: number; name: string | null; email: string | null; phoneMasked: string | null; joinedAt: string | null; plan: string | null; status: string | null;
@@ -126,7 +127,7 @@ export const getReports = async (days: number) => (await adminApi.get<Reports>("
 export type ServiceStat = { id: number; name: string; slug: string; domain: string; active: boolean; technicians: number; priceMin: number | null; priceMax: number | null; requests30: number };
 export const getServiceStats = async () => (await adminApi.get<ServiceStat[]>("/portal/services/stats")).data;
 
-export type PriceMedian = { serviceId: number; vehicleType: string; subtype: string; field: string; median: number; technicians: number };
+export type PriceMedian = { serviceId: RecordId; vehicleType: string; subtype: string; field: string; median: number; technicians: number };
 export const getPriceMedians = async () => (await adminApi.get<PriceMedian[]>("/portal/prices/medians")).data;
 
 export type CashDue = { technicianId: number; name: string | null; phoneMasked: string | null; jobs: number; amount: number; oldest: string | null };
@@ -152,28 +153,28 @@ export type PortalSettings = {
 export const getPortalSettings = async () => (await adminApi.get<PortalSettings>("/portal/settings")).data;
 
 // --- Technician sign-up, approval and editing (the app's own routes) ---
-export const getTechnicianProfile = async (id: number) => (await rootApi.get<Record<string, unknown>>(`/technicians/${id}`)).data;
-export const getTechnicianApprovalAudit = async (id: number) => (await rootApi.get<unknown>(`/technicians/${id}/approval-audit`)).data;
-export const getTechnicianServicePricing = async (id: number) => (await rootApi.get<unknown[]>(`/technicians/${id}/service-pricing`)).data;
+export const getTechnicianProfile = async (id: RecordId) => (await rootApi.get<Record<string, unknown>>(`/technicians/${id}`)).data;
+export const getTechnicianApprovalAudit = async (id: RecordId) => (await rootApi.get<unknown>(`/technicians/${id}/approval-audit`)).data;
+export const getTechnicianServicePricing = async (id: RecordId) => (await rootApi.get<unknown[]>(`/technicians/${id}/service-pricing`)).data;
 export const createTechnician = async (payload: Record<string, unknown>) => (await rootApi.post<{ id: string; status: string }>("/technicians/create", payload)).data;
-export const updateTechnicianProfile = async (id: number, payload: Record<string, unknown>) => (await rootApi.put(`/technicians/${id}/profile`, payload)).data;
+export const updateTechnicianProfile = async (id: RecordId, payload: Record<string, unknown>) => (await rootApi.put(`/technicians/${id}/profile`, payload)).data;
 export const approveTechnician = async (id: number, reason: string) => (await rootApi.patch(`/technicians/${id}/approve`, { reason })).data;
 export const rejectTechnician = async (id: number, reason: string) => (await rootApi.patch(`/technicians/${id}/reject`, { reason })).data;
 export const listPendingTechnicians = async () => (await rootApi.get<unknown>("/technicians/pending")).data;
 export const listAllTechniciansRaw = async () => (await rootApi.get<unknown>("/technicians/list")).data;
 
 export type PricingTemplate = {
-  services: { id: number; service_name: string; service_slug?: string }[];
-  categories: { id: number; category_name: string }[];
-  subcategories: { id: number; vehicle_category_id: number; subcategory_name: string }[];
-  pricingFields: { id: number; service_id: number; field_key: string; field_label: string; field_type?: string; required?: boolean | number }[];
-  fleets?: { id: number; fleet_name: string }[];
+  services: { id: RecordId; service_name: string; service_slug?: string }[];
+  categories: { id: RecordId; category_name: string }[];
+  subcategories: { id: RecordId; vehicle_category_id: RecordId; subcategory_name: string }[];
+  pricingFields: { id: RecordId; service_id: RecordId; field_key: string; field_label: string; field_type?: string; required?: boolean | number }[];
+  fleets?: { id: RecordId; fleet_name: string }[];
 };
 export const getPricingTemplate = async () => (await rootApi.get<PricingTemplate>("/technicians/pricing-template")).data;
-export type ServicePricingRow = { id?: number; service_id: number; vehicle_category_id: number; vehicle_subcategory_id?: number | null; pricing_json: Record<string, string | number> | string };
+export type ServicePricingRow = { id?: RecordId; service_id: RecordId; vehicle_category_id: RecordId; vehicle_subcategory_id?: RecordId | null; pricing_json: Record<string, string | number> | string };
 export type AdminNote = { id: number; adminId: string; noteType: string; note: string; metadata: Record<string, unknown> | null; createdAt: string | null };
-export const getTechnicianNotes = async (id: number) => (await rootApi.get<{ notes: AdminNote[] }>(`/admin-extended/technicians/${id}/admin-notes`)).data.notes;
-export const deleteTechnician = async (id: number) => (await adminApi.delete(`/technicians/${id}`)).data;
+export const getTechnicianNotes = async (id: RecordId) => (await rootApi.get<{ notes: AdminNote[] }>(`/admin-extended/technicians/${id}/admin-notes`)).data.notes;
+export const deleteTechnician = async (id: RecordId) => (await adminApi.delete(`/technicians/${id}`)).data;
 
 // --- One request: the full record, who dispatch could offer it to, and its payment checks ---
 export type RequestDetails = {
@@ -268,9 +269,9 @@ export const resolveComplaintWith = async (id: number, resolutionNote: string) =
 export const addComplaintNote = async (id: number, note: string) => (await rootApi.post(`/admin-extended/complaints/${id}/internal-note`, { note })).data;
 
 // --- Messages to technicians (logged in the audit log with their title) ---
-type Sent = { success: boolean; payload: { technicianIds: number[]; targetCount: number; title: string } };
+type Sent = { success: boolean; payload: { technicianIds: RecordId[]; targetCount: number; title: string } };
 export const sendAnnouncement = async (title: string, message: string) => (await rootApi.post<Sent>("/admin-extended/notifications/system-announcement", { title, message })).data;
-export const sendToTechnicians = async (title: string, message: string, technicianIds: number[]) => (await rootApi.post<Sent>("/admin-extended/notifications/technician-broadcast", { title, message, technicianIds })).data;
+export const sendToTechnicians = async (title: string, message: string, technicianIds: RecordId[]) => (await rootApi.post<Sent>("/admin-extended/notifications/technician-broadcast", { title, message, technicianIds })).data;
 export const sendUrgent = async (title: string, message: string) => (await rootApi.post<Sent>("/admin-extended/notifications/emergency-message", { title, message })).data;
 
 // --- Services, vehicle types, sub-types, price fields and tow trucks (the price setup technicians fill in) ---

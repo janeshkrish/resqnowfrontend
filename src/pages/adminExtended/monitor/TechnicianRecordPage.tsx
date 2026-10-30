@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
+import { recordId, type RecordId } from "@/lib/recordId";
 import { getTechnicianJobs, getTechnicianRecord, getTechnicianReviews, type TechnicianRecord } from "../api/adminMonitorApi";
 import { useAdminEvents } from "./adminLive";
 import { clock, dayAndTime, initials, money, PHASE_LABEL, service } from "./monitorFormat";
@@ -85,7 +86,7 @@ export function Overview({ record, go }: { record: TechnicianRecord; go: (tab: T
   );
 }
 
-export function Jobs({ technicianId, onOpen }: { technicianId: number; onOpen: (id: number) => void }) {
+export function Jobs({ technicianId, onOpen }: { technicianId: RecordId; onOpen: (id: number) => void }) {
   const [page, setPage] = useState(1);
   const [days, setDays] = useState<number | null>(30);
   const [status, setStatus] = useState("all");
@@ -212,7 +213,7 @@ export function Reliability({ record, onOpen }: { record: TechnicianRecord; onOp
   );
 }
 
-export function Reviews({ record, technicianId }: { record: TechnicianRecord; technicianId: number }) {
+export function Reviews({ record, technicianId }: { record: TechnicianRecord; technicianId: RecordId }) {
   const [page, setPage] = useState(1);
   const reviews = useQuery({ queryKey: ["admin", "monitor", "tech-reviews", technicianId, page], queryFn: () => getTechnicianReviews(technicianId, { page, limit: 10 }) });
   const total = record.reviews.count;
@@ -254,11 +255,11 @@ export function Reviews({ record, technicianId }: { record: TechnicianRecord; te
 
 export default function TechnicianRecordPage() {
   const params = useParams();
-  const technicianId = Number(params.technicianId);
+  const technicianId = recordId(params.technicianId) ?? "";
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("overview");
   const [openId, setOpenId] = useState<number | null>(null);
-  const record = useQuery({ queryKey: ["admin", "monitor", "tech", technicianId], queryFn: () => getTechnicianRecord(technicianId), enabled: Number.isInteger(technicianId) && technicianId > 0, refetchInterval: 60_000 });
+  const record = useQuery({ queryKey: ["admin", "monitor", "tech", technicianId], queryFn: () => getTechnicianRecord(technicianId), enabled: Boolean(technicianId), refetchInterval: 60_000 });
   // Any request or payment change can move these numbers; refresh at most every 5 seconds.
   useAdminEvents(() => void queryClient.invalidateQueries({ queryKey: ["admin", "monitor", "tech"] }), 5_000);
   const data = record.data;

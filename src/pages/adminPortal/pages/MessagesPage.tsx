@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { RecordId } from "@/lib/recordId";
 
 import { listAudit, listTechnicians, sendAnnouncement, sendToTechnicians, sendUrgent, type TechnicianRow, type TechnicianTab } from "../api/portalApi";
 import { actionWords, clock, day, initials, service } from "../format";
@@ -34,7 +35,7 @@ export default function MessagesPage() {
   const [kind, setKind] = useState<Kind>("announcement");
   const [serviceKey, setServiceKey] = useState("");
   const [state, setState] = useState<TechnicianTab>("on_duty");
-  const [picked, setPicked] = useState<number[]>([]);
+  const [picked, setPicked] = useState<RecordId[]>([]);
   const [find, setFind] = useState("");
   const [pasted, setPasted] = useState("");
   const [title, setTitle] = useState("");
@@ -52,7 +53,7 @@ export default function MessagesPage() {
   const targets = who === "all" ? null : who === "filter" ? (filtered.data || []).map((row) => row.id) : pickIds;
   const reach = who === "all" ? everyone.data?.length ?? null : targets?.length ?? 0;
   const ready = title.trim() && message.trim() && message.length <= MAX && (who === "all" || (targets && targets.length > 0));
-  const nameOf = (id: number) => everyone.data?.find((row) => row.id === id)?.name || `#${id}`;
+  const nameOf = (id: RecordId) => everyone.data?.find((row) => row.id === id)?.name || `#${id}`;
   const list = (everyone.data || []).filter((row) => !find.trim() || [row.name, row.owner, String(row.id), row.phoneMasked].some((value) => String(value || "").toLowerCase().includes(find.trim().toLowerCase())));
 
   const send = async () => {

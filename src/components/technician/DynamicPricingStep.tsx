@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { RecordId } from '@/lib/recordId';
 import { Check, ChevronDown, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,16 +8,16 @@ import { canonicalizeServiceKey, canonicalizeVehicleKey } from '@/config/technic
 import { SIGNUP_EV_CONNECTORS, SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, signupCsvTokens, type SignupVehicle } from '@/utils/technicianSignupPricing';
 
 export interface PricingRow {
-  service_id: number;
-  vehicle_category_id: number;
-  vehicle_subcategory_id?: number | null;
+  service_id: RecordId;
+  vehicle_category_id: RecordId;
+  vehicle_subcategory_id?: RecordId | null;
   pricing_json: Record<string, string | number>;
 }
 export interface PricingTemplate {
-  services: { id: number; service_name: string; service_slug?: string }[];
-  categories: { id: number; category_name: string }[];
-  subcategories: { id: number; vehicle_category_id: number; subcategory_name: string }[];
-  pricingFields: { id: number; service_id: number; field_key: string; field_label: string; field_type?: string; required?: boolean }[];
+  services: { id: RecordId; service_name: string; service_slug?: string }[];
+  categories: { id: RecordId; category_name: string }[];
+  subcategories: { id: RecordId; vehicle_category_id: RecordId; subcategory_name: string }[];
+  pricingFields: { id: RecordId; service_id: RecordId; field_key: string; field_label: string; field_type?: string; required?: boolean }[];
 }
 interface Props extends PricingTemplate {
   selectedServiceIds: string[];

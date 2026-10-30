@@ -5,6 +5,25 @@ def updatesEnabled = (project.findProperty('RESQNOW_APP_UPDATES_ENABLED') ?: 'fa
 if (!(updatesEnabled in ['true', 'false'])) {
     throw new GradleException('RESQNOW_APP_UPDATES_ENABLED must be true or false')
 }
+def suppliedCode = project.findProperty('RESQNOW_ANDROID_VERSION_CODE')
+def suppliedName = project.findProperty('RESQNOW_ANDROID_VERSION_NAME')
+if ((suppliedCode != null) != (suppliedName != null)) {
+    throw new GradleException('Android version code and name must be provided together')
+}
+def checkedCode = 4
+def checkedName = '1.3'
+if (suppliedCode != null) {
+    def rawCode = suppliedCode.toString()
+    def rawName = suppliedName.toString()
+    if (!(rawCode ==~ /[1-9][0-9]{0,9}/) || new BigInteger(rawCode) > 2147483647 ||
+        rawName.trim().isEmpty() || rawName.length() > 60 || rawName.find(/[\p{Cntrl}]/)) {
+        throw new GradleException('Invalid checked Android release version')
+    }
+    checkedCode = Integer.parseInt(rawCode)
+    checkedName = rawName
+}
+def signingValues = ['RESQNOW_ANDROID_KEYSTORE_PATH', 'RESQNOW_ANDROID_KEY_ALIAS', 'RESQNOW_ANDROID_STORE_PASSWORD', 'RESQNOW_ANDROID_KEY_PASSWORD'].collectEntries { name -> [(name): System.getenv(name)] }
+def hasOwnerSigning = signingValues.values().every { value -> value != null && !value.isEmpty() }
 
 android {
     namespace = "com.resqnow1.app"
@@ -14,8 +33,8 @@ android {
         applicationId "com.resqnow1.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "1.3"
+        versionCode checkedCode
+        versionName checkedName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -23,10 +42,32 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasOwnerSigning) {
+            ownerRelease {
+                storeFile file(signingValues.RESQNOW_ANDROID_KEYSTORE_PATH)
+                storePassword signingValues.RESQNOW_ANDROID_STORE_PASSWORD
+                keyAlias signingValues.RESQNOW_ANDROID_KEY_ALIAS
+                keyPassword signingValues.RESQNOW_ANDROID_KEY_PASSWORD
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasOwnerSigning) signingConfig signingConfigs.ownerRelease
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { task -> task.project == project && task.name in ['assembleRelease', 'bundleRelease', 'packageRelease'] }) {
+        if (suppliedCode == null || updatesEnabled != 'true' || System.getenv('VITE_NATIVE_BUILD') != 'true' || System.getenv('VITE_APP_UPDATES_ENABLED') != 'true') {
+            throw new GradleException('Release requires checked version overrides and enabled packaged/native updater build flags')
+        }
+        if (!hasOwnerSigning || !file(signingValues.RESQNOW_ANDROID_KEYSTORE_PATH).isFile()) {
+            throw new GradleException('Release requires the existing owner signing key through environment-only configuration')
         }
     }
 }

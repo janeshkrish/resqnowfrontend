@@ -30,4 +30,8 @@ public class UpdateStateStoreTest {
  @Test public void onlyActualInstalledVersionClearsTheCandidate() throws Exception {
   UpdateStateStore s=new UpdateStateStore(new Disk());s.begin(UpdateManifest.parse(UpdateManifestTest.fixture()));assertFalse(s.clearIfInstalled(11));assertTrue(s.clearIfInstalled(12));assertEquals("idle",s.read().getProperty("phase"));
  }
+ @Test public void corruptedUpdaterStateCanBeRecoveredForAnExplicitNewRequest()throws Exception{
+  Disk d=new Disk();d.value.setProperty("phase","ready");UpdateStateStore s=new UpdateStateStore(d);try{s.read();fail("corrupt offer accepted");}catch(java.io.IOException expected){}
+  assertEquals("cancelled",s.readForNewRequest().getProperty("phase"));s.begin(UpdateManifest.parse(UpdateManifestTest.fixture()));assertEquals("queued",s.read().getProperty("phase"));
+ }
 }

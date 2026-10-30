@@ -15,6 +15,8 @@ public final class UpdateStateStore {
  private final Disk disk;
  public UpdateStateStore(Disk disk){if(disk==null)throw new IllegalArgumentException("Update state storage required");this.disk=disk;}
  public Properties read() throws IOException {synchronized(LOCK){return validated(disk.read());}}
+ /** Only an explicit retry/cancel may reset corrupt updater-owned metadata. */
+ public Properties readForNewRequest() throws IOException {synchronized(LOCK){try{return read();}catch(IOException corrupt){cancel();return read();}}}
  public String begin(UpdateManifest manifest) throws IOException {synchronized(LOCK){Properties p=new Properties();String id=UUID.randomUUID().toString();p.setProperty("generation",id);p.setProperty("phase","queued");p.setProperty("bytesDownloaded","0");Properties m=manifest.toProperties();for(String key:m.stringPropertyNames())p.setProperty("manifest."+key,m.getProperty(key));disk.write(p);return id;}}
  public boolean update(String generation,String phase,long bytes,String errorCode) throws IOException {synchronized(LOCK){
   Properties p=read();String prior=p.getProperty("phase");

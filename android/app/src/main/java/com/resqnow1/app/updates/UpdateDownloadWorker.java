@@ -23,11 +23,12 @@ public final class UpdateDownloadWorker extends Worker {
  public UpdateDownloadWorker(@NonNull Context context,@NonNull WorkerParameters parameters){super(context,parameters);}
  public static OneTimeWorkRequest request(String generation,boolean allowMetered){
   UpdateStorage.requireGeneration(generation);
-  return new OneTimeWorkRequest.Builder(UpdateDownloadWorker.class).setInputData(new Data.Builder().putString("generation",generation).build()).setConstraints(new Constraints.Builder().setRequiredNetworkType(allowMetered?NetworkType.CONNECTED:NetworkType.UNMETERED).build()).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag(WORK_NAME).build();
+  return new OneTimeWorkRequest.Builder(UpdateDownloadWorker.class).setInputData(new Data.Builder().putString("generation",generation).build()).setConstraints(new Constraints.Builder().setRequiredNetworkType(allowMetered?NetworkType.CONNECTED:NetworkType.UNMETERED).build()).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag(WORK_NAME).addTag(WORK_NAME+":"+generation).build();
  }
  @NonNull @Override public Result doWork(){
   final Context context=getApplicationContext();final UpdateStateStore store=UpdateStorage.open(context);final String generation=getInputData().getString("generation");
   try{
+   if(!UpdateNativeGate.enabled(context))return failure("disabled");
    UpdateStorage.requireGeneration(generation);Properties state=store.read();if(!generation.equals(state.getProperty("generation")))return Result.success();
    String phase=state.getProperty("phase");if(phase.equals("cancelled")||phase.equals("idle")||phase.equals("failed")||phase.equals("ready")||phase.equals("permission-required")||phase.equals("installing"))return Result.success();
    final UpdateManifest release=UpdateStateStore.manifest(state);PackageInfo installed=context.getPackageManager().getPackageInfo(context.getPackageName(),0);long version=Build.VERSION.SDK_INT>=28?installed.getLongVersionCode():installed.versionCode;
@@ -40,7 +41,7 @@ public final class UpdateDownloadWorker extends Worker {
    downloader.download(release,partial,verified,new UpdateDownloader.Control(){
     private long lastTime=0,lastBytes=0;
     public boolean cancelled(){if(isStopped())return true;try{return !generation.equals(store.read().getProperty("generation"));}catch(IOException e){return true;}}
-    public void progress(long bytes)throws IOException {long now=System.nanoTime();if(bytes==0||bytes==release.sizeBytes||bytes-lastBytes>=1024*1024||now-lastTime>=TimeUnit.SECONDS.toNanos(1)){if(!store.update(generation,"downloading",bytes,null))throw new java.io.InterruptedIOException("update_cancelled");lastTime=now;lastBytes=bytes;}}
+    public void progress(long bytes)throws IOException {long now=System.nanoTime();if(bytes==0||bytes==release.sizeBytes||bytes-lastBytes>=1024*1024||now-lastTime>=TimeUnit.SECONDS.toNanos(1)){if(!store.update(generation,"downloading",bytes,null))throw new java.io.InterruptedIOException("update_cancelled");setProgressAsync(new Data.Builder().putLong("bytesDownloaded",bytes).build());lastTime=now;lastBytes=bytes;}}
     public void verifying()throws IOException {if(!store.update(generation,"verifying",release.sizeBytes,null))throw new java.io.InterruptedIOException("update_cancelled");}
    });
    // Hash verified only. The plugin must also inspect APK package/SDK/certificate

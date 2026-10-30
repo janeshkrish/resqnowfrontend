@@ -1,10 +1,16 @@
 apply plugin: 'com.android.application'
 import groovy.json.JsonSlurper
 
+def updatesEnabled = (project.findProperty('RESQNOW_APP_UPDATES_ENABLED') ?: 'false').toString()
+if (!(updatesEnabled in ['true', 'false'])) {
+    throw new GradleException('RESQNOW_APP_UPDATES_ENABLED must be true or false')
+}
+
 android {
     namespace = "com.resqnow1.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
+        manifestPlaceholders += [resqnowAppUpdatesEnabled: updatesEnabled]
         applicationId "com.resqnow1.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion

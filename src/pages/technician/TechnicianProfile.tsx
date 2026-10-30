@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
+import { AppUpdatePanel } from '@/components/AppUpdatePanel';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { TechBack, TechLanguageSheet, TechPage, TechSwitch } from "@/components/technician/app/TechUi";
 import { useSocket } from "@/contexts/SocketContext";
@@ -587,7 +588,7 @@ const TechnicianProfile = () => {
         }
     };
 
-    return <TechPage tab="me" testId="technician-profile">{renderContent()}<AppAnalyticsConsent /></TechPage>;
+    return <TechPage tab="me" testId="technician-profile">{renderContent()}<AppUpdatePanel /><AppAnalyticsConsent /></TechPage>;
 };
 
 export default TechnicianProfile;

@@ -13,7 +13,7 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     // Node-script tests use node:test; release:check runs all of them as a
     // separate required gate rather than silently omitting them.
-    exclude: [...configDefaults.exclude, 'e2e/**', 'e2e-integration/**', 'scripts/**/*.test.mjs'],
+    exclude: [...configDefaults.exclude, 'output/**', 'e2e/**', 'e2e-integration/**', 'scripts/**/*.test.mjs'],
   },
   resolve: {
     alias: {

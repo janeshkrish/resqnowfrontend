@@ -1,0 +1,2 @@
+import { defineConfig, devices } from '@playwright/test';
+export default defineConfig({testDir:'./e2e-integration',testMatch:'app-updates.spec.ts',workers:1,fullyParallel:false,timeout:30000,expect:{timeout:10000},reporter:'list',outputDir:'output/playwright/updates',globalSetup:'./scripts/start-app-updates-e2e.mjs',use:{baseURL:'http://127.0.0.1:5195',channel:'chrome',serviceWorkers:'block',trace:'retain-on-failure'},projects:[{name:'desktop',use:{...devices['Desktop Chrome']}},{name:'phone',use:{...devices['Pixel 7']}}]});

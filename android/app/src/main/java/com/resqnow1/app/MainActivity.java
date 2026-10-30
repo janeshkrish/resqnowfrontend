@@ -27,6 +27,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VoiceThozhanPlugin.class);
         registerPlugin(AppInstallationPlugin.class);
         registerPlugin(AppUpdaterPlugin.class);
+        bridgeBuilder.addWebViewListener(new com.resqnow1.app.updates.NativeCodeRefresh(this));
         super.onCreate(savedInstanceState);
         ensureFirebaseInitialized();
         NotificationChannels.ensureAll(this);

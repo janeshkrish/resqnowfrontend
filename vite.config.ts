@@ -43,7 +43,7 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       react(),
       mode === "development" && componentTagger(),
-      VitePWA({
+      env.VITE_NATIVE_BUILD !== 'true' && VitePWA({
         registerType: "autoUpdate",
         injectRegister: "auto",
         manifestFilename: "manifest.json",
@@ -92,6 +92,12 @@ export default defineConfig(({ mode, command }) => {
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
+            {
+              // Metadata and delivery must never come from the generic API cache.
+              urlPattern: /\/api\/public\/android-app(?:\/|$)/,
+              handler: "NetworkOnly",
+              method: "GET",
+            },
             {
               // Authorization responses must not survive in the generic script cache.
               urlPattern: ({ url }) =>

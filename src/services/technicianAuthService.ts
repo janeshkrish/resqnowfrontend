@@ -234,12 +234,12 @@ export const technicianSchema = z.object({
         district: z.string().optional(),
         pincode: z.string().optional(),
     }),
-    serviceAreaRange: z.coerce.number().min(1, "Min 1 km"),
-    experience: z.coerce.number().min(0, "Invalid experience"),
+    serviceAreaRange: z.coerce.number<string | number>().min(1, "Min 1 km"),
+    experience: z.coerce.number<string | number>().min(0, "Invalid experience"),
 
     // Step 1: Services
     specialties: z.array(z.string()).min(1, "Select at least one service"),
-    vehicle_types: z.record(z.boolean()).refine((data) => data && Object.values(data).some(val => val === true), {
+    vehicle_types: z.record(z.string(), z.boolean()).refine((data) => data && Object.values(data).some(val => val === true), {
         message: "Select at least one vehicle type"
     }),
     towing_fleet_types: z.array(z.string()).default([]),
@@ -271,7 +271,7 @@ export const technicianSchema = z.object({
 
     // Step 5: Banking
     payment_details: z.object({
-        modes: z.record(z.boolean()),
+        modes: z.record(z.string(), z.boolean()),
         upi_id: z.string().optional(),
         bank_account_number: z.string().optional(),
         ifsc_code: z.string().optional(),
@@ -310,3 +310,4 @@ export const technicianSchema = z.object({
 });
 
 export type TechnicianFormValues = z.infer<typeof technicianSchema>;
+export type TechnicianFormInput = z.input<typeof technicianSchema>;

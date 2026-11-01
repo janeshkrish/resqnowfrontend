@@ -2,11 +2,14 @@ import { Button } from '@/components/ui/button';
 import { useAppUpdates } from './AppUpdateProvider';
 export function AppUpdatePanel(){
   const u=useAppUpdates();const s=u?.snapshot;if(!u||!s?.enabled)return null;
-  const release=s.release&&(!u.offer||s.release.versionCode>=u.offer.versionCode)?s.release:u.offer;
+  const staged=s.release&&['queued','downloading','verifying','ready','permission-required','installing'].includes(s.phase)?s.release:null;
+  const release=staged??(s.release&&(!u.offer||s.release.versionCode>=u.offer.versionCode)?s.release:u.offer);
+  const newer=staged&&u.offer&&u.offer.versionCode>staged.versionCode?u.offer:null;
   const waiting=['queued','downloading','verifying','installing'].includes(s.phase);
   return <section aria-label="App updates" className="my-4 rounded-xl border bg-background p-4 text-foreground">
     <h2 className="font-semibold">App updates</h2><p className="my-2 text-sm">Installed version {s.installedVersionName??s.installedVersionCode}. Updates keep your account and settings.</p>
     {release?<p className="text-sm">Version {release.versionName} {s.phase==='ready'?'is ready to install.':s.phase==='queued'?'will download on Wi-Fi.':s.phase==='downloading'?'is downloading.':s.phase==='verifying'?'is being verified.':s.phase==='installing'?'is awaiting Android confirmation.':'is available.'}</p>:<p className="text-sm">Check for the latest Android release.</p>}
+    {newer?<p className="text-sm">A newer version {newer.versionName} is also available. Check for updates after the current download finishes to retrieve it.</p>:null}
     {['downloading','verifying'].includes(s.phase)&&release?<progress className="my-2 w-full" aria-label="Update download progress" max={release.sizeBytes} value={s.bytesDownloaded}/>:null}
     {u.message?<p role="status" className="my-2 text-sm">{u.message}</p>:null}
     {s.phase==='failed'?<p role="status" className="my-2 text-sm">The update could not finish. Retry when you have a stable connection and free storage.</p>:null}

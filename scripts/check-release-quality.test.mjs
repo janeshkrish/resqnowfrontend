@@ -61,6 +61,7 @@ test('runs every required gate with synthetic settings and no test-name/project 
     assert.ok(calls[2].args.includes('run'));
     assert.ok(calls[3].args.includes('test'));
     assert.ok(calls[3].args.includes('--forbid-only'),'browser gate must reject exclusive tests');
+    assert.ok(calls[3].args.includes('--workers=1'),'real-time audio cases use one browser worker, with all inventory and zero-retry checks retained');
     assert.ok(calls[4].args.includes('build'));
     assert.equal(calls[3].env.CI,'true');
     assert.equal(calls[4].env.VITE_FRONTEND_ONLY,'false');

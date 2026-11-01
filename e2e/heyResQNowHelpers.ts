@@ -23,6 +23,29 @@ export async function openApp(page: Page, path: string, { heyOn = true, heard = 
     localStorage.setItem("resqnow_user_token", "e2e-customer-token");
     if (heyOn) localStorage.setItem("resqnow_hey_resqnow", "1");
     const w = window as unknown as Record<string, unknown>;
+    // Counts/levels only, never audio samples. Preserve the real worker/spotter.
+    const diagnostics = { sentFrames: 0, sentSamples: 0, peak: 0, ready: 0, heard: 0, resets: 0, errors: 0 };
+    w.__wakeDiagnostics = diagnostics;
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(script: string | URL, options?: WorkerOptions) {
+        super(script, options);
+        if (String(script).includes('/hey-resqnow/worker.js')) this.addEventListener('message', event => {
+          if (event.data?.type === 'ready') diagnostics.ready++;
+          if (event.data?.type === 'heard') diagnostics.heard++;
+          if (event.data?.type === 'error') diagnostics.errors++;
+        });
+      }
+      postMessage(message: unknown, transfer?: Transferable[] | StructuredSerializeOptions) {
+        const value = message as { type?: string; samples?: Float32Array };
+        if (value?.type === 'reset') diagnostics.resets++;
+        if (value?.type === 'audio' && value.samples) {
+          diagnostics.sentFrames++; diagnostics.sentSamples += value.samples.length;
+          for (const sample of value.samples) diagnostics.peak = Math.max(diagnostics.peak, Math.abs(sample));
+        }
+        Reflect.apply(NativeWorker.prototype.postMessage, this, [message, transfer ?? []]);
+      }
+    };
     // Every microphone the page opens, to check it lets go when it should.
     const streams: MediaStream[] = [];
     w.__micCalls = 0;

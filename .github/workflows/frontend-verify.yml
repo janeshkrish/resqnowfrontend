@@ -27,7 +27,7 @@ defaults:
 jobs:
   release-quality:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -39,6 +39,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --ignore-scripts
+      - name: Reject high or critical dependency advisories
+        run: npm audit --audit-level=high
       - name: Install the browser used by both projects
         run: node node_modules/@playwright/test/cli.js install --with-deps chrome
       - name: Require every release-quality gate
@@ -135,11 +137,110 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  native-upgrade-acceptance:
+    if: >-
+      github.repository == 'janeshkrish/resqnowfrontend' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (vars.ANDROID_NATIVE_ACCEPTANCE_ENABLED == 'true' || inputs.run_android_acceptance == true)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          path: frontend
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --ignore-scripts
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Enable KVM only on this disposable Linux runner
+        run: sudo chmod a+rw /dev/kvm
+      - name: Exercise Android confirmation and real A-to-B upgrade on a dedicated fresh emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          avd-name: resqnow-updater-acceptance
+          emulator-port: 5554
+          working-directory: frontend
+          disable-animations: true
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -camera-back none -camera-front none
+          script: ANDROID_SERIAL=emulator-5554 node scripts/android-updater-acceptance.mjs
+      - name: Retain only synthetic acceptance results, never fixture keys or APKs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-upgrade-acceptance
+          path: frontend/output/quality/native-upgrade-acceptance.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  native-legacy-consent:
+    if: >-
+      github.repository == 'janeshkrish/resqnowfrontend' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (vars.ANDROID_NATIVE_ACCEPTANCE_ENABLED == 'true' || inputs.run_android_acceptance == true)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [24, 26]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          path: frontend
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --ignore-scripts
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Enable KVM only on this disposable Linux runner
+        run: sudo chmod a+rw /dev/kvm
+      - name: Exercise the real native plugin and system permission/installer UI
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          avd-name: resqnow-updater-acceptance
+          emulator-port: 5554
+          working-directory: frontend
+          disable-animations: true
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -camera-back none -camera-front none
+          script: ANDROID_SERIAL=emulator-5554 node scripts/android-updater-acceptance.mjs --legacy-consent
+      - name: Retain only the synthetic consent result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-consent-api-${{ matrix.api }}
+          path: frontend/output/quality/native-legacy-consent.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   android-release:
-    needs: [release-quality, native-verification, native-acceptance]
+    needs: [release-quality, native-verification, native-acceptance, native-upgrade-acceptance, native-legacy-consent]
     if: >-
       needs.release-quality.result == 'success' && needs.native-verification.result == 'success' &&
-      needs.native-acceptance.result == 'success' && github.repository == 'janeshkrish/resqnowfrontend' &&
+      needs.native-acceptance.result == 'success' && needs.native-upgrade-acceptance.result == 'success' && needs.native-legacy-consent.result == 'success' &&
+      github.repository == 'janeshkrish/resqnowfrontend' &&
       github.ref == 'refs/heads/main' && github.run_attempt == 1 &&
       ((github.event_name == 'push' && vars.ANDROID_AUTO_RELEASE_ENABLED == 'true' && vars.ANDROID_UPDATER_ACCEPTANCE_CONFIRMED == 'true') ||
       (github.event_name == 'workflow_dispatch' && inputs.android_release == 'dry-run'))

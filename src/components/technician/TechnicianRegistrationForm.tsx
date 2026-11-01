@@ -4,7 +4,8 @@ import { useForm, FormProvider, useFormContext } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   technicianRegistrationSchema,
-  RegisterFormValues
+  RegisterFormValues,
+  RegisterFormInput
 } from "@/types/technician-registration";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -538,7 +539,7 @@ export default function TechnicianRegistrationForm({ onSubmit, isSubmitting }: T
   const [currentStep, setCurrentStep] = useState(0);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
-  const methods = useForm<RegisterFormValues>({
+  const methods = useForm<RegisterFormInput, unknown, RegisterFormValues>({
     resolver: zodResolver(technicianRegistrationSchema),
     defaultValues: {
       vehicle_types: { two_wheeler: false, four_wheeler: false, commercial: false, heavy: false, ev: false },

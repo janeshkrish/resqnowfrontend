@@ -20,7 +20,9 @@ import java.util.concurrent.TimeUnit;
 public final class UpdateDownloadWorker extends Worker {
  public static final String WORK_NAME="resqnow-apk-update";
  private volatile UpdateDownloader downloader;
- public UpdateDownloadWorker(@NonNull Context context,@NonNull WorkerParameters parameters){super(context,parameters);}
+ private final UpdateDownloader.ConnectionFactory connections;
+ public UpdateDownloadWorker(@NonNull Context context,@NonNull WorkerParameters parameters){this(context,parameters,null);}
+ UpdateDownloadWorker(@NonNull Context context,@NonNull WorkerParameters parameters,UpdateDownloader.ConnectionFactory connections){super(context,parameters);this.connections=connections;}
  public static OneTimeWorkRequest request(String generation,boolean allowMetered){
   UpdateStorage.requireGeneration(generation);
   return new OneTimeWorkRequest.Builder(UpdateDownloadWorker.class).setInputData(new Data.Builder().putString("generation",generation).build()).setConstraints(new Constraints.Builder().setRequiredNetworkType(allowMetered?NetworkType.CONNECTED:NetworkType.UNMETERED).build()).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag(WORK_NAME).addTag(WORK_NAME+":"+generation).build();
@@ -37,7 +39,7 @@ public final class UpdateDownloadWorker extends Worker {
    if(new StatFs(partial.getParent()).getAvailableBytes()<Math.max(0,release.sizeBytes-length)+16L*1024*1024){fail(store,generation,"storage");return failure("storage");}
    if(phase.equals("verifying"))store.update(generation,"queued",length,null);
    if(!store.update(generation,"downloading",length,null))return Result.success();
-   downloader=new UpdateDownloader();
+   downloader=connections==null?new UpdateDownloader():new UpdateDownloader(connections);
    downloader.download(release,partial,verified,new UpdateDownloader.Control(){
     private long lastTime=0,lastBytes=0;
     public boolean cancelled(){if(isStopped())return true;try{return !generation.equals(store.read().getProperty("generation"));}catch(IOException e){return true;}}

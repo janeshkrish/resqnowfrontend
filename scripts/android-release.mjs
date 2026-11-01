@@ -36,8 +36,8 @@ export async function verifyAndroidArtifact({apk,expectedManifest:m,tools=create
   const before=createHash('sha256').update(await fs.readFile(apk)).digest('hex');
   const badging=await tools.badging(apk);const signature=await tools.signature(apk);
   const pkg=/^package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'/m.exec(badging);
-  const min=/^sdkVersion:'([0-9]+)'/m.exec(badging);const target=/^targetSdkVersion:'([0-9]+)'/m.exec(badging);
-  if(!pkg||pkg[1]!==m.applicationId||Number(pkg[2])!==m.versionCode||pkg[3]!==m.versionName||Number(min?.[1])!==m.minSdk||Number(target?.[1])!==m.targetSdk||/^application-debuggable(?:\s|$)/m.test(badging))throw Error('APK package/version/SDK/debug policy mismatch');
+  const min=[...badging.matchAll(/^(?:sdkVersion|minSdkVersion):'([0-9]+)'\r?$/gm)];const target=[...badging.matchAll(/^targetSdkVersion:'([0-9]+)'\r?$/gm)];
+  if(!pkg||pkg[1]!==m.applicationId||Number(pkg[2])!==m.versionCode||pkg[3]!==m.versionName||min.length!==1||target.length!==1||Number(min[0]?.[1])!==m.minSdk||Number(target[0]?.[1])!==m.targetSdk||/^application-debuggable(?:\s|$)/m.test(badging))throw Error('APK package/version/SDK/debug policy mismatch');
   const signers=[...signature.matchAll(/^Signer #(\d+) certificate SHA-256 digest: ([a-f0-9]{64})\s*$/gm)];
   if(!/^Verifies\s*$/m.test(signature)||/DOES NOT VERIFY|Android Debug/i.test(signature)||signers.length!==1||signers[0][1]!=='1'||signers[0][2]!==m.signingCertificateSha256)throw Error('APK production signature mismatch');
   // Re-stat after tool inspection to reject a replaced/truncated build output.

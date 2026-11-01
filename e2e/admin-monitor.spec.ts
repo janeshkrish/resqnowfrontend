@@ -278,6 +278,11 @@ test("Monitor: one job on its live map, the live feed moves the ETA, and the tim
 
   await panel.getByRole("button", { name: "Escalate" }).click();
   await expect.poll(() => w.calls).toContain("POST /api/admin/requests/5502/escalate");
+  await expect(page.getByText("Escalated: the search is widened", { exact: true })).toBeVisible();
+  // A mouse over the mobile top-centre toast intentionally pauses its expiry.
+  // Let the notification finish before trying the Close button underneath it.
+  await page.mouse.move(0, 0);
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
   await panel.getByRole("button", { name: "Close", exact: true }).click();
   await expect(panel).toHaveCount(0);
   expect(errors).toEqual([]);

@@ -20,6 +20,12 @@ test('verifies real APK bytes against independent Android tool outputs before ge
   assert.equal(typeof api.verifyAndroidArtifact,'function');const result=await api.verifyAndroidArtifact({apk,expectedManifest:expected,tools:{badging:async()=>badging,signature:async()=>signature}});
   assert.deepEqual(result,{...expected,sizeBytes:16,sha256:'fa33f24e6a2c7164c08ffd861085fdc5bdae59c424d53944fb8edc4ffb4f756c'});
 }));
+test('accepts modern build-tools minSdkVersion and legacy sdkVersion, never missing or duplicate SDK records',()=>artifact(async apk=>{
+  const inspect=badgingText=>api.verifyAndroidArtifact({apk,expectedManifest:expected,tools:{badging:async()=>badgingText,signature:async()=>signature}});
+  assert.equal((await inspect(badging.replace("sdkVersion:'24'","minSdkVersion:'24'"))).minSdk,24);
+  assert.equal((await inspect(badging)).minSdk,24);
+  for(const value of [badging+"minSdkVersion:'24'\n",badging.replace("sdkVersion:'24'\n",''),badging.replace("sdkVersion:'24'","minSdkVersion:'25'")])await assert.rejects(()=>inspect(value),/SDK|policy/);
+}));
 test('rejects debug packages, wrong signatures, package/version/SDK, and missing signature verification',()=>artifact(async apk=>{
   assert.equal(typeof api.verifyAndroidArtifact,'function');
   const cases=[{badging:badging+'application-debuggable\n'},{badging:badging.replace('com.resqnow1.app','evil.app')},{badging:badging.replace("versionCode='112'","versionCode='111'")},{badging:badging.replace("sdkVersion:'24'","sdkVersion:'26'")},{signature:signature.replace('b'.repeat(64),'a'.repeat(64))},{signature:signature.replace('CN=ResQNow','CN=Android Debug')},{signature:'DOES NOT VERIFY'}];

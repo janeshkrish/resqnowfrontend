@@ -4,10 +4,10 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescripti
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { UseFormReturn } from "react-hook-form";
-import { RegisterFormValues, specialtiesOptions } from "@/types/technician-registration";
+import { RegisterFormValues, RegisterFormInput, specialtiesOptions } from "@/types/technician-registration";
 
 interface PricingFieldsProps {
-  form: UseFormReturn<RegisterFormValues>;
+  form: UseFormReturn<RegisterFormInput, unknown, RegisterFormValues>;
 }
 
 const PricingFields = ({ form }: PricingFieldsProps) => {

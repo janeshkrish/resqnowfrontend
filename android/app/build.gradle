@@ -5,6 +5,12 @@ def updatesEnabled = (project.findProperty('RESQNOW_APP_UPDATES_ENABLED') ?: 'fa
 if (!(updatesEnabled in ['true', 'false'])) {
     throw new GradleException('RESQNOW_APP_UPDATES_ENABLED must be true or false')
 }
+def acceptanceEnabled = (project.findProperty('RESQNOW_UPDATER_ACCEPTANCE') ?: 'false').toString()
+if (!(acceptanceEnabled in ['true', 'false']) || (acceptanceEnabled == 'true' && System.getenv('RESQNOW_UPDATER_ACCEPTANCE_ONLY') != 'true')) {
+    throw new GradleException('Updater acceptance variants require explicit fixture-only configuration')
+}
+def fixtureSigning = ['RESQNOW_ACCEPTANCE_KEYSTORE_PATH', 'RESQNOW_ACCEPTANCE_KEY_ALIAS', 'RESQNOW_ACCEPTANCE_STORE_PASSWORD', 'RESQNOW_ACCEPTANCE_KEY_PASSWORD'].collectEntries { name -> [(name): System.getenv(name)] }
+def hasFixtureSigning = fixtureSigning.values().every { value -> value != null && !value.isEmpty() }
 def suppliedCode = project.findProperty('RESQNOW_ANDROID_VERSION_CODE')
 def suppliedName = project.findProperty('RESQNOW_ANDROID_VERSION_NAME')
 if ((suppliedCode != null) != (suppliedName != null)) {
@@ -26,6 +32,7 @@ def signingValues = ['RESQNOW_ANDROID_KEYSTORE_PATH', 'RESQNOW_ANDROID_KEY_ALIAS
 def hasOwnerSigning = signingValues.values().every { value -> value != null && !value.isEmpty() }
 
 android {
+    if (acceptanceEnabled == 'true') testBuildType 'updaterAcceptance'
     namespace = "com.resqnow1.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -43,6 +50,14 @@ android {
         }
     }
     signingConfigs {
+        if (acceptanceEnabled == 'true' && hasFixtureSigning) {
+            acceptanceFixture {
+                storeFile file(fixtureSigning.RESQNOW_ACCEPTANCE_KEYSTORE_PATH)
+                storePassword fixtureSigning.RESQNOW_ACCEPTANCE_STORE_PASSWORD
+                keyAlias fixtureSigning.RESQNOW_ACCEPTANCE_KEY_ALIAS
+                keyPassword fixtureSigning.RESQNOW_ACCEPTANCE_KEY_PASSWORD
+            }
+        }
         if (hasOwnerSigning) {
             ownerRelease {
                 storeFile file(signingValues.RESQNOW_ANDROID_KEYSTORE_PATH)
@@ -53,6 +68,14 @@ android {
         }
     }
     buildTypes {
+        if (acceptanceEnabled == 'true') {
+            updaterAcceptance {
+                initWith debug
+                debuggable true
+                matchingFallbacks = ['debug']
+                if (hasFixtureSigning) signingConfig signingConfigs.acceptanceFixture
+            }
+        }
         release {
             if (hasOwnerSigning) signingConfig signingConfigs.ownerRelease
             minifyEnabled false
@@ -62,7 +85,11 @@ android {
 }
 
 gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { task -> task.project == project && task.name in ['assembleUpdaterAcceptance', 'packageUpdaterAcceptance'] } && !hasFixtureSigning) {
+        throw new GradleException('Acceptance APKs require an explicitly synthetic fixture signing key')
+    }
     if (graph.allTasks.any { task -> task.project == project && task.name in ['assembleRelease', 'bundleRelease', 'packageRelease'] }) {
+        if (acceptanceEnabled == 'true') throw new GradleException('Acceptance-only builds cannot be released')
         if (suppliedCode == null || updatesEnabled != 'true' || System.getenv('VITE_NATIVE_BUILD') != 'true' || System.getenv('VITE_APP_UPDATES_ENABLED') != 'true') {
             throw new GradleException('Release requires checked version overrides and enabled packaged/native updater build flags')
         }
@@ -87,6 +114,7 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.4.0'
     implementation project(':capacitor-cordova-android-plugins')
     implementation 'com.google.firebase:firebase-messaging:24.1.0'
     implementation 'androidx.work:work-runtime:2.11.2'

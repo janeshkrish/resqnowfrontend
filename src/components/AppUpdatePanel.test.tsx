@@ -12,10 +12,10 @@ vi.mock('@/contexts/TechnicianAuthContext',()=>({useTechnicianAuth:()=>({technic
 vi.mock('@/contexts/TechnicianJobContext',()=>({useTechnicianJob:()=>({acceptedJobId:mock.busy?'job':null,pendingAcceptanceId:null})}));
 vi.mock('@/lib/api',()=>({API_BASE_URL:'https://api.example',apiFetch:async(path:string)=>new Response(path.includes('active-job')?'null':'[]')}));
 afterEach(()=>{cleanup();vi.unstubAllGlobals();mock.bridge=null;mock.tech=false;mock.busy=false;});
-function setup(phase='ready',path='/settings'){
+function setup(phase='ready',path='/settings',offer=fixture){
   const state={phase,release:fixture,enabled:true,installedVersionCode:4,installedVersionName:'1.3',sdkVersion:36,bytesDownloaded:16};
   mock.bridge={getState:vi.fn(async()=>state),scheduleDownload:vi.fn(async()=>state),requestInstall:vi.fn(async()=>state),cancelDownload:vi.fn(async()=>({...state,phase:'cancelled'})),cancelInstallPreparation:vi.fn(async()=>{}),openInstallPermissionSettings:vi.fn(async()=>{}),addListener:vi.fn(async()=>({remove:async()=>{}}))};
-  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({state:'ready',release:fixture}))));
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({state:'ready',release:offer}))));
   render(<MemoryRouter future={{v7_startTransition:true,v7_relativeSplatPath:true}} initialEntries={[path]}><AppUpdateProvider><AppUpdatePanel /></AppUpdateProvider></MemoryRouter>);
   return mock.bridge;
 }
@@ -34,4 +34,15 @@ it('offers explicit mobile data and cancel while waiting for Wi-Fi',async()=>{
 });
 it('defers installation during an accepted technician job',async()=>{
   mock.tech=true;mock.busy=true;const bridge=setup('ready','/technician/profile');expect(await screen.findByRole('button',{name:'Update now'})).toBeDisabled();expect(bridge.requestInstall).not.toHaveBeenCalled();
+});
+it('keeps staged version A and its ready/install message distinct from newer offer B',async()=>{
+  const newer={...fixture,versionCode:fixture.versionCode+1,versionName:'newer-B',apkUrl:`https://github.com/janeshkrish/resqnowfrontend/releases/download/android-v${fixture.versionCode+1}/resqnow.apk`};
+  const bridge=setup('downloading','/settings',newer);
+  await screen.findByText(`Version ${fixture.versionName} is downloading.`);
+  expect(await screen.findByText(/A newer version newer-B is also available/)).toBeInTheDocument();
+  const staged={...await bridge.getState(),phase:'ready'};bridge.getState.mockResolvedValue(staged);bridge.requestInstall.mockResolvedValue(staged);
+  await act(async()=>{bridge.addListener.mock.calls[0][1](staged);});
+  expect(screen.getByText(`Version ${fixture.versionName} is ready to install.`)).toBeInTheDocument();
+  expect(screen.queryByText('Version newer-B is ready to install.')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Update now'}));await waitFor(()=>expect(bridge.requestInstall).toHaveBeenCalledTimes(1));expect(bridge.scheduleDownload).not.toHaveBeenCalled();
 });

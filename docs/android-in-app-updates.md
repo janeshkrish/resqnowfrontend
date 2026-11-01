@@ -26,6 +26,10 @@ The release verifier independently runs Android badging and signature tools, rej
 
 ## Verification / outstanding activation
 
+Acceptance is split into separate fresh hosted emulators. The API36 external host exercises the actual frontend/native worker and an Android-confirmed A-to-B installation, including denied permission return, installer cancellation, data retention and stale-code refresh. API24 and26 additionally run a native consent test against the real registered AppUpdater plugin, real signed candidate and real Settings/installer UI; these do not depend on old stock WebView JavaScript support. The consent test seeds download bytes only, never mocks permission/installation or approves B. The API36 flow owns full download/install evidence. All three acceptance jobs must succeed before signing/publication; compiling their sources is not runtime acceptance.
+
+Synthetic fixture construction uses fresh temporary signing keys, distinct from production credentials, and removes those keys in `finally`. Generated test APK/assets remain ignored. A hosted driver refuses phones, local/non-CI targets and any emulator with ResQNow already installed. It never uninstalls/clears A or ADB-installs B. Keep publication disabled while any release-quality, audit, hosted-runtime, certificate-continuity or first-release gate is outstanding.
+
 - Frontend: `npm run typecheck`, `npm run test:scripts`, `npm test`, `npm run release:check` in a secret-free snapshot.
 - Real API/browser integration: `node node_modules/@playwright/test/cli.js test --config=playwright.updates.config.ts`. Native/auth boundaries are test-only simulations; the backend release router and React controls are real.
 - Android: JDK21/SDK36; `android/gradlew.bat -p android :app:testDebugUnitTest :app:compileDebugAndroidTestJavaWithJavac :app:assembleDebug --no-daemon`.
@@ -35,6 +39,8 @@ The release verifier independently runs Android badging and signature tools, rej
 ## Owner-controlled GitHub setup (not performed by this implementation)
 
 After independent review and an explicitly approved push, deploy the backend main changes before activating the frontend workflow. The real-router browser gate checks out the public backend main; it intentionally fails if that backend feature has not been pushed. Backend update/delivery flags can remain false during these checks.
+
+Before a verification push, the owner must confirm `ANDROID_AUTO_RELEASE_ENABLED` is absent or `false`; an unknown status is not confirmation. Do not enable publication just to run emulator checks: dispatch `verify` with `run_android_acceptance=true` instead.
 
 The existing `Verify frontend` workflow retains one complete frontend gate and adds native compile/unit checks. Optional hosted emulators cover API24/26/36. All verification jobs have read-only permissions, synthetic provider configuration and no signing secrets. Only the trusted main release job has contents-write permissions. Release jobs are serialized and reruns cannot reuse a code.
 

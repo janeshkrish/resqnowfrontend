@@ -1,5 +1,8 @@
 node_modules/
 /android/app/src/debug/google-services.json
+/android/app/src/updaterAcceptance/assets/
+/android/app/src/updaterAcceptance/google-services.json
+/android/app/src/androidTestUpdaterAcceptance/assets/
 dist/
 dev-dist/
 

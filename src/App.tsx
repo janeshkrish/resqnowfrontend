@@ -38,6 +38,7 @@ const routeFallback = (
 );
 
 const Login = lazyWithReload(() => import("./pages/Login"));
+const PasswordRecovery = lazyWithReload(() => import('./pages/PasswordRecovery'));
 const Register = lazyWithReload(() => import("./pages/Register"));
 const OTPVerify = lazyWithReload(() => import("./pages/OTPVerify"));
 const ConfirmEmail = lazyWithReload(() => import("./pages/ConfirmEmail"));
@@ -224,6 +225,12 @@ const App = () => {
                             <Routes>
                             {/* Auth routes */}
                             <Route path="/login" element={<Login />} />
+                            <Route path='/forgot-password' element={<PasswordRecovery role='user' mode='request' />} />
+                            <Route path='/reset-password' element={<PasswordRecovery role='user' mode='reset' />} />
+                            <Route path='/verify-recovery-email' element={<PasswordRecovery role='user' mode='verify' />} />
+                            <Route path='/technician/forgot-password' element={<PasswordRecovery role='technician' mode='request' />} />
+                            <Route path='/technician/reset-password' element={<PasswordRecovery role='technician' mode='reset' />} />
+                            <Route path='/technician/verify-recovery-email' element={<PasswordRecovery role='technician' mode='verify' />} />
                             <Route path="/register" element={<Register />} />
                             <Route path="/otp-verify" element={<OTPVerify />} />
                             <Route path="/confirm-email" element={<ConfirmEmail />} />

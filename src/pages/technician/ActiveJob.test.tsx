@@ -150,6 +150,20 @@ describe("technician active-job navigation", () => {
     expect(screen.getByText("You earn").nextSibling).toHaveTextContent("₹500");
   });
 
+  it('offers assigned-technician acknowledgement for the exact server cash amount after work', async () => {
+    activeJobState.value = { ...activeJobState.value, status: 'payment_pending', payment_status: 'pending', payment_method: 'cash',
+      cash_payment_intent: JSON.stringify({ intentId: 'intent-42', technicianId: 'tech-1', amountPaise: 55000, currency: 'INR' }) };
+    vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, request: { payment_status: 'paid' } }) } as Response);
+    render(<MemoryRouter initialEntries={['/technician/active-job/request-42']}><Routes><Route path='/technician/active-job/:requestId' element={<ActiveJob />} /></Routes></MemoryRouter>);
+    expect(screen.queryByText('Waiting for customer payment...')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button',{ name: 'I received INR 550.00 cash' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/payments/cash/confirm'),expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      body: JSON.stringify({ requestId: 'request-42', intentId: 'intent-42', amountPaise: 55000, currency: 'INR', received: true }),
+    })));
+    await waitFor(() => expect(refreshActiveJob).toHaveBeenCalled());
+  });
+
   it("uses the promised earnings when celebrating completion", async () => {
     activeJobState.value = { ...activeJobState.value, status: "completed", amount: 1260, technicianEstimatedEarning: 1200 };
     render(<MemoryRouter initialEntries={["/technician/active-job/request-42"]}><Routes><Route path="/technician/active-job/:requestId" element={<ActiveJob />} /></Routes></MemoryRouter>);

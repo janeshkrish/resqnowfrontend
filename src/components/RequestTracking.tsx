@@ -624,7 +624,9 @@ const RequestTracking = () => {
       const body = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        toast.success("Cash payment recorded");
+        if (body.pendingReceipt) toast.info("Cash selected. Your technician must confirm receipt.");
+        else if (body.alreadyPaid) toast.success("Cash payment already confirmed");
+        else { toast.error("Cash receipt is still pending. Refresh the request."); return; }
         setShowPayment(false);
         setShowPaymentSummary(false);
         refresh();
@@ -1050,7 +1052,9 @@ const RequestTracking = () => {
           total: money(billTotal),
           note: [
             requestExtras?.price_locked ? "Price locked." : null,
-            phase === "pay" ? "Pay online or in cash." : "You pay after the work is done.",
+            phase === "pay" && request?.payment_method === 'cash' && request?.cash_payment_intent
+              ? "Waiting for the technician to confirm cash receipt."
+              : phase === "pay" ? "Pay online or in cash." : "You pay after the work is done.",
           ]
             .filter(Boolean)
             .join(" "),

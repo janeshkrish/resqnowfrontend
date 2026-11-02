@@ -1,27 +1,19 @@
-import React, { useMemo, useState } from "react";
+import { loadRazorpay } from '@/lib/razorpayLoader';
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getUserToken } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { Check, X, Shield, Star, Rocket } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SubscriptionPlanConfig, usePricingConfig } from "@/hooks/usePricingConfig";
-
-type KnownSubscription = "free" | "basic" | "premium" | "enterprise" | "none";
 
 const planIcons = {
   free: Shield,
   basic: Star,
   premium: Rocket,
 } as const;
-
-const toKnownSubscription = (id: string): KnownSubscription => {
-  if (id === "free" || id === "basic" || id === "premium" || id === "enterprise" || id === "none") {
-    return id;
-  }
-  return "basic";
-};
 
 const getPlanTone = (plan: SubscriptionPlanConfig) => {
   const key = (plan.color || "").toLowerCase();
@@ -52,13 +44,17 @@ const getPlanTone = (plan: SubscriptionPlanConfig) => {
 const formatPrice = (currency: string, amount: number) => `${currency} ${Math.round(amount)}`;
 
 const Subscription = () => {
-  const { user, updateSubscription } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const navigate = useNavigate();
   const { data: pricingConfig } = usePricingConfig();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(
     user?.subscription && user.subscription !== "none" ? user.subscription : "basic"
   );
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    setSelectedPlan(user?.subscription && user.subscription !== "none" ? user.subscription : "basic");
+  }, [user?.id, user?.subscription]);
 
   const subscriptionPlans = useMemo(
     () => (pricingConfig?.subscription_plans || []).filter((plan) => plan.active !== false),
@@ -70,29 +66,23 @@ const Subscription = () => {
     const amount = Number(plan.amount || 0);
 
     if (amount <= 0 || planId === "free") {
-      setIsProcessing(true);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      await updateSubscription("free");
-      toast.success("Switched to PAY-AS-YOU-GO plan.");
-      setIsProcessing(false);
-      navigate("/");
       return;
     }
+
+    const checkoutToken = getUserToken();
+    if (!checkoutToken) { toast.error("Sign in before purchasing a plan."); return; }
 
     setIsProcessing(true);
 
-    if (!(window as any).Razorpay) {
-      toast.error("Payment gateway not loaded. Please try again.");
-      setIsProcessing(false);
-      return;
-    }
-
     try {
+      await loadRazorpay();
       const orderRes = await apiFetch("/api/payments/create-subscription-order", {
         method: "POST",
         body: JSON.stringify({ planId }),
       });
       const orderData = await orderRes.json();
+
+      if (getUserToken() !== checkoutToken) { setIsProcessing(false); return; }
 
       if (!orderRes.ok || !orderData.success) {
         throw new Error(orderData.error || "Failed to create order");
@@ -107,6 +97,7 @@ const Subscription = () => {
         order_id: orderData.order_id,
         handler: async (response: any) => {
           try {
+            if (getUserToken() !== checkoutToken) return;
             const verifyRes = await apiFetch("/api/payments/verify-subscription-payment", {
               method: "POST",
               cache: "no-store",
@@ -119,14 +110,21 @@ const Subscription = () => {
             });
             const verifyData = await verifyRes.json();
 
+            if (getUserToken() !== checkoutToken) return;
+
             if (!verifyRes.ok || !verifyData.success) {
               toast.error("Payment verification failed. Please contact support.");
               return;
             }
 
-            await updateSubscription(toKnownSubscription(planId));
-            toast.success("Subscription activated successfully!");
-            navigate("/");
+            try {
+              const currentProfile = await refreshUser();
+              if (!currentProfile || getUserToken() !== checkoutToken) return;
+              toast.success("Subscription confirmed. Your current plan is up to date.");
+              navigate("/");
+            } catch {
+              toast.info("Payment verified. Unable to refresh your plan yet. Refresh this page to check it; you do not need to pay again.");
+            }
           } catch (verifyErr) {
             console.error("Verification error:", verifyErr);
             toast.error("Failed to verify payment.");
@@ -169,8 +167,8 @@ const Subscription = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
         {subscriptionPlans.map((plan) => {
           const isUserPlan =
-            user?.subscription === plan.id ||
-            (plan.id === "free" && (!user?.subscription || user.subscription === "none"));
+            !!user && (user.subscription === plan.id ||
+            (plan.id === "free" && (!user.subscription || user.subscription === "none")));
           const isSelected = selectedPlan === plan.id;
           const PlanIcon = planIcons[plan.id as keyof typeof planIcons] || Shield;
           const tone = getPlanTone(plan);
@@ -269,7 +267,7 @@ const Subscription = () => {
                     e.stopPropagation();
                     handleSubscribe(plan);
                   }}
-                  disabled={isProcessing || isUserPlan}
+                  disabled={loading || !user || isProcessing || isUserPlan || Number(plan.amount || 0) <= 0 || plan.id === "free"}
                   className={`w-full py-6 text-lg font-semibold shadow-md transition-all ${tone.button}`}
                 >
                   {isProcessing && selectedPlan === plan.id
@@ -277,7 +275,7 @@ const Subscription = () => {
                     : isUserPlan
                       ? "Active Plan"
                       : Number(plan.amount || 0) === 0
-                        ? "Switch to Free"
+                        ? "Included by default"
                         : `Subscribe to ${plan.name}`}
                 </Button>
               </div>

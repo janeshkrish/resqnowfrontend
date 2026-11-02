@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
+import RecoveryEmailSettings from '@/components/RecoveryEmailSettings';
 import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
@@ -372,6 +373,7 @@ const SettingsPage = () => {
     const viaSupport = (title: string) => setSupport({ title, sub: "This isn’t in the app yet. Our support team will do it for you." });
     body = (
       <Inner title="Privacy and security" sub="Your password and your data." onBack={back}>
+        <RecoveryEmailSettings role='user' accountId={String(user?.id || '')} />
         <div className="rq-ac-group rq-ac-first">
           <div className="rq-ac-row is-plain">
             <MaterialSymbol name="mail" />
@@ -381,9 +383,9 @@ const SettingsPage = () => {
         </div>
         <div className="rq-ac-group rq-ac-next">
           {user?.googleId ? null : (
-            <button type="button" className="rq-ac-row" onClick={() => viaSupport("Change password")}>
-              <MaterialSymbol name="key" /><span className="rq-ac-row-text"><b>Change password</b></span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />
-            </button>
+            <Link to='/forgot-password' className="rq-ac-row">
+              <MaterialSymbol name="key" /><span className="rq-ac-row-text"><b>Reset password by email</b></span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />
+            </Link>
           )}
           <Link to="/privacy-policy" className="rq-ac-row">
             <MaterialSymbol name="policy" /><span className="rq-ac-row-text"><b>How we use your data</b><span>Privacy policy</span></span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />

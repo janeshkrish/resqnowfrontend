@@ -735,7 +735,7 @@ const buildMockTowingEstimate = (body: AnyRecord) => {
     };
   };
 
-const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
+const mockApi = (url: URL, method: string, body: AnyRecord, requestHeaders = new Headers()): Response => {
   const path = url.pathname;
   const q = url.searchParams;
 
@@ -1638,8 +1638,31 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
   if (requestStatusMatch && method === "PATCH") {
     const req = requestById(requestStatusMatch[1]);
     if (!req) return json({ error: "Not found" }, 404);
-    const status = String(body.status || req.status);
-    const next = { ...req, status, payment_status: status === "paid" || status === "completed" ? "completed" : req.payment_status };
+    const requested = String(body.status || req.status).trim().toLowerCase();
+    const technicianUpdate = requestStatusMatch[2] === 'technician-status';
+    const status = technicianUpdate && requested === 'completed'
+      ? (req.isTowing ? 'service_completed' : 'awaiting_payment')
+      : technicianUpdate && req.isTowing && ['paid', 'job-closed', 'job_closed'].includes(requested) ? 'closed' : requested;
+    if (technicianUpdate) {
+      if (!req.isTowing && ['paid', 'closed'].includes(status)) {
+        return json({ error: 'Use online verification or cash receipt confirmation to confirm payment.' }, 409);
+      }
+      if (status === 'closed') {
+        const paid = ['paid', 'completed'].includes(String(req.payment_status || '').trim().toLowerCase());
+        const receipt = req.cash_payment_receipt && typeof req.cash_payment_receipt === 'object'
+          ? req.cash_payment_receipt as AnyRecord : null;
+        const online = req.demo_payment_confirmation && typeof req.demo_payment_confirmation === 'object'
+          ? req.demo_payment_confirmation as AnyRecord : null;
+        const hasReceipt = req.payment_method === 'cash' && receipt?.technicianId === String(req.technician_id) && !!receipt?.receivedAt;
+        const hasOnline = req.payment_method === 'razorpay' && online?.requestId === req.id &&
+          online?.userId === req.user_id && online?.technicianId === req.technician_id;
+        if (!paid || (!hasReceipt && !hasOnline) || !['payment_pending', 'awaiting_payment', 'closed'].includes(req.status)) {
+          return json({ error: 'A confirmed payment is required before closing this job.' }, 409);
+        }
+      }
+    }
+    const next = { ...req, status, payment_status: technicianUpdate ? req.payment_status
+      : status === "paid" || status === "completed" ? "completed" : req.payment_status };
     upsertRequest(next);
     return json({ success: true, request: withTechnician(next) });
   }
@@ -1738,33 +1761,57 @@ const mockApi = (url: URL, method: string, body: AnyRecord): Response => {
     });
   }
   if (path === "/api/payments/create-subscription-order" && method === "POST") return json({ id: `order_${Date.now()}`, order_id: `order_${Date.now()}`, amount: 9900, currency: "INR", key_id: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_demo", success: true, total_amount: 99 });
-  if (path === "/api/payments/verify-subscription-payment" && method === "POST") return json({ success: true });
+  if (path === "/api/payments/verify-subscription-payment" && method === "POST") {
+    const plan = MOCK_PRICING_CONFIG.subscription_plans.find(item => item.id === body.planId && item.active !== false);
+    if (!plan) return json({ error: 'Unknown subscription plan' }, 400);
+    ensureUserProfile({ subscription: plan.id });
+    return json({ success: true });
+  }
   if (path === "/api/payments/confirm" && method === "POST") {
     const req = requestById(String(body.requestId || ""));
-    if (req) upsertRequest({ ...req, status: "paid", payment_status: "completed", payment_method: "razorpay", is_settled: true });
-    return json({ success: true, request: req ? withTechnician({ ...req, status: "paid", payment_status: "completed" }) : undefined });
+    const next = req ? { ...req, status: req.isTowing ? 'payment_pending' : 'completed', payment_status: 'completed',
+      payment_method: 'razorpay', is_settled: true, demo_payment_confirmation: {
+        requestId: req.id, userId: req.user_id, technicianId: req.technician_id, receivedAt: nowIso(),
+      } } : null;
+    if (next) upsertRequest(next);
+    return json({ success: true, request: next ? withTechnician(next) : undefined });
   }
+  const cashPayable = (request: AnyRecord) => (request.isTowing
+    ? ['service_completed', 'payment_pending', 'awaiting_payment'] : ['awaiting_payment', 'payment_pending']).includes(request.status);
   if (path === "/api/payments/cash" && method === "POST") {
     const request = requestById(String(body.requestId || ""));
     if (!request) return json({ error: "Request not found" }, 404);
-    if (isRequestPaid(request)) return json({ success: true, alreadyPaid: true });
-
+    if (!getUserToken() || String(request.user_id) !== String(ensureUserProfile().id)) return json({ error: 'Forbidden' },403);
+    if (isRequestPaid(request)) return request.payment_method === 'cash'
+      ? json({ success: true, alreadyPaid: true, request }) : json({ error: 'Already settled online' },409);
+    if (!cashPayable(request)) return json({ error: 'Cash is available after service completion', code: 'CASH_STAGE_NOT_PAYABLE' },409);
     const quote = buildMockPaymentQuote(request, body.couponCode, { preserveExistingApplied: false, paymentMode: "cash" });
-    if (String(body.couponCode || "").trim() && !quote.coupon.is_applied) {
-      return json({ error: quote.coupon.reason || "Coupon could not be applied.", coupon: quote.coupon }, 400);
-    }
-
-    upsertRequest({
-      ...request,
-      status: "paid",
-      payment_status: "completed",
-      payment_method: "cash",
-      is_settled: false,
-      applied_coupon_code: quote.coupon.applied_coupon_code,
-      applied_discount_percent: quote.coupon.is_applied ? quote.coupon.discount_percent : 0,
-      applied_discount_amount: quote.breakdown.discount_amount,
-    });
-    return json({ success: true });
+    if (String(body.couponCode || "").trim() && !quote.coupon.is_applied) return json({ error: quote.coupon.reason, coupon: quote.coupon },400);
+    const intent = { intentId: crypto.randomUUID(), technicianId: String(request.technician_id),
+      amountPaise: Math.round(quote.breakdown.total_amount * 100), currency: quote.breakdown.currency };
+    const next = { ...request, payment_method: 'cash', cash_payment_intent: intent,
+      applied_coupon_code: quote.coupon.applied_coupon_code, applied_discount_percent: quote.coupon.is_applied ? quote.coupon.discount_percent : 0,
+      applied_discount_amount: quote.breakdown.discount_amount };
+    upsertRequest(next);
+    return json({ success: true, pendingReceipt: true, cash_intent: intent, request: withTechnician(next) });
+  }
+  if (path === '/api/payments/cash/confirm' && method === 'POST') {
+    const technician = readStore<AnyRecord | null>('resqnow_technician',null);
+    const techToken = getTechnicianToken();
+    if (!techToken || requestHeaders.get('Authorization') !== `Bearer ${techToken}`) return json({ error: 'Forbidden' },403);
+    const request = requestById(String(body.requestId || ''));
+    if (!request || String(request.technician_id) !== String(technician?.id)) return json({ error: 'Request not assigned to you' },404);
+    const rawIntent = request.cash_payment_intent;
+    const intent = rawIntent && typeof rawIntent === 'object' ? rawIntent as AnyRecord : null;
+    if (body.received !== true) return json({ error: 'Confirm receipt of the full cash amount' },400);
+    if (!intent || typeof intent.intentId !== 'string' || !Number.isSafeInteger(intent.amountPaise) || intent.amountPaise <= 0 ||
+        !/^[A-Z]{3}$/.test(intent.currency) || intent.technicianId !== String(technician?.id) || body.intentId !== intent.intentId ||
+        body.amountPaise !== intent.amountPaise || body.currency !== intent.currency || request.payment_method !== 'cash') return json({ error: 'Cash details changed' },409);
+    if (isRequestPaid(request)) return json({ success: true, alreadyPaid: true, request: withTechnician(request) });
+    if (!cashPayable(request)) return json({ error: 'Service is not finished' },409);
+    const next = { ...request, status: request.isTowing ? request.status : 'completed', payment_status: 'paid', is_settled: false,
+      cash_payment_receipt: { ...intent, receivedAt: nowIso() } };
+    upsertRequest(next); return json({ success: true, request: withTechnician(next) });
   }
   if (path === "/api/payments/diagnostics/overview" && method === "GET") return json({ records: getRequests().map((item, idx) => ({ payment_id: idx + 1, service_request_id: item.id, payment_method: "online", payment_row_status: "captured", payment_total_amount: Number(item.amount || 0), platform_fee: 0, technician_amount: Number(item.amount || 0), is_settled: 1, payment_created_at: item.updated_at || item.created_at, request_status: item.status, request_payment_status: item.payment_status, customer_name: "Demo User", customer_email: "demo@resqnow.app", technician_name: withTechnician(item).technician?.name || "Rapid Auto Care", checks: { request_paid_consistent: true, payment_method_consistent: true } })), stats: { total_payments: getRequests().length, completed_payments: getRequests().length, cash_payments: 0, online_payments: getRequests().length } });
   if (/^\/api\/payments\/diagnostics\/request\/.+$/.test(path) && method === "GET") return json({ request: { id: path.split("/").pop(), status: "paid", payment_status: "completed" }, payments: [{ id: "pay_demo", amount: 699 }], invoices: [{ id: "inv_demo", total: 699 }], checks: { request_paid_consistent: true, payment_method_consistent: true } });
@@ -1865,7 +1912,7 @@ const installMockFetch = () => {
     }
     const method = (init?.method || (input instanceof Request ? input.method : "GET") || "GET").toUpperCase();
     const body = await parseBody(input, init);
-    return mockApi(url, method, body);
+    return mockApi(url, method, body, new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)));
   };
   fetchPatched = true;
 };

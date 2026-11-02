@@ -1,3 +1,4 @@
+import { loadRazorpay } from '@/lib/razorpayLoader';
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { TechnicianJobModal, JobRequest } from "@/components/technician/TechnicianJobModal";
@@ -1425,10 +1426,7 @@ const TechnicianDashboard = () => {
 
       const orderData = await orderRes.json();
 
-      if (!(window as any).Razorpay) {
-        toast.error("Payment gateway not loaded", { description: "Please check your internet connection." });
-        return;
-      }
+      await loadRazorpay();
 
       const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
       if (!keyId) {

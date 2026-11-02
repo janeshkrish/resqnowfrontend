@@ -1,3 +1,4 @@
+import { loadRazorpay } from '@/lib/razorpayLoader';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bike, Car, Loader2, Truck } from 'lucide-react';
@@ -7,6 +8,8 @@ import { useTechnicianJob } from '@/contexts/TechnicianJobContext';
 import { toast } from 'sonner';
 import ActiveJobMap, { type ActiveJobRouteState } from '@/components/technician/ActiveJobMap';
 import TechnicianJobCompletion from '@/components/technician/TechnicianJobCompletion';
+import CashReceiptConfirmation from '@/components/technician/CashReceiptConfirmation';
+import { readCashReceiptIntent } from '@/lib/cashReceipt';
 import CancelledJobCard, { CancelledJobDetails } from '@/components/technician/CancelledJobCard';
 import { apiUrl } from '@/lib/api';
 import { logLiveTrackingDiagnostic } from '@/lib/liveTrackingDiagnostics';
@@ -405,6 +408,7 @@ const ActiveJob = () => {
   // 2. Pay Dues Handler
   const handlePayDues = async () => {
     try {
+      await loadRazorpay();
       const orderRes = await fetch(apiUrl('/api/technicians/me/pay-dues/order'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
@@ -931,6 +935,7 @@ const ActiveJob = () => {
   const bookedEstimatedDuration = toOptionalNumber(job.estimatedDuration ?? job.estimated_duration);
   const jobAddress = toOptionalString(job.address ?? job.location?.address ?? stateJob?.address) || 'Location not available';
   const isTowingActiveJob = Boolean(job.isTowing);
+  const hasCashReceiptPending = Boolean(readCashReceiptIntent(job));
   const towingAction = isTowingActiveJob ? getTowingAction(status, job.payment_status ?? job.paymentStatus) : null;
   const TowingActionIcon = towingAction?.icon;
   const isWaitingForTowingPayment =
@@ -1258,12 +1263,16 @@ const ActiveJob = () => {
               </button>
             )}
 
-            {isTowingActiveJob && status === 'payment_pending' && !isPaidPaymentStatus(job.payment_status ?? job.paymentStatus) && (
+            {isTowingActiveJob && status === 'payment_pending' && !hasCashReceiptPending && !isPaidPaymentStatus(job.payment_status ?? job.paymentStatus) && (
               <div className="tj-wait" role="status">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Waiting for customer payment...
               </div>
             )}
+
+            <CashReceiptConfirmation job={job} token={token} technicianId={technician?.id}
+              onConfirmed={async () => { await refreshActiveJob(); await refreshDues(); }}
+              onStale={() => refreshActiveJob()} />
 
             {!isTowingActiveJob && status === 'accepted' && !pendingAcceptanceId && (
               <button
@@ -1291,7 +1300,7 @@ const ActiveJob = () => {
               </button>
             )}
 
-            {!isTowingActiveJob && status === 'payment_pending' && (
+            {!isTowingActiveJob && status === 'payment_pending' && !hasCashReceiptPending && (
               <div className="tj-wait" role="status">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Waiting for customer payment...

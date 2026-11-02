@@ -197,6 +197,19 @@ describe("RequestTracking live metrics", () => {
     expect(paymentHarness.summaryProps.isProcessing).toBe(false);
   });
 
+  it('tells the customer cash is awaiting technician receipt instead of claiming payment completed', async () => {
+    trackingHarness.request = { ...trackingHarness.request, status: 'payment_pending', amount: 1200, pricing_status: 'confirmed', pricing_finalized: true };
+    paymentHarness.apiFetch.mockImplementation(async (path: string) => new Response(JSON.stringify(
+      path === '/api/payments/cash' ? { success: true, pendingReceipt: true, cash_intent: { intentId: 'intent-1', amountPaise: 132000, currency: 'INR' } } : { error: 'No quote fixture' }),{ status: path === '/api/payments/cash' ? 200 : 400 }));
+    await renderTracking();
+    fireEvent.click(screen.getByRole('button',{ name: /pay cash to test/i }));
+    await waitFor(() => expect(paymentHarness.summaryProps?.isOpen).toBe(true));
+    await act(async () => { await paymentHarness.summaryProps.onConfirm(); });
+    expect(paymentHarness.info).toHaveBeenCalledWith('Cash selected. Your technician must confirm receipt.');
+    expect(paymentHarness.success).not.toHaveBeenCalledWith('Cash payment recorded');
+    expect(trackingHarness.refresh).toHaveBeenCalled();
+  });
+
   describe("while a technician is being found", () => {
     const search = (overrides: Record<string, unknown> = {}) => {
       trackingHarness.technician = null as unknown as Record<string, unknown>;

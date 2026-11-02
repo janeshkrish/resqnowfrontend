@@ -20,7 +20,7 @@ export default defineConfig(({ mode, command }) => {
     : /$a/;
   const paymentNoCacheRuntimePattern = escapedApiBaseUrl
     ? new RegExp(
-      `^${escapedApiBaseUrl}/api/(payments/(confirm|verify|confirm-status|verify-subscription-payment|verify-service-payment|verify-registration-payment)|technicians/me/(verify-dues|pay-dues/verify))(?:$|[/?].*)`,
+      `^${escapedApiBaseUrl}/api/(password-recovery(?:/[^?#]*)?|auth/me|payments/(confirm|verify|confirm-status|verify-subscription-payment|verify-service-payment|verify-registration-payment)|technicians/me/(verify-dues|pay-dues/verify))(?:$|[/?].*)`,
       "i"
     )
     : /$a/;

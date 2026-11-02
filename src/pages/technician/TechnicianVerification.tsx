@@ -1,6 +1,7 @@
 import { Link, Navigate } from "react-router-dom";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
+import RecoveryEmailSettings from '@/components/RecoveryEmailSettings';
 import { TechPage } from "@/components/technician/app/TechUi";
 import { useTechnicianAuth } from "@/contexts/TechnicianAuthContext";
 import { TECH_SUPPORT_PHONE } from "@/lib/technicianApp";
@@ -77,6 +78,7 @@ const TechnicianVerification = () => {
       <h1 className="tp-h1 tp-pj">{t("verify.title")}</h1>
       <p className="tp-sub">{[technician?.name, technician?.email].filter(Boolean).join(" · ")}</p>
       {renderStatusContent()}
+      <RecoveryEmailSettings role='technician' accountId={String(technician?.id || '')} />
       <a className="tp-big is-plain is-help tp-press" href={`tel:${TECH_SUPPORT_PHONE}`} style={{ marginTop: 16 }}>
         <MaterialSymbol name="call" />
         {t("common.callHelp")}

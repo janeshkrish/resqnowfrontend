@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { loadRazorpay } from '@/lib/razorpayLoader';
 import { toast } from "sonner";
 import { isServicePaymentFinalized } from "@/utils/serviceRequestPayment";
 
@@ -18,6 +19,7 @@ export const useServicePayment = () => {
   const processPayment = async (options: ProcessPaymentOptions) => {
     setIsProcessing(true);
     try {
+      await loadRazorpay();
       const orderRes = await apiFetch("/api/payments/create-order", {
         method: "POST",
         body: JSON.stringify({

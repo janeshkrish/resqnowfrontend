@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import MaterialSymbol from "@/components/home/MaterialSymbol";
+import RecoveryEmailSettings from '@/components/RecoveryEmailSettings';
 import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { TechBack, TechLanguageSheet, TechPage, TechSwitch } from "@/components/technician/app/TechUi";
@@ -499,7 +500,8 @@ const TechnicianProfile = () => {
                     <div data-testid="technician-security">
                         {backToMe}
                         <h1 className="tp-h1 tp-pj">{t("security.title")}</h1>
-                        <button type="button" className="tp-big is-plain tp-press" style={{ marginTop: 16 }}>
+                        <RecoveryEmailSettings role='technician' accountId={String(technician?.id || '')} />
+                        <button type="button" className="tp-big is-plain tp-press" style={{ marginTop: 16 }} onClick={()=>navigate('/technician/forgot-password')}>
                             <MaterialSymbol name="lock_reset" />
                             {t("security.password")}
                         </button>

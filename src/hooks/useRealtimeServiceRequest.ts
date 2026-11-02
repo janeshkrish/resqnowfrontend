@@ -58,6 +58,7 @@ interface RequestData {
   amount?: number | string | null;
   service_charge?: number | string | null;
   payment_method?: string | null;
+  cash_payment_intent?: string | Record<string, any> | null;
   paymentMode?: "cash" | "upi" | null;
   payment_mode?: "cash" | "upi" | null;
   baseAmount?: number | string | null;

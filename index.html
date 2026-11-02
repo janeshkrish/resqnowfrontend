@@ -2,9 +2,11 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <meta name="referrer" content="no-referrer" />
     <!-- Zoho Marketing Automation / PageSense: asynchronous visitor tracking -->
     <script type="text/javascript">
       (function (w, s) {
+        if (/^\/(?:technician\/)?(?:forgot-password|reset-password|verify-recovery-email)\/?$/.test(w.location.pathname)) return;
         var e = document.createElement("script");
         e.type = "text/javascript";
         e.async = true;
@@ -34,8 +36,6 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- Razorpay Payment Gateway -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </head>
 
   <body>

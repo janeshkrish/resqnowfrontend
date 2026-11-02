@@ -165,7 +165,7 @@ export function PaymentSummaryDialog({
                 {isCash ? "Cash Payment Summary" : "Confirm Your Payment"}
               </DialogTitle>
               <p className="mt-1 text-xs font-medium text-white/80">
-                Review the final amount before proceeding.
+                {isCash ? 'Your technician confirms receipt after collecting this amount.' : 'Review the final amount before proceeding.'}
               </p>
             </div>
             <div className="rounded-xl bg-white/15 p-2">
@@ -338,7 +338,7 @@ export function PaymentSummaryDialog({
                   Processing
                 </>
               ) : isCash ? (
-                "Confirm Cash"
+                "Choose cash"
               ) : (
                 `Pay ${formatAmount(resolvedTotalAmount)}`
               )}

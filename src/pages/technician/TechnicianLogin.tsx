@@ -158,6 +158,7 @@ const TechnicianLogin = () => {
                     )}
                   />
 
+                  <Link to='/technician/forgot-password' className='block text-sm text-primary underline'>Forgot password?</Link>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
                       <span className="flex items-center justify-center">

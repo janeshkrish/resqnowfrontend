@@ -243,6 +243,7 @@ export const useTechnicianActiveJob = (technicianId?: string, autoRefreshMs = 15
     const handleStatusUpdate = (data: any) => {
       const requestId = String(data?.requestId || data?.id || "");
       if (!requestId) return;
+      if (data?.cashReceiptPending) void refreshActiveJob();
       setActiveJob((prev: any) => {
         if (!prev) return prev;
         const previousRequestId = String(prev.requestId || prev.id || "");

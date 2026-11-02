@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { apiUrl } from "@/lib/api";
+import { recordId, type RecordId } from "@/lib/recordId";
 import { addAdminTechnicianNote, getAdminTechnicianLoginActivity, sendAdminTechnicianLoginReminder } from "@/pages/adminExtended/api/adminExtendedApi";
 import { getTechnicianRecord } from "@/pages/adminExtended/api/adminMonitorApi";
 import { useAdminEvents } from "@/pages/adminExtended/monitor/adminLive";
@@ -33,7 +34,7 @@ const LANG_HOURS = (hours: { is_24x7?: boolean; opening_time?: string; closing_t
 
 export default function TechnicianPage() {
   const params = useParams();
-  const technicianId = Number(params.technicianId);
+  const technicianId = recordId(params.technicianId) ?? "";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useSearchParams();
@@ -43,7 +44,7 @@ export default function TechnicianPage() {
   const [deleting, setDeleting] = useState(false);
   const visibility = useVisibility();
 
-  const valid = Number.isInteger(technicianId) && technicianId > 0;
+  const valid = Boolean(technicianId);
   const record = useQuery({ queryKey: ["admin", "monitor", "tech", technicianId], queryFn: () => getTechnicianRecord(technicianId), enabled: valid, refetchInterval: 60_000 });
   const profile = useQuery({ queryKey: ["portal", "tech-profile", technicianId], queryFn: () => getTechnicianProfile(technicianId), enabled: valid });
   useAdminEvents(() => {
@@ -109,7 +110,7 @@ export default function TechnicianPage() {
   );
 }
 
-function ProfileTab({ technicianId, profile, onDelete }: { technicianId: number; profile: Profile; onDelete: () => void }) {
+function ProfileTab({ technicianId, profile, onDelete }: { technicianId: RecordId; profile: Profile; onDelete: () => void }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const visibility = useVisibility();
@@ -215,7 +216,7 @@ function ProfileTab({ technicianId, profile, onDelete }: { technicianId: number;
 const rowJson = (row: ServicePricingRow) => (typeof row.pricing_json === "string" ? json<Record<string, string | number>>(row.pricing_json, {}) : row.pricing_json || {});
 const isDistance = (key: string) => /distance|free_km/i.test(key);
 
-function PricingTab({ technicianId, profile }: { technicianId: number; profile: Profile | undefined }) {
+function PricingTab({ technicianId, profile }: { technicianId: RecordId; profile: Profile | undefined }) {
   const navigate = useNavigate();
   const rows = useQuery({ queryKey: ["portal", "tech-pricing", technicianId], queryFn: () => getTechnicianServicePricing(technicianId) });
   const template = useQuery({ queryKey: ["portal", "pricing-template"], queryFn: getPricingTemplate, staleTime: 10 * 60_000 });
@@ -223,7 +224,7 @@ function PricingTab({ technicianId, profile }: { technicianId: number; profile: 
   const groups = useMemo(() => groupPricing((rows.data || []) as ServicePricingRow[], template.data), [rows.data, template.data]);
   if (rows.isError) return <ErrorState error={rows.error} onRetry={() => void rows.refetch()} />;
   if (rows.isLoading || template.isLoading) return <Loading height={300} />;
-  const median = (serviceId: number, vehicle: string, subtype: string, field: string) =>
+  const median = (serviceId: RecordId, vehicle: string, subtype: string, field: string) =>
     medians.data?.find((item) => item.serviceId === serviceId && item.vehicleType === vehicle && item.subtype === subtype && item.field === field);
   const specialties = json<string[]>(profile?.specialties, []);
   return (
@@ -270,24 +271,26 @@ function PricingTab({ technicianId, profile }: { technicianId: number; profile: 
 
 function groupPricing(rows: ServicePricingRow[], template: PricingTemplate | undefined) {
   if (!template) return [];
-  const byService = new Map<number, { serviceId: number; domain: string; fields: { key: string; label: string }[]; vehicles: Map<string, { key: string; rows: { subtype: string; label: string; values: Record<string, string | number> }[] }> }>();
+  const byService = new Map<RecordId, { serviceId: RecordId; domain: string; fields: { key: string; label: string }[]; vehicles: Map<string, { key: string; rows: { subtype: string; label: string; values: Record<string, string | number> }[] }> }>();
   for (const row of rows) {
-    const svc = template.services.find((item) => Number(item.id) === Number(row.service_id));
+    const serviceId = recordId(row.service_id);
+    if (serviceId == null) continue;
+    const svc = template.services.find((item) => recordId(item.id) === serviceId);
     if (!svc) continue;
     const pricing = rowJson(row);
     if (!byService.has(svc.id)) {
-      const fields = template.pricingFields.filter((field) => Number(field.service_id) === Number(svc.id)).map((field) => ({ key: field.field_key, label: field.field_label }));
+      const fields = template.pricingFields.filter((field) => recordId(field.service_id) === serviceId).map((field) => ({ key: field.field_key, label: field.field_label }));
       byService.set(svc.id, { serviceId: svc.id, domain: String(pricing.service_domain || svc.service_slug || svc.service_name), fields, vehicles: new Map() });
     }
     const group = byService.get(svc.id)!;
-    const vehicleKey = String(pricing.vehicle_type || template.categories.find((item) => Number(item.id) === Number(row.vehicle_category_id))?.category_name || "").toLowerCase();
+    const vehicleKey = String(pricing.vehicle_type || template.categories.find((item) => recordId(item.id) === recordId(row.vehicle_category_id))?.category_name || "").toLowerCase();
     if (!group.vehicles.has(vehicleKey)) group.vehicles.set(vehicleKey, { key: vehicleKey, rows: [] });
     group.vehicles.get(vehicleKey)!.rows.push({ subtype: String(pricing.vehicle_subtype || ""), label: String(pricing.vehicle_subtype_label || pricing.vehicle_subtype || "Any"), values: pricing });
   }
   return [...byService.values()].map((group) => ({ ...group, vehicles: [...group.vehicles.values()] }));
 }
 
-function PayoutsTab({ technicianId }: { technicianId: number }) {
+function PayoutsTab({ technicianId }: { technicianId: RecordId }) {
   const payouts = useQuery({ queryKey: ["portal", "tech-payouts", technicianId], queryFn: () => getTechnicianPayouts(technicianId) });
   if (payouts.isError) return <ErrorState error={payouts.error} onRetry={() => void payouts.refetch()} />;
   if (!payouts.data) return <Loading height={300} />;
@@ -329,7 +332,7 @@ function PayoutsTab({ technicianId }: { technicianId: number }) {
   );
 }
 
-function ActivityTab({ technicianId, name }: { technicianId: number; name: string }) {
+function ActivityTab({ technicianId, name }: { technicianId: RecordId; name: string }) {
   const activity = useQuery({ queryKey: ["portal", "tech-activity", technicianId], queryFn: () => getAdminTechnicianLoginActivity(technicianId, { sessionLimit: 200, alertLimit: 30 }), refetchInterval: 60_000 });
   const [sending, setSending] = useState(false);
   if (activity.isError) return <ErrorState error={activity.error} onRetry={() => void activity.refetch()} />;

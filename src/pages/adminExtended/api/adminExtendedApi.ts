@@ -1,6 +1,7 @@
 import axios from "axios";
 import { apiFetch, apiUrl, readJsonSafely } from "@/lib/api";
 import { announceAdminSessionEnded } from "@/lib/adminSession";
+import type { RecordId } from "@/lib/recordId";
 
 export const adminApi = axios.create({
   baseURL: apiUrl("/api/admin"),
@@ -442,7 +443,7 @@ export async function getAdminTechnicians(params: {
 }
 
 export async function toggleAdminTechnicianVisibility(payload: {
-  technicianId: number;
+  technicianId: RecordId;
   isVisible?: boolean;
   note?: string;
 }) {
@@ -450,13 +451,13 @@ export async function toggleAdminTechnicianVisibility(payload: {
   return data;
 }
 
-export async function addAdminTechnicianNote(payload: { technicianId: number; note: string }) {
+export async function addAdminTechnicianNote(payload: { technicianId: RecordId; note: string }) {
   const { data } = await adminApi.post("/technician/note", payload);
   return data;
 }
 
 export async function sendAdminTechnicianLoginReminder(payload: {
-  technicianId: number;
+  technicianId: RecordId;
   message?: string;
 }) {
   const { data } = await adminApi.post("/technician/send-login-reminder", payload);
@@ -464,7 +465,7 @@ export async function sendAdminTechnicianLoginReminder(payload: {
 }
 
 export async function getAdminTechnicianLoginActivity(
-  technicianId: number,
+  technicianId: RecordId,
   params: { sessionLimit?: number; alertLimit?: number } = {}
 ) {
   const { data } = await adminApi.get<TechnicianLoginActivityResponse>(

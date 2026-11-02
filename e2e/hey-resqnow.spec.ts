@@ -4,6 +4,9 @@ import { badge, micCalls, micLive, microphone, openApp } from "./heyResQNowHelpe
 // Saying "Hey ResQNow" (the fake microphone plays "Hey rescue now" on a loop).
 test.use(microphone("hey-resqnow.wav"));
 test.describe.configure({ timeout: 120_000 });
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) console.log('Wake-word diagnostics:', await page.evaluate(() => (window as unknown as { __wakeDiagnostics?: unknown }).__wakeDiagnostics).catch(() => 'page unavailable'));
+});
 
 test("saying “Hey ResQNow” on the home screen opens Thozhan, which starts listening straight away", async ({ page }) => {
   const { errors, spotterFiles } = await openApp(page, "/", { heard: ["Ennoda bike puncture aayiduchu"] });

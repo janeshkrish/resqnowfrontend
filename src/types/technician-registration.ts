@@ -176,7 +176,7 @@ export const appReadinessSchema = z.object({
 // 11. Agreement
 export const agreementSchema = z.object({
   agreed_to_terms: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the terms and declarations" }),
+    error: "You must agree to the terms and declarations",
   }),
 });
 
@@ -194,7 +194,7 @@ export const technicianRegistrationSchema = basicInfoBase
   // Add placeholder for file objects which are handled separately or via state
   .extend({
     // We don't validate File objects here deepy, just layout
-    pricing: z.record(z.number()).optional(), // Backward comp fallback
+    pricing: z.record(z.string(), z.number()).optional(), // Backward comp fallback
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -202,6 +202,7 @@ export const technicianRegistrationSchema = basicInfoBase
   });
 
 export type RegisterFormValues = z.infer<typeof technicianRegistrationSchema>;
+export type RegisterFormInput = z.input<typeof technicianRegistrationSchema>;
 
 export const tamilNaduDistricts = [
   "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore",

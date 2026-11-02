@@ -173,7 +173,10 @@ export async function runReleaseChecks({run,env,cwd=process.cwd()}){
   await gate('unit',[path.join(cwd,'node_modules/vitest/vitest.mjs'),'run','--pool=threads','--maxWorkers=1','--reporter=default','--reporter=json','--outputFile',unitPath]);
   const unit=assertUnitReport(await readReport(unitPath,'Unit report'),unitFiles,cwd);
   const browserPath=path.join(reports,'browser.json');
-  await gate('browser',[path.join(cwd,'node_modules/@playwright/test/cli.js'),'test','--forbid-only','--trace=off','--retries=0','--workers=2','--reporter=line,json'],{PLAYWRIGHT_JSON_OUTPUT_FILE:browserPath});
+  // The real fake-microphone/WASM cases have wall-clock audio deadlines. Keep
+  // them on the configured single browser worker rather than competing Chrome
+  // instances; discovery, both viewports and zero-retry requirements are unchanged.
+  await gate('browser',[path.join(cwd,'node_modules/@playwright/test/cli.js'),'test','--forbid-only','--trace=off','--retries=0','--workers=1','--reporter=line,json'],{PLAYWRIGHT_JSON_OUTPUT_FILE:browserPath});
   const browser=assertBrowserReport(await readReport(browserPath,'Browser report'),browserFiles,cwd);
   // Production validates its public API origin. Building a static bundle does
   // not contact it; executable unit/browser tests keep their synthetic origin.

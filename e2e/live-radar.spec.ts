@@ -80,6 +80,9 @@ const sheet = (page: Page) => page.locator(".rqr-sheet");
 const card = (page: Page, name: string) => page.getByRole("article", { name });
 /** Where the sheet's handle rests once the spring has stopped moving. */
 async function restingHandle(page: Page) {
+  // Cards can be visible behind the opening splash. Wait for real input readiness
+  // before using manual pointer coordinates; trial does not activate the handle.
+  await page.getByRole("button", { name: "Resize the panel" }).click({ trial: true });
   const handle = page.locator(".rqr-drag");
   let last = -1;
   await expect.poll(async () => {

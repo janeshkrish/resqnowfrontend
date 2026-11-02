@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TechnicianAuthProvider } from "@/contexts/TechnicianAuthContext";
 import { AppAnalyticsBridge } from '@/components/AppAnalyticsBridge';
 import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
+import { AppUpdateProvider } from '@/components/AppUpdateProvider';
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { ThemeProvider } from "@/components/item-providers/ThemeProvider";
 import { SocketProvider } from "@/contexts/SocketContext";
@@ -216,6 +217,7 @@ const App = () => {
                   <AppAnalyticsConsent mode="prompt" />
                   <SocketProvider>
                     <TechnicianJobProvider>
+                      <AppUpdateProvider>
                       <FCMWrapper>
                         <TooltipProvider>
                           <Sonner />
@@ -298,6 +300,7 @@ const App = () => {
                           </Suspense>
                         </TooltipProvider>
                       </FCMWrapper>
+                      </AppUpdateProvider>
                     </TechnicianJobProvider>
                   </SocketProvider>
                 </TechnicianAuthProvider>

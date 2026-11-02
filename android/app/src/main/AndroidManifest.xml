@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Used only after the user chooses Update; Android still confirms installation. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -41,6 +43,7 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
+        <meta-data android:name="com.resqnow.app_updates_enabled" android:value="${resqnowAppUpdatesEnabled}" />
         <!-- Channel for pushes Android shows by itself: the quiet "Other updates", never the job ring. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
@@ -103,6 +106,14 @@
                 <data android:scheme="resqnow" android:host="auth" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name=".updates.UpdateFileProvider"
+            android:authorities="${applicationId}.appupdates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_file_paths" />
+        </provider>
 
         <provider
             android:name="androidx.core.content.FileProvider"

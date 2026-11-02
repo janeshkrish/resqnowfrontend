@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import MaterialSymbol from "@/components/home/MaterialSymbol";
 import RecoveryEmailSettings from '@/components/RecoveryEmailSettings';
 import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
+import { AppUpdatePanel } from '@/components/AppUpdatePanel';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVoiceEnabled } from "@/hooks/useVoiceEnabled";
@@ -488,7 +489,7 @@ const SettingsPage = () => {
 
   return (
     <div className="rq-pg rq-ac">
-      <div className="rq-pg-in">{body}</div>
+      <div className="rq-pg-in">{body}<AppUpdatePanel /></div>
 
       <Sheet open={Boolean(editing)} onClose={() => setEditing(null)} title={editing ? EDIT[editing].title : ""} sub={editing ? EDIT[editing].sub : undefined}>
         {editing === "gender" ? (

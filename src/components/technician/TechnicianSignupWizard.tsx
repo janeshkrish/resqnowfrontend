@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import LocationDetector, { type LocationState } from "./LocationDetector";
 import DynamicPricingStep, { type PricingTemplate } from "./DynamicPricingStep";
-import { technicianAuthService, technicianSchema, type TechnicianFormValues } from "@/services/technicianAuthService";
+import { technicianAuthService, technicianSchema, type TechnicianFormValues, type TechnicianFormInput } from "@/services/technicianAuthService";
 import { technicianAdminService } from "@/services/technicianAdminService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -127,7 +127,7 @@ function SignupPreviewDetail({ label, value }: { label: string; value?: React.Re
     return <div><dt>{label}</dt><dd>{value === "" || value == null ? "Not provided" : value}</dd></div>;
 }
 
-function TechnicianApplicationPreview({ data, template, onEdit }: { data: TechnicianFormValues; template: PricingTemplate | null; onEdit: (step: number) => void }) {
+function TechnicianApplicationPreview({ data, template, onEdit }: { data: TechnicianFormInput; template: PricingTemplate | null; onEdit: (step: number) => void }) {
     const vehicles = getSelectedSignupVehicleTypes(data.vehicle_types);
     const rows = template ? filterSignupPricing(data.pricing_config, template, data.specialties, vehicles) : [];
     const documentLabels = [{ key: "garage_front", label: "Shop Front" }, { key: "profile_photo", label: "Profile Photo" }, { key: "tools_photo", label: "Tools / Bay" }, { key: "facilities_photo", label: "Facilities" }] as const;
@@ -236,7 +236,7 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
     const [showTechnicianAgreementError, setShowTechnicianAgreementError] = useState(false);
     const navigate = useNavigate();
 
-    const form = useForm<TechnicianFormValues>({
+    const form = useForm<TechnicianFormInput, unknown, TechnicianFormValues>({
         resolver: zodResolver(technicianSchema),
         mode: "onChange",
         defaultValues: {
@@ -279,7 +279,7 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
 
     const handleNext = async () => {
         if (uploadingDocuments.length) { toast.error("Please wait for your photos to finish uploading."); return; }
-        let fields: FieldPath<TechnicianFormValues>[] = [];
+        let fields: FieldPath<TechnicianFormInput>[] = [];
         if (currentStep === 0) fields = ["proprietor_name", "name", "email", "password", "confirmPassword", "phone", "location", "experience", "serviceAreaRange"];
         if (currentStep === 1) fields = ["specialties", "vehicle_types", "towing_fleet_types"];
         if (currentStep === 2) fields = ["aadhaar_number", "documents"];
@@ -304,7 +304,8 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
             else {
                 const allValid = await trigger();
                 if (!allValid) { toast.error("Please check the required details in your application."); return; }
-                await onSubmit(form.getValues());
+                // Submit parsed resolver output, not the editable numeric text in getValues().
+                await form.handleSubmit(onSubmit)();
             }
         } else {
             console.log("Validation Errors:", errors);

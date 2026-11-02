@@ -82,6 +82,8 @@ type Options = {
 };
 
 async function signIn(page: Page, options: Options = {}) {
+  const baseURL = test.info().project.use.baseURL;
+  if (!baseURL) throw new Error("Technician session fixture requires the configured app origin");
   const errors: string[] = [];
   const calls: Call[] = [];
   const technician = { ...TECHNICIAN, technician_id: "RQT-0007", rating: 4.7, upi_id: "arun@upi", address: "14 Gandhipuram, Coimbatore", service_area_range: 10, experience: 6, ...options.technician };
@@ -94,7 +96,9 @@ async function signIn(page: Page, options: Options = {}) {
   let dues = options.pendingDues ?? 0;
   page.on("pageerror", (error) => errors.push(error.message));
   await page.addInitScript(
-    ({ me, permission, language }) => {
+    ({ me, permission, language, origin }) => {
+      // Init scripts also run in vendor/opaque frames. Seed only this app's main document.
+      if (window !== window.top || location.origin !== origin) return;
       // A signed-in technician: the test token only ever reaches the mocked API below.
       localStorage.setItem("resqnow_technician_token", "e2e-technician-token");
       localStorage.setItem("resqnow_technician", JSON.stringify(me));
@@ -107,7 +111,7 @@ async function signIn(page: Page, options: Options = {}) {
         return state;
       };
     },
-    { me: technician, permission: options.notification ?? "granted", language: options.language ?? null },
+    { me: technician, permission: options.notification ?? "granted", language: options.language ?? null, origin: new URL(baseURL).origin },
   );
   await page.route((url) => url.hostname === "api.e2e.test", async (route) => {
     const request = route.request();
@@ -175,6 +179,23 @@ const fitsWidth = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 
 test.describe("technician app", () => {
+  test("session setup leaves sandboxed embedded documents alone", async ({ page }) => {
+    await fakeSocketServer(page);
+    const { errors } = await signIn(page);
+    await page.goto("/technician/dashboard");
+    await expect(page.getByTestId("technician-home")).toBeVisible();
+    await page.evaluate(() => {
+      const frame = document.createElement("iframe");
+      frame.title = "Isolated embedded document";
+      frame.sandbox.add("allow-scripts");
+      frame.srcdoc = "<!doctype html><p>Embedded content without storage access</p>";
+      document.body.append(frame);
+    });
+    await expect(page.frameLocator('iframe[title="Isolated embedded document"]').getByText("Embedded content without storage access")).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("resqnow_technician_token"))).toBe("e2e-technician-token");
+    expect(errors).toEqual([]);
+  });
+
   test("home: duty, today's money and the places to go, with nothing of the old dashboard", async ({ page }) => {
     await fakeSocketServer(page);
     const { errors, calls } = await signIn(page);

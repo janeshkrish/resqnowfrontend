@@ -36,16 +36,24 @@ test("the list: right now, services, the 30-day numbers, dues, and the tabs", as
 test("hiding from new jobs, a log-in reminder and deleting, from the row", async ({ page }) => {
   const { w, errors } = await openPortal(page, "/admin/technicians");
   const table = page.getByTestId("technicians-table");
+  const openMenu = async () => {
+    const more = table.getByRole("button", { name: "More for Bala S" });
+    // The mobile table scrolls horizontally; its menu intentionally closes on
+    // scroll. Finish revealing the action before opening that menu.
+    await more.scrollIntoViewIfNeeded();
+    await expect(more).toBeInViewport({ ratio: 1 });
+    await more.click();
+  };
   await table.getByRole("switch", { name: "Murugan S shown to customers" }).click();
   await expect.poll(() => w.calls.find((call) => call.path === "/api/admin/technician/toggle")?.body).toMatchObject({ technicianId: 12, isVisible: false });
   await expect(table.getByRole("switch", { name: "Murugan S shown to customers" })).toHaveAttribute("aria-checked", "false");
   await expect(page).toHaveURL(/\/admin\/technicians$/);
 
-  await table.getByRole("button", { name: "More for Bala S" }).click();
+  await openMenu();
   await page.getByRole("menuitem", { name: "Send a log-in reminder" }).click();
   await expect.poll(() => w.calls.find((call) => call.path === "/api/admin/technician/send-login-reminder")?.body).toMatchObject({ technicianId: 21 });
 
-  await table.getByRole("button", { name: "More for Bala S" }).click();
+  await openMenu();
   await page.getByRole("menuitem", { name: "Delete technician" }).click();
   const dialog = page.getByTestId("delete-technician");
   await expect(dialog).toContainText("Owes ₹1,240 in cash dues");

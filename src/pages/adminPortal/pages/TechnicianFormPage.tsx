@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { PricingRow, PricingTemplate as SignupTemplate } from "@/components/technician/DynamicPricingStep";
 import { canonicalizeServiceKey, canonicalizeVehicleKey, normalizeSpecialtiesForApi, normalizeVehicleTypesForApi } from "@/config/technicianNormalization";
 import { apiFetch, apiUrl } from "@/lib/api";
+import { recordId, type RecordId } from "@/lib/recordId";
 import { searchLocations, type LocationSearchResult } from "@/lib/geo";
 import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
 import { technicianSchema } from "@/services/technicianAuthService";
@@ -13,7 +14,7 @@ import { buildTechnicianSignupPayload } from "@/utils/technicianSignupPayload";
 import { filterSignupPricing, getSelectedSignupVehicleTypes, getSignupPricingError, SIGNUP_EV_CONNECTORS, SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, signupCsvTokens, type SignupVehicle } from "@/utils/technicianSignupPricing";
 import { createTechnician, getPriceMedians, getPricingTemplate, getTechnicianProfile, getTechnicianServicePricing, updateTechnicianProfile } from "../api/portalApi";
 import { rupees } from "../format";
-import { Btn, Check, ErrorState, Icon, Loading, Note, Pill, Radio, usePortalHeader } from "../ui";
+import { Btn, Check, Empty, ErrorState, Icon, Loading, Note, Pill, Radio, usePortalHeader } from "../ui";
 
 // Add or edit a technician with the same steps, fields, checks and saved shape as the app's technician sign-up.
 
@@ -115,8 +116,8 @@ function fromProfile(profile: Record<string, unknown>, rows: unknown[]): FormSta
     app_readiness: { has_smartphone: Boolean(app.has_smartphone), preferred_language: text(app.preferred_language) || "English" },
     pricing_config: rows.map((raw) => {
       const row = raw as Record<string, unknown>;
-      return { service_id: Number(row.service_id), vehicle_category_id: Number(row.vehicle_category_id), vehicle_subcategory_id: num(row.vehicle_subcategory_id), pricing_json: json<Record<string, string | number>>(row.pricing_json, {}) };
-    }).filter((row) => row.pricing_json.vehicle_subtype),
+      return { service_id: recordId(row.service_id), vehicle_category_id: recordId(row.vehicle_category_id), vehicle_subcategory_id: recordId(row.vehicle_subcategory_id), pricing_json: json<Record<string, string | number>>(row.pricing_json, {}) };
+    }).filter((row) => row.service_id != null && row.vehicle_category_id != null && row.pricing_json.vehicle_subtype),
     payment_details: { modes: pay.modes && Object.keys(pay.modes).length ? pay.modes : { cash: true }, upi_id: text(pay.upi_id), bank_name: text(pay.bank_name), bank_account_number: text(pay.bank_account_number), ifsc_code: text(pay.ifsc_code) },
   };
 }
@@ -137,14 +138,14 @@ function problemsFor(form: FormState, fields: string[], editing: boolean) {
 export default function TechnicianFormPage({ mode }: { mode: "add" | "edit" }) {
   const editing = mode === "edit";
   const params = useParams();
-  const technicianId = Number(params.technicianId);
+  const technicianId = recordId(params.technicianId) ?? "";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   usePortalHeader(editing ? "Edit technician" : "Add technician", "The same form technicians fill in when they sign up in the app.");
   const template = useQuery({ queryKey: ["portal", "pricing-template"], queryFn: getPricingTemplate, staleTime: 10 * 60_000 });
   const medians = useQuery({ queryKey: ["portal", "price-medians"], queryFn: getPriceMedians, staleTime: 10 * 60_000 });
-  const profile = useQuery({ queryKey: ["portal", "tech-profile", technicianId], queryFn: () => getTechnicianProfile(technicianId), enabled: editing && technicianId > 0 });
-  const pricing = useQuery({ queryKey: ["portal", "tech-pricing", technicianId], queryFn: () => getTechnicianServicePricing(technicianId), enabled: editing && technicianId > 0 });
+  const profile = useQuery({ queryKey: ["portal", "tech-profile", technicianId], queryFn: () => getTechnicianProfile(technicianId), enabled: editing && Boolean(technicianId) });
+  const pricing = useQuery({ queryKey: ["portal", "tech-pricing", technicianId], queryFn: () => getTechnicianServicePricing(technicianId), enabled: editing && Boolean(technicianId) });
   const [form, setForm] = useState<FormState>(BLANK);
   const [loaded, setLoaded] = useState(!editing);
   const [step, setStep] = useState(0);
@@ -233,6 +234,7 @@ export default function TechnicianFormPage({ mode }: { mode: "add" | "edit" }) {
     }
   };
 
+  if (editing && !technicianId) return <Empty icon="error" title="That technician does not exist" />;
   if (editing && (profile.isError || pricing.isError)) return <ErrorState error={profile.error || pricing.error} onRetry={() => { void profile.refetch(); void pricing.refetch(); }} />;
   if (template.isError) return <ErrorState error={template.error} onRetry={() => void template.refetch()} />;
   if (!loaded || !tpl) return <Loading height={420} label="Loading the form" />;
@@ -519,14 +521,14 @@ function Operations({ form, set, err }: StepProps) {
   );
 }
 
-function Pricing({ form, set, template, medians, problem }: { form: FormState; set: StepProps["set"]; template: SignupTemplate; medians: { serviceId: number; vehicleType: string; subtype: string; field: string; median: number; technicians: number }[]; problem: string }) {
+function Pricing({ form, set, template, medians, problem }: { form: FormState; set: StepProps["set"]; template: SignupTemplate; medians: { serviceId: RecordId; vehicleType: string; subtype: string; field: string; median: number; technicians: number }[]; problem: string }) {
   const vehicles = getSelectedSignupVehicleTypes(form.vehicle_types) as Vehicle[];
   const [serviceKey, setServiceKey] = useState(form.specialties[0] || "");
   const [vehicleKey, setVehicleKey] = useState<Vehicle>(vehicles[0] || "car");
   const service = template.services.find((item) => canonicalizeServiceKey(item.service_slug || item.service_name) === serviceKey);
   const category = template.categories.find((item) => canonicalizeVehicleKey(item.category_name) === vehicleKey);
   const fields = template.pricingFields.filter((field) => String(field.service_id) === String(service?.id));
-  const rowsFor = (serviceId: number | undefined, categoryId: number | undefined) => form.pricing_config.filter((row) => row.service_id === serviceId && row.vehicle_category_id === categoryId);
+  const rowsFor = (serviceId: RecordId | undefined, categoryId: RecordId | undefined) => form.pricing_config.filter((row) => row.service_id === serviceId && row.vehicle_category_id === categoryId);
   const usual = (subtype: string, field: string) => medians.find((item) => item.serviceId === service?.id && item.vehicleType === vehicleKey && item.subtype === subtype && item.field === field);
   const statusOf = (key: string) => {
     const svc = template.services.find((item) => canonicalizeServiceKey(item.service_slug || item.service_name) === key);

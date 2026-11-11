@@ -82,7 +82,7 @@ jobs:
         env:
           ANDROID_CHECKS_ONLY: 'true'
       - run: node node_modules/@capacitor/cli/bin/capacitor sync android
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: node scripts/android-release-build.mjs --prepare-sdk
       - run: bash android/gradlew -p android :app:testDebugUnitTest :app:compileDebugAndroidTestJavaWithJavac :app:assembleDebug --no-daemon
 
   native-acceptance:
@@ -116,7 +116,7 @@ jobs:
         env:
           ANDROID_CHECKS_ONLY: 'true'
       - run: node node_modules/@capacitor/cli/bin/capacitor sync android
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: node scripts/android-release-build.mjs --prepare-sdk
       - name: Enable KVM only on this disposable Linux runner
         run: sudo chmod a+rw /dev/kvm
       - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
@@ -160,7 +160,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci --ignore-scripts
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: node scripts/android-release-build.mjs --prepare-sdk
       - name: Enable KVM only on this disposable Linux runner
         run: sudo chmod a+rw /dev/kvm
       - name: Exercise Android confirmation and real A-to-B upgrade on a dedicated fresh emulator
@@ -211,7 +211,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci --ignore-scripts
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: node scripts/android-release-build.mjs --prepare-sdk
       - name: Enable KVM only on this disposable Linux runner
         run: sudo chmod a+rw /dev/kvm
       - name: Exercise the real native plugin and system permission/installer UI
@@ -267,7 +267,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci --ignore-scripts
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: node scripts/android-release-build.mjs --prepare-sdk
       - name: Build, sign, verify and publish only in the explicitly activated mode
         run: node scripts/android-release.mjs ${{ github.event_name == 'workflow_dispatch' && '--dry-run' || '--publish' }}
         env:

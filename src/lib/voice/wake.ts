@@ -60,31 +60,55 @@ export function to16k(input: Float32Array, rate: number): Float32Array {
   return out;
 }
 
-type Spotter = { worker: Worker; ready: Promise<void> };
+type Spotter = { worker: Worker; ready: Promise<void>; dispose: () => void };
+type Session = { id: number; controller: AbortController; heard: () => void; processed: () => void };
 let spotter: Spotter | null = null;
-let heardCallback: (() => void) | null = null;
+let activeSession: Session | null = null;
+let listeningGeneration = 0;
+const stoppedListening = new DOMException("Wake-word listening was stopped", "AbortError");
+const startupTimeout = 30_000;
+const frameTimeout = 6_000;
 
 /** The spotter runs in its own worker, kept between pauses so turning back to the app is instant. */
 function startSpotter(): Spotter {
   if (spotter) return spotter;
-  const worker = new Worker(`${WAKE_FILES}worker.js`);
+  // The service worker caches script URLs. This version speaks the frame-acknowledgement protocol.
+  const worker = new Worker(`${WAKE_FILES}worker.js?v=2`);
+  let rejectReady!: (error: Error) => void;
   const ready = new Promise<void>((resolve, reject) => {
-    worker.onmessage = (event: MessageEvent<{ type: string; message?: string }>) => {
-      if (event.data.type === "ready") resolve();
-      else if (event.data.type === "heard") heardCallback?.();
-      else if (event.data.type === "error") reject(new Error(event.data.message || "The listener could not start"));
+    rejectReady = reject;
+    worker.onmessage = ({ data }: MessageEvent<{ type: string; session?: number; message?: string }>) => {
+      if (spotter?.worker !== worker) return;
+      if (data.type === "ready") resolve();
+      else if (data.type === "error") fail(new Error(data.message || "The listener failed"));
+      else if (activeSession && (data.session === undefined || activeSession.id === data.session)) {
+        if (data.type === "heard") activeSession.heard();
+        else if (data.type === "processed") activeSession.processed();
+      }
     };
-    worker.onerror = () => reject(new Error("The listener could not load"));
   });
-  spotter = { worker, ready };
-  ready.catch(() => { stopSpotter(); });
+  const dispose = () => {
+    if (spotter?.worker !== worker) return;
+    spotter = null;
+    worker.onmessage = worker.onerror = worker.onmessageerror = null;
+    worker.terminate();
+    rejectReady(stoppedListening);
+  };
+  function fail(error: Error) {
+    if (spotter?.worker !== worker) return;
+    rejectReady(error);
+    dispose();
+    activeSession?.controller.abort(error);
+  }
+  worker.onerror = worker.onmessageerror = () => fail(new Error("The listener stopped responding"));
+  spotter = { worker, ready, dispose };
   return spotter;
 }
 
 /** Turned off: the worker and its model go too. */
 export function stopSpotter() {
-  spotter?.worker.terminate();
-  spotter = null;
+  spotter?.dispose();
+  activeSession?.controller.abort(stoppedListening);
 }
 
 export type WakeListening = { stop: () => void };
@@ -97,7 +121,7 @@ type TrackProcessor = new (init: { track: MediaStreamTrack }) => { readable: Rea
  * Android app's WebView) reads the track directly, which needs no tap first; other browsers go
  * through an AudioContext, which some only start after the customer touches the page.
  */
-function captureAudio(mic: MediaStream, onSamples: (samples: Float32Array) => void): () => void {
+function captureAudio(mic: MediaStream, onSamples: (samples: Float32Array) => void, fail: (error: Error) => void): () => void {
   let pending: Float32Array[] = [];
   let count = 0;
   const collect = (samples: Float32Array) => {
@@ -114,71 +138,178 @@ function captureAudio(mic: MediaStream, onSamples: (samples: Float32Array) => vo
 
   const Processor = (window as unknown as { MediaStreamTrackProcessor?: TrackProcessor }).MediaStreamTrackProcessor;
   const track = mic.getAudioTracks()[0];
+  let reader: ReadableStreamDefaultReader<AudioFrame> | undefined;
   if (Processor && track) {
-    const reader = new Processor({ track }).readable.getReader();
+    // Some browsers expose the processor for video tracks only.
+    try { reader = new Processor({ track }).readable.getReader(); } catch { /* try Web Audio */ }
+  }
+  if (reader) {
+    const frames = reader;
     let running = true;
     void (async () => {
       while (running) {
-        const { value, done } = await reader.read().catch(() => ({ value: undefined, done: true }));
-        if (done || !value) break;
-        const raw = new Float32Array(value.numberOfFrames);
-        value.copyTo(raw, { planeIndex: 0, format: "f32-planar" });
-        const rate = value.sampleRate;
-        value.close();
-        collect(to16k(raw, rate));
+        const { value, done } = await frames.read();
+        if (done) throw new Error("Microphone input ended");
+        try {
+          if (!running) return;
+          const raw = new Float32Array(value.numberOfFrames);
+          value.copyTo(raw, { planeIndex: 0, format: "f32-planar" });
+          collect(to16k(raw, value.sampleRate));
+        } finally { value.close(); }
       }
-    })();
-    return () => { running = false; void reader.cancel().catch(() => {}); };
+    })().catch(error => { if (running) fail(error); });
+    return () => { running = false; void frames.cancel().catch(() => {}); };
   }
 
   const audio = new AudioContext();
-  const source = audio.createMediaStreamSource(mic);
-  const tap = audio.createScriptProcessor(4096, 1, 1);
-  const quiet = audio.createGain();
-  quiet.gain.value = 0;
-  tap.onaudioprocess = (event) => collect(to16k(event.inputBuffer.getChannelData(0), audio.sampleRate));
-  source.connect(tap);
-  tap.connect(quiet);
-  quiet.connect(audio.destination);
-  const wake = () => { if (audio.state === "suspended") void audio.resume().catch(() => {}); };
-  wake();
-  window.addEventListener("pointerdown", wake);
-  return () => {
+  let tap: ScriptProcessorNode | undefined;
+  const nodes: AudioNode[] = [];
+  const wake = () => { if (audio.state === "suspended") void audio.resume().catch(fail); };
+  // A newly created context may need the next tap. A running context that becomes
+  // interrupted must drop the active badge and release the microphone.
+  let wasRunning = audio.state === "running";
+  const stateChanged = () => {
+    if (wasRunning && audio.state !== "running") fail(new Error("Microphone audio was interrupted"));
+    wasRunning = audio.state === "running";
+  };
+  const close = () => {
     window.removeEventListener("pointerdown", wake);
-    tap.onaudioprocess = null;
-    try { source.disconnect(); tap.disconnect(); quiet.disconnect(); } catch { /* already apart */ }
+    audio.removeEventListener("statechange", stateChanged);
+    if (tap) tap.onaudioprocess = null;
+    for (const node of nodes) node.disconnect();
     void audio.close().catch(() => {});
   };
+  try {
+    const source = audio.createMediaStreamSource(mic);
+    nodes.push(source);
+    tap = audio.createScriptProcessor(4096, 1, 1);
+    nodes.push(tap);
+    const quiet = audio.createGain();
+    nodes.push(quiet);
+    quiet.gain.value = 0;
+    tap.onaudioprocess = (event) => {
+      try { collect(to16k(event.inputBuffer.getChannelData(0), audio.sampleRate)); }
+      catch (error) { fail(error as Error); }
+    };
+    source.connect(tap);
+    tap.connect(quiet);
+    quiet.connect(audio.destination);
+    audio.addEventListener("statechange", stateChanged);
+    window.addEventListener("pointerdown", wake);
+    wake();
+    return close;
+  } catch (error) {
+    close();
+    throw error;
+  }
 }
 
 /**
  * Listens for "Hey ResQNow" until stopped. Rejects when the microphone is refused or the listener
  * can't load; `onHeard` runs once per phrase.
  */
-export async function listenForWakeWord(onHeard: () => void): Promise<WakeListening> {
-  const { worker, ready } = startSpotter();
-  const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-  const stopMic = () => mic.getTracks().forEach((track) => track.stop());
-  try {
-    await ready;
-  } catch (error) {
-    stopMic();
-    throw error;
-  }
-  let lastHeard = 0;
-  heardCallback = () => {
-    // One phrase, one opening: the spotter can fire twice on a long "Heyyy ResQNow".
-    if (Date.now() - lastHeard < 3000) return;
-    lastHeard = Date.now();
-    onHeard();
-  };
-  const stopCapture = captureAudio(mic, (samples) => worker.postMessage({ type: "audio", samples }, [samples.buffer]));
-  return {
-    stop: () => {
-      stopCapture();
-      heardCallback = null;
-      worker.postMessage({ type: "reset" });
-      stopMic();
+export async function listenForWakeWord(onHeard: () => void, options: {
+  signal?: AbortSignal;
+  onListening?: () => void;
+  onError?: (error: Error) => void;
+} = {}): Promise<WakeListening> {
+  if (options.signal?.aborted) throw stoppedListening;
+  activeSession?.controller.abort(stoppedListening);
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone access is unavailable");
+  const engine = startSpotter();
+  const controller = new AbortController();
+  const { signal } = controller;
+  const id = ++listeningGeneration;
+  const stop = () => controller.abort(stoppedListening);
+  const fail = (error: Error) => controller.abort(error);
+  const trackEnded = () => fail(new Error("The microphone was disconnected"));
+  let mic: MediaStream | undefined;
+  let stopCapture: (() => void) | undefined;
+  let captureStarted = false;
+  let sentFrame = false;
+  let acknowledged = false;
+  let lastFrame = 0;
+  let lastProcessed = 0;
+  let lastHeard = -Infinity;
+  activeSession = {
+    id, controller,
+    heard() {
+      if (!captureStarted || Date.now() - lastHeard < 3000) return;
+      lastHeard = Date.now();
+      onHeard();
+    },
+    processed() {
+      if (!sentFrame) return;
+      lastProcessed = Date.now();
+      if (!acknowledged) {
+        acknowledged = true;
+        options.onListening?.();
+      }
     },
   };
+
+  const setupTimer = window.setTimeout(() => {
+    engine.dispose();
+    fail(new Error("Wake-word startup timed out"));
+  }, startupTimeout);
+  let frameTimer: number | undefined;
+  const stopped = new Promise<never>((_, reject) => {
+    signal.addEventListener("abort", () => {
+      const reason = signal.reason as Error;
+      if (activeSession?.id === id) activeSession = null;
+      window.clearTimeout(setupTimer);
+      window.clearInterval(frameTimer);
+      options.signal?.removeEventListener("abort", stop);
+      for (const track of mic?.getTracks() ?? []) {
+        track.removeEventListener?.("ended", trackEnded);
+        track.stop();
+      }
+      stopCapture?.();
+      reject(reason);
+      if (captureStarted && reason !== stoppedListening) options.onError?.(reason);
+    }, { once: true });
+  });
+  options.signal?.addEventListener("abort", stop, { once: true });
+
+  async function startCapture() {
+    const acquire = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      if (signal.aborted) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      mic = stream;
+      const track = mic.getAudioTracks()[0];
+      if (!track || track.readyState === "ended") throw new Error("No live microphone is available");
+      track.addEventListener?.("ended", trackEnded);
+    };
+    await Promise.all([engine.ready, acquire()]);
+    if (signal.aborted || !mic) throw signal.reason;
+    stopCapture = captureAudio(mic, samples => {
+      if (signal.aborted) return;
+      lastFrame = Date.now();
+      sentFrame = true;
+      engine.worker.postMessage({ type: "audio", samples, session: id }, [samples.buffer]);
+    }, fail);
+    captureStarted = true;
+    window.clearTimeout(setupTimer);
+    lastFrame = lastProcessed = Date.now();
+    frameTimer = window.setInterval(() => {
+      const now = Date.now();
+      if (now - lastFrame >= frameTimeout) fail(new Error("Microphone audio stopped arriving"));
+      else if (now - lastProcessed >= frameTimeout) {
+        engine.dispose();
+        fail(new Error("The wake-word listener stopped processing audio"));
+      }
+    }, 1000);
+  }
+  try {
+    await Promise.race([startCapture(), stopped]);
+    return { stop };
+  } catch (error) {
+    fail(error as Error);
+    throw error;
+  }
 }

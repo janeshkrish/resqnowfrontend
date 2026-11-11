@@ -5,7 +5,7 @@ import { firstMissingAnswer } from "@/lib/requestForm";
 import { hasVehicle } from "@/lib/vehicleChoice";
 import {
   answerChips, applyReply, contextOf, emptyDraft, findVehicle, formHandoff, formStepOneComplete, hear, mergeHeard, nextStep, repliesFor,
-  understandReply, type Step, type VoiceDraft,
+  mergeAi, mergeAiWithFeedback, understandReply, type Step, type VoiceDraft,
 } from "./engine";
 import { UI } from "./lexicon";
 import { normalize, tamilToLatin } from "./words";
@@ -40,6 +40,84 @@ function talk(sentence: string, answers: Record<string, string> = {}, garage: Ve
 }
 
 const formNeeds = (draft: VoiceDraft) => firstMissingAnswer(serviceSpecFor(draft.service), draft.answers, contextOf(draft));
+
+describe("interpreting corrections and safety answers", () => {
+  it.each([
+    "My car does not have a puncture. The battery is dead.",
+    "My car tyre isn't flat, the battery is dead.",
+    "It's not a flat tyre, the battery is dead.",
+    "Tyre puncture illa, battery dead aayiduchu",
+    "Puncture illa, battery dead aayiduchu",
+    "பஞ்சர் இல்லை, பேட்டரி வேலை செய்யவில்லை",
+    "It's a puncture. Actually I need a jump for my battery.",
+  ])("uses the service the customer affirms in %s", (text) => {
+    expect(hear(text, emptyDraft(), []).service).toBe("battery");
+    expect(understandReply({ kind: "service" }, emptyDraft(), text, [])?.value).toBe("battery");
+  });
+
+  it.each([
+    ["SOS, nobody is hurt", "no"], ["SOS, no one is injured", "no"],
+    ["SOS, யாருக்கும் காயம் இல்லை", "no"], ["SOS, yaarukkum kaayam illa", "no"],
+    ["SOS, my passenger is hurt but I am not hurt", "yes"],
+    ["SOS, I'm not hurt but my passenger is bleeding", "yes"],
+    ["SOS, nobody is hurt. Actually someone is hurt", "yes"],
+    ["SOS, someone is hurt. Correction, nobody is injured", "no"],
+    ["Keys locked in car, no child inside", "no"],
+    ["Keys locked in car, my dog is inside but no child is inside", "yes"],
+    ["சாவி உள்ளே, குழந்தை உள்ளே இல்லை", "no"],
+  ])("interprets the safety cue in %s as %s", (text, expected) => {
+    const result = mergeHeard(emptyDraft(), hear(text, emptyDraft(), []), "voice");
+    const id = result.draft.service === "lockout" ? "inside" : "hurt";
+    expect(result.draft.answers[id]).toBe(expected);
+    expect(result.said.some(line => line.urgent)).toBe(expected === "yes");
+  });
+
+  it.each([["yes", "yes"], ["no", "no"], ["ஆமாம்", "yes"], ["இல்லை", "no"]])(
+    "accepts %s as a direct reply to the injury question", (text, value) => {
+      expect(understandReply({ kind: "question", id: "hurt" }, { ...emptyDraft(), service: "sos" }, text, [])?.value).toBe(value);
+    });
+
+  it("collects affirmative issues and drops a negated issue", () => {
+    const heard = hear("Engine overheating and no smoke, but the brakes are failing", emptyDraft(), []);
+    expect(heard.answers.issue).toEqual(["heat", "brakes"]);
+  });
+
+  it("takes the last correction even when an option is repeated", () => {
+    const heard = hear("I need petrol, diesel, sorry petrol", emptyDraft(), []);
+    expect(heard.answers.fuel).toBe("petrol");
+  });
+
+  it("keeps the family and service when the negation describes a fault", () => {
+    expect(hear("My car isn't running; its battery isn't working", emptyDraft(), [])).toMatchObject({ family: "car", service: "battery" });
+  });
+
+  it("reopens service selection and discards its answers when a customer retracts a diagnosis", () => {
+    const previous = talk("My car has a puncture").draft;
+    const heard = hear("Actually there is no puncture", previous, []);
+    const next = mergeHeard(previous, heard, "voice").draft;
+    expect(next.service).toBeNull();
+    expect(next.answers).toEqual({});
+    expect(nextStep(next, [])).toEqual({ kind: "service" });
+    expect(mergeAiWithFeedback(next, { service: "flat-tire" }, [], heard.deniedServices).draft.service).toBeNull();
+    expect(hear("A puncture. Actually there is no puncture", emptyDraft(), []).service).toBeNull();
+  });
+
+  it("cancels a towing offer after the customer corrects the triggering fuel answer", () => {
+    const first = mergeHeard(emptyDraft(), hear("CNG car", emptyDraft(), []), "voice").draft;
+    expect(first.pendingSwitch).toMatchObject({ question: "fuel" });
+    const next = mergeHeard(first, hear("Actually diesel", first, []), "voice").draft;
+    expect(next.answers.fuel).toBe("diesel");
+    expect(next.pendingSwitch).toBeNull();
+  });
+
+  it("keeps the safety callout when a checked AI answer fills the gap", () => {
+    const draft: VoiceDraft = { ...emptyDraft(), service: "lockout", family: "car" };
+    const result = mergeAiWithFeedback(draft, { answers: { inside: "yes" } }, []);
+    expect(result.said).toEqual(applyReply(draft, { kind: "question", id: "inside" }, "yes", [], "voice").said);
+    expect(result.said).toEqual([expect.objectContaining({ urgent: true })]);
+    expect(mergeAi(result.draft, { answers: { inside: "no" } }, []).answers.inside).toBe("yes");
+  });
+});
 
 describe("ResQNow-Thozhan fills the request form", () => {
   it("asks only what a bike puncture is missing, in the form's order", () => {

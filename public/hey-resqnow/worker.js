@@ -15,6 +15,7 @@ var KEYWORDS = [
 
 var kws = null;
 var stream = null;
+var session = null;
 
 self.Module = {
   locateFile: function (path) { return path; },
@@ -64,13 +65,19 @@ self.onmessage = function (event) {
     return;
   }
   if (data.type !== "audio") return;
+  // Never combine the previous microphone session's partial keyword with new audio.
+  if (session !== data.session) {
+    kws.reset(stream);
+    session = data.session;
+  }
   stream.acceptWaveform(16000, data.samples);
   while (kws.isReady(stream)) {
     kws.decode(stream);
     var result = kws.getResult(stream);
     if (result && result.keyword) {
       kws.reset(stream);
-      self.postMessage({ type: "heard", keyword: result.keyword });
+      self.postMessage({ type: "heard", keyword: result.keyword, session: session });
     }
   }
+  self.postMessage({ type: "processed", session: session });
 };

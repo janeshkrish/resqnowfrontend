@@ -28,6 +28,16 @@ export function createAndroidBuildRunner({root,env=process.env,run=execute}){
       return path.join(root,'android/app/build/outputs/apk/release/app-release.apk');
     }};
 }
+export async function prepareAndroidSdk({root,env=process.env,platform=process.platform,run=execute}){
+  if(platform!=='linux')throw Error('SDK package setup is limited to hosted Linux; local Windows uses its installed SDK');
+  const sdk=env.ANDROID_HOME||env.ANDROID_SDK_ROOT;
+  if(typeof sdk!=='string'||!path.isAbsolute(sdk))throw Error('An absolute installed Android SDK root is required');
+  // GitHub's runner image installs this tool here without promising it is on PATH.
+  const manager=path.join(sdk,'cmdline-tools/latest/bin/sdkmanager');
+  try{if(!(await fs.stat(manager)).isFile())throw Error('not a file');}catch{throw Error('Installed Android command-line tools are unavailable');}
+  const safeEnv=Object.fromEntries(Object.entries(env).filter(([key,value])=>OS_KEYS.has(key.toUpperCase())&&typeof value==='string'));
+  await run(manager,['platforms;android-36','build-tools;36.0.0'],{cwd:root,env:safeEnv,timeout:600000});
+}
 export async function prepareAndroidChecks({root,env=process.env}){
   if(env.CI!=='true'||env.ANDROID_CHECKS_ONLY!=='true')throw Error('Synthetic native setup is limited to explicit CI verification');
   // Google's debug source set takes precedence without modifying the tracked production config.
@@ -37,6 +47,8 @@ export async function prepareAndroidChecks({root,env=process.env}){
   const dist=path.join(root,'dist');await fs.mkdir(dist,{recursive:true});await fs.writeFile(path.join(dist,'index.html'),'<!doctype html><html><body>Native compile/instrumentation boundary. Not a production web build.</body></html>',{flag:'wx'});
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  if(process.argv[2]!=='--prepare-checks'){console.error('Only --prepare-checks is supported');process.exitCode=1;}
-  else prepareAndroidChecks({root:fileURLToPath(new URL('../',import.meta.url))}).catch(()=>{console.error('Synthetic native setup refused or could not finish');process.exitCode=1;});
+  const root=fileURLToPath(new URL('../',import.meta.url));
+  const task=process.argv[2]==='--prepare-checks'?()=>prepareAndroidChecks({root}):process.argv[2]==='--prepare-sdk'?()=>prepareAndroidSdk({root}):null;
+  if(!task){console.error('Only --prepare-checks or --prepare-sdk is supported');process.exitCode=1;}
+  else task().catch(error=>{console.error(error.message);process.exitCode=1;});
 }

@@ -31,19 +31,19 @@ function silentWav(ms: number) {
 }
 
 type Options = {
-  enabled?: boolean; ai?: boolean; heard?: string[]; noMic?: boolean; micBlocked?: boolean; tamilVoice?: boolean; aiReply?: Record<string, unknown>;
+  enabled?: boolean; ai?: boolean; heard?: string[]; noMic?: boolean; micBlocked?: boolean; tamilVoice?: boolean; aiReply?: Record<string, unknown>; confidence?: number;
   /** The server's natural voice is on; `voiceFails` makes every line fail, so the phone's voice must take over. */
   naturalVoice?: boolean; voiceFails?: boolean;
 };
 
-async function openVoice(page: Page, path: string, { enabled = true, ai = false, heard = [], noMic = false, micBlocked = false, tamilVoice = true, aiReply = {}, naturalVoice = false, voiceFails = false }: Options = {}) {
+async function openVoice(page: Page, path: string, { enabled = true, ai = false, heard = [], noMic = false, micBlocked = false, tamilVoice = true, aiReply = {}, naturalVoice = false, voiceFails = false, confidence }: Options = {}) {
   const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
   const spokenLines: Array<{ text: string; lang: string }> = [];
   const errors: string[] = [];
   let sentRequest: Record<string, unknown> | null = null;
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.addInitScript(({ heard, noMic, micBlocked, tamilVoice }) => {
+  await page.addInitScript(({ heard, noMic, micBlocked, tamilVoice, confidence }) => {
     localStorage.setItem("resqnow_user_token", "e2e-customer-token");
     const w = window as unknown as Record<string, unknown>;
     w.__heard = heard;
@@ -69,7 +69,7 @@ async function openVoice(page: Page, path: string, { enabled = true, ai = false,
           if (!phrase) { this.onerror?.({ error: "no-speech" }); this.onend?.(); return; }
           const words = phrase.split(" ");
           this.onresult?.({ results: { length: 1, 0: { isFinal: false, 0: { transcript: words.slice(0, Math.ceil(words.length / 2)).join(" ") } } } });
-          setTimeout(() => { this.onresult?.({ results: { length: 1, 0: { isFinal: true, 0: { transcript: phrase } } } }); this.onend?.(); }, 350);
+          setTimeout(() => { this.onresult?.({ results: { length: 1, 0: { isFinal: true, 0: { transcript: phrase, confidence } } } }); this.onend?.(); }, 350);
         }, 250);
       }
       stop() {}
@@ -93,7 +93,7 @@ async function openVoice(page: Page, path: string, { enabled = true, ai = false,
       setTimeout(() => u.onend?.(new Event("end") as SpeechSynthesisEvent), 30);
     };
     window.speechSynthesis.cancel = () => {};
-  }, { heard, noMic, micBlocked, tamilVoice });
+  }, { heard, noMic, micBlocked, tamilVoice, confidence });
 
   await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, (route) => route.fulfill({ contentType: "application/javascript", body: fakeMappls }));
   await page.route((url) => url.hostname === "api.e2e.test", async (route) => {
@@ -173,6 +173,38 @@ async function slide(page: Page) {
 test.use({ geolocation: HOME, permissions: ["geolocation"] });
 test.describe.configure({ timeout: 150_000 });
 
+test("a wake session accepts a follow-up after speaking without another mic tap", async ({ page }) => {
+  const { errors } = await openVoice(page, "/thozhan?wake=1", {
+    heard: ["My car has a puncture", "Hyundai i20"],
+  });
+  await expect(page.locator(".vt-you")).toHaveCount(2, { timeout: 30000 });
+  await expect(page.locator(".vt-you").nth(1)).toContainText("Hyundai i20");
+  await expect(page.locator(".vt-tok").nth(1)).toContainText("i20");
+  expect(errors).toEqual([]);
+});
+
+test("an uncertain transcript can be corrected before it changes the request", async ({ page }) => {
+  const { errors } = await openVoice(page, "/thozhan", {
+    heard: ["My car has a puncture"], confidence: 0.3,
+  });
+  await page.locator(".vt-mic").click();
+  await expect(page.getByLabel("Type to ResQNow-Thozhan")).toHaveValue("My car has a puncture");
+  await expect(page.locator(".vt-you")).toHaveCount(0);
+  await page.getByLabel("Type to ResQNow-Thozhan").fill("My car does not have a puncture. The battery is dead.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.locator(".vt-tok").first()).toContainText("Battery");
+  expect(errors).toEqual([]);
+});
+
+test("AI-derived lockout danger presents the same emergency action", async ({ page }) => {
+  const { errors } = await openVoice(page, "/thozhan", {
+    ai: true, aiReply: { service: "lockout", family: "car", answers: { inside: "yes" } },
+  });
+  await typeToThozhan(page, "The door will not open and I cannot reach my little one");
+  await expect(page.locator(".vt-call")).toHaveAttribute("href", "tel:112");
+  expect(errors).toEqual([]);
+});
+
 test("the owner's script: a bike puncture said aloud, every form answer asked, sent as the form sends it", async ({ page }) => {
   const { posts, errors } = await openVoice(page, "/thozhan", { heard: ["Ennoda bike puncture aayiduchu"] });
 
@@ -242,7 +274,9 @@ test("the owner's script: a bike puncture said aloud, every form answer asked, s
   });
   // It heard Tanglish in Indian English (English letters, as the word lists expect), and read every
   // Tanglish line aloud in Tamil script with the Tamil voice.
-  expect(await page.evaluate(() => (window as unknown as { __langs: string[] }).__langs)).toEqual(["en-IN"]);
+  const locales = await page.evaluate(() => (window as unknown as { __langs: string[] }).__langs);
+  expect(locales.length).toBeGreaterThan(0);
+  expect(locales.every(locale => locale === "en-IN")).toBe(true);
   const spoken = await page.evaluate(() => (window as unknown as { __spoken: Array<{ text: string; voice: string }> }).__spoken);
   // (The typed English landmark turns the talk to English at the end, and English is read by the English voice.)
   expect(spoken.filter((line) => line.voice === "Tamil (India)").length).toBeGreaterThan(5);

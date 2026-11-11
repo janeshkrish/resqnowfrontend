@@ -142,9 +142,11 @@ export function useUnifiedServiceRequestFlow({
   successDescription = "Searching for nearby technicians...",
   allowDirectTechnician = false
 }: UnifiedRequestFlowOptions) {
+  const pendingKey = `${storageKey}:submission:${user?.id ?? user?.email ?? "guest"}`;
   const [formData, setFormData] = useState<ServiceRequestFormData>(() => {
     if (resetRequested) {
       localStorage.removeItem(storageKey);
+      localStorage.removeItem(pendingKey);
     }
 
     const savedData = localStorage.getItem(storageKey);
@@ -178,6 +180,7 @@ export function useUnifiedServiceRequestFlow({
 
   const [currentLocation, setCurrentLocation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [isEstimatingTowing, setIsEstimatingTowing] = useState(false);
   const [towingEstimate, setTowingEstimate] = useState<any>(null);
   const [towingEstimateError, setTowingEstimateError] = useState<string | null>(null);
@@ -438,12 +441,13 @@ export function useUnifiedServiceRequestFlow({
   };
 
   const submitRequest = async (techId?: string) => {
-    if (isSubmitting) return;
+    if (submittingRef.current) return;
     if (!serviceId) {
       toast.error("Service unavailable", { description: "Service ID missing." });
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -481,6 +485,13 @@ export function useUnifiedServiceRequestFlow({
           dropPlaceId: formData.dropPlaceId || formData.dropPlace?.placeId || null,
           dropLat,
           dropLng,
+        });
+      }
+      // Only customer-selected fields identify the intent. A refreshed towing estimate and
+      // current timestamp must not change a retry of a booking whose response was lost.
+      const intent = JSON.stringify(payload);
+      if (requiresDropLocation) {
+        Object.assign(payload, {
           distanceKm: formData.routeDistanceKm ?? towingEstimate?.distanceKm ?? towingEstimate?.quote?.distance_km ?? null,
           estimatedDuration: formData.estimatedDuration ?? towingEstimate?.estimatedDuration ?? towingEstimate?.quote?.estimated_duration ?? null,
           pricingBreakdown: formData.pricingBreakdown ?? towingEstimate?.pricingBreakdown ?? towingEstimate?.quote?.pricing_breakdown ?? null,
@@ -489,9 +500,14 @@ export function useUnifiedServiceRequestFlow({
         });
       }
 
+      let pending: { intent: string; body: string } | null = null;
+      try { pending = JSON.parse(localStorage.getItem(pendingKey) || "null"); } catch { /* No usable saved attempt. */ }
+      const body = pending?.intent === intent && typeof pending.body === "string" ? pending.body
+        : JSON.stringify({ ...payload, idempotencyKey: Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, "0")).join("") });
+      localStorage.setItem(pendingKey, JSON.stringify({ intent, body }));
       const res = await apiFetch("/api/service-requests", {
         method: "POST",
-        body: JSON.stringify(payload)
+        body
       });
 
       if (!res.ok) {
@@ -506,6 +522,8 @@ export function useUnifiedServiceRequestFlow({
       }
 
       const data = await res.json();
+      if (!data?.id) throw new Error("The booking response has no tracking ID. Please retry.");
+      localStorage.removeItem(pendingKey);
       localStorage.removeItem(storageKey);
 
       if (onSubmitted) {
@@ -529,6 +547,7 @@ export function useUnifiedServiceRequestFlow({
         description: error?.message || "Please try again."
       });
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };

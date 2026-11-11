@@ -13,8 +13,8 @@ export type L3 = Record<Lang, string> & { say?: string };
 const L = (en: string, tg: string, ta: string, say?: string): L3 => ({ en, tg, ta, ...(say ? { say } : {}) });
 
 export const NOT_SURE = /not sure|don'?t know|dont know|theriyala|theriyadhu|தெரியல|தெரியாது/i;
-export const YES = /^(yes|yeah|yep|ok|okay|correct|right|aamaa|aama|amaa|adhe|sari|seri|ஆமா|ஆமாம்|அதே|சரி)\b/i;
-export const NO = /^(no|nope|illa|illai|vera|different|another|இல்லை|வேறு)\b/i;
+export const YES = /^(yes|yeah|yep|ok|okay|correct|right|aamaa|aama|amaa|adhe|sari|seri|ஆமா|ஆமாம்|அதே|சரி)(?=$|[\s,.!?])/i;
+export const NO = /^(no|nope|illa|illai|vera|different|another|இல்லை|இல்ல|வேறு)(?=$|[\s,.!?])/i;
 export const SKIP = /^(skip|no|none|illa|theriyala|don'?t know|வேண்டாம்|இல்லை)\b/i;
 
 /** Which service a sentence is about. Order matters: the first rule that matches wins. */
@@ -22,7 +22,7 @@ export const SERVICE_WORDS: Array<[ServiceKey, RegExp]> = [
   ["sos", /emergency|\bsos\b|kaappathunga|help me|காப்பாத்துங்க|அவசர/i],
   ["ev-charging", /charge (illa|theernduchu|poyiduchu|kammi|low|zero|dead|mudinjiduchu)|out of charge|no charge|charging|சார்ஜ்/i],
   ["winching", /ditch|kuzhi|pallam|\bmud\b|sethu|chetru|\bsand\b|slipped|fell into|thanni-?la|drain|பள்ளம்|சேறு|குழி/i],
-  ["flat-tire", /punct\w*|punchar|pancher|\bflat\b|\btyre|\btire|tyar|பஞ்சர்|டயர்/i],
+  ["flat-tire", /\b(?:flat|punctured)\s+t[yi]re\b|\bt[yi]re\s+punct\w*|டயர்\s*பஞ்சர்|punct\w*|punchar|pancher|\bflat\b|\bt[yi]re|tyar|பஞ்சர்|டயர்/i],
   ["battery", /battery|start aagala|won'?t start|not starting|பேட்டரி|ஸ்டார்ட் ஆக/i],
   ["fuel", /petrol|diesel|\bfuel\b|\bcng\b|பெட்ரோல்|டீசல்|எரிபொருள்/i],
   ["lockout", /\bkeys?\b|saavi|chaavi|locked|lockout|சாவி/i],
@@ -42,8 +42,8 @@ export const HIGHWAY = /highway|nedunjaalai|நெடுஞ்சாலை/i;
 
 type Words = Record<string, RegExp>;
 const HURT_WORDS: Words = {
-  yes: /\bhurt|injur|bleed|blood|adi pattu|adi pattirukku|adi pattuchu|ratham|ambulance|காயம்|அடிபட்டு|ரத்தம்/i,
-  no: /no one|nobody|not hurt|yaarukkum (adi )?(illa|padala)|adi padala|safe|everyone.{0,6}(ok|fine)|யாருக்கும் இல்லை|அடிபடல/i,
+  yes: /\bhurt\b|injur(?:ed|y|ies)|bleed(?:ing)?|blood|adi patt(?:u|irukku|uchu)|kaayam|ratham|ambulance|காயம்|அடிபட்டு|ரத்தம்/i,
+  no: /\b(?:no one|nobody)\s+(?:(?:is|was|got|has been)\s+)?(?:hurt|injured|bleeding)\b|\b(?:not|isn['’]?t|wasn['’]?t)\s+(?:hurt|injured|bleeding)\b|\bno (?:injuries|injury)\b|(?:yaarukkum )?(?:adi|kaayam) (?:illa\w*|padala)|(?:யாருக்கும் )?(?:காயம்\s*இல்லை|காயமில்லை|அடிபடல)|\beveryone (?:is )?(?:safe|ok|fine)\b/i,
 };
 
 /** The words that answer each question, keyed by service, question id and option value. */
@@ -92,8 +92,8 @@ export const ANSWER_WORDS: Record<ServiceKey, Record<string, Words>> = {
     qty: {},
   },
   lockout: {
-    inside: { yes: /(baby|child|kid|kuzhandhai|paapa|dog|cat|pet|naai|someone|my (son|daughter)).{0,24}(inside|ulla)|ulla (kuzhandhai|paapa|naai)|குழந்தை/i,
-      no: /no one|nobody|yaarum illa|^no\b|^illa\b|யாரும் இல்லை/i },
+    inside: { yes: /\b(?:baby|child|kid|dog|cat|pet|someone|son|daughter|kuzhandhai|paapa|naai)\s+(?:(?:is|was|still|locked|stuck|trapped)\s+)*(?:inside|ulla)|ulla (?:kuzhandhai|paapa|naai)|(?:குழந்தை|நாய்|பூனை)\s+உள்ளே|உள்ளே\s+(?:குழந்தை|நாய்|பூனை)/i,
+      no: /\b(?:no one|nobody|no (?:child|baby|kid|dog|pet|person))\s+(?:(?:is|was|locked|stuck|trapped)\s+)*inside|\b(?:is not|isn['’]?t|not) (?:locked |stuck )?inside|(?:ulla )?yaarum illa|(?:kuzhandhai|paapa|naai) ulla illa|(?:உள்ளே\s+)?யாரும் இல்லை|(?:குழந்தை|நாய்|பூனை) உள்ளே இல்லை/i },
     what: { inside: /(key|saavi|chaavi).{0,16}(inside|ulla)|locked inside|ulla (vechu|maattikichu)|உள்ளே/i, lost: /\blost\b|kaanom|missing|தொலை|காணோம்/i,
       broken: /broke|odanj|stuck in (the )?lock|உடை/i, remote: /remote|fob|central lock/i },
   },

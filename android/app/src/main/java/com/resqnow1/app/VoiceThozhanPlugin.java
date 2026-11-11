@@ -35,6 +35,8 @@ import java.util.Set;
 public class VoiceThozhanPlugin extends Plugin {
 
     private SpeechRecognizer recognizer;
+    private volatile String requestedSession;
+    private String activeSession;
     private TextToSpeech tts;
     private boolean ttsReady;
     private final Map<String, PluginCall> speaking = new HashMap<>();
@@ -50,6 +52,7 @@ public class VoiceThozhanPlugin extends Plugin {
 
     @PluginMethod
     public void listen(PluginCall call) {
+        requestedSession = call.getString("sessionId", "legacy");
         if (getPermissionState("microphone") != PermissionState.GRANTED) {
             requestPermissionForAlias("microphone", call, "afterMicrophonePermission");
             return;
@@ -66,13 +69,16 @@ public class VoiceThozhanPlugin extends Plugin {
     private void startListening(PluginCall call) {
         String lang = call.getString("lang", "ta-IN");
         getActivity().runOnUiThread(() -> {
+            String session = call.getString("sessionId", "legacy");
+            if (!session.equals(requestedSession)) { call.resolve(); return; }
             if (!SpeechRecognizer.isRecognitionAvailable(getContext())) {
                 call.reject("Speech recognition is not available on this phone", "unavailable");
                 return;
             }
             if (recognizer != null) recognizer.destroy();
             recognizer = SpeechRecognizer.createSpeechRecognizer(getContext());
-            recognizer.setRecognitionListener(new Listener());
+            activeSession = session;
+            recognizer.setRecognitionListener(new Listener(recognizer, session));
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
@@ -88,13 +94,30 @@ public class VoiceThozhanPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         getActivity().runOnUiThread(() -> {
-            if (recognizer != null) recognizer.stopListening();
+            String session = call.getString("sessionId", "legacy");
+            if (session.equals(requestedSession)) requestedSession = null;
+            if (recognizer != null && session.equals(activeSession)) {
+                if (Boolean.TRUE.equals(call.getBoolean("discard", false))) {
+                    recognizer.cancel();
+                    recognizer.destroy();
+                    recognizer = null;
+                    activeSession = null;
+                } else recognizer.stopListening();
+            }
             call.resolve();
         });
     }
 
     private class Listener implements RecognitionListener {
-        @Override public void onReadyForSpeech(Bundle params) {}
+        private final SpeechRecognizer owner;
+        private final String session;
+        Listener(SpeechRecognizer owner, String session) { this.owner = owner; this.session = session; }
+        private void send(String event, JSObject data) {
+            if (recognizer != owner) return;
+            data.put("sessionId", session);
+            notifyListeners(event, data);
+        }
+        @Override public void onReadyForSpeech(Bundle params) { send("ready", new JSObject()); }
         @Override public void onBeginningOfSpeech() {}
         @Override public void onRmsChanged(float rmsdB) {}
         @Override public void onBufferReceived(byte[] buffer) {}
@@ -103,12 +126,18 @@ public class VoiceThozhanPlugin extends Plugin {
 
         @Override
         public void onPartialResults(Bundle results) {
-            emit("partial", firstResult(results));
+            JSObject data = new JSObject();
+            data.put("text", firstResult(results));
+            send("partial", data);
         }
 
         @Override
         public void onResults(Bundle results) {
-            emit("final", firstResult(results));
+            JSObject data = new JSObject();
+            data.put("text", firstResult(results));
+            float[] scores = results == null ? null : results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+            if (scores != null && scores.length > 0 && scores[0] >= 0) data.put("confidence", (double) scores[0]);
+            send("final", data);
             finish();
         }
 
@@ -116,22 +145,15 @@ public class VoiceThozhanPlugin extends Plugin {
         public void onError(int error) {
             JSObject data = new JSObject();
             data.put("error", VoiceErrors.name(error));
-            notifyListeners("error", data);
+            send("error", data);
             finish();
         }
-    }
-
-    private void emit(String event, String text) {
-        JSObject data = new JSObject();
-        data.put("text", text);
-        notifyListeners(event, data);
-    }
-
-    private void finish() {
-        notifyListeners("end", new JSObject());
-        if (recognizer != null) {
-            recognizer.destroy();
+        private void finish() {
+            if (recognizer != owner) return;
+            send("end", new JSObject());
             recognizer = null;
+            activeSession = null;
+            owner.destroy();
         }
     }
 

@@ -1,9 +1,13 @@
 /* "Hey ResQNow" is listening: a small pill above the bottom bar, quiet, in ResQNow navy. */
-.hey-badge {
+.hey-status {
   position: fixed;
   left: 12px;
   bottom: calc(14px + 66px + 10px + env(safe-area-inset-bottom, 0px));
   z-index: 49;
+  display: flex;
+  gap: 6px;
+}
+.hey-badge, .hey-manual {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -24,10 +28,10 @@
 .hey-badge.is-blocked { background: rgba(142, 24, 34, 0.94); }
 .hey-badge.is-blocked .rq-symbol { color: #fff; animation: none; }
 @media (min-width: 1024px) {
-  .hey-badge { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 18px; }
+  .hey-status { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 18px; }
 }
 @keyframes heyIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes heyBreathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .hey-badge, .hey-badge .rq-symbol { animation: none; }
+  .hey-badge, .hey-manual, .hey-badge .rq-symbol { animation: none; }
 }

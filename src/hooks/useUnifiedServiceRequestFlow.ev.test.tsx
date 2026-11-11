@@ -31,3 +31,34 @@ it("refreshes towing route readiness when only structured EV body details change
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 750)); });
   expect(apiFetch).toHaveBeenCalledTimes(2);
 });
+
+it("retains a towing submission across a lost response and reload, then opens its tracking page", async () => {
+  window.history.replaceState({ usr: { reset: true } }, "");
+  const navigate = vi.fn();
+  const sent: string[] = [];
+  apiFetch.mockImplementation(async (path: string, init: RequestInit) => {
+    if (path !== "/api/service-requests") return new Response(JSON.stringify({ quote: { distance_km: 10 } }));
+    sent.push(String(init.body));
+    if (sent.length === 1) throw new TypeError("Response lost");
+    return new Response(JSON.stringify({ id: "recovered-request" }));
+  });
+  const useBooking = () => useUnifiedServiceRequestFlow({
+    serviceId: "towing", vehicleType: "car", storageKey: "recover-booking", navigate,
+    resetRequested: Boolean(window.history.state?.usr?.reset),
+    createInitialFormData: () => ({ name: "Asha", phone: "9999999999", vehicleType: "car", vehicleSubtype: "hatchback", vehicleModel: "Swift", location: "Pickup", locationLat: 11, locationLng: 77,
+      dropLocation: "Drop", dropLat: 12, dropLng: 78, details: "", selectedTechnicianId: null }),
+    validateStep1: () => true, buildVehicleModel: data => data.vehicleModel,
+  });
+  const first = renderHook(useBooking);
+  await act(async () => { await Promise.all([first.result.current.submitRequest(), first.result.current.submitRequest()]); });
+  expect(sent).toHaveLength(1);
+  expect(JSON.parse(sent[0]).idempotencyKey).toBeTruthy();
+  expect(navigate).not.toHaveBeenCalled();
+  expect(window.history.state?.usr?.reset).toBeUndefined();
+  first.unmount();
+  const second = renderHook(useBooking);
+  await act(async () => { await second.result.current.submitRequest(); });
+  expect(sent[1]).toEqual(sent[0]);
+  expect(navigate).toHaveBeenCalledWith("/request-service-tracking/recovered-request", expect.anything());
+  expect(localStorage.getItem("recover-booking")).toBeNull();
+});

@@ -6,7 +6,7 @@ import { displayName, garageForFamily, brandById } from "@/lib/vehicleChoice";
 import type { Mood } from "@/components/voice/Thozhan";
 import { askVoiceAi } from "@/lib/voice/api";
 import {
-  aiContext, applyReply, calloutFor, detectLang, emptyDraft, formHandoff, hear, isMulti, mergeAi, mergeHeard, nextStep, understandReply,
+  aiContext, applyReply, calloutFor, detectLang, emptyDraft, formHandoff, hear, isExplicitCorrection, isMulti, mergeAiWithFeedback, mergeHeard, nextStep, understandReply,
   type Said, type Step, type Via, type VoiceDraft,
 } from "@/lib/voice/engine";
 import { LINES, NOD, type L3, type Lang } from "@/lib/voice/lexicon";
@@ -20,7 +20,7 @@ import type { VehicleFamily } from "@/lib/vehicleClasses";
 export type Turn =
   | { id: number; who: "you"; text: string; via: Via; keys: string[] }
   | { id: number; who: "thozhan"; line: Line; call?: string };
-export type Status = "idle" | "listening" | "thinking" | "talking";
+export type Status = "idle" | "starting" | "listening" | "thinking" | "talking";
 type NewTurn = Turn extends infer T ? (T extends Turn ? Omit<T, "id"> : never) : never;
 export type Phase = "hello" | "convo" | "handing";
 export type FoundPlace = { address: string; lat: number; lng: number; title: string; subtitle: string };
@@ -28,6 +28,14 @@ export type MicTrouble = null | MicProblem;
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const MUTE_KEY = "resqnow_thozhan_muted";
+const LANGUAGE_KEY = "resqnow_thozhan_language";
+function preferredLanguage(): "auto" | Lang {
+  try {
+    const value = localStorage.getItem(LANGUAGE_KEY);
+    if (value === "tg" || value === "en" || value === "ta") return value;
+  } catch { /* storage may be unavailable */ }
+  return "auto";
+}
 
 /** Where the customer is: the device's location, named by the same lookup the request form uses. */
 function locate(): Promise<FoundPlace | null> {
@@ -37,7 +45,7 @@ function locate(): Promise<FoundPlace | null> {
       const { latitude: lat, longitude: lng } = position.coords;
       const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       try {
-        const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`));
+        const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`), { signal: AbortSignal.timeout(3500) });
         const data = res.ok ? await res.json() : null;
         const summary = summarizePlace(data);
         const address = String(data?.display_name || fallback);
@@ -66,8 +74,10 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
   const [live, setLive] = useState("");
   const [step, setStep] = useState<Step | null>(null);
   const [mood, setMood] = useState<Mood>("happy");
-  const [langPref, setLangPref] = useState<"auto" | Lang>("auto");
-  const [lastLang, setLastLang] = useState<Lang>("tg");
+  const [langPref, setLangPref] = useState<"auto" | Lang>(preferredLanguage);
+  const [lastLang, setLastLang] = useState<Lang>(() => /^ta\b/i.test(navigator.language) ? "ta" : "tg");
+  const [reviewText, setReviewText] = useState("");
+  const [busy, setBusy] = useState(false);
   const [picks, setPicks] = useState<string[]>([]);
   const [place, setPlace] = useState<FoundPlace | null>(null);
   const [nod, setNod] = useState<keyof typeof NOD | null>(null);
@@ -88,13 +98,44 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
   const acks = useRef(0);
   const hadInput = useRef(false);
   const listening = useRef<Listening | null>(null);
+  const micGeneration = useRef(0);
+  const micOpen = useRef(false);
+  const micTimer = useRef<ReturnType<typeof setTimeout>>();
+  const handsFree = useRef(false);
+  const turnBusy = useRef(false);
+  const handing = useRef(false);
+  const resumeMic = useRef<() => void>(() => {});
   const nodSeen = useRef<Record<string, true>>({});
 
+  const stopCapture = useCallback(() => {
+    handsFree.current = false;
+    micGeneration.current++;
+    micOpen.current = false;
+    clearTimeout(micTimer.current);
+    listening.current?.abort?.();
+    listening.current = null;
+    if (alive.current) {
+      setStatus(current => current === "listening" || current === "starting" ? "idle" : current);
+      setLive("");
+    }
+  }, []);
   useEffect(() => {
     alive.current = true;
     const calm = setTimeout(() => setMood((m) => (m === "happy" ? "idle" : m)), 2600);
-    return () => { alive.current = false; clearTimeout(calm); listening.current?.stop(); silence(); };
-  }, []);
+    const hidden = () => {
+      if (document.visibilityState === "hidden") {
+        const wasCapturing = micOpen.current;
+        stopCapture();
+        silence();
+        if (wasCapturing) { setStatus("idle"); setLive(""); setMood("idle"); }
+      }
+    };
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      alive.current = false; clearTimeout(calm); stopCapture(); silence();
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [stopCapture]);
 
   useEffect(() => { setNaturalVoice(naturalVoice); }, [naturalVoice]);
 
@@ -145,7 +186,9 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
   }, [say]);
 
   const handoff = useCallback((atLocation: boolean) => {
-    if (!alive.current) return;
+    if (!alive.current || handing.current) return;
+    handing.current = true;
+    stopCapture();
     setPhase("handing");
     setBurst(true);
     silence();
@@ -153,7 +196,7 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     const { path, storageKey, saved } = formHandoff(refs.current.draft, p ? { address: p.address, lat: p.lat, lng: p.lng } : null, { atLocation });
     try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch { /* private mode: the form starts on its own */ }
     setTimeout(() => { if (alive.current) onHandoff(path); }, 950);
-  }, [onHandoff]);
+  }, [onHandoff, stopCapture]);
 
   /** Asks the next thing the form still needs, or hands over once nothing is missing. */
   const askNext = useCallback(async () => {
@@ -218,7 +261,7 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
   }, [askNext, commit, handoff, say, sayAll]);
 
   /** Whatever the customer said or typed. */
-  const handleInput = useCallback(async (raw: string, via: Via) => {
+  const processInput = useCallback(async (raw: string, via: Via) => {
     const text = raw.trim();
     if (!text) return;
     if (via !== "voice") unlockAudio();
@@ -241,9 +284,9 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
         setStatus("thinking");
         const reading = await askVoiceAi({ text, lang: detected, ...aiContext(next, next.service) });
         if (reading) {
-          const before = next.service;
-          next = mergeAi(next, reading, g);
-          if (!before && next.service) said = [{ line: "understood" }, ...said];
+          const ai = mergeAiWithFeedback(next, reading, g, heard.deniedServices);
+          next = ai.draft;
+          said = [...said, ...ai.said.filter(item => item.line !== "understood" || !said.some(old => old.line === "understood"))];
         }
       }
       commit(next);
@@ -252,32 +295,51 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
       return;
     }
     if (!current) { addTurn({ who: "you", text, via, keys: [] }); await askNext(); return; }
-    const reply = understandReply(current, d, text, g);
+    const heard = hear(text, d, g);
+    const retracted = !!d.service && heard.deniedServices.includes(d.service);
+    const hazardChanged = ["inside", "hurt"].some(id => heard.answers[id] !== undefined && heard.answers[id] !== d.answers[id]);
+    const correcting = isExplicitCorrection(text) && (heard.service || heard.family || Object.keys(heard.answers).length);
+    const reply = retracted || hazardChanged || correcting ? null : understandReply(current, d, text, g);
     addTurn({ who: "you", text, via, keys: reply ? [text.toLowerCase()] : [] });
     if (reply) { await applyAndContinue(current, reply.value as string | string[], via, reply.quote); return; }
-    if (refs.current.ai) {
-      setStatus("thinking");
-      const reading = await askVoiceAi({ text, lang: detected, asking: stepName(current), ...aiContext(d, d.service) });
-      const next = reading ? mergeAi(d, reading, g) : d;
-      if (next !== d && JSON.stringify(next) !== JSON.stringify(d)) { commit(next); await askNext(); return; }
-    }
     // Something else useful in the words (a different problem, or the vehicle), even if not this answer.
-    const heard = hear(text, d, g);
-    if (heard.vehicle || Object.keys(heard.answers).length || (heard.service && heard.service !== d.service)) {
+    if (retracted || correcting || heard.vehicle || Object.keys(heard.answers).length || (heard.service && heard.service !== d.service)) {
       const merged = mergeHeard(d, heard, via);
       commit(merged.draft);
       await sayAll(merged.said.filter((s) => s.line !== "understood"), merged.draft);
       await askNext();
       return;
     }
+    if (refs.current.ai) {
+      setStatus("thinking");
+      const reading = await askVoiceAi({ text, lang: detected, asking: stepName(current), ...aiContext(d, d.service) });
+      if (reading) {
+        const ai = mergeAiWithFeedback(d, reading, g, heard.deniedServices);
+        if (JSON.stringify(ai.draft) !== JSON.stringify(d)) {
+          commit(ai.draft); await sayAll(ai.said, ai.draft); await askNext(); return;
+        }
+      }
+    }
     await say({ kind: "line", key: "again" }, "concern");
     await askNext();
   }, [addTurn, applyAndContinue, askNext, commit, langPref, say, sayAll]);
 
+  const handleInput = useCallback(async (text: string, via: Via) => {
+    if (!text.trim() || turnBusy.current || handing.current) return;
+    if (via !== "voice") stopCapture();
+    turnBusy.current = true;
+    setBusy(true);
+    setReviewText("");
+    try { await processInput(text, via); }
+    finally { turnBusy.current = false; if (alive.current) setBusy(false); }
+    if (alive.current && handsFree.current && !handing.current && document.visibilityState !== "hidden") resumeMic.current();
+  }, [processInput, stopCapture]);
+
   /** A tapped answer. Pick-all questions collect taps until "That's all". */
   const choose = useCallback((value: string, label: string) => {
     const current = refs.current.step;
-    if (!current || status === "thinking") return;
+    if (!current || status === "thinking" || turnBusy.current) return;
+    stopCapture();
     unlockAudio();
     if (isMulti(current, refs.current.draft)) {
       setPicks((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
@@ -285,16 +347,21 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     }
     answered.current = true;
     addTurn({ who: "you", text: label, via: "tap", keys: [] });
-    void applyAndContinue(current, value, "tap");
-  }, [addTurn, applyAndContinue, status]);
+    turnBusy.current = true;
+    setBusy(true);
+    void applyAndContinue(current, value, "tap").finally(() => { turnBusy.current = false; if (alive.current) setBusy(false); });
+  }, [addTurn, applyAndContinue, status, stopCapture]);
 
   const finishPicks = useCallback((labels: string[], skipLabel: string) => {
     const current = refs.current.step;
-    if (!current) return;
+    if (!current || turnBusy.current) return;
+    stopCapture();
     answered.current = true;
     addTurn({ who: "you", text: labels.length ? labels.join(", ") : skipLabel, via: "tap", keys: [] });
-    void applyAndContinue(current, picks.length ? picks : "__skip", "tap");
-  }, [addTurn, applyAndContinue, picks]);
+    turnBusy.current = true;
+    setBusy(true);
+    void applyAndContinue(current, picks.length ? picks : "__skip", "tap").finally(() => { turnBusy.current = false; if (alive.current) setBusy(false); });
+  }, [addTurn, applyAndContinue, picks, stopCapture]);
 
   /** Little reactions while the customer is still talking, the way a friend says "mm" or "aiyo". */
   const backchannel = useCallback((partial: string) => {
@@ -308,42 +375,86 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     setTimeout(() => { if (alive.current) setNod((n) => (n === pick ? null : n)); }, 1500);
   }, []);
 
-  const toggleMic = useCallback(async () => {
-    if (status === "listening") { listening.current?.stop(); return; }
-    if (phase === "handing") return;
+  const startMic = useCallback(async () => {
+    if (!alive.current || handing.current || micOpen.current || turnBusy.current || document.visibilityState === "hidden") return;
+    const generation = ++micGeneration.current;
+    const active = () => alive.current && micGeneration.current === generation && micOpen.current;
+    micOpen.current = true;
     silence();
     unlockAudio();
     setTrouble(null);
-    setStatus("listening");
+    setReviewText("");
+    setStatus("starting");
     setMood("listen");
     setLive("");
     refs.current.live = "";
     nodSeen.current = {};
     let finalText = "";
+    let confidence: number | undefined;
     let error = "";
-    listening.current = await listen(refs.current.lang, {
-      onPartial: (t) => { refs.current.live = t; setLive(t); backchannel(t); },
-      onFinal: (t) => { finalText = t; },
-      onError: (code) => { error = code; },
-      onEnd: () => {
-        listening.current = null;
-        if (!alive.current) return;
-        const said = (finalText || refs.current.live).trim();
-        setLive("");
-        setNod(null);
-        setStatus("idle");
-        setMood("idle");
-        if (said) { void handleInput(said, "voice"); return; }
-        if (!error) { setTrouble("unheard"); return; }
-        void explainMicError(error).then((problem) => { if (alive.current) setTrouble(problem); });
-      },
-    });
-  }, [backchannel, handleInput, phase, status]);
+    const finish = () => {
+      if (!active()) return;
+      clearTimeout(micTimer.current);
+      listening.current = null;
+      micOpen.current = false;
+      setLive(""); setNod(null); setStatus("idle"); setMood("idle");
+      if (!error && finalText && (confidence === undefined || confidence >= 0.55)) {
+        void handleInput(finalText, "voice");
+        return;
+      }
+      handsFree.current = false;
+      setReviewText((finalText || refs.current.live).trim());
+      void explainMicError(error || "no-speech").then(problem => {
+        if (alive.current && generation === micGeneration.current) setTrouble(problem);
+      });
+    };
+    const deadline = (ms: number) => {
+      clearTimeout(micTimer.current);
+      micTimer.current = setTimeout(() => {
+        if (!active()) return;
+        const current = listening.current;
+        error = "no-speech";
+        finish();
+        current?.abort?.();
+      }, ms);
+    };
+    deadline(15000);
+    try {
+      const session = await listen(refs.current.lang, {
+        onReady: () => { if (active()) { setStatus("listening"); deadline(30000); } },
+        onPartial: (t) => { if (active()) { setStatus("listening"); refs.current.live = t; setLive(t); backchannel(t); } },
+        onFinal: (t, score) => { finalText = t.trim(); confidence = score; },
+        onError: (code) => { error = code; },
+        onEnd: finish,
+      });
+      if (active()) listening.current = session;
+      else session.abort?.();
+    } catch { error = "unavailable"; finish(); }
+  }, [backchannel, handleInput]);
+  resumeMic.current = () => { void startMic(); };
+  const toggleMic = useCallback(async () => {
+    if (micOpen.current) {
+      handsFree.current = false;
+      if (listening.current) listening.current.stop();
+      else { stopCapture(); setStatus("idle"); }
+      return;
+    }
+    handsFree.current = true;
+    await startMic();
+  }, [startMic, stopCapture]);
+  const startHandsFree = useCallback(() => {
+    handsFree.current = true;
+    void startMic();
+  }, [startMic]);
 
   const cycleLang = useCallback(() => {
     const order: Array<"auto" | Lang> = ["auto", "tg", "en", "ta"];
-    setLangPref((p) => order[(order.indexOf(p) + 1) % order.length]);
-  }, []);
+    stopCapture();
+    setStatus(s => s === "starting" || s === "listening" ? "idle" : s);
+    const next = order[(order.indexOf(langPref) + 1) % order.length];
+    setLangPref(next);
+    try { localStorage.setItem(LANGUAGE_KEY, next); } catch { /* device storage unavailable */ }
+  }, [langPref, stopCapture]);
 
   const toggleMute = useCallback(() => {
     setMuted((m) => {
@@ -356,6 +467,6 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
 
   return {
     draft, turns, phase, status, live, step, mood, lang, langPref, picks, place, nod, muted, trouble, burst,
-    handleInput, choose, finishPicks, toggleMic, cycleLang, toggleMute, handoff,
+    handleInput, choose, finishPicks, toggleMic, startHandsFree, stopCapture, cycleLang, toggleMute, handoff, reviewText, busy,
   };
 }

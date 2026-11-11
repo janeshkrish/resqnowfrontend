@@ -99,6 +99,19 @@ gradle.taskGraph.whenReady { graph ->
     }
 }
 
+// Check the final APK even when the signed build is launched directly from Gradle.
+def verifyReleaseThozhanAssets = tasks.register('verifyReleaseThozhanAssets', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'node', 'scripts/thozhan-artifacts.mjs', 'android/app/build/outputs/apk/release/app-release.apk'
+    // The verifier needs the filesystem and Node, never the owner's signing credentials.
+    setEnvironment(System.getenv().findAll { name, value ->
+        name.toUpperCase(Locale.ROOT) in ['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP']
+    })
+}
+tasks.matching { it.name == 'packageRelease' }.configureEach {
+    finalizedBy verifyReleaseThozhanAssets
+}
+
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'

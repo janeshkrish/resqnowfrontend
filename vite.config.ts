@@ -1,9 +1,10 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { resolveApiConfiguration } from "./src/lib/apiConfig";
+import { verifyThozhanDist } from "./scripts/thozhan-artifacts.mjs";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -20,7 +21,7 @@ export default defineConfig(({ mode, command }) => {
     : /$a/;
   const paymentNoCacheRuntimePattern = escapedApiBaseUrl
     ? new RegExp(
-      `^${escapedApiBaseUrl}/api/(password-recovery(?:/[^?#]*)?|auth/me|payments/(confirm|verify|confirm-status|verify-subscription-payment|verify-service-payment|verify-registration-payment)|technicians/me/(verify-dues|pay-dues/verify))(?:$|[/?].*)`,
+      `^${escapedApiBaseUrl}/api/(password-recovery(?:/[^?#]*)?|auth/me|voice/status|payments/(confirm|verify|confirm-status|verify-subscription-payment|verify-service-payment|verify-registration-payment)|technicians/me/(verify-dues|pay-dues/verify))(?:$|[/?].*)`,
       "i"
     )
     : /$a/;
@@ -35,6 +36,7 @@ export default defineConfig(({ mode, command }) => {
   return {
     build: {
       outDir: "dist",
+      manifest: true,
     },
     server: {
       host: "::",
@@ -42,6 +44,14 @@ export default defineConfig(({ mode, command }) => {
     },
     plugins: [
       react(),
+      {
+        name: "verify-thozhan-dist",
+        apply: "build",
+        async writeBundle({ dir }) {
+          if (!dir) throw new Error("Missing web build output directory");
+          await verifyThozhanDist({ dist: dir, publicDir: this.environment.config.publicDir });
+        },
+      } satisfies Plugin,
       mode === "development" && componentTagger(),
       env.VITE_NATIVE_BUILD !== 'true' && VitePWA({
         registerType: "autoUpdate",
@@ -84,6 +94,7 @@ export default defineConfig(({ mode, command }) => {
           ],
         },
         workbox: {
+          globPatterns: ["**/*.{js,css,html,woff2}"],
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,

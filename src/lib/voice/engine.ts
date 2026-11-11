@@ -195,10 +195,46 @@ export function findVehicle(text: string, family: VehicleFamily | null, garage: 
   return null;
 }
 
+// Explicit corrections replace earlier words for the same field. Unrelated fields can still use
+// the earlier part (e.g. "my car has a puncture, actually the battery is dead").
+const CORRECTION = /\b(?:actually|correction|sorry|i mean)\b|உண்மையில்|மன்னிக்கவும்/i;
+export const isExplicitCorrection = (text: string) => CORRECTION.test(text);
+const matchesIn = (text: string, re: RegExp) => Array.from(text.matchAll(new RegExp(re.source, "gi")));
+
+function isNegated(text: string, match: RegExpMatchArray, fuel = false): boolean {
+  const at = match.index!;
+  const before = text.slice(0, at);
+  const after = text.slice(at + match[0].length);
+  // Running out of fuel is itself a request for fuel.
+  if (fuel && (/^\s+(?:illa(?:i)?\b|இல்லை)/i.test(after) ||
+      (/\b(?:no|out of|without)\s+$/i.test(before) && !/^\s+(?:issue|problem)\b/i.test(after)))) return false;
+  return /\b(?:not|no|without|never|(?:do|does|did|is|are|was|have|has)n['’]?t)\s+(?:(?:have|need|want|any|a|an|the|my|really)\s+)*$/i.test(before)
+    || /^\s+(?:illa(?:i)?\b|இல்லை|அல்ல|(?:is |was |are )(?:fine|okay|ok|intact)\b|(?:(?:is|was|are)\s+not|(?:is|was|are)n['’]?t)\s+(?:flat|punctured|damaged|dead|broken)\b)/i.test(after);
+}
+
+function findKeyword<T extends string>(text: string, words: Array<[T, RegExp]>) {
+  let match: { key: T; quote: string } | null = null;
+  const decided = new Set<T>();
+  const denied: T[] = [];
+  for (const part of text.split(CORRECTION).reverse()) {
+    for (const [key, re] of words) {
+      if (decided.has(key)) continue;
+      const hits = matchesIn(part, re);
+      if (!hits.length) continue;
+      decided.add(key);
+      const positive = hits.find(m => !isNegated(part, m, key === "fuel"));
+      if (!positive) denied.push(key);
+      else match ??= { key, quote: positive[0] };
+    }
+  }
+  return { match, denied };
+}
+
 /** A question's answer in a sentence: the option said last wins; pick-all questions take every one. */
 export function hearAnswer(service: ServiceKey, q: Question, text: string, ctx: FormContext): { value: AnswerValue; quote: string } | null {
+  const parts = text.split(CORRECTION).reverse();
   if (LITRE_QUESTIONS.has(`${service}.${q.id}`)) {
-    const l = litresIn(text);
+    const l = parts.map(litresIn).find(Boolean);
     if (!l) return null;
     const option = optionsFor(q, ctx).find((o) => Number(o.v) === l.n);
     return option ? { value: option.v, quote: l.quote } : null;
@@ -206,19 +242,28 @@ export function hearAnswer(service: ServiceKey, q: Question, text: string, ctx: 
   const words = ANSWER_WORDS[service]?.[q.id];
   if (!words) return null;
   const options: QuestionOption[] = [...optionsFor(q, ctx), ...(q.extra ? [q.extra] : [])];
-  const hits: Array<{ v: string; quote: string; at: number }> = [];
-  for (const option of options) {
-    const m = words[option.v]?.exec(text);
-    if (m) hits.push({ v: option.v, quote: m[0], at: m.index });
+  for (const part of parts) {
+    const hits = options.flatMap(({ v }) => (words[v] ? matchesIn(part, words[v]) : [])
+      .filter(m => !isNegated(part, m, service === "fuel" && q.id === "fuel"))
+      .map(m => ({ v, quote: m[0], at: m.index!, end: m.index! + m[0].length })));
+    // "Hurt" is inside "nobody is hurt", just as "have a spare" is inside "don't have a spare".
+    const separate = hits.filter(h => !hits.some(other => other.at <= h.at && other.end >= h.end && other.quote.length > h.quote.length));
+    if (!separate.length) continue;
+    if (q.multi) {
+      const values = new Map(separate.map(h => [h.v, h.quote]));
+      return { value: [...values.keys()], quote: [...values.values()].join(", ") };
+    }
+    // One person can be safe while someone else is hurt or trapped.
+    const urgent = (q.id === "hurt" || q.id === "inside") && separate.find(h => h.v === "yes");
+    const selected = urgent || separate.sort((a, b) => b.at - a.at)[0];
+    return { value: selected.v, quote: selected.quote };
   }
-  if (!hits.length) return null;
-  if (q.multi) return { value: hits.map((h) => h.v), quote: hits.map((h) => h.quote).join(", ") };
-  const last = hits.sort((a, b) => b.at - a.at)[0];
-  return { value: last.v, quote: last.quote };
+  return null;
 }
 
 export type Heard = {
   service: ServiceKey | null;
+  deniedServices: ServiceKey[];
   family: VehicleFamily | null;
   familyWord: string;
   vehicle: FoundVehicle | null;
@@ -231,20 +276,22 @@ export type Heard = {
 /** Everything a free sentence says: the problem, the vehicle, and any answers it already gives. */
 export function hear(text: string, draft: VoiceDraft, garage: Vehicle[]): Heard {
   const quotes: Record<string, string> = {};
-  let service: ServiceKey | null = null;
-  for (const [key, re] of SERVICE_WORDS) { const m = re.exec(text); if (m) { service = key; quotes.service = m[0]; break; } }
-  let family: VehicleFamily | null = null;
-  let familyWord = "";
-  for (const [key, re] of FAMILY_WORDS) { const m = re.exec(text); if (m) { family = key; familyWord = m[0]; quotes.family = m[0]; break; } }
+  const { match: serviceMatch, denied: deniedServices } = findKeyword(text, SERVICE_WORDS);
+  let service = serviceMatch?.key ?? null;
+  if (serviceMatch) quotes.service = serviceMatch.quote;
+  const { match: familyMatch } = findKeyword(text, FAMILY_WORDS);
+  let family = familyMatch?.key ?? null;
+  const familyWord = familyMatch?.quote ?? "";
+  if (familyMatch) quotes.family = familyWord;
   if (!family && GENERIC_VEHICLE.test(text)) quotes.family = (GENERIC_VEHICLE.exec(text) ?? [""])[0];
   const vehicle = findVehicle(text, family ?? draft.family, garage) ?? (family ? null : findVehicle(text, null, garage));
   if (vehicle) { family = vehicle.family; quotes.vehicle = vehicle.quote; }
-  const svc = service ?? draft.service;
+  const svc = service ?? (draft.service && !deniedServices.includes(draft.service) ? draft.service : null);
   let evSwitched = false;
   if (svc === "ev-charging") family = "ev";
   if (svc === "fuel" && (family ?? draft.family) === "ev") { service = "ev-charging"; evSwitched = true; }
   const answers: Answers = {};
-  const finalService = service ?? draft.service;
+  const finalService = service ?? svc;
   if (finalService) {
     const ctx: FormContext = { family: family ?? draft.family ?? "car", classId: vehicle?.choice.vehicleSubtype || draft.vehicle.vehicleSubtype || null };
     for (const q of shownQuestions(serviceSpecFor(finalService), {}, ctx)) {
@@ -252,7 +299,7 @@ export function hear(text: string, draft: VoiceDraft, garage: Vehicle[]): Heard 
       if (found) { answers[q.id] = found.value; quotes[q.id] = found.quote; }
     }
   }
-  return { service, family, familyWord: familyWord && !GENERIC_VEHICLE.test(familyWord) ? familyWord : "", vehicle, answers, quotes, highway: HIGHWAY.test(text), evSwitched };
+  return { service, deniedServices, family, familyWord: familyWord && !GENERIC_VEHICLE.test(familyWord) ? familyWord : "", vehicle, answers, quotes, highway: HIGHWAY.test(text), evSwitched };
 }
 
 export type Said = { line: L3 | "understood" | "evSwitch" | "safetyHighway"; urgent?: boolean; call?: string };
@@ -261,9 +308,11 @@ export type Said = { line: L3 | "understood" | "evSwitch" | "safetyHighway"; urg
 export function mergeHeard(draft: VoiceDraft, heard: Heard, via: Via): { draft: VoiceDraft; said: Said[] } {
   const next: VoiceDraft = { ...draft, answers: { ...draft.answers }, asked: { ...draft.asked }, sources: { ...draft.sources } };
   const said: Said[] = [];
-  if (heard.service && heard.service !== next.service) {
+  if ((heard.service && heard.service !== next.service) || (next.service && heard.deniedServices.includes(next.service))) {
+    for (const id of Object.keys(next.answers)) delete next.sources[id];
     next.service = heard.service; next.answers = {}; next.asked = {}; next.pendingSwitch = null;
-    next.sources.service = { via, quote: heard.quotes.service };
+    if (heard.service) next.sources.service = { via, quote: heard.quotes.service };
+    else delete next.sources.service;
   }
   if (heard.family && heard.family !== next.family) {
     next.family = heard.family; next.vehicle = clearedChoice("choose"); next.garageAsked = false; next.wantsName = false;
@@ -282,6 +331,7 @@ export function mergeHeard(draft: VoiceDraft, heard: Heard, via: Via): { draft: 
   if (heard.highway) said.push({ line: "safetyHighway" });
   for (const [id, value] of Object.entries(heard.answers)) {
     const result = calloutFor(next, id, value);
+    if (next.pendingSwitch?.question === id && !result?.switchTo) next.pendingSwitch = null;
     if (result?.switchTo) next.pendingSwitch = next.pendingSwitch ?? { question: id, value: Array.isArray(value) ? value[0] : value };
     else if (result) said.push({ line: result.line, urgent: result.urgent, call: result.call });
   }
@@ -408,8 +458,10 @@ export function understandReply(step: Step, draft: VoiceDraft, text: string, gar
   const t = text.trim();
   if (!t) return null;
   switch (step.kind) {
-    case "service": { const m = SERVICE_WORDS.find(([, re]) => re.test(t)); return m ? { value: m[0], quote: t } : null; }
-    case "family": { const m = FAMILY_WORDS.find(([, re]) => re.test(t)); return m ? { value: m[0], quote: t } : null; }
+    case "service": case "family": {
+      const { match: m } = step.kind === "service" ? findKeyword(t, SERVICE_WORDS) : findKeyword(t, FAMILY_WORDS);
+      return m ? { value: m.key, quote: m.quote } : null;
+    }
     case "garage": {
       const mine = garageForFamily(garage, draft.family!);
       if (YES.test(t) && mine[0]) return { value: String(mine[0].id) };
@@ -438,6 +490,10 @@ export function understandReply(step: Step, draft: VoiceDraft, text: string, gar
       if (!q || !draft.service) return null;
       const found = hearAnswer(draft.service, q, t, contextOf(draft));
       if (found) return { value: found.value, quote: found.quote };
+      if ((q.id === "hurt" || q.id === "inside") && /^[^\s,.!?]+[,.!?]*$/u.test(t)) {
+        if (YES.test(t)) return { value: "yes", quote: t };
+        if (NO.test(t)) return { value: "no", quote: t };
+      }
       const byLabel = [...optionsFor(q, contextOf(draft)), ...(q.extra ? [q.extra] : [])].find((o) => o.label.toLowerCase() === t.toLowerCase());
       if (byLabel) return { value: q.multi ? [byLabel.v] : byLabel.v, quote: t };
       if (q.optional && SKIP.test(t)) return { value: "__skip" };
@@ -471,9 +527,9 @@ export function aiContext(draft: VoiceDraft, service: ServiceKey | null) {
 }
 
 /** Folds a checked AI reading into the draft, only where the words alone left a gap. */
-export function mergeAi(draft: VoiceDraft, ai: AiResult, garage: Vehicle[]): VoiceDraft {
-  const heard: Heard = { service: null, family: null, familyWord: "", vehicle: null, answers: {}, quotes: {}, highway: false, evSwitched: false };
-  if (!draft.service && ai.service && (VOICE_SERVICES as string[]).includes(ai.service)) heard.service = ai.service as ServiceKey;
+export function mergeAiWithFeedback(draft: VoiceDraft, ai: AiResult, garage: Vehicle[], deniedServices: ServiceKey[] = []): { draft: VoiceDraft; said: Said[] } {
+  const heard: Heard = { service: null, deniedServices: [], family: null, familyWord: "", vehicle: null, answers: {}, quotes: {}, highway: false, evSwitched: false };
+  if (!draft.service && ai.service && (VOICE_SERVICES as string[]).includes(ai.service) && !deniedServices.includes(ai.service as ServiceKey)) heard.service = ai.service as ServiceKey;
   if (!draft.family && ai.family && (FAMILIES as string[]).includes(ai.family)) heard.family = ai.family as VehicleFamily;
   if (!hasVehicle(draft.vehicle) && (ai.brand || ai.model)) {
     const found = findVehicle(`${ai.brand ?? ""} ${ai.model ?? ""}`, heard.family ?? draft.family, garage, { lenient: true });
@@ -490,10 +546,15 @@ export function mergeAi(draft: VoiceDraft, ai: AiResult, garage: Vehicle[]): Voi
       else if (!q.multi && typeof raw === "string" && allowed.has(raw)) heard.answers[q.id] = raw;
     }
   }
-  let next = mergeHeard(draft, heard, "ai").draft;
+  const merged = mergeHeard(draft, heard, "ai");
+  let next = merged.draft;
   if (!next.landmark && typeof ai.landmark === "string" && ai.landmark.trim()) next = { ...next, landmark: ai.landmark.trim().slice(0, 120) };
   if (!next.dropText && typeof ai.drop === "string" && ai.drop.trim()) next = { ...next, dropText: ai.drop.trim().slice(0, 160) };
-  return next;
+  return { draft: next, said: merged.said };
+}
+
+export function mergeAi(draft: VoiceDraft, ai: AiResult, garage: Vehicle[]): VoiceDraft {
+  return mergeAiWithFeedback(draft, ai, garage).draft;
 }
 
 /* ------------------------------------------------------------------ handing over to the form */

@@ -12,7 +12,7 @@ import { hasAnswer, shownQuestions } from "@/lib/requestForm";
 import { displayName, hasVehicle } from "@/lib/vehicleChoice";
 import { vehicleClassInfo, type VehicleFamily } from "@/lib/vehicleClasses";
 import { cn } from "@/lib/utils";
-import { fetchVoiceStatus, VOICE_STATUS_KEY } from "@/lib/voice/api";
+import { useVoiceStatus } from "@/hooks/useVoiceEnabled";
 import { answerChips, contextOf, FAMILIES, FAMILY_TITLES, isMulti, questionOf, repliesFor, type VoiceDraft } from "@/lib/voice/engine";
 import { LINES, NOD, UI } from "@/lib/voice/lexicon";
 import { segments, vehicleArt } from "@/lib/voice/talk";
@@ -57,7 +57,7 @@ function tokensFor(draft: VoiceDraft, stepKind: string | undefined, stepId: stri
 export default function VoiceThozhanPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const status = useQuery({ queryKey: VOICE_STATUS_KEY, queryFn: fetchVoiceStatus, staleTime: 60_000 });
+  const status = useVoiceStatus();
   const garageQuery = useQuery({ queryKey: GARAGE_QUERY_KEY, queryFn: listVehicles, staleTime: 60_000 });
   const preset = useMemo(() => {
     const service = params.get("service");
@@ -76,30 +76,44 @@ export default function VoiceThozhanPage() {
   });
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
+  const stopCapture = vt.stopCapture;
 
-  // Opened by "Hey ResQNow": listen straight away, once the wake listener has let go of the microphone.
   const woke = params.get("wake") === "1";
-  const startListening = useRef(vt.toggleMic);
-  startListening.current = vt.toggleMic;
+  const startListening = useRef(vt.startHandsFree);
+  startListening.current = vt.startHandsFree;
   useEffect(() => {
-    if (!woke) return;
-    const timer = setTimeout(() => void startListening.current(), 700);
-    return () => clearTimeout(timer);
-  }, [woke]);
+    if (!woke || !status.data?.enabled || status.data.wake === false || status.data.recognition === false) return;
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) startListening.current(); });
+    return () => { cancelled = true; };
+  }, [woke, status.data?.enabled, status.data?.wake, status.data?.recognition]);
+  useEffect(() => {
+    if (status.data?.recognition === false || (woke && status.data?.wake === false)) stopCapture();
+  }, [status.data?.recognition, status.data?.wake, stopCapture, woke]);
+  useEffect(() => {
+    if (vt.reviewText) { setTyped(vt.reviewText); setTyping(true); }
+  }, [vt.reviewText]);
 
   if (status.data && !status.data.enabled) return <Navigate to="/" replace />;
+  if (!status.data) return (
+    <div className="vt"><div className="vt-frame">
+      <p role="status">{status.isError || status.isPaused ? "Voice settings are unavailable. Try again or use the request form." : "Checking voice availability…"}</p>
+      <button type="button" className="vt-chip" onClick={() => void status.refetch()} disabled={status.isFetching}>Retry</button>
+      <button type="button" className="vt-chip" onClick={() => navigate("/")}>Go to services</button>
+    </div></div>
+  );
 
   const { draft, turns, phase, step, lang, langPref, picks, place } = vt;
   const listening = vt.status === "listening";
   const thinking = vt.status === "thinking";
   const talking = vt.status === "talking";
   const mood = listening ? "listen" : thinking ? "think" : vt.mood;
-  const replies = step && phase === "convo" && !listening && !thinking ? repliesFor(step, draft, garageQuery.data ?? [], UI, lang) : [];
+  const replies = step && phase === "convo" && !listening && !thinking && !vt.busy ? repliesFor(step, draft, garageQuery.data ?? [], UI, lang) : [];
   const multi = step ? isMulti(step, draft) : false;
   const optionalMulti = multi && step?.kind === "question" && Boolean(questionOf(draft.service, step.id)?.optional);
   const tokens = tokensFor(draft, step?.kind, step?.kind === "question" ? step.id : undefined, place?.title ?? null);
   const doneCount = tokens.filter((t) => t.done).length;
-  const showTyping = typing || vt.trouble === "blocked" || vt.trouble === "nomic" || vt.trouble === "unsupported";
+  const showTyping = typing || status.data.recognition === false || vt.trouble === "blocked" || vt.trouble === "nomic" || vt.trouble === "unsupported" || vt.trouble === "offline";
   const lastThozhan = turns.reduce((last, t, i) => (t.who === "thozhan" ? i : last), -1);
   const lastLength = lastThozhan >= 0 ? segments((turns[lastThozhan] as Extract<Turn, { who: "thozhan" }>).line, lang).length : 0;
   const after = lastLength * 0.075 + 0.35;
@@ -111,18 +125,20 @@ export default function VoiceThozhanPage() {
   else if (vt.trouble === "nomic") caption = "No microphone found. Type here instead.";
   else if (vt.trouble === "offline") caption = "Listening needs the internet. Check your connection, or type instead.";
   else if (vt.trouble === "unsupported") caption = inApp ? "This phone can’t listen right now. Type here instead." : "This browser can’t listen. Use Chrome or the ResQNow app, or type here.";
+  else if (vt.reviewText) caption = "Check what I heard. Edit the words and tap Send.";
   else if (vt.trouble === "unheard") caption = "I didn’t catch that. Tap the mic and try again.";
+  else if (vt.status === "starting") caption = "Opening microphone…";
   else if (listening) caption = "Listening · tap when you’re done";
   else if (thinking) caption = "ResQNow-Thozhan is thinking…";
   else if (talking) caption = "ResQNow-Thozhan is talking";
   else if (multi) caption = "Tap all that apply, then “That’s all”";
   else if (step && phase === "convo") caption = "Tap an answer, or tap the mic and say it";
-  const statusText = phase === "handing" ? "Opening your request" : listening ? "Listening to you" : thinking ? "Thinking" : talking ? "Talking" : "Here for you";
+  const statusText = phase === "handing" ? "Opening your request" : listening ? "Listening to you" : vt.status === "starting" ? "Opening microphone" : thinking ? "Thinking" : talking ? "Talking" : "Here for you";
 
   const submitTyped = (event: FormEvent) => {
     event.preventDefault();
     const text = typed.trim();
-    if (!text) return;
+    if (!text || vt.busy) return;
     setTyped("");
     setTyping(false);
     void vt.handleInput(text, "typed");
@@ -139,7 +155,7 @@ export default function VoiceThozhanPage() {
         <header className="vt-top">
           <span className="vt-name">
             <b>ResQNow<span>-Thozhan</span></b>
-            <small className={cn((listening || thinking || phase === "handing") && "is-live")}><i />{statusText}</small>
+            <small aria-live="polite" aria-atomic="true" className={cn((listening || thinking || phase === "handing") && "is-live")}><i />{statusText}</small>
           </span>
           <button type="button" className="vt-chip" onClick={vt.cycleLang} aria-label="Change the language ResQNow-Thozhan speaks">
             <MaterialSymbol name="translate" />{LANG_NAMES[lang]}{langPref === "auto" ? " · auto" : ""}
@@ -153,7 +169,7 @@ export default function VoiceThozhanPage() {
         </header>
 
         <div className="vt-charbox">
-          <button type="button" className="vt-charbtn" onClick={() => void vt.toggleMic()} aria-label={listening ? "Stop listening" : "Talk to ResQNow-Thozhan"}>
+          <button type="button" className="vt-charbtn" disabled={vt.busy || status.data.recognition === false} onClick={() => { setTyping(false); void vt.toggleMic(); }} aria-label={listening ? "Stop listening" : "Talk to ResQNow-Thozhan"}>
             <Thozhan size={160} mood={mood} talking={talking} burst={vt.burst} full />
           </button>
           {vt.nod && listening ? <span className="vt-nod" key={vt.nod}>{NOD[vt.nod][lang]}</span> : null}
@@ -277,13 +293,13 @@ export default function VoiceThozhanPage() {
               {vt.trouble ? <p className="vt-cap is-top" role="status">{caption}</p> : null}
               <form className="vt-type" onSubmit={submitTyped}>
                 <input value={typed} onChange={(event) => setTyped(event.target.value)} placeholder={UI.typeHere[lang]} aria-label="Type to ResQNow-Thozhan" autoFocus />
-                <button type="submit" className="vt-send" aria-label="Send"><MaterialSymbol name="arrow_forward" /></button>
+                <button type="submit" className="vt-send" disabled={vt.busy} aria-label="Send"><MaterialSymbol name="arrow_forward" /></button>
               </form>
             </>
           ) : (
             <>
-              <button type="button" className="vt-side" style={{ left: 22 } as CSSProperties} onClick={() => setTyping(true)} aria-label="Type instead"><MaterialSymbol name="keyboard" /></button>
-              <button type="button" className={cn("vt-mic", listening && "is-live")} onClick={() => void vt.toggleMic()} disabled={phase === "handing"}
+              <button type="button" className="vt-side" style={{ left: 22 } as CSSProperties} onClick={() => { vt.stopCapture(); setTyping(true); }} aria-label="Type instead"><MaterialSymbol name="keyboard" /></button>
+              <button type="button" className={cn("vt-mic", listening && "is-live")} onClick={() => void vt.toggleMic()} disabled={phase === "handing" || vt.busy}
                 aria-label={listening ? "Stop listening" : "Talk to ResQNow-Thozhan"}>
                 {listening ? <span className="vt-stop" /> : <MaterialSymbol name="mic" />}
               </button>

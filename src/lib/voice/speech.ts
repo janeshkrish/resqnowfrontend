@@ -1,8 +1,7 @@
 /**
- * Listening and speaking for ResQNow-Thozhan, with nothing the customer says recorded or uploaded:
- * the Android app uses the phone's own recogniser (the VoiceThozhan plugin in the app), the website
- * uses Chrome's, and where neither exists the customer types. Thozhan speaks in a natural,
- * human-sounding voice from the server when it has one, else with the phone's own voice.
+ * Android and browser speech services provide transcription. Their processing and connectivity
+ * depend on the installed recognizer. The app retains text for the request and supports typing
+ * when recognition is unavailable. Spoken replies use server audio or the device voice.
  */
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import { fetchVoiceAudio } from "./api";
@@ -10,11 +9,11 @@ import type { Lang } from "./lexicon";
 
 type NativeVoice = {
   available(options: { lang: string }): Promise<{ listen: boolean; speak: boolean }>;
-  listen(options: { lang: string }): Promise<void>;
-  stop(): Promise<void>;
+  listen(options: { lang: string; sessionId: string }): Promise<void>;
+  stop(options: { sessionId: string; discard?: boolean }): Promise<void>;
   speak(options: { text: string; lang: string }): Promise<void>;
   silence(): Promise<void>;
-  addListener(event: "partial" | "final" | "error" | "end", listener: (data: { text?: string; error?: string }) => void): Promise<PluginListenerHandle>;
+  addListener(event: "ready" | "partial" | "final" | "error" | "end", listener: (data: { text?: string; error?: string; confidence?: number; sessionId?: string }) => void): Promise<PluginListenerHandle>;
 };
 
 const NativeVoice = registerPlugin<NativeVoice>("VoiceThozhan");
@@ -32,7 +31,8 @@ export const voiceLang = (lang: Lang) => (lang === "en" ? "en-IN" : "ta-IN");
 type WebRecognition = {
   lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
   start(): void; stop(): void; abort(): void;
-  onresult: ((event: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
+  onstart: (() => void) | null;
+  onresult: ((event: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string; confidence?: number } }> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
 };
@@ -42,8 +42,8 @@ const webRecognition = (): (new () => WebRecognition) | null => {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 };
 
-export type ListenHandlers = { onPartial: (text: string) => void; onFinal: (text: string) => void; onError: (code: string) => void; onEnd: () => void };
-export type Listening = { stop: () => void };
+export type ListenHandlers = { onReady?: () => void; onPartial: (text: string) => void; onFinal: (text: string, confidence?: number) => void; onError: (code: string) => void; onEnd: () => void };
+export type Listening = { stop: () => void; abort?: () => void };
 
 /** Whether this device can listen at all; when it can't, the screen opens on typing. */
 export async function canListen(lang: Lang): Promise<boolean> {
@@ -55,37 +55,65 @@ export async function canListen(lang: Lang): Promise<boolean> {
 
 /** Starts listening; words arrive as they are said. A language the browser can't hear falls back to the other one once. */
 export async function listen(lang: Lang, handlers: ListenHandlers): Promise<Listening> {
-  return listenIn(recogniserLang(lang), handlers, true);
+  let attempt: Listening | null = null;
+  let stopped = false;
+  let ended = false;
+  const finish = () => { if (!ended) { ended = true; handlers.onEnd(); } };
+  const start = async (code: string, retry: boolean) => {
+    if (stopped || ended) return;
+    let unsupported = false;
+    const session = await listenIn(code, {
+      ...handlers,
+      onReady: () => { if (!ended) handlers.onReady?.(); },
+      onFinal: (text, score) => {
+        if (!ended) {
+          if (score === undefined) handlers.onFinal(text);
+          else handlers.onFinal(text, score);
+        }
+      },
+      onPartial: text => { if (!ended) handlers.onPartial(text); },
+      onError: error => {
+        if (ended) return;
+        unsupported = retry && (error === "language" || error === "language-not-supported");
+        if (!unsupported) handlers.onError(error);
+      },
+      onEnd: () => {
+        if (unsupported && !stopped) {
+          void start(code === "en-IN" ? "ta-IN" : "en-IN", false).catch(() => { handlers.onError("unavailable"); finish(); });
+        } else finish();
+      },
+    });
+    if (stopped || ended) session.abort?.();
+    else attempt = session;
+  };
+  void start(recogniserLang(lang), true).catch(() => { handlers.onError("unavailable"); finish(); });
+  return {
+    stop: () => { stopped = true; if (attempt) attempt.stop(); else finish(); },
+    abort: () => { stopped = true; attempt?.abort?.(); finish(); },
+  };
 }
 
-async function listenIn(code: string, handlers: ListenHandlers, canRetry: boolean): Promise<Listening> {
-  const other = code === "ta-IN" ? "en-IN" : "ta-IN";
+async function listenIn(code: string, handlers: ListenHandlers): Promise<Listening> {
   if (isNative()) {
-    let retrying = false;
-    let retried: Listening | null = null;
-    const subs = await Promise.all([
-      NativeVoice.addListener("partial", (d) => handlers.onPartial(d.text ?? "")),
-      NativeVoice.addListener("final", (d) => handlers.onFinal(d.text ?? "")),
-      NativeVoice.addListener("error", (d) => {
-        if (d.error === "language" && canRetry) { retrying = true; return; }
-        handlers.onError(d.error ?? "error");
-      }),
-      NativeVoice.addListener("end", () => {
-        subs.forEach((s) => s.remove());
-        // The phone can't hear this language: try the other one once the recogniser has stopped.
-        if (retrying) { void listenIn(other, handlers, false).then((next) => { retried = next; }); return; }
-        handlers.onEnd();
-      }),
-    ]);
+    const sessionId = crypto.randomUUID();
+    let active = true;
+    const subs: PluginListenerHandle[] = [];
+    const cleanup = () => { active = false; subs.splice(0).forEach(s => { void s.remove(); }); };
+    const relevant = (id?: string) => active && (id === undefined || id === sessionId);
     try {
-      await NativeVoice.listen({ lang: code });
-    } catch (error) {
-      subs.forEach((s) => s.remove());
-      // The plugin rejects with a short code ("permission", "unavailable"); the message is for people.
-      handlers.onError((error as { code?: string })?.code || "unavailable");
-      handlers.onEnd();
-    }
-    return { stop: () => { if (retried) retried.stop(); else void NativeVoice.stop(); } };
+      subs.push(await NativeVoice.addListener("ready", d => { if (relevant(d.sessionId)) handlers.onReady?.(); }));
+      subs.push(await NativeVoice.addListener("partial", d => { if (relevant(d.sessionId)) handlers.onPartial(d.text ?? ""); }));
+      subs.push(await NativeVoice.addListener("final", d => { if (relevant(d.sessionId)) handlers.onFinal(d.text ?? "", d.confidence); }));
+      subs.push(await NativeVoice.addListener("error", d => { if (relevant(d.sessionId)) handlers.onError(d.error ?? "error"); }));
+      subs.push(await NativeVoice.addListener("end", d => { if (relevant(d.sessionId)) { cleanup(); handlers.onEnd(); } }));
+      void NativeVoice.listen({ lang: code, sessionId }).catch(error => {
+        if (active) { cleanup(); handlers.onError(error?.code || "unavailable"); handlers.onEnd(); }
+      });
+    } catch (error) { cleanup(); throw error; }
+    return {
+      stop: () => { if (active) void NativeVoice.stop({ sessionId }).catch(() => { cleanup(); handlers.onEnd(); }); },
+      abort: () => { if (active) { cleanup(); void NativeVoice.stop({ sessionId, discard: true }).catch(() => {}); } },
+    };
   }
   const Recognition = webRecognition();
   if (!Recognition) {
@@ -99,32 +127,32 @@ async function listenIn(code: string, handlers: ListenHandlers, canRetry: boolea
   rec.interimResults = true;
   rec.maxAlternatives = 1;
   let final = "";
-  let retrying = false;
-  let retried: Listening | null = null;
+  let confidence: number | undefined;
+  rec.onstart = () => handlers.onReady?.();
   rec.onresult = (event) => {
-    let interim = "";
-    for (let i = 0; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (result.isFinal) final = `${final} ${result[0].transcript}`.trim(); else interim += result[0].transcript;
-    }
-    handlers.onPartial(`${final} ${interim}`.trim());
+    const results = Array.from(event.results);
+    const complete = results.filter((r) => r.isFinal);
+    final = complete.map((r) => r[0].transcript.trim()).join(" ").trim();
+    const scores = complete.map((r) => r[0].confidence).filter((score): score is number => score !== undefined && Number.isFinite(score) && score >= 0);
+    confidence = scores.length ? Math.min(...scores) : undefined;
+    handlers.onPartial(results.map((r) => r[0].transcript.trim()).join(" ").trim());
   };
   rec.onerror = (event) => {
-    if (event.error === "language-not-supported" && canRetry) {
-      retrying = true;
-      void listenIn(other, handlers, false).then((next) => { retried = next; });
-      return;
-    }
     handlers.onError(event.error);
   };
   rec.onend = () => {
-    if (retrying) return;
     // Chrome sometimes ends without marking anything final; the hook then uses the last words it showed.
-    if (final) handlers.onFinal(final);
+    if (final) {
+      if (confidence === undefined) handlers.onFinal(final);
+      else handlers.onFinal(final, confidence);
+    }
     handlers.onEnd();
   };
   try { rec.start(); } catch { handlers.onError("busy"); handlers.onEnd(); }
-  return { stop: () => { if (retried) retried.stop(); else try { rec.stop(); } catch { /* already stopped */ } } };
+  return {
+    stop: () => { try { rec.stop(); } catch { /* already stopped */ } },
+    abort: () => { rec.onend = null; rec.onerror = null; rec.onresult = null; rec.onstart = null; try { rec.abort(); } catch { /* already stopped */ } },
+  };
 }
 
 /** Why listening failed, in words the customer can act on: blocked, no microphone, offline, unsupported, or nothing heard. */
@@ -235,7 +263,7 @@ async function playNatural(text: string, lang: Lang): Promise<boolean> {
         stopPlayer = null;
         resolve(played);
       };
-      const timer = window.setTimeout(() => finish(started), 30000);
+      const timer = window.setTimeout(() => { audio.pause(); finish(started); }, 30000);
       audio.onended = () => finish(true);
       audio.onerror = () => finish(started);
       // Silenced (the customer tapped the mic): done, and the phone's voice must not take over.
@@ -256,7 +284,16 @@ export async function speak(text: string, lang: Lang): Promise<void> {
   if (!text) return;
   if (canPlay() && (await playNatural(text, lang))) return;
   if (isNative()) {
-    try { await NativeVoice.speak({ text, lang: voiceLang(lang) }); } catch { /* no voice installed: the words are on screen */ }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        NativeVoice.speak({ text, lang: voiceLang(lang) }),
+        new Promise<void>(resolve => {
+          timer = setTimeout(() => { void NativeVoice.silence().catch(() => {}); resolve(); }, 12000);
+        }),
+      ]);
+    } catch { /* the words remain on screen */ }
+    finally { clearTimeout(timer); }
     return;
   }
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -264,16 +301,17 @@ export async function speak(text: string, lang: Lang): Promise<void> {
   const voice = pickVoice(await browserVoices(), code);
   if (!voice) return;
   await new Promise<void>((resolve) => {
+    const timer = window.setTimeout(() => { window.speechSynthesis.cancel(); finish(); }, 12000);
+    const finish = () => { window.clearTimeout(timer); resolve(); };
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = voice.lang || code;
     utterance.voice = voice;
     // A touch slower than the default reads Tamil more clearly.
     utterance.rate = 0.95;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    utterance.onend = finish;
+    utterance.onerror = finish;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
-    window.setTimeout(resolve, 12000);
   });
 }
 

@@ -245,7 +245,8 @@ export function MapplsMapSurface({
     const circleLayers = circleLayersRef.current;
 
     setLoaded(false);
-    loadSdk()
+    const initialize = async () => loadSdk();
+    initialize()
       .then((loadedRuntime) => {
         if (disposed) return;
         runtime = loadedRuntime;

@@ -1,0 +1,137 @@
+{
+  "fetched": "2026-11-01",
+  "sources": [
+    "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
+    "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&icon_names=account_balance,account_balance_wallet,add,add_photo_alternate,airport_shuttle,android,arrow_back,arrow_drop_down,arrow_drop_up,arrow_forward,arrow_outward,assignment_ind,auto_towing,badge,bar_chart,battery_charging_full,block,bolt,build,calendar_month,call,campaign,cancel,car_crash,car_lock,car_repair,chat,check,check_circle,checklist,chevron_left,chevron_right,close,cloud,content_copy,contrast,credit_card,currency_rupee,dark_mode,delete,directions,directions_car,do_not_disturb_on,do_not_step,download,edit,edit_note,electric_car,electrical_services,emergency,engineering,error,ev_station,expand_less,expand_more,fact_check,flag,flood,forum,garage_home,gavel,grain,graphic_eq,group,groups,handshake,help,history,home,hourglass_top,how_to_reg,image,inbox,info,ios_share,key,key_off,keyboard,keyboard_arrow_down,keyboard_double_arrow_right,label,landslide,light_mode,lightbulb,list,local_gas_station,local_shipping,location_off,location_on,lock,lock_reset,logout,mail,map,menu,mic,mic_off,monitor_heart,monitoring,more_horiz,my_location,navigation,near_me,notification_important,notifications,notifications_active,oil_barrel,open_in_new,pan_tool,pause,payments,person,person_add,person_search,personal_injury,phishing,phone_iphone,photo_camera,photo_library,pin,pin_drop,play_arrow,policy,power_off,priority_high,progress_activity,propane_tank,push_pin,radar,radio_button_unchecked,receipt_long,refresh,remove,remove_circle,replay,schedule,search,search_off,sell,send,settings,settings_remote,slow_motion_video,smartphone,sms,sos,space_dashboard,star,star_half,stop,storefront,support_agent,swap_horiz,sync_alt,task_alt,terrain,thermostat,thumb_down,tire_repair,touch_app,translate,tune,two_wheeler,verified,verified_user,visibility,visibility_off,volume_off,volume_up,warning,water_drop,workspace_premium,zoom_out_map&display=block"
+  ],
+  "assets": [
+    {
+      "file": "ca157063339ac4ad418f214f.woff2",
+      "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+      "size": 25960,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2"
+    },
+    {
+      "file": "71d5ee93cc1e9f1d520a3a8b.woff2",
+      "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+      "size": 18748,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7SUc.woff2"
+    },
+    {
+      "file": "6e9e020a25f9b56d418f2c08.woff2",
+      "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+      "size": 11232,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7SUc.woff2"
+    },
+    {
+      "file": "1be3448e292fbf05ffe176fe.woff2",
+      "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+      "size": 18996,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2"
+    },
+    {
+      "file": "5c66f9e07e90c6d4ac4922cc.woff2",
+      "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+      "size": 10252,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2pL7SUc.woff2"
+    },
+    {
+      "file": "34b9c504cab7a73e37b74634.woff2",
+      "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+      "size": 85068,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7SUc.woff2"
+    },
+    {
+      "file": "3100e775e8616cd2611beecf.woff2",
+      "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+      "size": 48256,
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2"
+    },
+    {
+      "file": "c46a510ab43925a55ecfe6c2.woff2",
+      "sha256": "c46a510ab43925a55ecfe6c2d5fad0ce1902cd48ab276621d41f7afa42e4daee",
+      "size": 1716,
+      "source": "https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko70yyygA.woff2"
+    },
+    {
+      "file": "b275d1258601dda240fc6a1d.woff2",
+      "sha256": "b275d1258601dda240fc6a1d4a6cad56e691d898f5cdf1b0e4fd6ca0022d8e40",
+      "size": 8352,
+      "source": "https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko50yyygA.woff2"
+    },
+    {
+      "file": "38e3b8fd8045048eb311d901.woff2",
+      "sha256": "38e3b8fd8045048eb311d90170a4429ed2c8f405852dc3d91b5af8452758703f",
+      "size": 21728,
+      "source": "https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko40yyygA.woff2"
+    },
+    {
+      "file": "153fc85b70298beeb1d61a5f.woff2",
+      "sha256": "153fc85b70298beeb1d61a5f723331649e7f23bb77302a66e61cb3e2fbdb5e79",
+      "size": 27348,
+      "source": "https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2"
+    },
+    {
+      "file": "3c09135e88bbfcd848e99be1.woff2",
+      "sha256": "3c09135e88bbfcd848e99be137710afbb615a8d9a73c5c48e6cb0245a162af1d",
+      "size": 2588,
+      "source": "https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggqxSuXd.woff2"
+    },
+    {
+      "file": "447c49583b1b735cc6f56615.woff2",
+      "sha256": "447c49583b1b735cc6f566151db1d24354cec41076c55dd98455cfbde9e806c1",
+      "size": 14352,
+      "source": "https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggOxSuXd.woff2"
+    },
+    {
+      "file": "e507c109c31789b33994646b.woff2",
+      "sha256": "e507c109c31789b33994646b457ee288639324516357250607c9b1398186e069",
+      "size": 9268,
+      "source": "https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggSxSuXd.woff2"
+    },
+    {
+      "file": "dbf64d973b3987844df30992.woff2",
+      "sha256": "dbf64d973b3987844df30992c93f47d24ac8935ee8c9b1e320942aeb1b367703",
+      "size": 8388,
+      "source": "https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggixSuXd.woff2"
+    },
+    {
+      "file": "2f7335119075b2079f1d8825.woff2",
+      "sha256": "2f7335119075b2079f1d882530bbc18728461612bf90743203d73a74a48f4d9b",
+      "size": 15160,
+      "source": "https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggmxSuXd.woff2"
+    },
+    {
+      "file": "8c2def024c1bf31aacf3624a.woff2",
+      "sha256": "8c2def024c1bf31aacf3624ae3c4d701269b4ec3dc765c04830839f0d36b2d9e",
+      "size": 24532,
+      "source": "https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggexSg.woff2"
+    },
+    {
+      "file": "055f804774f0abe2c8181211.woff2",
+      "sha256": "055f804774f0abe2c8181211f00d849c6bcf197749d6822fde2c73c0375dd6d3",
+      "size": 156776,
+      "source": "https://fonts.gstatic.com/l/font?kit=sykd-zNym6YjUruM-QrEh7-nyTnjDwKNJ_190FjpZIvLgyidOK7BDB_QddXulOcfG1W7nZtukQy40HKm7UwBnkHv2QTZ2ZTGcflwx69-87B5YP09nWe9xo9UmI7t2AisF9lUxu0IYIHRVB7BjdIOfy3Zzx64m1qz5ueltS4QVkWIiarJhfSyUlRiNJzgz-rK1_WAaLqKf0MBu8C5a6W-ZB1R_DEs87RanibYDwmUgv6FCR6OPZWYCAmsmT0zcQh4rme4Y3JXpt3YEiCHBZvys26BCzf23t6mTND8dkfGHgeIX3cfeL4lYqVox9E&skey=70ddea8fe54d532e&v=v383"
+    }
+  ],
+  "licenses": [
+    {
+      "file": "Inter-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt"
+    },
+    {
+      "file": "Manrope-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/manrope/OFL.txt"
+    },
+    {
+      "file": "Plus-Jakarta-Sans-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/plusjakartasans/OFL.txt"
+    },
+    {
+      "file": "Material-Symbols-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE"
+    }
+  ]
+}

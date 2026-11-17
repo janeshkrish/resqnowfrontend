@@ -1,0 +1,13 @@
+# Mappls APK configuration repair
+
+The user requests rectification of Android map failures while explicitly leaving Mappls quota/billing for later. The distributed v1.3/code4 APK contains a different key from the live website; its Web SDK request returns401/ASSET_ACCESS_DENIED. The intended local production public key matches the live website fingerprint, but editing dotenv or deploying the website does not replace installed APK assets.
+
+Keep the current mappls-web-maps3.8.1/Capacitor integration and VITE_MAPPLS_MAP_SDK_KEY. A native SDK rewrite would replace existing React map/location/tracking logic and introduce unrelated platform integration; it is outside this repair. Runtime key delivery through a new backend endpoint would add another network/configuration dependency and is not needed to correct stale packaging. The implementation choice is to repair the existing build/sync/verification path, consistent with the user's existing request to handle implementation directly in the D: main checkout.
+
+Require a configured public SDK key before native asset preparation. Inspect the actual reachable Vite output (not source or orphan chunks), then compare copied Capacitor assets and finished APK bytes against that output. Every compiled Mappls key reader must match the approved build setting; no raw keys or SDK URLs may appear in errors. The packaged origin remains https://localhost; refuse accidental development-server or non-HTTPS native configuration. Existing signing/version/release gates remain intact.
+
+Provide a cross-platform android:sync command which builds native-mode web assets from the same production dotenv/public settings as the website, verifies them, and syncs/verifies Capacitor assets. This command does not sign, install, publish, enable updates or change account settings. The release adapter uses the same preparation and verifies its final APK.
+
+Initialization failures, including synchronous loader exceptions, stay inside the existing retryable map fallback. No new map design, provider fallback, Referrer spoofing, host impersonation, blanket allowNavigation, TLS relaxation, quota bypass or private server credential in VITE variables.
+
+All changes and verification artifacts stay under D:/resqnow-production-code. Preserve staged font/account tests and concurrent uncommitted voice work. Controlled SDK failures/static artifact tests can prove code behavior without paid Mappls calls; actual maps/tiles remain externally blocked until authorization and quota are valid. Do not call a debug build, compilation or HTTP fixture a production/device acceptance pass.

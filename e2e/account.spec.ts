@@ -48,6 +48,8 @@ async function openAccount(page: Page, { me = {}, settings = {}, failSettings = 
     const reply = (status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (method !== "GET") calls.push(`${method} ${url.pathname} ${request.postData() ?? ""}`.trim());
     if (url.pathname === "/api/auth/me") return reply(200, account);
+    if (url.pathname === "/api/password-recovery/user/status") return reply(200, { email: account.email, hasPassword: !account.googleId, verified: true });
+    if (url.pathname === "/api/password-recovery/user/request" && method === "POST") return reply(200, { message: "If this account has a verified recovery email, a password reset link will be sent. Check your inbox and spam folder." });
     if (url.pathname === "/api/auth/logout") return reply(200, { success: true });
     if (url.pathname === "/api/vehicles") return reply(200, VEHICLES);
     if (url.pathname === "/api/service-requests") return reply(200, requests());
@@ -300,12 +302,10 @@ test("Privacy and security, and reaching support", async ({ page }) => {
   await expect(page.getByRole("link", { name: "How we use your data Privacy policy" })).toHaveAttribute("href", "/privacy-policy");
   await shot(page, "security");
 
-  // Neither of these can be done in the app yet, so each one leads to the people who can do it.
-  await page.getByRole("button", { name: "Change password" }).click();
-  const password = page.getByRole("dialog", { name: "Change password" });
-  await expect(password.getByText("This isn’t in the app yet. Our support team will do it for you.")).toBeVisible();
-  await expect(password.getByRole("link", { name: /Call us/ })).toHaveAttribute("href", "tel:+919566510080");
-  await password.getByRole("button", { name: "Close" }).click();
+  // Password recovery now has a real flow; deletion still goes through support.
+  const recovery = page.getByRole("region", { name: "Password recovery" });
+  await expect(recovery).toContainText("Recovery email verified: asha@example.test");
+  await expect(recovery.getByRole("link", { name: "Reset password by email" })).toHaveAttribute("href", "/forgot-password");
   await page.getByRole("button", { name: /Delete my account/ }).click();
   const remove = page.getByRole("dialog", { name: "Delete my account" });
   await expect(remove.getByRole("link", { name: /Email us/ })).toHaveAttribute("href", "mailto:resqnow01@gmail.com");
@@ -333,6 +333,20 @@ test("someone signed in with Google has no password to change", async ({ page })
   await expect(page.getByText("Signed in with Google")).toBeVisible();
   await expect(page.getByRole("button", { name: /Delete my account/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Change password" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Reset password by email" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Password recovery" })).toContainText("This account has no password to reset.");
+});
+
+test("a verified recovery address can request a reset link from security settings", async ({ page }) => {
+  const { calls, errors } = await openAccount(page, { path: "/settings?tab=privacy" });
+  await page.getByRole("region", { name: "Password recovery" }).getByRole("link", { name: "Reset password by email" }).click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.getByRole("heading", { name: "Forgot password" })).toBeVisible();
+  await page.getByLabel("Email address", { exact: true }).fill("asha@example.test");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByRole("status")).toContainText("If this account has a verified recovery email, a password reset link will be sent.");
+  expect(calls).toEqual(['POST /api/password-recovery/user/request {"email":"asha@example.test"}']);
+  expect(errors).toEqual([]);
 });
 
 test("logging out asks first", async ({ page }) => {
@@ -350,7 +364,11 @@ test("logging out asks first", async ({ page }) => {
   await page.getByRole("button", { name: "Log out" }).click();
   await page.getByRole("dialog", { name: "Log out?" }).getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("resqnow_user_token"))).toBeNull();
+  // Logout may replace the document between URL observation and storage access.
+  // Retry only this read/assertion across that navigation, never the logout action.
+  await expect(async () => {
+    expect(await page.evaluate(() => localStorage.getItem("resqnow_user_token"))).toBeNull();
+  }).toPass({ timeout: 15_000 });
   expect(calls).toEqual(["POST /api/auth/logout"]);
 });
 

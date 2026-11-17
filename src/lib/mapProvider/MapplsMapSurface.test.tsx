@@ -84,6 +84,17 @@ describe("Mappls map surface", () => {
     expect(log).toHaveBeenCalledWith("[Mappls]", { code: "map_failed", origin: window.location.origin });
   });
 
+  it("contains a synchronous SDK exception and can retry without crashing the screen", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { runtime } = createFakeRuntime();
+    const loadSdk = vi.fn().mockImplementationOnce(() => { throw new Error("SDK initialization failed"); }).mockResolvedValue(runtime);
+    render(<MapplsMapSurface ariaLabel="Android map" loadSdk={loadSdk} markers={[]} polylines={[]} circles={[]} />);
+    expect(await screen.findByRole("status")).toHaveTextContent("Map is temporarily unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Retry map" }));
+    await waitFor(() => expect(runtime.Map).toHaveBeenCalledTimes(1));
+    expect(loadSdk).toHaveBeenCalledTimes(2);
+  });
+
   it("creates one map and forwards map interactions", async () => {
     const onInteract = vi.fn();
     const { fakeMap, runtime } = createFakeRuntime();

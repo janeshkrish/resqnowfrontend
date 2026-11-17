@@ -8,6 +8,22 @@ const SHOTS = process.env.TRACKING_SHOTS_DIR;
 const CUSTOMER_SPOT = { lat: 11.0168, lng: 76.9558 };
 const DROP_SPOT = { lat: 11.0401, lng: 76.9903 };
 
+test("a Mappls initialization failure keeps tracking usable and can retry", async ({ page }) => {
+  const { seen } = await openTracking(page);
+  const healthy = "export const initializeMapplsSdk = () => Promise.resolve(runtime);";
+  expect(fakeMappls).toContain(healthy);
+  const failedOnce = fakeMappls.replace(healthy, 'let attempts = 0; export const initializeMapplsSdk = () => { if (attempts++ === 0) throw new Error("Controlled Mappls initialization failure"); return Promise.resolve(runtime); };');
+  await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, route => route.fulfill({ contentType: "application/javascript", body: failedOnce }));
+  await page.reload();
+  await expect(page.getByText("Map is temporarily unavailable", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("tracking-card")).toBeVisible();
+  await expect(page.getByText("Something went wrong", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Retry map" }).click();
+  await expect(page.getByText("Map is temporarily unavailable", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("application")).toBeVisible();
+  expect(seen.errors).toEqual([]);
+});
+
 type TrackedRequest = Record<string, unknown> & { status: string; payment_status: string };
 
 /** A lockout request for a pickup truck, with Arun on the way: what the backend returns for it. */
@@ -105,6 +121,8 @@ async function openTracking(page: Page, initial: TrackedRequest = request()) {
 
   await page.goto("/request-service-tracking/5502");
   await expect(page.getByTestId("tracking-card")).toBeVisible();
+  // The card mounts behind the opening splash; coordinate input must wait for it to leave.
+  await expect(page.getByText("Your Roadside Assistance Partner")).toHaveCount(0);
   return { state, seen, socket };
 }
 

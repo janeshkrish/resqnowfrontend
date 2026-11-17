@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';import {createAndroidTools} from './android-release.mjs';
 import {randomUUID} from 'node:crypto';
+import {validateMapplsKey,verifyMapplsDist,verifyMapplsNativeAssets,verifyMapplsApk} from './mappls-artifacts.mjs';
 const SIGNING=['RESQNOW_ANDROID_KEYSTORE_PATH','RESQNOW_ANDROID_KEY_ALIAS','RESQNOW_ANDROID_STORE_PASSWORD','RESQNOW_ANDROID_KEY_PASSWORD'];
 const OS_KEYS=new Set(['PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','HOME','USERPROFILE','TEMP','TMP','TMPDIR','JAVA_HOME','ANDROID_HOME','ANDROID_SDK_ROOT','ANDROID_USER_HOME','GRADLE_USER_HOME','NPM_CONFIG_CACHE','LANG','LC_ALL']);
 export async function withSigningFile(env,body){
@@ -11,8 +12,19 @@ export async function withSigningFile(env,body){
   finally{data.fill(0);if(owned)await fs.rm(file,{force:true});}
 }
 function execute(command,args,options){return new Promise((resolve,reject)=>{const child=spawn(command,args,{...options,stdio:'inherit',windowsHide:true});child.once('error',()=>reject(Error('Android release build command could not start')));child.once('exit',code=>code===0?resolve():reject(Error('Android release build command failed')));});}
-export function createAndroidBuildRunner({root,env=process.env,run=execute}){
+export async function prepareAndroidWebAssets({root,publicSettings,env=process.env,run=execute}){
+  validateMapplsKey(publicSettings?.VITE_MAPPLS_MAP_SDK_KEY);
+  if(publicSettings.VITE_NATIVE_BUILD!=='true')throw Error('Native web assets require VITE_NATIVE_BUILD=true');
   const base=Object.fromEntries(Object.entries(env).filter(([key,value])=>OS_KEYS.has(key.toUpperCase())&&typeof value==='string'));
+  const settings=Object.fromEntries(Object.entries(publicSettings).filter(([key,value])=>key.startsWith('VITE_')&&typeof value==='string'));
+  const publicEnv={...base,...settings,NODE_ENV:'production',CI:'true'};
+  await run(process.execPath,['node_modules/vite/bin/vite.js','build'],{cwd:root,env:publicEnv});
+  await verifyMapplsDist({dist:path.join(root,'dist'),key:settings.VITE_MAPPLS_MAP_SDK_KEY});
+  await run(process.execPath,['node_modules/@capacitor/cli/bin/capacitor','sync','android'],{cwd:root,env:publicEnv});
+  await verifyMapplsNativeAssets({root,key:settings.VITE_MAPPLS_MAP_SDK_KEY});
+  return publicEnv;
+}
+export function createAndroidBuildRunner({root,env=process.env,run=execute}){
   return {tools:createAndroidTools({sdk:env.ANDROID_HOME??env.ANDROID_SDK_ROOT,javaHome:env.JAVA_HOME}),
     async build({version,publicSettings,googleServices}){
       for(const key of SIGNING)if(typeof env[key]!=='string'||!env[key])throw Error('Owner signing credentials are not configured');
@@ -20,12 +32,12 @@ export function createAndroidBuildRunner({root,env=process.env,run=execute}){
       const file=path.join(root,'android/app/google-services.json');await fs.mkdir(path.dirname(file),{recursive:true});
       try{if(JSON.stringify(JSON.parse(await fs.readFile(file,'utf8')))!==JSON.stringify(googleServices))throw Error('Existing Android provider configuration differs from approved settings');}
       catch(error){if(error.code!=='ENOENT')throw error;await fs.writeFile(file,JSON.stringify(googleServices),{flag:'wx'});}
-      const publicEnv={...base,...publicSettings,NODE_ENV:'production',CI:'true'};
-      await run(process.execPath,['node_modules/vite/bin/vite.js','build'],{cwd:root,env:publicEnv});
-      await run(process.execPath,['node_modules/@capacitor/cli/bin/capacitor','sync','android'],{cwd:root,env:publicEnv});
+      const publicEnv=await prepareAndroidWebAssets({root,publicSettings,env,run});
       const java=path.join(env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java');
       await run(java,['-classpath',path.join(root,'android/gradle/wrapper/gradle-wrapper.jar'),'org.gradle.wrapper.GradleWrapperMain','-p','android',':app:assembleRelease',`-PRESQNOW_ANDROID_VERSION_CODE=${version.versionCode}`,`-PRESQNOW_ANDROID_VERSION_NAME=${version.versionName}`,'-PRESQNOW_APP_UPDATES_ENABLED=true','--no-daemon'],{cwd:root,env:{...publicEnv,...Object.fromEntries(SIGNING.map(key=>[key,env[key]]))}});
-      return path.join(root,'android/app/build/outputs/apk/release/app-release.apk');
+      const apk=path.join(root,'android/app/build/outputs/apk/release/app-release.apk');
+      await verifyMapplsApk({root,apk,key:publicSettings.VITE_MAPPLS_MAP_SDK_KEY});
+      return apk;
     }};
 }
 export async function prepareAndroidSdk({root,env=process.env,platform=process.platform,run=execute}){

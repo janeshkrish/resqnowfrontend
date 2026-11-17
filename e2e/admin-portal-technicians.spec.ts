@@ -41,7 +41,7 @@ test("hiding from new jobs, a log-in reminder and deleting, from the row", async
     // The mobile table scrolls horizontally; its menu intentionally closes on
     // scroll. Finish revealing the action before opening that menu.
     await more.scrollIntoViewIfNeeded();
-    await expect(more).toBeInViewport({ ratio: 1 });
+    await more.click({ trial: true });
     await more.click();
   };
   await table.getByRole("switch", { name: "Murugan S shown to customers" }).click();

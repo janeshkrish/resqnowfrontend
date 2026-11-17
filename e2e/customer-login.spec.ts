@@ -50,6 +50,9 @@ async function openLogin(page: Page, { known = true, serverDownOnce = false, sen
   const unexpected: string[] = [];
   const idToken = firebaseIdToken();
   let serverDown = serverDownOnce;
+  // A successful sign-in now hydrates the server's current profile. Anonymous
+  // and unknown tokens must still be refused by this boundary.
+  const sessions = new Map<string, Json>();
   page.on("pageerror", (error) => errors.push(error.message));
   if (clock) await page.clock.install();
 
@@ -118,16 +121,27 @@ async function openLogin(page: Page, { known = true, serverDownOnce = false, sen
         return reply(503, { error: "Phone login is not available right now. Please use Google or email." });
       }
       if (body.idToken !== idToken) return reply(401, { error: "We could not confirm your number. Please try again." });
-      if (known) return reply(200, { token: "e2e-phone-token", role: "user", isNew: false, user: ACCOUNT });
+      if (known) {
+        sessions.set("e2e-phone-token", { ...ACCOUNT, subscription: "free" });
+        return reply(200, { token: "e2e-phone-token", role: "user", isNew: false, user: ACCOUNT });
+      }
       if (!body.name) return reply(200, { needsName: true, phone: PHONE });
-      return reply(201, { token: "e2e-phone-token", role: "user", isNew: true, user: { ...ACCOUNT, id: 501, name: body.name } });
+      const user = { ...ACCOUNT, id: 501, name: body.name };
+      sessions.set("e2e-phone-token", { ...user, subscription: "free" });
+      return reply(201, { token: "e2e-phone-token", role: "user", isNew: true, user });
     }
     if (url.pathname === "/api/users/login") {
       if (body.password !== "right-password") return reply(401, { error: "Invalid email or password." });
-      return reply(200, { token: "e2e-email-token", role: "user", user: { id: 41, name: "Asha Raman", email: body.email, isVerified: true, role: "user" } });
+      const user = { id: 41, name: "Asha Raman", email: body.email, isVerified: true, role: "user" };
+      sessions.set("e2e-email-token", { ...user, subscription: "free" });
+      return reply(200, { token: "e2e-email-token", role: "user", user });
     }
     if (url.pathname === "/api/auth/google/url") return reply(200, { url: "https://accounts.e2e.test/o/oauth2/auth?state=web" });
-    if (url.pathname === "/api/auth/me") return reply(401, { error: "Unauthorized" });
+    if (url.pathname === "/api/auth/me") {
+      const token = request.headers().authorization?.replace(/^Bearer /, "");
+      const profile = token ? sessions.get(token) : undefined;
+      return profile ? reply(200, profile) : reply(401, { error: "Unauthorized" });
+    }
     return reply(404, {});
   });
 

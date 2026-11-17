@@ -38,14 +38,15 @@ function preferredLanguage(): "auto" | Lang {
 }
 
 /** Where the customer is: the device's location, named by the same lookup the request form uses. */
-function locate(): Promise<FoundPlace | null> {
+function locate(signal: AbortSignal): Promise<FoundPlace | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) { resolve(null); return; }
     navigator.geolocation.getCurrentPosition(async (position) => {
+      if (signal.aborted) { resolve(null); return; }
       const { latitude: lat, longitude: lng } = position.coords;
       const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       try {
-        const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`), { signal: AbortSignal.timeout(3500) });
+        const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`), { signal: AbortSignal.any([signal, AbortSignal.timeout(3500)]) });
         const data = res.ok ? await res.json() : null;
         const summary = summarizePlace(data);
         const address = String(data?.display_name || fallback);
@@ -106,6 +107,8 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
   const handing = useRef(false);
   const resumeMic = useRef<() => void>(() => {});
   const nodSeen = useRef<Record<string, true>>({});
+  const turnController = useRef(new AbortController());
+  const isActive = useCallback((signal: AbortSignal) => alive.current && !signal.aborted && document.visibilityState !== 'hidden', []);
 
   const stopCapture = useCallback(() => {
     handsFree.current = false;
@@ -124,15 +127,20 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     const calm = setTimeout(() => setMood((m) => (m === "happy" ? "idle" : m)), 2600);
     const hidden = () => {
       if (document.visibilityState === "hidden") {
-        const wasCapturing = micOpen.current;
+        turnController.current.abort();
+        turnBusy.current = false;
+        handing.current = false;
+        setBusy(false);
+        setBurst(false);
+        setPhase(phase => phase === 'handing' ? 'convo' : phase);
         stopCapture();
         silence();
-        if (wasCapturing) { setStatus("idle"); setLive(""); setMood("idle"); }
+        setStatus("idle"); setLive(""); setMood("idle");
       }
     };
     document.addEventListener("visibilitychange", hidden);
     return () => {
-      alive.current = false; clearTimeout(calm); stopCapture(); silence();
+      alive.current = false; turnController.current.abort(); clearTimeout(calm); stopCapture(); silence();
       document.removeEventListener("visibilitychange", hidden);
     };
   }, [stopCapture]);
@@ -144,8 +152,9 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
 
   /** Says a line: a beat of thinking, the words on screen (and aloud unless muted), then quiet. Lines never overlap. */
   const say = useCallback((line: Line, nextMood: Mood, call?: string) => {
+    const signal = turnController.current.signal;
     const run = async () => {
-      if (!alive.current) return;
+      if (!isActive(signal)) return;
       setStatus("thinking");
       const asks = line.kind === "question" || (line.kind === "line" && line.key.startsWith("ask") && line.key !== "askModel");
       const shown: Line = answered.current && asks ? { ...line, ack: acks.current++ } : line;
@@ -155,25 +164,28 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
       const aloud = !refs.current.muted;
       if (aloud) prepareSpeech(words, refs.current.lang);
       await wait(420);
+      if (!isActive(signal)) return;
       if (aloud) await speechReady(words, refs.current.lang, 2500);
-      if (!alive.current) return;
+      if (!isActive(signal)) return;
       addTurn({ who: "thozhan", line: shown, call });
       setMood(nextMood);
       setStatus("talking");
       const least = 500 + words.split(/\s+/).length * 110;
       if (refs.current.muted) await wait(least);
       else await Promise.all([speak(words, refs.current.lang), wait(least)]);
-      if (alive.current) setStatus("idle");
+      if (isActive(signal)) setStatus("idle");
     };
     queue.current = queue.current.then(run, run);
     return queue.current;
-  }, [addTurn]);
+  }, [addTurn, isActive]);
 
   const vehicleName = (d: VoiceDraft) => (d.vehicle.vehicleModel ? displayName(d.vehicle) : d.familyWord || undefined);
 
   const sayAll = useCallback(async (said: Said[], d: VoiceDraft) => {
+    const signal = turnController.current.signal;
     const l = refs.current.lang;
     for (const item of said) {
+      if (!isActive(signal)) return;
       if (item.line === "understood" && d.service) {
         const chips = { react: reactChip(d.service, l), svc: serviceChip(d.service, l), ...(d.family ? { veh: vehicleChip(d.family, l, vehicleName(d)) } : {}) };
         await say({ kind: "line", key: d.family ? "understood" : "understoodNoVeh", chips }, "concern");
@@ -183,10 +195,11 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
         await say({ kind: "text", text: item.line }, "concern", item.call);
       }
     }
-  }, [say]);
+  }, [say, isActive]);
 
   const handoff = useCallback((atLocation: boolean) => {
-    if (!alive.current || handing.current) return;
+    const signal = turnController.current.signal;
+    if (!isActive(signal) || handing.current) return;
     handing.current = true;
     stopCapture();
     setPhase("handing");
@@ -195,11 +208,13 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     const p = refs.current.place;
     const { path, storageKey, saved } = formHandoff(refs.current.draft, p ? { address: p.address, lat: p.lat, lng: p.lng } : null, { atLocation });
     try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch { /* private mode: the form starts on its own */ }
-    setTimeout(() => { if (alive.current) onHandoff(path); }, 950);
-  }, [onHandoff, stopCapture]);
+    setTimeout(() => { if (isActive(signal)) onHandoff(path); }, 950);
+  }, [onHandoff, stopCapture, isActive]);
 
   /** Asks the next thing the form still needs, or hands over once nothing is missing. */
   const askNext = useCallback(async () => {
+    const signal = turnController.current.signal;
+    if (!isActive(signal)) return;
     const d = refs.current.draft;
     const g = refs.current.garage;
     const next = nextStep(d, g);
@@ -230,10 +245,11 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
       }
       case "location": {
         setStatus("thinking");
-        const found = await locate();
-        if (!alive.current) return;
+        const found = await locate(signal);
+        if (!isActive(signal)) return;
         if (!found) {
           await say({ kind: "line", key: "noLocation" }, "concern");
+          if (!isActive(signal)) return;
           handoff(true);
           return;
         }
@@ -246,22 +262,27 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
       case "landmark": await say({ kind: "line", key: "askLandmark" }, "curious"); return;
       case "done":
         await say({ kind: "line", key: d.service === "towing" ? "readyMap" : "ready" }, "happy");
+        if (!isActive(signal)) return;
         handoff(false);
         return;
     }
-  }, [handoff, say]);
+  }, [handoff, say, isActive]);
 
   const applyAndContinue = useCallback(async (current: Step, value: string | string[], via: Via, quote?: string) => {
+    const signal = turnController.current.signal;
     const result = applyReply(refs.current.draft, current, value, refs.current.garage, via, quote);
     commit(result.draft);
     if (result.switched) await say({ kind: "line", key: "switched" }, "happy");
+    if (!isActive(signal)) return;
     await sayAll(result.said, result.draft);
+    if (!isActive(signal)) return;
     if (current.kind === "location" && value === "map") { handoff(true); return; }
     await askNext();
-  }, [askNext, commit, handoff, say, sayAll]);
+  }, [askNext, commit, handoff, say, sayAll, isActive]);
 
   /** Whatever the customer said or typed. */
   const processInput = useCallback(async (raw: string, via: Via) => {
+    const signal = turnController.current.signal;
     const text = raw.trim();
     if (!text) return;
     if (via !== "voice") unlockAudio();
@@ -273,7 +294,7 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     const d = refs.current.draft;
     const current = refs.current.step;
     const g = refs.current.garage;
-    if (!hadInput.current || (current?.kind === "service" && !d.service)) {
+    if (!hadInput.current || !d.service || !current) {
       hadInput.current = true;
       const heard = hear(text, d, g);
       const merged = mergeHeard({ ...d, note: d.note || text }, heard, via);
@@ -282,63 +303,75 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
       addTurn({ who: "you", text, via, keys: Object.values(heard.quotes).filter(Boolean).map((q) => q.toLowerCase()) });
       if (refs.current.ai && (!next.service || !next.family)) {
         setStatus("thinking");
-        const reading = await askVoiceAi({ text, lang: detected, ...aiContext(next, next.service) });
+        const reading = await askVoiceAi({ text, lang: detected, ...aiContext(next, next.service) }, signal);
+        if (!isActive(signal)) return;
         if (reading) {
-          const ai = mergeAiWithFeedback(next, reading, g, heard.deniedServices);
+          const ai = mergeAiWithFeedback(next, reading, g, heard.deniedServices, heard.ambiguousFamily);
           next = ai.draft;
           said = [...said, ...ai.said.filter(item => item.line !== "understood" || !said.some(old => old.line === "understood"))];
         }
       }
       commit(next);
       await sayAll(said, next);
+      if (!isActive(signal)) return;
       await askNext();
       return;
     }
-    if (!current) { addTurn({ who: "you", text, via, keys: [] }); await askNext(); return; }
     const heard = hear(text, d, g);
     const retracted = !!d.service && heard.deniedServices.includes(d.service);
     const hazardChanged = ["inside", "hurt"].some(id => heard.answers[id] !== undefined && heard.answers[id] !== d.answers[id]);
     const correcting = isExplicitCorrection(text) && (heard.service || heard.family || Object.keys(heard.answers).length);
-    const reply = retracted || hazardChanged || correcting ? null : understandReply(current, d, text, g);
+    const reply = retracted || hazardChanged || correcting || heard.ambiguousFamily ? null : understandReply(current, d, text, g);
     addTurn({ who: "you", text, via, keys: reply ? [text.toLowerCase()] : [] });
     if (reply) { await applyAndContinue(current, reply.value as string | string[], via, reply.quote); return; }
     // Something else useful in the words (a different problem, or the vehicle), even if not this answer.
-    if (retracted || correcting || heard.vehicle || Object.keys(heard.answers).length || (heard.service && heard.service !== d.service)) {
+    if (retracted || correcting || heard.ambiguousFamily || heard.vehicle || Object.keys(heard.answers).length || (heard.service && heard.service !== d.service)) {
       const merged = mergeHeard(d, heard, via);
       commit(merged.draft);
       await sayAll(merged.said.filter((s) => s.line !== "understood"), merged.draft);
+      if (!isActive(signal)) return;
       await askNext();
       return;
     }
     if (refs.current.ai) {
       setStatus("thinking");
-      const reading = await askVoiceAi({ text, lang: detected, asking: stepName(current), ...aiContext(d, d.service) });
+      const reading = await askVoiceAi({ text, lang: detected, asking: stepName(current), ...aiContext(d, d.service) }, signal);
+      if (!isActive(signal)) return;
       if (reading) {
-        const ai = mergeAiWithFeedback(d, reading, g, heard.deniedServices);
+        const ai = mergeAiWithFeedback(d, reading, g, heard.deniedServices, heard.ambiguousFamily);
         if (JSON.stringify(ai.draft) !== JSON.stringify(d)) {
-          commit(ai.draft); await sayAll(ai.said, ai.draft); await askNext(); return;
+          commit(ai.draft); await sayAll(ai.said, ai.draft);
+          if (isActive(signal)) await askNext();
+          return;
         }
       }
     }
     await say({ kind: "line", key: "again" }, "concern");
+    if (!isActive(signal)) return;
     await askNext();
-  }, [addTurn, applyAndContinue, askNext, commit, langPref, say, sayAll]);
+  }, [addTurn, applyAndContinue, askNext, commit, langPref, say, sayAll, isActive]);
 
   const handleInput = useCallback(async (text: string, via: Via) => {
-    if (!text.trim() || turnBusy.current || handing.current) return;
+    if (!text.trim() || turnBusy.current || handing.current || document.visibilityState === 'hidden') return;
     if (via !== "voice") stopCapture();
+    turnController.current.abort();
+    const controller = turnController.current = new AbortController();
     turnBusy.current = true;
     setBusy(true);
     setReviewText("");
     try { await processInput(text, via); }
-    finally { turnBusy.current = false; if (alive.current) setBusy(false); }
-    if (alive.current && handsFree.current && !handing.current && document.visibilityState !== "hidden") resumeMic.current();
-  }, [processInput, stopCapture]);
+    finally {
+      if (turnController.current === controller) { turnBusy.current = false; if (alive.current) setBusy(false); }
+    }
+    if (!isActive(controller.signal)) return;
+    if (handsFree.current && !handing.current) resumeMic.current();
+  }, [processInput, stopCapture, isActive]);
 
   /** A tapped answer. Pick-all questions collect taps until "That's all". */
   const choose = useCallback((value: string, label: string) => {
     const current = refs.current.step;
     if (!current || status === "thinking" || turnBusy.current) return;
+    const controller = turnController.current = new AbortController();
     stopCapture();
     unlockAudio();
     if (isMulti(current, refs.current.draft)) {
@@ -349,18 +382,23 @@ export function useVoiceThozhan({ garage, ai, naturalVoice = false, preset, onHa
     addTurn({ who: "you", text: label, via: "tap", keys: [] });
     turnBusy.current = true;
     setBusy(true);
-    void applyAndContinue(current, value, "tap").finally(() => { turnBusy.current = false; if (alive.current) setBusy(false); });
+    void applyAndContinue(current, value, "tap").finally(() => {
+      if (turnController.current === controller) { turnBusy.current = false; if (alive.current) setBusy(false); }
+    });
   }, [addTurn, applyAndContinue, status, stopCapture]);
 
   const finishPicks = useCallback((labels: string[], skipLabel: string) => {
     const current = refs.current.step;
     if (!current || turnBusy.current) return;
+    const controller = turnController.current = new AbortController();
     stopCapture();
     answered.current = true;
     addTurn({ who: "you", text: labels.length ? labels.join(", ") : skipLabel, via: "tap", keys: [] });
     turnBusy.current = true;
     setBusy(true);
-    void applyAndContinue(current, picks.length ? picks : "__skip", "tap").finally(() => { turnBusy.current = false; if (alive.current) setBusy(false); });
+    void applyAndContinue(current, picks.length ? picks : "__skip", "tap").finally(() => {
+      if (turnController.current === controller) { turnBusy.current = false; if (alive.current) setBusy(false); }
+    });
   }, [addTurn, applyAndContinue, picks, stopCapture]);
 
   /** Little reactions while the customer is still talking, the way a friend says "mm" or "aiyo". */

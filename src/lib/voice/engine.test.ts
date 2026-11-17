@@ -41,6 +41,63 @@ function talk(sentence: string, answers: Record<string, string> = {}, garage: Ve
 
 const formNeeds = (draft: VoiceDraft) => firstMissingAnswer(serviceSpecFor(draft.service), draft.answers, contextOf(draft));
 
+describe("identifying the customer's vehicle among nearby places", () => {
+  it.each([
+    ["My car needs petrol near the bus stand", "car"],
+    ["My bike has a puncture near the bus stop", "bike"],
+    ["Near the bus station, my car needs petrol", "car"],
+    ["My car needs petrol near a bike shop", "car"],
+    ["My own truck needs diesel near the car showroom", "commercial"],
+    ["My car needs petrol beside a bus", "car"],
+    ["My car battery is dead, please send a tow truck", "car"],
+    ["My electric car needs charging near the bus stand", "ev"],
+    ["Electric scooter needs charging near a car showroom", "ev"],
+    ["My car is electric and the battery is dead", "ev"],
+    ["My bike is electric and needs help", "ev"],
+    ["My car is not electric and needs petrol", "car"],
+    ["My car needs petrol. Actually my bike needs petrol", "bike"],
+  ])("uses the stranded vehicle in %s", (text, family) => {
+    expect(hear(text, emptyDraft(), []).family).toBe(family);
+    expect(understandReply({ kind: "family" }, emptyDraft(), text, [])?.value).toBe(family);
+  });
+
+  it.each([
+    "I need petrol near the bus stand",
+    "I need petrol near a bike shop",
+    "My car and my bike need petrol",
+    "A car and a truck need petrol",
+    "My EV and my car need petrol",
+    "My car is electric and my bike battery is dead",
+  ])("asks which vehicle needs help instead of guessing from %s", (text) => {
+    const heard = hear(text, emptyDraft(), []);
+    expect(heard.vehicle).toBeNull();
+    expect(heard.family).toBeNull();
+    expect(understandReply({ kind: "family" }, emptyDraft(), text, [])).toBeNull();
+    expect(nextStep(mergeHeard(emptyDraft(), heard, "voice").draft, [])).toEqual({ kind: "family" });
+  });
+
+  it("recognizes an explicitly named Nissan Patrol while treating petrol as fuel", () => {
+    const heard = hear("My Nissan Patrol needs petrol near the bus stand", emptyDraft(), []);
+    expect(heard.vehicle?.choice.vehicleModel).toBe("Nissan Patrol");
+    expect(heard.family).toBe("car");
+    expect(heard.service).toBe("fuel");
+  });
+
+  it("reopens family selection for conflicting vehicles and prevents AI from picking one", () => {
+    const previous = mergeHeard(emptyDraft(), hear("My Honda Shine needs petrol", emptyDraft(), []), "voice").draft;
+    const heard = hear("Actually my car and my bike need petrol", previous, []);
+    expect(heard.ambiguousFamily).toBe(true);
+    const next = mergeHeard(previous, heard, "voice").draft;
+    expect(next.family).toBeNull();
+    expect(hasVehicle(next.vehicle)).toBe(false);
+    expect(nextStep(next, [])).toEqual({ kind: "family" });
+    const guessed = mergeAiWithFeedback(next, { family: "car", brand: "Hyundai", model: "i20" }, [], [], heard.ambiguousFamily).draft;
+    expect(guessed.family).toBeNull();
+    expect(hasVehicle(guessed.vehicle)).toBe(false);
+    expect(nextStep(guessed, [])).toEqual({ kind: "family" });
+  });
+});
+
 describe("interpreting corrections and safety answers", () => {
   it.each([
     "My car does not have a puncture. The battery is dead.",

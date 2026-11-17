@@ -3,6 +3,7 @@ package com.resqnow1.app;
 import android.Manifest;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Build;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -10,6 +11,7 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -23,10 +25,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ResQNow-Thozhan's ears and voice (src/lib/voice/speech.ts): the phone's own speech recogniser,
- * in Tamil or Indian English, and its own text-to-speech. Nothing is recorded or uploaded by the app.
+ * in Tamil or Indian English, and its own text-to-speech. Audio processing and connectivity
+ * depend on the installed Android recognition service.
  */
 @CapacitorPlugin(
     name = "VoiceThozhan",
@@ -41,6 +45,7 @@ public class VoiceThozhanPlugin extends Plugin {
     private boolean ttsReady;
     private final Map<String, PluginCall> speaking = new HashMap<>();
     private int utterances = 0;
+    private final AtomicInteger speechGeneration = new AtomicInteger();
 
     @PluginMethod
     public void available(PluginCall call) {
@@ -85,9 +90,28 @@ public class VoiceThozhanPlugin extends Plugin {
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            if (Build.VERSION.SDK_INT >= 33) {
+                JSArray phrases = call.getArray("phrases");
+                if (phrases != null) {
+                    ArrayList<String> hints = new ArrayList<>();
+                    for (int i = 0; i < Math.min(phrases.length(), 32); i++) {
+                        String phrase = phrases.optString(i, "").trim();
+                        if (!phrase.isEmpty() && phrase.length() <= 60) hints.add(phrase);
+                    }
+                    intent.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, hints);
+                }
+            }
             intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L);
-            recognizer.startListening(intent);
-            call.resolve();
+            try {
+                recognizer.startListening(intent);
+                call.resolve();
+            } catch (SecurityException error) {
+                recognizer.destroy(); recognizer = null; activeSession = null;
+                call.reject("Microphone permission is unavailable", "permission");
+            } catch (RuntimeException error) {
+                recognizer.destroy(); recognizer = null; activeSession = null;
+                call.reject("Speech recognition could not start", "unavailable");
+            }
         });
     }
 
@@ -165,6 +189,7 @@ public class VoiceThozhanPlugin extends Plugin {
 
     @PluginMethod
     public void speak(PluginCall call) {
+        final int generation = speechGeneration.incrementAndGet();
         String text = call.getString("text", "");
         String lang = call.getString("lang", "en-IN");
         if (text == null || text.trim().isEmpty()) {
@@ -173,6 +198,7 @@ public class VoiceThozhanPlugin extends Plugin {
         }
         call.setKeepAlive(true);
         withVoice(() -> {
+            if (generation != speechGeneration.get() || tts == null) { release(call); return; }
             Locale locale = Locale.forLanguageTag(lang);
             int set = tts.setLanguage(locale);
             if (set == TextToSpeech.LANG_MISSING_DATA || set == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -192,6 +218,7 @@ public class VoiceThozhanPlugin extends Plugin {
 
     @PluginMethod
     public void silence(PluginCall call) {
+        speechGeneration.incrementAndGet();
         if (tts != null) tts.stop();
         for (PluginCall pending : speaking.values()) release(pending);
         speaking.clear();
@@ -208,6 +235,7 @@ public class VoiceThozhanPlugin extends Plugin {
             return;
         }
         tts = new TextToSpeech(getContext(), (status) -> {
+            if (tts == null) { unavailable.run(); return; }
             ttsReady = status == TextToSpeech.SUCCESS;
             if (!ttsReady) {
                 unavailable.run();
@@ -251,6 +279,7 @@ public class VoiceThozhanPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        speechGeneration.incrementAndGet();
         if (recognizer != null) {
             recognizer.destroy();
             recognizer = null;

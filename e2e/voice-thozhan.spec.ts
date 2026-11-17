@@ -173,6 +173,27 @@ async function slide(page: Page) {
 test.use({ geolocation: HOME, permissions: ["geolocation"] });
 test.describe.configure({ timeout: 150_000 });
 
+test('hiding during the first reply cancels speech and a resumed description still fills the draft', async ({page}) => {
+  const {errors} = await openVoice(page, '/thozhan');
+  await typeToThozhan(page, 'My car battery is dead');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {configurable:true, value:'hidden'});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.locator('.vt-name')).toContainText('Here for you');
+  // The 420ms reply delay must elapse while hidden to exercise the cancellation race.
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() => (window as unknown as {__spoken:unknown[]}).__spoken)).toEqual([]);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {configurable:true, value:'visible'});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await typeToThozhan(page, 'Actually my bike has a puncture near the bus stop');
+  await expect(page.locator('.vt-tok').first()).toContainText('Puncture');
+  await expect(page.locator('.vt-tok').nth(1)).toContainText('Bike');
+  expect(errors).toEqual([]);
+});
+
 test("a wake session accepts a follow-up after speaking without another mic tap", async ({ page }) => {
   const { errors } = await openVoice(page, "/thozhan?wake=1", {
     heard: ["My car has a puncture", "Hyundai i20"],

@@ -137,7 +137,7 @@ type FoundVehicle = { family: VehicleFamily; choice: VehicleChoice; quote: strin
 
 // Model names that are everyday words or bare numbers count only when the brand is said too.
 const NEEDS_BRAND = new Set(["city", "boss", "partner", "magic", "dream", "street", "sport", "venue", "access", "pleasure", "passion", "glamour",
-  "shine", "x", "s1", "indie", "ace", "star city plus", "cliq", "navi", "aviator", "plus", "pro", "max", "one", "go", "life", "storm", "tour"]);
+  "shine", "x", "s1", "indie", "ace", "star city plus", "cliq", "navi", "aviator", "plus", "pro", "max", "one", "go", "life", "storm", "tour", "patrol"]);
 
 const modelWords = (model: CatalogModel) => normalize(model.model).split(" ");
 const brandNames = (brand: CatalogBrand) => Array.from(new Set([brand.name, brand.short].map((n) => normalize(n)).filter(Boolean)));
@@ -230,6 +230,37 @@ function findKeyword<T extends string>(text: string, words: Array<[T, RegExp]>) 
   return { match, denied };
 }
 
+/** Nearby businesses and recovery vehicles do not describe the vehicle needing help. */
+function findFamily(text: string): { match: { key: VehicleFamily; quote: string } | null; ambiguous: boolean } {
+  for (const part of text.split(CORRECTION).reverse()) {
+    const mentions = FAMILY_WORDS.flatMap(([key, re]) => matchesIn(part, re).map(hit => ({ key, hit })));
+    const relevant = mentions.filter(({ key, hit }) => {
+      const before = part.slice(0, hit.index!);
+      const after = part.slice(hit.index! + hit[0].length);
+      const place = /^[\s-]*(?:(?:car|bike|scooter|motorcycle|vehicle)[\s-]+)?(?:stand|stop|station|depot|terminal|shelter|shop|showroom|dealer(?:ship)?|garage|workshop|service[\s-]+cent(?:er|re))\b/i.test(after);
+      const recovery = key === "commercial" && /\btow(?:ing)?[\s-]+$/i.test(before);
+      return !place && !recovery;
+    });
+    if (!relevant.length) continue;
+    const positive = relevant.filter(({ hit }) => !isNegated(part, hit));
+    const described = positive.map(item => {
+      const electric = item.key !== "ev" && positive.some(other => other.key === "ev" &&
+        other.hit.index! >= item.hit.index! + item.hit[0].length &&
+        /^\s+(?:is\s+(?:an?\s+)?|runs\s+on\s+)$/i.test(part.slice(item.hit.index! + item.hit[0].length, other.hit.index!)));
+      return electric ? { ...item, key: "ev" as VehicleFamily } : item;
+    });
+    const candidates = described.filter(({ key, hit }) => key === "ev" || !described.some(other => other.key === "ev" &&
+      other.hit.index! <= hit.index! && (other.hit.index! + other.hit[0].length >= hit.index! + hit[0].length ||
+        (/^(?:electric|ev)$/i.test(other.hit[0]) && /^\s*$/.test(part.slice(other.hit.index! + other.hit[0].length, hit.index!))))));
+    const owned = candidates.filter(({ hit }) => /\b(?:my|our|ennoda|enoda|enga|namma|en)\s+(?:own\s+)?$|(?:என்|எனது|என்னோட|எங்களுடைய)\s*$/i.test(part.slice(0, hit.index!)));
+    const selected = owned.length ? owned : candidates;
+    if (new Set(selected.map(({ key }) => key)).size > 1) return { match: null, ambiguous: true };
+    const first = selected[0];
+    return { match: first ? { key: first.key, quote: first.hit[0] } : null, ambiguous: false };
+  }
+  return { match: null, ambiguous: false };
+}
+
 /** A question's answer in a sentence: the option said last wins; pick-all questions take every one. */
 export function hearAnswer(service: ServiceKey, q: Question, text: string, ctx: FormContext): { value: AnswerValue; quote: string } | null {
   const parts = text.split(CORRECTION).reverse();
@@ -265,6 +296,7 @@ export type Heard = {
   service: ServiceKey | null;
   deniedServices: ServiceKey[];
   family: VehicleFamily | null;
+  ambiguousFamily?: boolean;
   familyWord: string;
   vehicle: FoundVehicle | null;
   answers: Answers;
@@ -279,17 +311,17 @@ export function hear(text: string, draft: VoiceDraft, garage: Vehicle[]): Heard 
   const { match: serviceMatch, denied: deniedServices } = findKeyword(text, SERVICE_WORDS);
   let service = serviceMatch?.key ?? null;
   if (serviceMatch) quotes.service = serviceMatch.quote;
-  const { match: familyMatch } = findKeyword(text, FAMILY_WORDS);
+  const { match: familyMatch, ambiguous: ambiguousFamily } = findFamily(text);
   let family = familyMatch?.key ?? null;
   const familyWord = familyMatch?.quote ?? "";
   if (familyMatch) quotes.family = familyWord;
   if (!family && GENERIC_VEHICLE.test(text)) quotes.family = (GENERIC_VEHICLE.exec(text) ?? [""])[0];
-  const vehicle = findVehicle(text, family ?? draft.family, garage) ?? (family ? null : findVehicle(text, null, garage));
+  const vehicle = ambiguousFamily ? null : findVehicle(text, family ?? draft.family, garage) ?? (family ? null : findVehicle(text, null, garage));
   if (vehicle) { family = vehicle.family; quotes.vehicle = vehicle.quote; }
   const svc = service ?? (draft.service && !deniedServices.includes(draft.service) ? draft.service : null);
   let evSwitched = false;
-  if (svc === "ev-charging") family = "ev";
-  if (svc === "fuel" && (family ?? draft.family) === "ev") { service = "ev-charging"; evSwitched = true; }
+  if (svc === "ev-charging" && !ambiguousFamily) family = "ev";
+  if (svc === "fuel" && !ambiguousFamily && (family ?? draft.family) === "ev") { service = "ev-charging"; evSwitched = true; }
   const answers: Answers = {};
   const finalService = service ?? svc;
   if (finalService) {
@@ -299,7 +331,7 @@ export function hear(text: string, draft: VoiceDraft, garage: Vehicle[]): Heard 
       if (found) { answers[q.id] = found.value; quotes[q.id] = found.quote; }
     }
   }
-  return { service, deniedServices, family, familyWord: familyWord && !GENERIC_VEHICLE.test(familyWord) ? familyWord : "", vehicle, answers, quotes, highway: HIGHWAY.test(text), evSwitched };
+  return { service, deniedServices, family, ambiguousFamily, familyWord: familyWord && !GENERIC_VEHICLE.test(familyWord) ? familyWord : "", vehicle, answers, quotes, highway: HIGHWAY.test(text), evSwitched };
 }
 
 export type Said = { line: L3 | "understood" | "evSwitch" | "safetyHighway"; urgent?: boolean; call?: string };
@@ -314,7 +346,10 @@ export function mergeHeard(draft: VoiceDraft, heard: Heard, via: Via): { draft: 
     if (heard.service) next.sources.service = { via, quote: heard.quotes.service };
     else delete next.sources.service;
   }
-  if (heard.family && heard.family !== next.family) {
+  if (heard.ambiguousFamily) {
+    next.family = null; next.familyWord = ""; next.vehicle = clearedChoice("choose"); next.garageAsked = false; next.wantsName = false;
+    delete next.sources.vehicle;
+  } else if (heard.family && heard.family !== next.family) {
     next.family = heard.family; next.vehicle = clearedChoice("choose"); next.garageAsked = false; next.wantsName = false;
     next.sources.vehicle = { via, quote: heard.quotes.family };
   }
@@ -459,7 +494,7 @@ export function understandReply(step: Step, draft: VoiceDraft, text: string, gar
   if (!t) return null;
   switch (step.kind) {
     case "service": case "family": {
-      const { match: m } = step.kind === "service" ? findKeyword(t, SERVICE_WORDS) : findKeyword(t, FAMILY_WORDS);
+      const { match: m } = step.kind === "service" ? findKeyword(t, SERVICE_WORDS) : findFamily(t);
       return m ? { value: m.key, quote: m.quote } : null;
     }
     case "garage": {
@@ -527,11 +562,11 @@ export function aiContext(draft: VoiceDraft, service: ServiceKey | null) {
 }
 
 /** Folds a checked AI reading into the draft, only where the words alone left a gap. */
-export function mergeAiWithFeedback(draft: VoiceDraft, ai: AiResult, garage: Vehicle[], deniedServices: ServiceKey[] = []): { draft: VoiceDraft; said: Said[] } {
+export function mergeAiWithFeedback(draft: VoiceDraft, ai: AiResult, garage: Vehicle[], deniedServices: ServiceKey[] = [], ambiguousFamily = false): { draft: VoiceDraft; said: Said[] } {
   const heard: Heard = { service: null, deniedServices: [], family: null, familyWord: "", vehicle: null, answers: {}, quotes: {}, highway: false, evSwitched: false };
   if (!draft.service && ai.service && (VOICE_SERVICES as string[]).includes(ai.service) && !deniedServices.includes(ai.service as ServiceKey)) heard.service = ai.service as ServiceKey;
-  if (!draft.family && ai.family && (FAMILIES as string[]).includes(ai.family)) heard.family = ai.family as VehicleFamily;
-  if (!hasVehicle(draft.vehicle) && (ai.brand || ai.model)) {
+  if (!ambiguousFamily && !draft.family && ai.family && (FAMILIES as string[]).includes(ai.family)) heard.family = ai.family as VehicleFamily;
+  if (!ambiguousFamily && !hasVehicle(draft.vehicle) && (ai.brand || ai.model)) {
     const found = findVehicle(`${ai.brand ?? ""} ${ai.model ?? ""}`, heard.family ?? draft.family, garage, { lenient: true });
     if (found) { heard.vehicle = found; heard.family = found.family; }
   }

@@ -6,6 +6,11 @@ export type VoiceStatus = { enabled: boolean; ai: boolean; voice: boolean; wake?
 
 export const VOICE_STATUS_KEY = ["voice", "status"] as const;
 
+const withDeadline = (ms: number, signal?: AbortSignal) => {
+  const timeout = AbortSignal.timeout(ms);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+};
+
 /** Whether ResQNow-Thozhan is on for this customer (and its AI step), from the server. */
 export async function fetchVoiceStatus(): Promise<VoiceStatus> {
   const res = await apiFetch("/api/voice/status", { signal: AbortSignal.timeout(5000) });
@@ -21,7 +26,7 @@ export async function fetchVoiceStatus(): Promise<VoiceStatus> {
 /** The AI step, for a sentence the app couldn't fully read. Resolves to null on any failure, so the conversation carries on. */
 export async function askVoiceAi(payload: Record<string, unknown>, signal?: AbortSignal): Promise<AiResult | null> {
   try {
-    const res = await apiFetch("/api/voice/understand", { method: "POST", body: JSON.stringify(payload), signal: signal ?? AbortSignal.timeout(5500) });
+    const res = await apiFetch("/api/voice/understand", { method: "POST", body: JSON.stringify(payload), signal: withDeadline(5500, signal) });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     return data?.result && typeof data.result === "object" ? (data.result as AiResult) : null;
@@ -33,7 +38,7 @@ export async function askVoiceAi(payload: Record<string, unknown>, signal?: Abor
 /** A line in the natural voice, as audio; null on any failure, and the phone's own voice reads it instead. */
 export async function fetchVoiceAudio(text: string, lang: string, signal?: AbortSignal): Promise<Blob | null> {
   try {
-    const res = await apiFetch("/api/voice/speak", { method: "POST", body: JSON.stringify({ text, lang }), signal: signal ?? AbortSignal.timeout(7500) });
+    const res = await apiFetch("/api/voice/speak", { method: "POST", body: JSON.stringify({ text, lang }), signal: withDeadline(7500, signal) });
     if (!res.ok) return null;
     const audio = await res.blob();
     return audio.size > 0 ? audio : null;

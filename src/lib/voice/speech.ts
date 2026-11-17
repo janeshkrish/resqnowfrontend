@@ -9,7 +9,7 @@ import type { Lang } from "./lexicon";
 
 type NativeVoice = {
   available(options: { lang: string }): Promise<{ listen: boolean; speak: boolean }>;
-  listen(options: { lang: string; sessionId: string }): Promise<void>;
+  listen(options: { lang: string; sessionId: string; phrases?: string[] }): Promise<void>;
   stop(options: { sessionId: string; discard?: boolean }): Promise<void>;
   speak(options: { text: string; lang: string }): Promise<void>;
   silence(): Promise<void>;
@@ -20,9 +20,9 @@ const NativeVoice = registerPlugin<NativeVoice>("VoiceThozhan");
 const isNative = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 
 /**
- * Tanglish and English are heard in Indian English, which writes Tanglish words in English letters
- * ("ennoda bike puncture"), the way the word lists expect; the Tamil recogniser would write them in
- * Tamil script and drop the English words. Tamil is heard in Tamil.
+ * Indian English is the initial recognizer for Tanglish and English; Tamil starts with ta-IN.
+ * Mixed-language transcription depends on the installed speech service. Both scripts are accepted
+ * by the request parser, and an unavailable language gets one fallback attempt.
  */
 export const recogniserLang = (lang: Lang) => (lang === "ta" ? "ta-IN" : "en-IN");
 /** Tanglish is read from its Tamil-script form (talk.ts), so Tamil and Tanglish both use a Tamil voice. */
@@ -56,63 +56,103 @@ export async function canListen(lang: Lang): Promise<boolean> {
 /** Starts listening; words arrive as they are said. A language the browser can't hear falls back to the other one once. */
 export async function listen(lang: Lang, handlers: ListenHandlers): Promise<Listening> {
   let attempt: Listening | null = null;
+  let controller: AbortController | undefined;
+  let generation = 0;
   let stopped = false;
   let ended = false;
-  const finish = () => { if (!ended) { ended = true; handlers.onEnd(); } };
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    controller?.abort();
+    handlers.onEnd();
+  };
   const start = async (code: string, retry: boolean) => {
     if (stopped || ended) return;
+    controller?.abort();
+    const current = controller = new AbortController();
+    const id = ++generation;
+    const active = () => !ended && !current.signal.aborted && id === generation;
+    attempt = null;
     let unsupported = false;
-    const session = await listenIn(code, {
-      ...handlers,
-      onReady: () => { if (!ended) handlers.onReady?.(); },
-      onFinal: (text, score) => {
-        if (!ended) {
+    let failed = false;
+    try {
+      const session = await listenIn(code, {
+        onReady: () => { if (active() && !stopped) handlers.onReady?.(); },
+        onFinal: (text, score) => {
+          if (!active() || failed) return;
           if (score === undefined) handlers.onFinal(text);
           else handlers.onFinal(text, score);
-        }
-      },
-      onPartial: text => { if (!ended) handlers.onPartial(text); },
-      onError: error => {
-        if (ended) return;
-        unsupported = retry && (error === "language" || error === "language-not-supported");
-        if (!unsupported) handlers.onError(error);
-      },
-      onEnd: () => {
-        if (unsupported && !stopped) {
-          void start(code === "en-IN" ? "ta-IN" : "en-IN", false).catch(() => { handlers.onError("unavailable"); finish(); });
-        } else finish();
-      },
-    });
-    if (stopped || ended) session.abort?.();
-    else attempt = session;
+        },
+        onPartial: text => { if (active() && !failed) handlers.onPartial(text); },
+        onError: error => {
+          if (!active()) return;
+          failed = true;
+          unsupported = retry && (error === "language" || error === "language-not-supported");
+          if (!unsupported) handlers.onError(error);
+        },
+        onEnd: () => {
+          if (!active()) return;
+          if (unsupported && !stopped) void start(code === "en-IN" ? "ta-IN" : "en-IN", false);
+          else finish();
+        },
+      }, current.signal);
+      if (!active()) session.abort?.();
+      else attempt = session;
+    } catch {
+      if (active()) { handlers.onError("unavailable"); finish(); }
+    }
   };
-  void start(recogniserLang(lang), true).catch(() => { handlers.onError("unavailable"); finish(); });
+  void start(recogniserLang(lang), true);
   return {
     stop: () => { stopped = true; if (attempt) attempt.stop(); else finish(); },
-    abort: () => { stopped = true; attempt?.abort?.(); finish(); },
+    abort: () => { stopped = true; finish(); },
   };
 }
 
-async function listenIn(code: string, handlers: ListenHandlers): Promise<Listening> {
+async function listenIn(code: string, handlers: ListenHandlers, signal: AbortSignal): Promise<Listening> {
   if (isNative()) {
     const sessionId = crypto.randomUUID();
     let active = true;
+    let requested = false;
     const subs: PluginListenerHandle[] = [];
-    const cleanup = () => { active = false; subs.splice(0).forEach(s => { void s.remove(); }); };
-    const relevant = (id?: string) => active && (id === undefined || id === sessionId);
+    const cleanup = () => {
+      active = false;
+      signal.removeEventListener("abort", abort);
+      subs.splice(0).forEach(s => { void s.remove().catch(() => {}); });
+    };
+    const abort = () => {
+      if (!active) return;
+      cleanup();
+      if (requested) void NativeVoice.stop({ sessionId, discard: true }).catch(() => {});
+    };
+    const relevant = (id?: string) => active && id === sessionId;
+    const subscribe = async (event: Parameters<NativeVoice["addListener"]>[0], listener: Parameters<NativeVoice["addListener"]>[1]) => {
+      if (!active) return;
+      const subscription = await NativeVoice.addListener(event, listener);
+      if (active) subs.push(subscription);
+      else await subscription.remove();
+    };
+    signal.addEventListener("abort", abort, { once: true });
     try {
-      subs.push(await NativeVoice.addListener("ready", d => { if (relevant(d.sessionId)) handlers.onReady?.(); }));
-      subs.push(await NativeVoice.addListener("partial", d => { if (relevant(d.sessionId)) handlers.onPartial(d.text ?? ""); }));
-      subs.push(await NativeVoice.addListener("final", d => { if (relevant(d.sessionId)) handlers.onFinal(d.text ?? "", d.confidence); }));
-      subs.push(await NativeVoice.addListener("error", d => { if (relevant(d.sessionId)) handlers.onError(d.error ?? "error"); }));
-      subs.push(await NativeVoice.addListener("end", d => { if (relevant(d.sessionId)) { cleanup(); handlers.onEnd(); } }));
-      void NativeVoice.listen({ lang: code, sessionId }).catch(error => {
-        if (active) { cleanup(); handlers.onError(error?.code || "unavailable"); handlers.onEnd(); }
-      });
+      await subscribe("ready", d => { if (relevant(d.sessionId)) handlers.onReady?.(); });
+      await subscribe("partial", d => { if (relevant(d.sessionId)) handlers.onPartial(d.text ?? ""); });
+      await subscribe("final", d => { if (relevant(d.sessionId)) handlers.onFinal(d.text ?? "", d.confidence); });
+      await subscribe("error", d => { if (relevant(d.sessionId)) handlers.onError(d.error ?? "error"); });
+      await subscribe("end", d => { if (relevant(d.sessionId)) { cleanup(); handlers.onEnd(); } });
+      if (active) {
+        requested = true;
+        void NativeVoice.listen({ lang: code, sessionId, phrases: [
+          'ResQNow', 'puncture', 'பஞ்சர்', 'battery', 'பேட்டரி', 'petrol', 'பெட்ரோல்',
+          'diesel', 'டீசல்', 'towing', 'டோயிங்', 'flat tyre', 'tubeless', 'lockout',
+          'bike', 'பைக்', 'car', 'கார்', 'lorry', 'லாரி', 'electric vehicle',
+        ] }).catch(error => {
+          if (active) { cleanup(); handlers.onError(error?.code || "unavailable"); handlers.onEnd(); }
+        });
+      }
     } catch (error) { cleanup(); throw error; }
     return {
       stop: () => { if (active) void NativeVoice.stop({ sessionId }).catch(() => { cleanup(); handlers.onEnd(); }); },
-      abort: () => { if (active) { cleanup(); void NativeVoice.stop({ sessionId, discard: true }).catch(() => {}); } },
+      abort,
     };
   }
   const Recognition = webRecognition();
@@ -128,6 +168,18 @@ async function listenIn(code: string, handlers: ListenHandlers): Promise<Listeni
   rec.maxAlternatives = 1;
   let final = "";
   let confidence: number | undefined;
+  let ended = false;
+  const cleanup = () => {
+    ended = true;
+    signal.removeEventListener("abort", abort);
+    rec.onend = null; rec.onerror = null; rec.onresult = null; rec.onstart = null;
+  };
+  const abort = () => {
+    if (ended) return;
+    cleanup();
+    try { rec.abort(); } catch { /* already stopped */ }
+  };
+  signal.addEventListener("abort", abort, { once: true });
   rec.onstart = () => handlers.onReady?.();
   rec.onresult = (event) => {
     const results = Array.from(event.results);
@@ -141,17 +193,19 @@ async function listenIn(code: string, handlers: ListenHandlers): Promise<Listeni
     handlers.onError(event.error);
   };
   rec.onend = () => {
-    // Chrome sometimes ends without marking anything final; the hook then uses the last words it showed.
+    if (ended) return;
+    cleanup();
+    // Unfinalized words remain available for review in the hook.
     if (final) {
       if (confidence === undefined) handlers.onFinal(final);
       else handlers.onFinal(final, confidence);
     }
     handlers.onEnd();
   };
-  try { rec.start(); } catch { handlers.onError("busy"); handlers.onEnd(); }
+  try { rec.start(); } catch { cleanup(); handlers.onError("busy"); handlers.onEnd(); }
   return {
     stop: () => { try { rec.stop(); } catch { /* already stopped */ } },
-    abort: () => { rec.onend = null; rec.onerror = null; rec.onresult = null; rec.onstart = null; try { rec.abort(); } catch { /* already stopped */ } },
+    abort,
   };
 }
 
@@ -209,6 +263,8 @@ const clipKey = (text: string, lang: Lang) => `${voiceLang(lang)}|${text}`;
 const pause = (ms: number) => new Promise<null>((resolve) => setTimeout(() => resolve(null), ms));
 let player: HTMLAudioElement | null = null;
 let stopPlayer: (() => void) | null = null;
+let speechGeneration = 0;
+let stopDeviceSpeech: (() => void) | null = null;
 let unlocked = false;
 // A moment of silence, played on the customer's first tap so phones (iPhones most of all) let the voice play later.
 const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
@@ -246,28 +302,33 @@ export function unlockAudio() {
 }
 
 /** Plays a line in the natural voice; false when it can't, and the phone's own voice reads it instead. */
-async function playNatural(text: string, lang: Lang): Promise<boolean> {
+async function playNatural(text: string, lang: Lang, generation: number): Promise<boolean> {
   prepareSpeech(text, lang);
   const pending = clips.get(clipKey(text, lang));
   const clip = pending ? await Promise.race([pending, pause(8000)]) : null;
+  if (generation !== speechGeneration) return true;
   if (!clip) return false;
   const audio = audioPlayer();
   const url = URL.createObjectURL(clip);
   try {
     return await new Promise<boolean>((resolve) => {
       let started = false;
+      let finished = false;
       const finish = (played: boolean) => {
+        if (finished) return;
+        finished = true;
         window.clearTimeout(timer);
         audio.onended = null;
         audio.onerror = null;
-        stopPlayer = null;
+        if (stopPlayer === stop) stopPlayer = null;
         resolve(played);
       };
       const timer = window.setTimeout(() => { audio.pause(); finish(started); }, 30000);
       audio.onended = () => finish(true);
       audio.onerror = () => finish(started);
       // Silenced (the customer tapped the mic): done, and the phone's voice must not take over.
-      stopPlayer = () => { audio.pause(); finish(true); };
+      const stop = () => { audio.pause(); finish(true); };
+      stopPlayer = stop;
       audio.src = url;
       audio.play().then(() => { started = true; }, () => finish(false));
     });
@@ -282,14 +343,19 @@ async function playNatural(text: string, lang: Lang): Promise<boolean> {
  */
 export async function speak(text: string, lang: Lang): Promise<void> {
   if (!text) return;
-  if (canPlay() && (await playNatural(text, lang))) return;
+  const generation = speechGeneration;
+  if (canPlay() && (await playNatural(text, lang, generation))) return;
+  if (generation !== speechGeneration) return;
   if (isNative()) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         NativeVoice.speak({ text, lang: voiceLang(lang) }),
         new Promise<void>(resolve => {
-          timer = setTimeout(() => { void NativeVoice.silence().catch(() => {}); resolve(); }, 12000);
+          timer = setTimeout(() => {
+            if (generation === speechGeneration) void NativeVoice.silence().catch(() => {});
+            resolve();
+          }, 12000);
         }),
       ]);
     } catch { /* the words remain on screen */ }
@@ -299,10 +365,18 @@ export async function speak(text: string, lang: Lang): Promise<void> {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const code = voiceLang(lang);
   const voice = pickVoice(await browserVoices(), code);
-  if (!voice) return;
+  if (!voice || generation !== speechGeneration) return;
   await new Promise<void>((resolve) => {
-    const timer = window.setTimeout(() => { window.speechSynthesis.cancel(); finish(); }, 12000);
-    const finish = () => { window.clearTimeout(timer); resolve(); };
+    const timer = window.setTimeout(() => {
+      if (generation === speechGeneration) window.speechSynthesis.cancel();
+      finish();
+    }, 12000);
+    const finish = () => {
+      window.clearTimeout(timer);
+      if (stopDeviceSpeech === finish) stopDeviceSpeech = null;
+      resolve();
+    };
+    stopDeviceSpeech = finish;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = voice.lang || code;
     utterance.voice = voice;
@@ -316,7 +390,9 @@ export async function speak(text: string, lang: Lang): Promise<void> {
 }
 
 export function silence() {
+  speechGeneration++;
   stopPlayer?.();
+  stopDeviceSpeech?.();
   if (isNative()) { void NativeVoice.silence().catch(() => {}); return; }
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
 }

@@ -26,6 +26,10 @@ vi.mock('../api/pageVisitApi', () => ({
         browser: 'Chrome 122',
         location: 'Bengaluru, Karnataka, India',
         session_id: 's_abc123',
+        user_name: 'Ramesh Kumar',
+        user_email: 'ramesh@gmail.com',
+        user_phone: '+91 9876543210',
+        user_role: 'customer',
         created_at: new Date().toISOString(),
       },
     ],
@@ -53,7 +57,7 @@ function renderPage() {
 }
 
 describe('PageVisitPage', () => {
-  it('renders KPI metrics and visitor log table', async () => {
+  it('renders KPI metrics and visitor log table with user identity and route journey', async () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('12'));
@@ -64,6 +68,9 @@ describe('PageVisitPage', () => {
     // Table rows
     expect(await screen.findByText('103.21.244.2')).toBeInTheDocument();
     expect(screen.getByText('Bengaluru, Karnataka, India')).toBeInTheDocument();
+    expect(screen.getByText('Ramesh Kumar')).toBeInTheDocument();
+    expect(screen.getByText('ramesh@gmail.com')).toBeInTheDocument();
+    expect(screen.getByText('+91 9876543210')).toBeInTheDocument();
     expect(screen.getAllByText('referral (chatgpt)').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('45s')).toBeInTheDocument();
   });

@@ -12,6 +12,7 @@ import {
   Cell,
   Empty,
   ErrorState,
+  Icon,
   Kpis,
   Loading,
   Pager,
@@ -32,10 +33,10 @@ const RANGE_OPTIONS = [
   { value: "all", label: "All time" },
 ];
 
-const COLS = "130px 120px 140px 130px 120px minmax(130px, 1.2fr) minmax(150px, 1.4fr) 90px";
+const COLS = "115px minmax(210px, 1.3fr) minmax(230px, 1.6fr) 130px 120px 110px 80px";
 
 function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0) return "0s";
+  if (!seconds || seconds <= 0) return "< 5s";
   if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -99,7 +100,7 @@ export default function PageVisitPage() {
   const summaryQuery = useQuery({
     queryKey: ["portal", "page-visits", "summary", range],
     queryFn: () => getPageVisitSummary(range),
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
 
   // Fetch Visits List
@@ -117,7 +118,7 @@ export default function PageVisitPage() {
     queryKey: ["portal", "page-visits", "list", params],
     queryFn: () => listPageVisits(params),
     placeholderData: keepPreviousData,
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
 
   const summary = summaryQuery.data;
@@ -214,7 +215,7 @@ export default function PageVisitPage() {
           <SearchBox
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="Search page, IP, location, or source..."
+            placeholder="Search email, name, phone, IP, or page..."
             style={{ width: "100%", maxWidth: 320 }}
           />
           {(source || device || browser || search) && (
@@ -254,15 +255,14 @@ export default function PageVisitPage() {
             label="Page visits"
             testId="page-visits-table"
             cols={COLS}
-            minWidth={980}
+            minWidth={1050}
             head={[
               "Time",
-              "IP Address",
+              "Visitor & Identity",
+              "Route (Previous → Current)",
               "Location",
               "Device",
               "Browser",
-              "Page Visited",
-              "Previous Page",
               "Time Spent",
             ]}
             foot={
@@ -274,48 +274,112 @@ export default function PageVisitPage() {
               </>
             }
           >
-            {list.rows.map((row: PageVisitRow) => (
-              <Row key={row.id} cols={COLS} label={`Visit from ${row.ip_address} on ${row.page_visited}`}>
-                <Cell className="ap-faint">
-                  <span style={{ fontSize: "12.5px" }}>{formatVisitTime(row.created_at)}</span>
-                </Cell>
-                <Cell>
-                  <code style={{ fontSize: "12px", background: "var(--hair)", padding: "2px 5px", border: "1px solid var(--line)", borderRadius: 4 }}>
-                    {row.ip_address}
-                  </code>
-                </Cell>
-                <Cell>
-                  <span title={row.location} style={{ display: "block", fontSize: "13px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.location || "Local/Unknown"}
-                  </span>
-                </Cell>
-                <Cell>
-                  <span style={{ display: "block", fontSize: "13px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.device || "Unknown"}
-                  </span>
-                </Cell>
-                <Cell>
-                  <span style={{ display: "block", fontSize: "13px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.browser || "Unknown"}
-                  </span>
-                </Cell>
-                <Cell>
-                  <b title={row.page_visited} style={{ display: "block", fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.page_visited}
-                  </b>
-                </Cell>
-                <Cell>
-                  <Pill tone={resolveSourceTone(row.previous_page)}>
-                    {row.previous_page}
-                  </Pill>
-                </Cell>
-                <Cell>
-                  <span style={{ fontSize: "13px", fontWeight: 700 }}>
-                    {formatDuration(row.time_spent_seconds)}
-                  </span>
-                </Cell>
-              </Row>
-            ))}
+            {list.rows.map((row: PageVisitRow) => {
+              const hasUser = Boolean(row.user_email || row.user_name || row.user_phone);
+              const isInternalPrevious = String(row.previous_page || "").startsWith("/");
+
+              return (
+                <Row key={row.id} cols={COLS} label={`Visit from ${row.ip_address} on ${row.page_visited}`}>
+                  {/* Time */}
+                  <Cell className="ap-faint">
+                    <span style={{ fontSize: "12px", whiteSpace: "nowrap" }}>{formatVisitTime(row.created_at)}</span>
+                  </Cell>
+
+                  {/* Visitor & Identity (IP + Name + Email/Gmail + Phone) */}
+                  <Cell>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <code style={{ fontSize: "12px", background: "var(--hair)", padding: "1px 5px", border: "1px solid var(--line)", borderRadius: 4 }}>
+                          {row.ip_address}
+                        </code>
+                        {hasUser && (
+                          <Pill tone={row.user_role === "technician" ? "warn" : "ok"}>
+                            {row.user_role || "user"}
+                          </Pill>
+                        )}
+                      </div>
+
+                      {hasUser ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                          {row.user_name && (
+                            <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {row.user_name}
+                            </span>
+                          )}
+                          {row.user_email && (
+                            <span style={{ fontSize: "12px", color: "var(--sub)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={row.user_email}>
+                              {row.user_email}
+                            </span>
+                          )}
+                          {row.user_phone && (
+                            <span style={{ fontSize: "11.5px", color: "var(--faint)" }}>
+                              {row.user_phone}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: "11.5px", color: "var(--faint)" }}>
+                          Guest / Not signed in
+                        </span>
+                      )}
+                    </div>
+                  </Cell>
+
+                  {/* Route (Previous Page → Current Page) */}
+                  <Cell>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {isInternalPrevious ? (
+                          <code style={{ fontSize: "11.5px", color: "var(--sub)", background: "var(--hair)", padding: "1px 5px", borderRadius: 4 }}>
+                            {row.previous_page}
+                          </code>
+                        ) : (
+                          <Pill tone={resolveSourceTone(row.previous_page)}>
+                            {row.previous_page}
+                          </Pill>
+                        )}
+                        <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--brand)" }}>→</span>
+                        <b title={row.page_visited} style={{ fontSize: "13px", color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {row.page_visited}
+                        </b>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, fontSize: "11px", color: "var(--faint)" }}>
+                        <span>From: <b>{row.previous_page}</b></span>
+                        <span>To: <b>{row.page_visited}</b></span>
+                      </div>
+                    </div>
+                  </Cell>
+
+                  {/* Location */}
+                  <Cell>
+                    <span title={row.location} style={{ display: "block", fontSize: "12.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.location || "Local/Unknown"}
+                    </span>
+                  </Cell>
+
+                  {/* Device */}
+                  <Cell>
+                    <span style={{ display: "block", fontSize: "12.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.device || "Unknown"}
+                    </span>
+                  </Cell>
+
+                  {/* Browser */}
+                  <Cell>
+                    <span style={{ display: "block", fontSize: "12.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.browser || "Unknown"}
+                    </span>
+                  </Cell>
+
+                  {/* Time Spent */}
+                  <Cell>
+                    <span style={{ fontSize: "13px", fontWeight: 700 }}>
+                      {formatDuration(row.time_spent_seconds)}
+                    </span>
+                  </Cell>
+                </Row>
+              );
+            })}
           </Table>
         )}
       </Card>

@@ -20,6 +20,10 @@ export interface PageVisitRow {
   browser: string;
   location: string;
   session_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  user_phone: string | null;
+  user_role: string | null;
   created_at: string;
 }
 

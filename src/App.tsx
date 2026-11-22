@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TechnicianAuthProvider } from "@/contexts/TechnicianAuthContext";
 import { AppAnalyticsBridge } from '@/components/AppAnalyticsBridge';
 import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
+import { PageVisitTracker } from '@/components/PageVisitTracker';
 import { AppUpdateProvider } from '@/components/AppUpdateProvider';
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { ThemeProvider } from "@/components/item-providers/ThemeProvider";
@@ -210,6 +211,7 @@ const App = () => {
           <BrowserRouter future={{ v7_startTransition: true }}>
             <AppRuntimeBridge />
             <ScrollToTop />
+            <PageVisitTracker />
             <AdminAuthProvider>
               <AuthProvider>
                 <TechnicianAuthProvider>

@@ -37,6 +37,7 @@ const NAV: NavEntry[] = [
   { kind: "item", to: "/admin/payouts", icon: "account_balance", label: "Payouts", count: "payouts" },
   { kind: "item", to: "/admin/reports", icon: "bar_chart", label: "Reports" },
   { kind: "item", to: "/admin/app-installs", icon: "install_mobile", label: "App installs" },
+  { kind: "item", to: "/admin/page-visit", icon: "query_stats", label: "Page Visit" },
   { kind: "section", label: "Support" },
   { kind: "item", to: "/admin/complaints", icon: "support_agent", label: "Complaints", count: "complaints" },
   { kind: "item", to: "/admin/messages", icon: "campaign", label: "Messages" },

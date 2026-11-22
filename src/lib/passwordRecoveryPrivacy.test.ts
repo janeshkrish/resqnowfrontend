@@ -3,9 +3,9 @@ import { expect, it } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-it('initial recovery documents skip marketing and checkout scripts and suppress referrers',()=>{
+it('initial recovery documents skip marketing and checkout scripts and expose only the origin cross-site',()=>{
   const html=fs.readFileSync(new URL('../../index.html',import.meta.url),'utf8');
-  expect(html).toContain('<meta name="referrer" content="no-referrer"');
+  expect(html).toContain('<meta name="referrer" content="strict-origin-when-cross-origin"');
   expect(html).not.toContain('checkout.razorpay.com');
   const tracker=html.match(/<script type="text\/javascript">([\s\S]*?)<\/script>/)![1];
   for(const path of ['/forgot-password','/reset-password','/verify-recovery-email','/technician/forgot-password','/technician/reset-password','/technician/verify-recovery-email']) {

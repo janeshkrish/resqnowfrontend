@@ -158,8 +158,8 @@ export const getTechnicianApprovalAudit = async (id: RecordId) => (await rootApi
 export const getTechnicianServicePricing = async (id: RecordId) => (await rootApi.get<unknown[]>(`/technicians/${id}/service-pricing`)).data;
 export const createTechnician = async (payload: Record<string, unknown>) => (await rootApi.post<{ id: string; status: string }>("/technicians/create", payload)).data;
 export const updateTechnicianProfile = async (id: RecordId, payload: Record<string, unknown>) => (await rootApi.put(`/technicians/${id}/profile`, payload)).data;
-export const approveTechnician = async (id: number, reason: string) => (await rootApi.patch(`/technicians/${id}/approve`, { reason })).data;
-export const rejectTechnician = async (id: number, reason: string) => (await rootApi.patch(`/technicians/${id}/reject`, { reason })).data;
+export const approveTechnician = async (id: RecordId, reason: string) => (await rootApi.patch(`/technicians/${id}/approve`, { reason })).data;
+export const rejectTechnician = async (id: RecordId, reason: string) => (await rootApi.patch(`/technicians/${id}/reject`, { reason })).data;
 export const listPendingTechnicians = async () => (await rootApi.get<unknown>("/technicians/pending")).data;
 export const listAllTechniciansRaw = async () => (await rootApi.get<unknown>("/technicians/list")).data;
 

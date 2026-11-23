@@ -31,22 +31,26 @@
 
 **Interfaces:** verifyMapplsDist({dist,key}) returns reachable files; verifyMapplsNativeAssets({root,key}) and verifyMapplsApk({root,apk,key}) validate actual assets/configuration; prepareAndroidWebAssets({root,publicSettings,env,run}) runs isolated Vite/Capacitor preparation. Existing release build consumes the prepared assets and checks final APK.
 
-- [ ] Write tests for real emitted code, wrong/missing key, matching-key decoy, orphan/traversal manifest, stale copied assets and APK, wrong native origin, valid output, redacted errors, isolated commands and refusal before signing.
-- [ ] Run Node tests and observe expected RED before implementing exports/behavior.
-- [ ] Implement focused bounded verifiers, preparation, local sync entry point and release adapter wiring without reading private credentials into web children.
-- [ ] Run Node tests to GREEN and real native-mode static build/artifact checks using controlled public settings. Document no live provider/device proof.
+- [x] Write tests for real emitted code, wrong/missing key, matching-key decoy, orphan/traversal manifest, stale copied assets and APK, wrong native origin, valid output, redacted errors, isolated commands and refusal before signing.
+- [x] Run Node tests and observe expected RED before implementing exports/behavior.
+- [x] Implement focused bounded verifiers, preparation, local sync entry point and release adapter wiring without reading private credentials into web children.
+- [x] Run Node tests to GREEN and real native-mode static build/artifact checks using controlled public settings. Document no live provider/device proof.
 
 ### Task 2: Contain initialization errors
 
 **Files:** src/lib/mapProvider/MapplsMapSurface.tsx and .test.tsx.
 
-- [ ] Add a synchronous SDK loader failure/retry regression; observe RED.
-- [ ] Normalize loader invocation through the promise chain; retain existing UI/cleanup.
-- [ ] Run the complete map SDK/map surface/places/tracking unit suites, typecheck and relevant browser checks.
+- [x] Add a synchronous SDK loader failure/retry regression; observe RED.
+- [x] Normalize loader invocation through the promise chain; retain existing UI/cleanup.
+- [x] Run the complete map SDK/map surface/places/tracking unit suites, typecheck and relevant browser checks.
 
 ### Task 3: Verify and hand off
 
-- [ ] Run full Node scripts and unit suite in a source-matched, secret-free D: snapshot; record unrelated failures rather than altering concurrent voice work.
-- [ ] Build/inspect current native web and APK artifacts as feasible without production signing credentials; explicitly distinguish synthetic verification from a shippable APK.
-- [ ] Focused independent review and fix Important findings with RED-to-GREEN tests.
-- [ ] Report exact verified changes and remaining provider/production signing/device gates; no automatic push or publication.
+- [x] Run full Node scripts and unit suite in a source-matched, secret-free D: snapshot; record unrelated failures rather than altering concurrent voice work.
+- [x] Build/inspect current native web and APK artifacts as feasible without production signing credentials; explicitly distinguish synthetic verification from a shippable APK.
+- [x] Focused independent review and fix Important findings with RED-to-GREEN tests.
+- [x] Report exact verified changes and remaining provider/production signing/device gates; no automatic push or publication.
+
+## Handoff
+
+See [the verification record](../../mappls-repair-verification-2026-11-18.md) for exact results and limitations. These completed implementation tasks do not assert live Mappls access, Android runtime acceptance, production signing or deployment. Changes remain in the normal D: frontend `main` checkout; this repair did not push or publish anything.

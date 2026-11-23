@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';import {createAndroidTools} from './android-release.mjs';
 import {randomUUID} from 'node:crypto';
-import {validateMapplsKey,verifyMapplsDist,verifyMapplsNativeAssets,verifyMapplsApk} from './mappls-artifacts.mjs';
+import {validateMapplsKey,verifyReviewedMapplsKey,verifyMapplsDist,verifyMapplsNativeAssets,verifyMapplsApk} from './mappls-artifacts.mjs';
 const SIGNING=['RESQNOW_ANDROID_KEYSTORE_PATH','RESQNOW_ANDROID_KEY_ALIAS','RESQNOW_ANDROID_STORE_PASSWORD','RESQNOW_ANDROID_KEY_PASSWORD'];
 const OS_KEYS=new Set(['PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','HOME','USERPROFILE','TEMP','TMP','TMPDIR','JAVA_HOME','ANDROID_HOME','ANDROID_SDK_ROOT','ANDROID_USER_HOME','GRADLE_USER_HOME','NPM_CONFIG_CACHE','LANG','LC_ALL']);
 export async function withSigningFile(env,body){
@@ -12,9 +12,25 @@ export async function withSigningFile(env,body){
   finally{data.fill(0);if(owned)await fs.rm(file,{force:true});}
 }
 function execute(command,args,options){return new Promise((resolve,reject)=>{const child=spawn(command,args,{...options,stdio:'inherit',windowsHide:true});child.once('error',()=>reject(Error('Android release build command could not start')));child.once('exit',code=>code===0?resolve():reject(Error('Android release build command failed')));});}
+export async function verifyMapplsAndroidConfiguration({root}){
+  const app=path.join(root,'android/app');
+  const fail=()=>{throw Error('Mappls Android configuration requires one matching, nonempty approved .a.conf/.a.olf pair');};
+  let names;try{names=await fs.readdir(app);}catch{fail();}
+  const configs=names.filter(name=>name.endsWith('.a.conf')),licenses=names.filter(name=>name.endsWith('.a.olf'));
+  if(configs.length!==1||licenses.length!==1)fail();
+  const appId=configs[0].slice(0,-'.a.conf'.length);
+  if(!/^[A-Za-z0-9_-]{1,120}$/.test(appId)||licenses[0]!==`${appId}.a.olf`)fail();
+  for(const name of [configs[0],licenses[0]]){
+    let info;try{info=await fs.lstat(path.join(app,name));}catch{fail();}
+    if(!info.isFile()||info.size===0)fail();
+  }
+  // File presence is not provider/license acceptance; never read/log their contents.
+  return {appId};
+}
 export async function prepareAndroidWebAssets({root,publicSettings,env=process.env,run=execute}){
   validateMapplsKey(publicSettings?.VITE_MAPPLS_MAP_SDK_KEY);
   if(publicSettings.VITE_NATIVE_BUILD!=='true')throw Error('Native web assets require VITE_NATIVE_BUILD=true');
+  await verifyReviewedMapplsKey({root,key:publicSettings.VITE_MAPPLS_MAP_SDK_KEY});
   const base=Object.fromEntries(Object.entries(env).filter(([key,value])=>OS_KEYS.has(key.toUpperCase())&&typeof value==='string'));
   const settings=Object.fromEntries(Object.entries(publicSettings).filter(([key,value])=>key.startsWith('VITE_')&&typeof value==='string'));
   const publicEnv={...base,...settings,NODE_ENV:'production',CI:'true'};
@@ -28,6 +44,7 @@ export function createAndroidBuildRunner({root,env=process.env,run=execute}){
   return {tools:createAndroidTools({sdk:env.ANDROID_HOME??env.ANDROID_SDK_ROOT,javaHome:env.JAVA_HOME}),
     async build({version,publicSettings,googleServices}){
       for(const key of SIGNING)if(typeof env[key]!=='string'||!env[key])throw Error('Owner signing credentials are not configured');
+      await verifyMapplsAndroidConfiguration({root});
       if(!(await fs.stat(env.RESQNOW_ANDROID_KEYSTORE_PATH)).isFile())throw Error('Owner signing file is unavailable');
       const file=path.join(root,'android/app/google-services.json');await fs.mkdir(path.dirname(file),{recursive:true});
       try{if(JSON.stringify(JSON.parse(await fs.readFile(file,'utf8')))!==JSON.stringify(googleServices))throw Error('Existing Android provider configuration differs from approved settings');}

@@ -1,6 +1,10 @@
 # Android APK updater
 
-Implementation is in the regular frontend/backend main checkouts. A local commit is not a deployment. Production publication and update offers remain disabled until the owner accepts the release and hosted Android tests.
+Implementation is in the regular frontend/backend main checkouts. A local commit is not a deployment. Production publication and update offers must stay disabled until the owner accepts the release and hosted Android tests; source defaults are not confirmation of live repository settings.
+
+For current verification evidence, the bootstrap limitation and owner-controlled release prerequisites, see [production delivery status, 23 November 2026](android-production-release-status-2026-11-23.md). The earlier [19 November checkpoint](android-production-release-status-2026-11-19.md) is retained as history.
+
+Current Android main also uses the native Mappls SDK. Before a signed release, securely supply its matching approved `<appId>.a.conf` and `<appId>.a.olf` pair in `android/app`; never commit their contents or substitute the Web Maps key. The release adapter refuses absent, mismatched, ambiguous, empty or non-regular-file pairs before build/signing commands. The direct Gradle release task graph also rejects a missing configuration/license pair. Presence is only a preflight, not proof of provider licensing or live map operation. Hosted provisioning of the approved pair and actual native map acceptance remain release prerequisites.
 
 ## Delivery and user flow
 
@@ -19,6 +23,8 @@ Defaults: `VITE_APP_UPDATES_ENABLED=false`, Gradle `RESQNOW_APP_UPDATES_ENABLED=
 Source defaults remain versionCode4/versionName1.3. Release builds must supply paired checked Gradle properties `RESQNOW_ANDROID_VERSION_CODE` and `RESQNOW_ANDROID_VERSION_NAME`. Allocation is reviewed floor + GitHub workflow run number, never a timestamp. Candidate codes must exceed both reviewed distributed maximum and all reserved release history. Overflow, rerun attempts, reused tags and inaccessible history fail closed. Rollbacks use a new, higher code.
 
 Before signing, the owner must confirm the highest version ever distributed and the existing production signing certificate. A local distribution APK was inspected: code4, package `com.resqnow1.app`, certificate SHA-256 `3874c317a48dcd014c0665786a139246890bb0f951561097eb7d2d732bcf6826`. This alone does **not** establish the identity of every previously distributed APK. Do not replace the production key.
+
+On 23 November the local inventory additionally verified production-signed QA/diagnostic APKs through code7; the owner confirmed that7 is the highest version distributed or installed elsewhere. The reviewed starting floor is therefore7, not4 or6. The new candidate must still exceed reserved/published release history. The owner also approved shipping native automatic wake disabled: production settings require `VITE_NATIVE_WAKE_ENABLED=false`, shared by the background listener and restored `/thozhan?wake=1` entry. Tap-to-talk and server voice/recognition kill switches remain separate; normal website wake is unchanged.
 
 Signing is environment-only: `RESQNOW_ANDROID_KEYSTORE_PATH`, `RESQNOW_ANDROID_KEY_ALIAS`, `RESQNOW_ANDROID_STORE_PASSWORD`, `RESQNOW_ANDROID_KEY_PASSWORD`. Never commit keys/passwords, copy them into web variables, print them, or include signing intermediates in artifacts. Unsigned/unconfigured release builds are refused; debug builds keep the usual debug key and are never production artifacts.
 

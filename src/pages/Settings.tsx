@@ -10,7 +10,7 @@ import { AppAnalyticsConsent } from '@/components/AppAnalyticsConsent';
 import { AppUpdatePanel } from '@/components/AppUpdatePanel';
 import { useTheme } from "@/components/item-providers/ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
-import { useVoiceEnabled } from "@/hooks/useVoiceEnabled";
+import { useWakeEnabled } from "@/hooks/useVoiceEnabled";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { apiFetch } from "@/lib/api";
 import { GARAGE_QUERY_KEY, listVehicles } from "@/lib/garage";
@@ -163,7 +163,7 @@ const SettingsPage = () => {
   // Back from a page inside Account: to where the customer came from, or to Account when this was the first page opened.
   const back = () => (location.key !== "default" ? navigate(-1) : setSearchParams({}, { replace: true }));
 
-  const voiceOn = useVoiceEnabled();
+  const wakeAvailable = useWakeEnabled();
   const [heyOn, setHeyOn] = useState(wakeWordOn);
   const [heyBusy, setHeyBusy] = useState(false);
   const [micRefused, setMicRefused] = useState(false);
@@ -268,6 +268,7 @@ const SettingsPage = () => {
   // "Hey ResQNow" belongs to this phone, so it is kept here rather than in the account's settings.
   const flipHey = async (next: boolean) => {
     if (!next) { setWakeWord(false); return; }
+    if (!wakeAvailable) return;
     setHeyBusy(true);
     try {
       // Ask for the microphone now, while the customer is looking at why.
@@ -362,7 +363,12 @@ const SettingsPage = () => {
       </Inner>
     );
   } else if (view === "voice") {
-    body = (
+    body = !wakeAvailable ? (
+      <Inner title="Voice assistant" sub="Open Thozhan and tap the microphone to speak." onBack={back}>
+        <p className="rq-ac-note">Automatic wake is unavailable in this version. You can still use the microphone in Thozhan.</p>
+        <Link to="/thozhan" className="rq-btn rq-btn-soft rq-btn-block">Open Thozhan</Link>
+      </Inner>
+    ) : (
       <Inner title="Hey ResQNow" sub="Open ResQNow-Thozhan by saying it, without touching the phone." onBack={back}>
         <div className="rq-ac-group rq-ac-first">
           <Switch name="Say “Hey ResQNow”" say={micRefused ? "Allow the microphone for ResQNow first" : "Opens Thozhan from any ResQNow screen"} on={heyOn} disabled={heyBusy} onFlip={flipHey} />
@@ -465,7 +471,7 @@ const SettingsPage = () => {
             <MaterialSymbol name="contrast" /><span className="rq-ac-row-text"><b>Appearance</b></span>
             <span className="rq-ac-val">{settingsLoading ? "" : THEME_NAMES[settings.appearance.theme] ?? ""}</span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />
           </button>
-          {voiceOn ? (
+          {wakeAvailable ? (
             <button type="button" className="rq-ac-row" onClick={() => open("voice")}>
               <MaterialSymbol name="mic" /><span className="rq-ac-row-text"><b>Hey ResQNow</b><span>Open Thozhan by voice</span></span>
               <span className="rq-ac-val">{heyOn ? "On" : "Off"}</span><MaterialSymbol name="chevron_right" className="rq-ac-chev" />

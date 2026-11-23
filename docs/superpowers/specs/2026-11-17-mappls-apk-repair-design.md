@@ -6,6 +6,8 @@ Keep the current mappls-web-maps3.8.1/Capacitor integration and VITE_MAPPLS_MAP_
 
 Require a configured public SDK key before native asset preparation. Inspect the actual reachable Vite output (not source or orphan chunks), then compare copied Capacitor assets and finished APK bytes against that output. Every compiled Mappls key reader must match the approved build setting; no raw keys or SDK URLs may appear in errors. The packaged origin remains https://localhost; refuse accidental development-server or non-HTTPS native configuration. Existing signing/version/release gates remain intact.
 
+The reviewed public-key fingerprint is source-controlled independently of dotenv/CI values, using the website's intended public credential as the reference. It contains no raw key and blocks an outdated CI setting before building. Intentional key rotation requires a reviewed fingerprint update alongside both environments' public settings.
+
 Provide a cross-platform android:sync command which builds native-mode web assets from the same production dotenv/public settings as the website, verifies them, and syncs/verifies Capacitor assets. This command does not sign, install, publish, enable updates or change account settings. The release adapter uses the same preparation and verifies its final APK.
 
 Initialization failures, including synchronous loader exceptions, stay inside the existing retryable map fallback. No new map design, provider fallback, Referrer spoofing, host impersonation, blanket allowNavigation, TLS relaxation, quota bypass or private server credential in VITE variables.

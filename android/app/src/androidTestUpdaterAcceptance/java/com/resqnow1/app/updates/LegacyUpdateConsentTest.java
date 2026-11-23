@@ -24,7 +24,12 @@ public final class LegacyUpdateConsentTest {
  }
  private static JSObject state(AppUpdaterPlugin plugin)throws Exception{ResultCall call=new ResultCall("getState");plugin.getState(call);return call.await();}
  private static JSObject phase(AppUpdaterPlugin plugin,String expected)throws Exception{long end=System.currentTimeMillis()+20000;while(System.currentTimeMillis()<end){JSObject value=state(plugin);if(expected.equals(value.optString("phase")))return value;Thread.sleep(100);}throw new AssertionError("Native phase did not become "+expected);}
- private static void backToApp(UiDevice device){device.pressBack();assertTrue("Did not return to ResQNow",device.wait(Until.hasObject(By.pkg(APP).depth(0)),15000));}
+ private static String uiFailure(UiDevice device){
+  String state="foreground="+device.getCurrentPackageName();
+  try{java.io.ByteArrayOutputStream xml=new java.io.ByteArrayOutputStream();device.dumpWindowHierarchy(xml);String value=xml.toString("UTF-8");state+="; ui="+value.substring(0,Math.min(value.length(),6000));}catch(Exception unavailable){state+="; hierarchy unavailable";}
+  return state;
+ }
+ private static void backToApp(UiDevice device){device.pressBack();if(!device.wait(Until.hasObject(By.pkg(APP).depth(0)),15000))fail("Did not return to ResQNow; "+uiFailure(device));}
  private static void settings(AppUpdaterPlugin plugin,UiDevice device)throws Exception{ResultCall call=new ResultCall("openInstallPermissionSettings");plugin.openInstallPermissionSettings(call);call.await();assertTrue("No real settings UI",device.wait(Until.hasObject(By.pkg("com.android.settings").depth(0)),15000));}
  private static void setPermission(AppUpdaterPlugin plugin,UiDevice device,Context context,boolean granted)throws Exception {
   settings(plugin,device);
@@ -53,7 +58,7 @@ public final class LegacyUpdateConsentTest {
    settings(plugin,device);backToApp(device);phase(plugin,"permission-required");assertFalse(UpdateInstaller.permissionGranted(context));assertEquals(1001,UpdateInstaller.installed(context).versionCode);
    setPermission(plugin,device,context,true);phase(plugin,"ready");assertEquals(APP,device.getCurrentPackageName());assertEquals(1001,UpdateInstaller.installed(context).versionCode);
    ResultCall installation=new ResultCall("requestInstall");plugin.requestInstall(installation);assertTrue("No real Android installer",device.wait(Until.hasObject(By.pkg(INSTALLER).depth(0)),20000));
-   UiObject2 cancel=device.wait(Until.findObject(By.pkg(INSTALLER).text("Cancel")),10000);assertNotNull(cancel);cancel.click();installation.await();phase(plugin,"ready");
+   UiObject2 cancel=device.wait(Until.findObject(By.pkg(INSTALLER).text("Cancel")),10000);if(cancel==null)fail("No explicit installer Cancel control; "+uiFailure(device));cancel.click();installation.await();phase(plugin,"ready");
    assertEquals(APP,device.getCurrentPackageName());assertEquals(1001,UpdateInstaller.installed(context).versionCode);phase(plugin,"ready");assertEquals(APP,device.getCurrentPackageName());
   }
  }

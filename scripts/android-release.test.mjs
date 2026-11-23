@@ -5,10 +5,15 @@ test('allocates deterministic increasing Android codes, never timestamps or reru
   assert.deepEqual(version({floor:100,runNumber:12,latestVersionCode:110}),{versionCode:112,versionName:'1.4.112',tag:'android-v112'});
   for(const input of [{floor:4,runNumber:1,latestVersionCode:5},{floor:2147483647,runNumber:1,latestVersionCode:4},{floor:4,runNumber:0,latestVersionCode:4},{floor:4.5,runNumber:1,latestVersionCode:4},{floor:4,runNumber:2,latestVersionCode:null}])assert.throws(()=>version(input));
 });
-const settings={VITE_API_URL:'https://resqnowbackend-production-c392.up.railway.app',VITE_FRONTEND_ONLY:'false',VITE_APP_UPDATES_ENABLED:'true',VITE_NATIVE_BUILD:'true',VITE_FIREBASE_API_KEY:'AIzaSyApprovedPublicConfigKey12345678901',VITE_FIREBASE_AUTH_DOMAIN:'resqnow-prod.firebaseapp.com',VITE_FIREBASE_PROJECT_ID:'resqnow-prod',VITE_FIREBASE_MESSAGING_SENDER_ID:'123456789012',VITE_FIREBASE_APP_ID:'1:123456789012:web:abcdef123456',VITE_MAPPLS_MAP_SDK_KEY:'approved-public-map-key',VITE_RAZORPAY_KEY_ID:'rzp_live_1234567890'};
+const settings={VITE_API_URL:'https://resqnowbackend-production-c392.up.railway.app',VITE_FRONTEND_ONLY:'false',VITE_APP_UPDATES_ENABLED:'true',VITE_NATIVE_BUILD:'true',VITE_NATIVE_WAKE_ENABLED:'false',VITE_FIREBASE_API_KEY:'AIzaSyApprovedPublicConfigKey12345678901',VITE_FIREBASE_AUTH_DOMAIN:'resqnow-prod.firebaseapp.com',VITE_FIREBASE_PROJECT_ID:'resqnow-prod',VITE_FIREBASE_MESSAGING_SENDER_ID:'123456789012',VITE_FIREBASE_APP_ID:'1:123456789012:web:abcdef123456',VITE_MAPPLS_MAP_SDK_KEY:'approved-public-map-key',VITE_RAZORPAY_KEY_ID:'rzp_live_1234567890'};
 test('production builds require explicit public settings and reject test/demo overrides',()=>{
   assert.equal(typeof api.validateProductionSettings,'function');assert.doesNotThrow(()=>api.validateProductionSettings(settings));
   for(const patch of [{VITE_API_URL:'http://localhost:5000'},{VITE_FRONTEND_ONLY:'true'},{VITE_FIREBASE_PROJECT_ID:'resqnow-e2e'},{VITE_FIREBASE_API_KEY:''},{VITE_NATIVE_BUILD:'false'},{VITE_RAZORPAY_KEY_ID:'rzp_test_example'}])assert.throws(()=>api.validateProductionSettings({...settings,...patch}));
+});
+test('the approved production release cannot enable automatic wake and carries its explicit off setting',()=>{
+  const approved={...settings,VITE_NATIVE_WAKE_ENABLED:'false'};
+  assert.equal(api.validateProductionSettings(approved).VITE_NATIVE_WAKE_ENABLED,'false');
+  for(const value of [undefined,'','true','FALSE','invalid'])assert.throws(()=>api.validateProductionSettings({...approved,VITE_NATIVE_WAKE_ENABLED:value}));
 });
 const badging="package: name='com.resqnow1.app' versionCode='112' versionName='1.4.112'\nsdkVersion:'24'\ntargetSdkVersion:'36'\n";
 const signature='Verifies\nSigner #1 certificate DN: CN=ResQNow\nSigner #1 certificate SHA-256 digest: '+ 'b'.repeat(64)+'\n';

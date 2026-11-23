@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {build} from 'vite';
 import {zipSync} from 'fflate';
+import {createHash} from 'node:crypto';
 const api=await import('./mappls-artifacts.mjs').catch(()=>({}));
 const KEY='controlled-public-mappls-key';
 
@@ -13,7 +14,7 @@ async function fixture(t){
   t.after(()=>fs.rm(root,{recursive:true,force:true}));
   const dist=path.join(root,'dist');await fs.mkdir(path.join(dist,'.vite'),{recursive:true});await fs.mkdir(path.join(dist,'assets'));
   await fs.writeFile(path.join(dist,'index.html'),'<script type="module" src="/assets/app.js"></script>');
-  await fs.writeFile(path.join(dist,'assets/app.js'),'window.app=true;');
+  await fs.writeFile(path.join(dist,'assets/app.js'),'window.loadMap=()=>import("./map.js");');
   await fs.writeFile(path.join(dist,'assets/map.js'),`window.label="VITE_MAPPLS_MAP_SDK_KEY";window.loader={readKey:()=>${JSON.stringify(KEY)}};`);
   const manifest={'index.html':{isEntry:true,file:'assets/app.js',dynamicImports:['map']},map:{file:'assets/map.js'}};
   await fs.writeFile(path.join(dist,'.vite/manifest.json'),JSON.stringify(manifest));
@@ -33,6 +34,13 @@ test('Mappls verification reads reachable compiled key readers, not merely a mat
   await fs.writeFile(path.join(f.dist,'assets/map.js'),`window.label="VITE_MAPPLS_MAP_SDK_KEY";window.decoy=${JSON.stringify(KEY)};window.loader={readKey:()=>"stale-key"};`);
   await assert.rejects(()=>api.verifyMapplsDist({dist:f.dist,key:KEY}),error=>/Mappls.*key/i.test(error.message)&&!error.message.includes(KEY)&&!error.message.includes('stale-key'));
 });
+test('the reviewed public-key fingerprint rejects an old build setting without revealing either key',async t=>{
+  const f=await fixture(t);assert.equal(typeof api.verifyReviewedMapplsKey,'function');
+  await fs.mkdir(path.join(f.root,'config'));
+  await fs.writeFile(path.join(f.root,'config/mappls-public-key.json'),JSON.stringify({schemaVersion:1,sha256:createHash('sha256').update(KEY).digest('hex')}));
+  await api.verifyReviewedMapplsKey({root:f.root,key:KEY});
+  await assert.rejects(()=>api.verifyReviewedMapplsKey({root:f.root,key:'old-sdk-setting'}),error=>/fingerprint/i.test(error.message)&&!error.message.includes(KEY)&&!error.message.includes('old-sdk-setting'));
+});
 test('Mappls verification refuses missing settings, missing readers and orphan chunks',async t=>{
   const f=await fixture(t);assert.equal(typeof api.verifyMapplsDist,'function');
   for(const key of [undefined,'','  '])await assert.rejects(()=>api.verifyMapplsDist({dist:f.dist,key}),/Mappls.*key/i);
@@ -48,6 +56,24 @@ test('Mappls verification refuses stale index and manifest paths outside dist',a
   await fs.writeFile(path.join(f.dist,'index.html'),'<script type="module" src="/assets/app.js"></script>');
   f.manifest.map.file='../outside.js';await fs.writeFile(path.join(f.dist,'.vite/manifest.json'),JSON.stringify(f.manifest));
   await assert.rejects(()=>api.verifyMapplsDist({dist:f.dist,key:KEY}),/path|outside/i);
+});
+test('Mappls verification rejects emitted imports that disagree with the manifest',async t=>{
+  const f=await fixture(t);
+  await fs.writeFile(path.join(f.dist,'assets/app.js'),'window.loadMap=()=>import("./stale-map.js");');
+  await fs.writeFile(path.join(f.dist,'assets/stale-map.js'),'window.loader={readKey:()=>"stale-key"};');
+  await assert.rejects(()=>api.verifyMapplsDist({dist:f.dist,key:KEY}),/import|manifest|graph/i);
+});
+test('every reachable compiled reader is checked even without a diagnostic key-name string',async t=>{
+  const f=await fixture(t);
+  await fs.writeFile(path.join(f.dist,'assets/app.js'),`window.label="VITE_MAPPLS_MAP_SDK_KEY";window.good={readKey:()=>${JSON.stringify(KEY)}};window.loadMap=()=>import("./map.js");`);
+  await fs.writeFile(path.join(f.dist,'assets/map.js'),'window.loader={readKey:()=>"stale-key"};');
+  await assert.rejects(()=>api.verifyMapplsDist({dist:f.dist,key:KEY}),/Mappls.*key/i);
+});
+test('a literal computed reader cannot hide a stale key beside an approved reader',async t=>{
+  const f=await fixture(t);
+  await fs.writeFile(path.join(f.dist,'assets/app.js'),`window.good={readKey:()=>${JSON.stringify(KEY)}};window.loadMap=()=>import("./map.js");`);
+  await fs.writeFile(path.join(f.dist,'assets/map.js'),'window.loader={["readKey"]:()=>"stale-key"};');
+  await assert.rejects(()=>api.verifyMapplsDist({dist:f.dist,key:KEY}),/Mappls.*key/i);
 });
 test('synced Android assets must match the built map and keep the local HTTPS origin',async t=>{
   const f=await fixture(t);assert.equal(typeof api.verifyMapplsNativeAssets,'function');

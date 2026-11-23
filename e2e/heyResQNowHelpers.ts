@@ -11,9 +11,9 @@ export const microphone = (file: string) => ({
   geolocation: { latitude: 11.0168, longitude: 76.9558 },
 });
 
-export type Options = { heyOn?: boolean; heard?: string[]; micBlocked?: boolean };
+export type Options = { heyOn?: boolean; heard?: string[]; micBlocked?: boolean; wakeEnabled?: boolean };
 
-export async function openApp(page: Page, path: string, { heyOn = true, heard = [], micBlocked = false }: Options = {}) {
+export async function openApp(page: Page, path: string, { heyOn = true, heard = [], micBlocked = false, wakeEnabled = true }: Options = {}) {
   const errors: string[] = [];
   const spotterFiles: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -85,7 +85,7 @@ export async function openApp(page: Page, path: string, { heyOn = true, heard = 
     const url = new URL(request.url());
     const reply = (status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (url.pathname === "/api/auth/me") return reply(200, { id: 41, name: "Asha", email: "asha@example.test", phone: "9876543210", isVerified: true });
-    if (url.pathname === "/api/voice/status") return reply(200, { enabled: true, ai: false, voice: false });
+    if (url.pathname === "/api/voice/status") return reply(200, { enabled: true, ai: false, voice: false, wake: wakeEnabled });
     if (url.pathname === "/api/vehicles") return reply(200, []);
     if (url.pathname === "/api/service-requests") return reply(200, []);
     if (url.pathname === "/api/users/me/settings") return reply(200, {});

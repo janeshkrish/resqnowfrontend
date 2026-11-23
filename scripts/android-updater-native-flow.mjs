@@ -23,14 +23,15 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
       if(!seeded||path.basename(apk)!=='legacy-consent-androidTest.apk')throw Error('Only the explicit consent test APK is allowed');
       await call('install','-t',apk);
       const output=await call('shell','am','instrument','-w','-r','-e','resqnowHostedAcceptanceOnly','true','-e','class','com.resqnow1.app.updates.LegacyUpdateConsentTest',APP+'.test/androidx.test.runner.AndroidJUnitRunner');
-      if(!/OK \(1 test\)/.test(output)||/FAILURES|INSTRUMENTATION_FAILED|Process crashed/.test(output))throw Error('Real Android consent instrumentation failed: '+output.slice(-4000));
+      if(!/OK \(1 test\)/.test(output)||/FAILURES|INSTRUMENTATION_FAILED|Process crashed/.test(output))throw Error('Real Android consent instrumentation failed: '+output.slice(0,8000)+'\n[bounded diagnostic tail]\n'+output.slice(-4000));
       assert.equal(await version(),1001);
     },
     async attach(){
       const pid=await until(async()=>{const value=(await call('shell','pidof',APP)).trim();return /^[0-9]+$/.test(value)&&value;},{label:'owned app process'});
       const port=(await call('forward','tcp:0','localabstract:webview_devtools_remote_'+pid)).trim();if(!/^[1-9][0-9]{0,4}$/.test(port)||Number(port)>65535)throw Error('Invalid owned CDP port');forwards.add(port);
       const attach=connect??(await import('@playwright/test')).chromium.connectOverCDP.bind((await import('@playwright/test')).chromium);
-      const browser=await until(()=>attach('http://127.0.0.1:'+port,{timeout:5000}),{label:'native WebView CDP'});
+      // Android WebView does not implement desktop browser-context download management.
+      const browser=await until(()=>attach('http://127.0.0.1:'+port,{timeout:5000,noDefaults:true}),{label:'native WebView CDP'});
       const page=await until(async()=>browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().startsWith('https://localhost/')),{label:'packaged local WebView'});return {browser,page};
     },
     async allowSource(){

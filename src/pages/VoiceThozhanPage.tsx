@@ -13,6 +13,7 @@ import { displayName, hasVehicle } from "@/lib/vehicleChoice";
 import { vehicleClassInfo, type VehicleFamily } from "@/lib/vehicleClasses";
 import { cn } from "@/lib/utils";
 import { useVoiceStatus } from "@/hooks/useVoiceEnabled";
+import { wakeEnabledForStatus } from "@/lib/voice/availability";
 import { answerChips, contextOf, FAMILIES, FAMILY_TITLES, isMulti, questionOf, repliesFor, type VoiceDraft } from "@/lib/voice/engine";
 import { LINES, NOD, UI } from "@/lib/voice/lexicon";
 import { segments, vehicleArt } from "@/lib/voice/talk";
@@ -79,17 +80,18 @@ export default function VoiceThozhanPage() {
   const stopCapture = vt.stopCapture;
 
   const woke = params.get("wake") === "1";
+  const wakeAllowed = wakeEnabledForStatus(status.data);
   const startListening = useRef(vt.startHandsFree);
   startListening.current = vt.startHandsFree;
   useEffect(() => {
-    if (!woke || !status.data?.enabled || status.data.wake === false || status.data.recognition === false) return;
+    if (!woke || !wakeAllowed) return;
     let cancelled = false;
     queueMicrotask(() => { if (!cancelled) startListening.current(); });
     return () => { cancelled = true; };
-  }, [woke, status.data?.enabled, status.data?.wake, status.data?.recognition]);
+  }, [woke, wakeAllowed]);
   useEffect(() => {
-    if (status.data?.recognition === false || (woke && status.data?.wake === false)) stopCapture();
-  }, [status.data?.recognition, status.data?.wake, stopCapture, woke]);
+    if (status.data?.recognition === false || (woke && !wakeAllowed)) stopCapture();
+  }, [status.data?.recognition, wakeAllowed, stopCapture, woke]);
   useEffect(() => {
     if (vt.reviewText) { setTyped(vt.reviewText); setTyping(true); }
   }, [vt.reviewText]);

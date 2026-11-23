@@ -46,6 +46,8 @@ async function openAccount(page: Page, { me = {}, settings = {}, failSettings = 
     const url = new URL(request.url());
     const method = request.method();
     const reply = (status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    // Navigation telemetry is separate from the account mutations asserted below.
+    if (url.pathname === "/api/page-visits" && method === "POST") return reply(200, { success: true });
     if (method !== "GET") calls.push(`${method} ${url.pathname} ${request.postData() ?? ""}`.trim());
     if (url.pathname === "/api/auth/me") return reply(200, account);
     if (url.pathname === "/api/password-recovery/user/status") return reply(200, { email: account.email, hasPassword: !account.googleId, verified: true });
@@ -115,7 +117,7 @@ test("Account: who you are, the three shortcuts, the plan and the settings list"
   }
   await shot(page, "main");
 
-  // Opening the page changes nothing on the server.
+  // Opening the page changes no account data (navigation telemetry is separate).
   expect(calls).toEqual([]);
   expect(errors).toEqual([]);
 });

@@ -129,11 +129,11 @@ Never place backend secrets, database credentials, JWT secrets, Razorpay secrets
 
 `VITE_MAPPLS_MAP_SDK_KEY` is embedded by Vite at build time. After adding or changing it, restart the dev server and rebuild the web/Capacitor bundle.
 
-The Android APK also uses the **Web Maps SDK** inside Capacitor at `https://localhost`. Use the Static Key from the Mappls **Web** application with Web Maps access. Creating a separate Android application in Mappls does not switch this integration to the native Android SDK; a Backend/Cloud application's key is not a replacement for the Web Maps key.
+The website and older hybrid APKs use the Web Maps SDK. Current Android main uses the native Mappls SDK through `ResqnowMappls`: it needs the approved matching `<appId>.a.conf` and `<appId>.a.olf` files associated with `com.resqnow1.app` and the production signing certificate. A Web/Backend key does not replace that native configuration. See [Android Mappls build status](docs/android-mappls.md) before publishing; file presence alone is not proof of provider authentication.
 
-The signed GitHub Actions build reads `vars.VITE_MAPPLS_MAP_SDK_KEY` from the repository's **Settings → Secrets and variables → Actions → Variables**. Keep that variable aligned with the Web Maps key used by the working website. Editing a local `.env` or changing hosting settings does not update an APK that has already been built. Build Android web assets with `VITE_NATIVE_BUILD=true`, run Capacitor sync, then build and sign an APK with an increased version code.
+The signed GitHub Actions build still reads `vars.VITE_MAPPLS_MAP_SDK_KEY` for the shared web assets; keep it aligned with the website's Web Maps key. Native Android configuration/license files must be securely provisioned separately, never committed. Release checks reject an absent pair. Editing a local `.env` or changing hosting settings does not update an APK that has already been built. Build Android web assets with `VITE_NATIVE_BUILD=true`, run Capacitor sync, then build and sign an APK with an increased version code only after all release prerequisites pass.
 
-In the Mappls console, add each actual app origin to the key's IP/domain restrictions. For this repository, that normally includes:
+For Web SDK use (including legacy hybrid APKs), add each actual app origin to the key's IP/domain restrictions. For this repository, that normally includes:
 
 ```text
 http://localhost:8080

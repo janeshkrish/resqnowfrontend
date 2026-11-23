@@ -48,3 +48,16 @@ test("a blocked microphone says so, and the badge leads to the switch", async ({
   await badge(page).click();
   await expect(page).toHaveURL(/\/settings\?tab=voice$/);
 });
+
+test("unavailable automatic wake cannot be enabled from a saved settings link, but manual voice stays available", async ({ page }) => {
+  await openApp(page, "/settings?tab=voice", { heyOn: true, wakeEnabled: false });
+  await expect(page.getByRole("heading", { name: "Voice assistant", exact: true })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Say “Hey ResQNow”/ })).toHaveCount(0);
+  await expect(badge(page)).toHaveCount(0);
+  expect(await micCalls(page)).toBe(0);
+  const manual = page.getByRole("link", { name: "Open Thozhan", exact: true });
+  await expect(manual).toHaveAttribute("href", "/thozhan");
+  await manual.click();
+  await expect(page.locator(".vt-hi")).toBeVisible();
+  await expect(badge(page)).toHaveCount(0);
+});

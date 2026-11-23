@@ -84,6 +84,10 @@ jobs:
       - run: node node_modules/@capacitor/cli/bin/capacitor sync android
       - run: node scripts/android-release-build.mjs --prepare-sdk
       - run: bash android/gradlew -p android :app:testDebugUnitTest :app:compileDebugAndroidTestJavaWithJavac :app:assembleDebug --no-daemon
+      - name: Reject direct release producers without native Mappls configuration
+        run: node scripts/android-release-guards.mjs
+        env:
+          ANDROID_CHECKS_ONLY: 'true'
 
   native-acceptance:
     if: >-
@@ -286,6 +290,7 @@ jobs:
           VITE_API_URL: https://resqnowbackend-production-c392.up.railway.app
           VITE_FRONTEND_ONLY: 'false'
           VITE_NATIVE_BUILD: 'true'
+          VITE_NATIVE_WAKE_ENABLED: 'false'
           VITE_APP_UPDATES_ENABLED: 'true'
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}

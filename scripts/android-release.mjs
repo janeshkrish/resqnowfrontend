@@ -11,11 +11,11 @@ export function prepareAndroidVersion({floor,runNumber,latestVersionCode}){
   if(!whole(versionCode,1)||versionCode<=latestVersionCode)throw Error('Android version must increase without overflow or tag reuse');
   return {versionCode,versionName:`1.4.${versionCode}`,tag:`android-v${versionCode}`};
 }
-const REQUIRED=['VITE_API_URL','VITE_FRONTEND_ONLY','VITE_APP_UPDATES_ENABLED','VITE_NATIVE_BUILD','VITE_FIREBASE_API_KEY','VITE_FIREBASE_AUTH_DOMAIN','VITE_FIREBASE_PROJECT_ID','VITE_FIREBASE_MESSAGING_SENDER_ID','VITE_FIREBASE_APP_ID','VITE_MAPPLS_MAP_SDK_KEY','VITE_RAZORPAY_KEY_ID'];
+const REQUIRED=['VITE_API_URL','VITE_FRONTEND_ONLY','VITE_APP_UPDATES_ENABLED','VITE_NATIVE_BUILD','VITE_NATIVE_WAKE_ENABLED','VITE_FIREBASE_API_KEY','VITE_FIREBASE_AUTH_DOMAIN','VITE_FIREBASE_PROJECT_ID','VITE_FIREBASE_MESSAGING_SENDER_ID','VITE_FIREBASE_APP_ID','VITE_MAPPLS_MAP_SDK_KEY','VITE_RAZORPAY_KEY_ID'];
 const OPTIONAL=['VITE_FIREBASE_STORAGE_BUCKET','VITE_FIREBASE_VAPID_KEY','VITE_GOOGLE_MAPS_API_KEY'];
 export function validateProductionSettings(settings){
   for(const name of REQUIRED){const v=settings?.[name];if(typeof v!=='string'||!v.trim()||v!==v.trim()||/[\r\n\u0000]/.test(v)||/e2e|synthetic|placeholder|example\.(?:test|com)|localhost|(?:^|[._-])demo(?:$|[._-])|rzp_test_/i.test(v))throw Error('Missing or non-production public setting: '+name);}
-  if(settings.VITE_API_URL!=='https://resqnowbackend-production-c392.up.railway.app'||settings.VITE_FRONTEND_ONLY!=='false'||settings.VITE_NATIVE_BUILD!=='true'||settings.VITE_APP_UPDATES_ENABLED!=='true')throw Error('Production Android build flags/origin are not approved');
+  if(settings.VITE_API_URL!=='https://resqnowbackend-production-c392.up.railway.app'||settings.VITE_FRONTEND_ONLY!=='false'||settings.VITE_NATIVE_BUILD!=='true'||settings.VITE_APP_UPDATES_ENABLED!=='true'||settings.VITE_NATIVE_WAKE_ENABLED!=='false')throw Error('Production Android build flags/origin are not approved');
   if(!/^\d{6,20}$/.test(settings.VITE_FIREBASE_MESSAGING_SENDER_ID)||!settings.VITE_FIREBASE_APP_ID.startsWith(`1:${settings.VITE_FIREBASE_MESSAGING_SENDER_ID}:web:`)||!settings.VITE_FIREBASE_AUTH_DOMAIN.endsWith('.firebaseapp.com')||!settings.VITE_RAZORPAY_KEY_ID.startsWith('rzp_live_'))throw Error('Public production provider configuration is inconsistent');
   return Object.fromEntries([...REQUIRED,...OPTIONAL].map(name=>[name,settings[name]??'']));
 }

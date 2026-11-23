@@ -1,6 +1,19 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 const api=await import('./android-updater-native-flow.mjs').catch(()=>({}));
 const env={CI:'true',GITHUB_ACTIONS:'true',ANDROID_SERIAL:'emulator-5554',ANDROID_HOME:'/synthetic-sdk'};
+
+test('owned WebView attachment preserves Android context defaults instead of requesting desktop download management',async()=>{
+  const commands=[];let attachment;
+  const page={url:()=> 'https://localhost/index.html'};
+  const driver=await api.createEmulatorDriver({env,
+    run:async(_command,args)=>{commands.push(args);if(args.includes('emu'))return 'resqnow-updater-acceptance\nOK';if(args.includes('pidof'))return '4242';if(args.includes('tcp:0'))return '37127';return '';},
+    connect:async(url,options)=>{attachment={url,options};return {contexts:()=>[{pages:()=>[page]}]};},
+  });
+  const attached=await driver.attach();assert.equal(attached.page,page);
+  assert.deepEqual(attachment,{url:'http://127.0.0.1:37127',options:{timeout:5000,noDefaults:true}});
+  assert.ok(commands.some(args=>args.includes('localabstract:webview_devtools_remote_4242')));
+  await driver.close();assert.ok(commands.some(args=>args.includes('--remove')&&args.includes('tcp:37127')));
+});
 test('host driver performs no command outside an explicitly owned hosted emulator',async()=>{
   assert.equal(typeof api.createEmulatorDriver,'function');let calls=0;await assert.rejects(()=>api.createEmulatorDriver({env:{...env,GITHUB_ACTIONS:'false'},run:async()=>{calls++;}}));assert.equal(calls,0);
   await assert.rejects(()=>api.createEmulatorDriver({env,run:async()=>{calls++;return 'personal-avd\nOK';}}),/owned|hosted/i);assert.equal(calls,1);

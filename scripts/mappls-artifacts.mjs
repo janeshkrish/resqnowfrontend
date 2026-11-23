@@ -2,11 +2,19 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parseAst} from 'rollup/parseAst';
 import {unzipSync} from 'fflate';
+import {createHash} from 'node:crypto';
 
 const MAX_FILE=12*1024*1024,MAX_TOTAL=64*1024*1024,MAX_FILES=2048;
 const fail=message=>{throw Error('Mappls assets: '+message);};
 export function validateMapplsKey(key){
   if(typeof key!=='string'||!key||key!==key.trim()||key.length>2048||/[\u0000-\u0020\u007f]/.test(key))fail('a configured public SDK key is required');
+}
+/** This reviewed fingerprint is independent of mutable local/CI environment values. */
+export async function verifyReviewedMapplsKey({root,key}){
+  validateMapplsKey(key);
+  let reviewed;
+  try{reviewed=JSON.parse(await readInside(root,'config/mappls-public-key.json',8192));}catch{fail('reviewed public-key fingerprint is missing or invalid');}
+  if(reviewed?.schemaVersion!==1||!/^([a-f0-9]{64})$/.test(reviewed.sha256??'')||createHash('sha256').update(key).digest('hex')!==reviewed.sha256)fail('configured SDK key does not match the reviewed public-key fingerprint');
 }
 function safeName(name){
   if(typeof name!=='string'||!name||name.includes('\\')||/[\u0000-\u001f]/.test(name)||path.posix.isAbsolute(name)||path.posix.normalize(name)!==name||name.startsWith('../'))fail('invalid build asset path');
@@ -22,13 +30,19 @@ async function readInside(root,name,limit=MAX_FILE){
   const bytes=await fs.readFile(file);if(bytes.length!==stat.size)fail('build asset changed during inspection');
   return bytes;
 }
-function compiledKeys(code,key){
+function inspectCode(code,key){
   let ast;try{ast=parseAst(code);}catch{fail('compiled SDK code could not be inspected');}
-  let count=0;const pending=[ast];
+  let count=0;const imports=new Set(),pending=[ast];
   while(pending.length){
     const node=pending.pop();
+    if(node.type==='ImportDeclaration'||node.type==='ExportAllDeclaration'||node.type==='ExportNamedDeclaration'&&node.source||node.type==='ImportExpression'){
+      if(node.source?.type!=='Literal'||typeof node.source.value!=='string')fail('emitted imports cannot be verified against the build manifest');
+      imports.add(node.source.value);
+    }
     if(node.type==='ObjectExpression')for(const property of node.properties){
-      if(property.type!=='Property'||property.computed||(property.key.name??property.key.value)!=='readKey')continue;
+      if(property.type!=='Property')continue;
+      const name=property.computed?(property.key.type==='Literal'?property.key.value:undefined):(property.key.name??property.key.value);
+      if(name!=='readKey')continue;
       count++;
       let body=property.value.type==='ArrowFunctionExpression'?property.value.body:null;
       if(body?.type==='BlockStatement')body=body.body.length===1&&body.body[0].type==='ReturnStatement'?body.body[0].argument:null;
@@ -40,7 +54,7 @@ function compiledKeys(code,key){
       }else if(value&&typeof value==='object'&&typeof value.type==='string')pending.push(value);
     }
   }
-  return count;
+  return {readers:count,imports};
 }
 
 /** Check the app entry graph that will execute, never arbitrary/orphan output. */
@@ -58,14 +72,27 @@ export async function verifyMapplsDist({dist,key}){
     if(visited.size>=MAX_FILES||!Object.hasOwn(manifest,id))fail('invalid or oversized app entry graph');
     visited.add(id);const chunk=manifest[id];
     const bytes=await readInside(dist,safeName(chunk.file));total+=bytes.length;files.add(chunk.file);
-    const code=bytes.toString('utf8');
-    if(code.includes('VITE_MAPPLS_MAP_SDK_KEY'))readers+=compiledKeys(code,key);
+    const inspected=inspectCode(bytes.toString('utf8'),key);readers+=inspected.readers;
     for(const css of chunk.css??[]){const name=safeName(css);total+=(await readInside(dist,name)).length;files.add(name);}
     if(total>MAX_TOTAL)fail('app entry graph exceeds the inspection limit');
+    const declared=new Set(),next=[];
     for(const ids of [chunk.imports??[],chunk.dynamicImports??[]]){
       if(!Array.isArray(ids)||ids.some(item=>typeof item!=='string'))fail('invalid app entry graph');
-      pending.push(...ids);
+      for(const dependency of ids){
+        if(!Object.hasOwn(manifest,dependency))fail('invalid app entry graph');
+        declared.add(safeName(manifest[dependency].file));next.push(dependency);
+      }
     }
+    const actual=new Set();
+    for(const specifier of inspected.imports){
+      if(/^https?:\/\//.test(specifier))continue;
+      if(!specifier.startsWith('.')&&!specifier.startsWith('/'))fail('emitted imports disagree with the build manifest');
+      const resolved=new URL(specifier,'https://apk.invalid/'+chunk.file);
+      if(resolved.origin!=='https://apk.invalid')fail('emitted imports disagree with the build manifest');
+      actual.add(safeName(decodeURIComponent(resolved.pathname.slice(1))));
+    }
+    if(actual.size!==declared.size||[...actual].some(file=>!declared.has(file)))fail('emitted imports disagree with the build manifest');
+    pending.push(...next);
   }
   if(!readers)fail('compiled Mappls SDK key readers are missing from the app entry graph');
   return files;

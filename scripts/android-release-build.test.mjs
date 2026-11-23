@@ -1,15 +1,22 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';
 import {zipSync} from 'fflate';
+import {createHash} from 'node:crypto';
 const api=await import('./android-release-build.mjs').catch(()=>({}));
 async function fixture(body){const root=await fs.mkdtemp(path.join(os.tmpdir(),'resqnow-native-build-'));try{await body(root);}finally{await fs.rm(root,{recursive:true,force:true});}}
 const MAP_KEY='controlled-public-sdk-key';
-async function mapBuildFiles(root,{staleNative=false,staleApk=false}={}){
+async function mapBuildFiles(root,{staleNative=false,staleApk=false,nativeConfiguration=true}={}){
   const dist=path.join(root,'dist'),assets=path.join(root,'android/app/src/main/assets');
+  await fs.mkdir(path.join(root,'config'),{recursive:true});
+  await fs.writeFile(path.join(root,'config/mappls-public-key.json'),JSON.stringify({schemaVersion:1,sha256:createHash('sha256').update(MAP_KEY).digest('hex')}));
   await fs.mkdir(path.join(dist,'.vite'),{recursive:true});await fs.mkdir(path.join(dist,'assets'),{recursive:true});
   const html='<script type="module" src="/assets/map.js"></script>',code=`window.label="VITE_MAPPLS_MAP_SDK_KEY";window.loader={readKey:()=>${JSON.stringify(MAP_KEY)}};`;
   await fs.writeFile(path.join(dist,'index.html'),html);await fs.writeFile(path.join(dist,'assets/map.js'),code);
   await fs.writeFile(path.join(dist,'.vite/manifest.json'),JSON.stringify({'index.html':{isEntry:true,file:'assets/map.js'}}));
   await fs.mkdir(assets,{recursive:true});await fs.cp(dist,path.join(assets,'public'),{recursive:true});
+  if(nativeConfiguration){
+    await fs.writeFile(path.join(root,'android/app/fixture-app.a.conf'),'synthetic configuration; not a provider credential');
+    await fs.writeFile(path.join(root,'android/app/fixture-app.a.olf'),'synthetic license; not valid for Mappls');
+  }
   if(staleNative)await fs.writeFile(path.join(assets,'public/assets/map.js'),'stale native bundle');
   const config=JSON.stringify({appId:'com.resqnow1.app',server:{androidScheme:'https'}});
   await fs.writeFile(path.join(assets,'capacitor.config.json'),config);
@@ -31,6 +38,11 @@ test('native preparation refuses missing Mappls settings before any build or syn
   await assert.rejects(()=>api.prepareAndroidWebAssets({root,publicSettings:{VITE_NATIVE_BUILD:'true'},env:{},run:async()=>{called=true;}}),/Mappls.*key/i);
   assert.equal(called,false);
 }));
+test('native preparation refuses a stale CI Mappls setting before any command',()=>fixture(async root=>{
+  await mapBuildFiles(root);let called=false;
+  await assert.rejects(()=>api.prepareAndroidWebAssets({root,publicSettings:{VITE_NATIVE_BUILD:'true',VITE_MAPPLS_MAP_SDK_KEY:'old-sdk-setting'},env:{},run:async()=>{called=true;}}),/fingerprint/i);
+  assert.equal(called,false);
+}));
 test('stale synced maps stop the release before Gradle/signing and a stale APK is never returned',()=>fixture(async root=>{
   const key=path.join(root,'synthetic-key');await fs.writeFile(key,'not a private key');
   const env={JAVA_HOME:root,ANDROID_HOME:root,RESQNOW_ANDROID_KEYSTORE_PATH:key,RESQNOW_ANDROID_KEY_ALIAS:'alias',RESQNOW_ANDROID_STORE_PASSWORD:'synthetic-password',RESQNOW_ANDROID_KEY_PASSWORD:'synthetic-password'};
@@ -44,6 +56,33 @@ test('stale synced maps stop the release before Gradle/signing and a stale APK i
 test('missing signing credentials stop before any command or config write',()=>fixture(async root=>{
   assert.equal(typeof api.createAndroidBuildRunner,'function');let called=false;
   const runner=api.createAndroidBuildRunner({root,env:{JAVA_HOME:root,ANDROID_HOME:root},run:async()=>{called=true;}});await assert.rejects(()=>runner.build({version:{versionCode:112,versionName:'1.4.112'},publicSettings:{},googleServices:{}}));assert.equal(called,false);await assert.rejects(()=>fs.stat(path.join(root,'android/app/google-services.json')));
+}));
+
+test('release refuses missing native Mappls configuration before web build, signing or provider config writes',()=>fixture(async root=>{
+  await mapBuildFiles(root,{nativeConfiguration:false});
+  const key=path.join(root,'synthetic-key');await fs.writeFile(key,'not a private key');
+  let commands=0;
+  const runner=api.createAndroidBuildRunner({root,env:{JAVA_HOME:root,ANDROID_HOME:root,RESQNOW_ANDROID_KEYSTORE_PATH:key,RESQNOW_ANDROID_KEY_ALIAS:'alias',RESQNOW_ANDROID_STORE_PASSWORD:'synthetic-password',RESQNOW_ANDROID_KEY_PASSWORD:'synthetic-password'},run:async()=>{commands++;}});
+  await assert.rejects(()=>runner.build({version:{versionCode:112,versionName:'1.4.112'},publicSettings:{VITE_NATIVE_BUILD:'true',VITE_MAPPLS_MAP_SDK_KEY:MAP_KEY},googleServices:{public:'synthetic config'}}),/Mappls Android configuration/i);
+  assert.equal(commands,0);
+  await assert.rejects(()=>fs.stat(path.join(root,'android/app/google-services.json')));
+}));
+
+test('native Mappls configuration rejects incomplete, ambiguous, empty or non-file pairs without reading credential contents',()=>fixture(async root=>{
+  assert.equal(typeof api.verifyMapplsAndroidConfiguration,'function');
+  const app=path.join(root,'android/app');await fs.mkdir(app,{recursive:true});
+  await fs.writeFile(path.join(app,'fixture-app.a.conf'),'synthetic config');
+  await fs.writeFile(path.join(app,'different-app.a.olf'),'synthetic license');
+  await assert.rejects(()=>api.verifyMapplsAndroidConfiguration({root}),/Mappls Android configuration/i);
+  await fs.rename(path.join(app,'different-app.a.olf'),path.join(app,'fixture-app.a.olf'));
+  assert.deepEqual(await api.verifyMapplsAndroidConfiguration({root}),{appId:'fixture-app'});
+  await fs.writeFile(path.join(app,'another-app.a.conf'),'synthetic config');
+  await assert.rejects(()=>api.verifyMapplsAndroidConfiguration({root}),/Mappls Android configuration/i);
+  await fs.rm(path.join(app,'another-app.a.conf'));
+  await fs.writeFile(path.join(app,'fixture-app.a.olf'),'');
+  await assert.rejects(()=>api.verifyMapplsAndroidConfiguration({root}),/Mappls Android configuration/i);
+  await fs.rm(path.join(app,'fixture-app.a.olf'));await fs.mkdir(path.join(app,'fixture-app.a.olf'));
+  await assert.rejects(()=>api.verifyMapplsAndroidConfiguration({root}),/Mappls Android configuration/i);
 }));
 test('synthetic native verification setup refuses to overwrite an owner configuration',()=>fixture(async root=>{
   assert.equal(typeof api.prepareAndroidChecks,'function');await assert.rejects(()=>api.prepareAndroidChecks({root,env:{}}));

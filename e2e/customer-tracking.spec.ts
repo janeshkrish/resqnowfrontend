@@ -12,12 +12,14 @@ test("a Mappls initialization failure keeps tracking usable and can retry", asyn
   const { seen } = await openTracking(page);
   const healthy = "export const initializeMapplsSdk = () => Promise.resolve(runtime);";
   expect(fakeMappls).toContain(healthy);
-  const failedOnce = fakeMappls.replace(healthy, 'let attempts = 0; export const initializeMapplsSdk = () => { if (attempts++ === 0) throw new Error("Controlled Mappls initialization failure"); return Promise.resolve(runtime); };');
-  await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, route => route.fulfill({ contentType: "application/javascript", body: failedOnce }));
+  const unavailable = fakeMappls.replace(healthy, 'export const initializeMapplsSdk = () => { if (!window.__e2eAllowMapSdk) throw new Error("Controlled Mappls initialization failure"); return Promise.resolve(runtime); };');
+  await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, route => route.fulfill({ contentType: "application/javascript", body: unavailable }));
   await page.reload();
   await expect(page.getByText("Map is temporarily unavailable", { exact: true })).toBeVisible();
   await expect(page.getByTestId("tracking-card")).toBeVisible();
   await expect(page.getByText("Something went wrong", { exact: true })).toHaveCount(0);
+  // Restore only the controlled SDK boundary; recovery still needs the real retry tap.
+  await page.evaluate(() => { Object.assign(window, { __e2eAllowMapSdk: true }); });
   await page.getByRole("button", { name: "Retry map" }).click();
   await expect(page.getByText("Map is temporarily unavailable", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("application")).toBeVisible();

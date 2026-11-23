@@ -365,6 +365,9 @@ test.describe("while a technician is being found", () => {
     await expect(page.getByTestId("tracking-big")).toHaveText("Finding a locksmith nearby");
 
     await expect(page.getByTestId("tracking-sheet")).toHaveAttribute("data-size", "half");
+    // The card mounts behind the opening splash; a visible/still handle can
+    // remain covered. Wait for real input readiness without clicking it.
+    await page.getByRole("button", { name: "Open details", exact: true }).click({ trial: true });
     await settled(page);
     const box = (await page.locator(".lt-grab").boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

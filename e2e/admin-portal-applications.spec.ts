@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { noSideScroll, openPortal, shot } from "./fixtures/adminPortal";
+import { noSideScroll, openPortal, portalWorld, shot } from "./fixtures/adminPortal";
 
 // Applications: who is waiting, the checks on each application, their prices next to the city usual, and the decision.
 
@@ -51,5 +51,60 @@ test("check an application, ask for documents, approve it, then reject the next 
   await expect(list.getByRole("button", { name: "MK Tyre Works" })).toBeVisible();
   await list.getByRole("button", { name: "Squad Recovery" }).click();
   await expect(app.getByRole("link", { name: "Open their record" })).toHaveAttribute("href", "/admin/technicians/42?tab=profile");
+  expect(errors).toEqual([]);
+});
+
+test("applications keep UUIDs for decisions, pricing, and audit history", async ({ page }) => {
+  const approveId = "10000000-0000-4000-8000-000000000001";
+  const rejectId = "10000000-0000-4000-8000-000000000002";
+  const serviceId = "10000000-0000-4000-8000-000000000003";
+  const categoryId = "10000000-0000-4000-8000-000000000004";
+  const subtypeId = "10000000-0000-4000-8000-000000000005";
+  const technicianPath = (id: string) => `/api/technicians/${id}`;
+  const world = portalWorld();
+  world.applicants = world.applicants.map((row) => ({ ...row, id: row.id === "90" ? approveId : row.id === "91" ? rejectId : row.id }));
+  const auditReads = new Set<string>();
+  const { w, errors } = await openPortal(page, `/admin/applications/${approveId}`, {
+    world,
+    extra: async ({ path, method, reply }) => {
+      if (path === "/api/technicians/pricing-template") {
+        await reply(200, {
+          services: [{ ...world.template.services[1], id: serviceId }],
+          categories: [{ ...world.template.categories[1], id: categoryId }],
+          subcategories: [{ id: subtypeId, vehicle_category_id: categoryId, subcategory_name: "Sedan" }],
+          pricingFields: [{ ...world.template.pricingFields[5], service_id: serviceId }],
+        });
+      } else if (path === `${technicianPath(approveId)}/service-pricing`) {
+        await reply(200, [{ ...world.pricing[0], service_id: serviceId, vehicle_category_id: categoryId, vehicle_subcategory_id: subtypeId }]);
+      } else if (path === `${technicianPath(rejectId)}/service-pricing`) {
+        await reply(200, []);
+      } else if ([approveId, rejectId].some((id) => path === `${technicianPath(id)}/approval-audit`)) {
+        auditReads.add(path);
+        await reply(200, []);
+      } else if (method === "PATCH" && (path === `${technicianPath(approveId)}/approve` || path === `${technicianPath(rejectId)}/reject`)) {
+        const approved = path.endsWith("/approve");
+        const id = approved ? approveId : rejectId;
+        world.applicants = world.applicants.map((row) => row.id === id ? {
+          ...row, status: approved ? "approved" : "rejected", verification_status: approved ? "verified" : "rejected",
+        } : row);
+        await reply(200, { success: true });
+      } else {
+        return false;
+      }
+      return true;
+    },
+  });
+
+  const app = page.getByTestId("application");
+  await expect(app.getByText("₹700", { exact: true })).toBeVisible();
+  await expect.poll(() => auditReads.has(`${technicianPath(approveId)}/approval-audit`)).toBe(true);
+  await app.getByRole("button", { name: "Approve" }).click();
+  await expect(page).toHaveURL(new RegExp(`/admin/applications/${rejectId}$`));
+  expect(w.calls.find((call) => call.path === `${technicianPath(approveId)}/approve`)).toMatchObject({ method: "PATCH", body: { reason: "Documents checked" } });
+
+  await app.getByLabel("Note for the record").fill("Please verify the shop address.");
+  await app.getByRole("button", { name: "Reject" }).click();
+  await expect(page.getByText("Nobody is waiting")).toBeVisible();
+  expect(w.calls.find((call) => call.path === `${technicianPath(rejectId)}/reject`)).toMatchObject({ method: "PATCH", body: { reason: "Please verify the shop address." } });
   expect(errors).toEqual([]);
 });

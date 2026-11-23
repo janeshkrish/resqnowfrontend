@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import type { PricingRow, PricingTemplate as SignupTemplate } from "@/components/technician/DynamicPricingStep";
 import { apiUrl } from "@/lib/api";
+import { recordId, type RecordId } from "@/lib/recordId";
 import { useAdminEvents } from "@/pages/adminExtended/monitor/adminLive";
 import { filterSignupPricing, getSelectedSignupVehicleTypes, getSignupPricingError, SIGNUP_SERVICES, SIGNUP_VEHICLES } from "@/utils/technicianSignupPricing";
 import { approveTechnician, getPriceMedians, getPricingTemplate, getTechnicianApprovalAudit, getTechnicianServicePricing, listAllTechniciansRaw, rejectTechnician } from "../api/portalApi";
@@ -13,7 +14,7 @@ import { Btn, Dialog, Empty, ErrorState, Icon, Loading, Note, Pill, usePortalHea
 
 // People who want to join as technicians: check, call, then decide.
 
-type Applicant = Record<string, unknown> & { id: string; name: string; status?: string; verification_status?: string; created_at?: string | null };
+type Applicant = Record<string, unknown> & { id: RecordId; name: string; status?: string; verification_status?: string; created_at?: string | null };
 type Filter = "pending" | "approved" | "rejected";
 const json = <T,>(value: unknown, fallback: T): T => {
   if (value == null || value === "") return fallback;
@@ -33,13 +34,16 @@ export default function ApplicationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("pending");
-  const all = useQuery({ queryKey: ["portal", "applications"], queryFn: async () => (await listAllTechniciansRaw()) as Applicant[], refetchInterval: 60_000 });
+  const all = useQuery({ queryKey: ["portal", "applications"], queryFn: listAllTechniciansRaw, refetchInterval: 60_000 });
   useAdminEvents(() => void queryClient.invalidateQueries({ queryKey: ["portal", "applications"] }), 2_000, APPLICATION_EVENTS);
-  const rows = useMemo(() => (Array.isArray(all.data) ? all.data : []), [all.data]);
+  const rows = useMemo(() => (Array.isArray(all.data) ? all.data as Applicant[] : []).flatMap((row) => {
+    const id = recordId(row?.id);
+    return id === null ? [] : [{ ...row, id }];
+  }), [all.data]);
   const counts = { pending: 0, approved: 0, rejected: 0 } as Record<Filter, number>;
   rows.forEach((row) => { counts[statusOf(row)] += 1; });
   const shown = rows.filter((row) => statusOf(row) === filter).sort((a, b) => filter === "pending" ? Date.parse(a.created_at || "") - Date.parse(b.created_at || "") : Date.parse(b.created_at || "") - Date.parse(a.created_at || "")).slice(0, 100);
-  const selectedId = params.technicianId || shown[0]?.id || null;
+  const selectedId = params.technicianId ? recordId(params.technicianId) : shown[0]?.id ?? null;
   const selected = rows.find((row) => row.id === selectedId) || null;
   useEffect(() => {
     if (selected && statusOf(selected) !== filter) setFilter(statusOf(selected));
@@ -65,7 +69,7 @@ export default function ApplicationsPage() {
         ))}
       </div>
       {selected ? <Detail key={selected.id} row={selected} onDone={(nextId) => navigate(nextId ? `/admin/applications/${nextId}` : "/admin/applications")}
-        nextId={shown.find((row) => row.id !== selected.id)?.id || null} /> : <Empty icon="inbox" title="Pick an application" />}
+        nextId={shown.find((row) => row.id !== selected.id)?.id ?? null} /> : <Empty icon="inbox" title="Pick an application" />}
     </div>
   );
 }
@@ -84,9 +88,9 @@ function ListItem({ row, on, onOpen }: { row: Applicant; on: boolean; onOpen: ()
   );
 }
 
-function Detail({ row, onDone, nextId }: { row: Applicant; onDone: (nextId: string | null) => void; nextId: string | null }) {
+function Detail({ row, onDone, nextId }: { row: Applicant; onDone: (nextId: RecordId | null) => void; nextId: RecordId | null }) {
   const queryClient = useQueryClient();
-  const id = Number(row.id);
+  const id = row.id;
   const status = statusOf(row);
   const template = useQuery({ queryKey: ["portal", "pricing-template"], queryFn: getPricingTemplate, staleTime: 10 * 60_000 });
   const medians = useQuery({ queryKey: ["portal", "price-medians"], queryFn: getPriceMedians, staleTime: 10 * 60_000 });
@@ -103,9 +107,17 @@ function Detail({ row, onDone, nextId }: { row: Applicant; onDone: (nextId: stri
   const pay = json<{ upi_id?: string; bank_name?: string; bank_account_number?: string }>(row.payment_details, {});
   const vehicles = getSelectedSignupVehicleTypes(json<Record<string, boolean>>(row.vehicle_types, {}));
   const specialties = json<string[]>(row.specialties, []);
-  const rows: PricingRow[] = (Array.isArray(pricing.data) ? pricing.data : []).map((raw) => {
+  const rows: PricingRow[] = (Array.isArray(pricing.data) ? pricing.data : []).flatMap((raw) => {
     const item = raw as Record<string, unknown>;
-    return { service_id: Number(item.service_id), vehicle_category_id: Number(item.vehicle_category_id), vehicle_subcategory_id: item.vehicle_subcategory_id == null ? null : Number(item.vehicle_subcategory_id), pricing_json: json<Record<string, string | number>>(item.pricing_json, {}) };
+    const serviceId = recordId(item.service_id);
+    const categoryId = recordId(item.vehicle_category_id);
+    if (serviceId === null || categoryId === null) return [];
+    return [{
+      service_id: serviceId,
+      vehicle_category_id: categoryId,
+      vehicle_subcategory_id: recordId(item.vehicle_subcategory_id),
+      pricing_json: json<Record<string, string | number>>(item.pricing_json, {}),
+    }];
   });
   const tpl = template.data as unknown as SignupTemplate | undefined;
   const pricingError = tpl ? getSignupPricingError(filterSignupPricing(rows, tpl, specialties, vehicles), tpl, specialties, vehicles) : null;

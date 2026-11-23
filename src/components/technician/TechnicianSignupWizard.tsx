@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import LocationDetector, { type LocationState } from "./LocationDetector";
 import DynamicPricingStep, { type PricingTemplate } from "./DynamicPricingStep";
-import { technicianAuthService, technicianSchema, type TechnicianFormValues, type TechnicianFormInput } from "@/services/technicianAuthService";
+import { technicianAuthService, technicianSchema, technicianWithShopPinSchema, type TechnicianFormValues, type TechnicianFormInput } from "@/services/technicianAuthService";
 import { technicianAdminService } from "@/services/technicianAdminService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -237,7 +237,7 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
     const navigate = useNavigate();
 
     const form = useForm<TechnicianFormInput, unknown, TechnicianFormValues>({
-        resolver: zodResolver(technicianSchema),
+        resolver: zodResolver(isAdmin ? technicianWithShopPinSchema : technicianSchema),
         mode: "onChange",
         defaultValues: {
             name: "", proprietor_name: "", phone: "", alternate_phone: "", email: "", password: "", confirmPassword: "",
@@ -256,7 +256,7 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
         }
     });
 
-    const { control, watch, setValue, trigger, formState: { errors } } = form;
+    const { control, watch, getValues, setValue, trigger, formState: { errors } } = form;
     const selectedServices = watch("specialties") || [];
     const selectedVehicleTypeMap = watch("vehicle_types");
     const selectedVehicleTypes = getSelectedSignupVehicleTypes(selectedVehicleTypeMap);
@@ -267,9 +267,9 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
     const hasScheduledHours = Boolean(hours.opening_time || hours.closing_time);
     const consentAgreed = watch("consent.agreed");
 
-    const handleLocationDetected = React.useCallback((loc: LocationState) => {
-        setValue("location", loc);
-    }, [setValue]);
+    const handleLocationDetected = React.useCallback((loc: Partial<LocationState>) => {
+        setValue("location", { ...getValues("location"), ...loc }, { shouldValidate: true, shouldDirty: true });
+    }, [getValues, setValue]);
 
     // Scroll to top on step change
     useEffect(() => {
@@ -531,26 +531,31 @@ const TechnicianSignupWizard = ({ variant = "public" }: { variant?: "public" | "
                                         <MapPin className="w-5 h-5 text-primary" />
                                         <div>
                                             <h3 className="font-bold text-lg leading-tight">Operating Area</h3>
-                                            <p className="text-[11px] text-muted-foreground">Define your base location and service radius.</p>
+                                            <p className="text-[11px] text-muted-foreground">
+                                                {isAdmin ? "Use GPS to place the shop's pin." : "Enter your shop address manually or use optional GPS detection to autofill it."}
+                                            </p>
                                         </div>
-                                    </div>
-
-                                    <div className="pt-2">
-                                        <LocationDetector onLocationDetected={handleLocationDetected} defaultLocation={watch("location")} />
                                     </div>
 
                                     <div className="space-y-4 pt-2">
                                         <div className="grid grid-cols-2 gap-3">
                                             <FormField control={control} name="location.city" render={({ field }) => (
-                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">City/Town</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Auto-detected" /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">City/Town</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="City or town" /></FormControl><FormMessage /></FormItem>
                                             )} />
                                             <FormField control={control} name="location.state" render={({ field }) => (
                                                 <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">State *</FormLabel><FormControl><Input {...field} className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Required" /></FormControl><FormMessage /></FormItem>
                                             )} />
                                         </div>
                                         <FormField control={control} name="location.address" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Full Address *</FormLabel><FormControl><Textarea {...field} placeholder="Shop Number, Street, Landmark" className="rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all min-h-[80px] resize-none" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem><FormLabel className="text-[11px] uppercase text-muted-foreground/80 font-bold tracking-wider">Full Address *</FormLabel><FormControl><Textarea {...field} placeholder="Shop number, street, locality, PIN code" className="rounded-xl bg-muted/50 border-transparent focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/10 transition-all min-h-[80px] resize-none" /></FormControl><FormMessage /></FormItem>
                                         )} />
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <LocationDetector onLocationDetected={handleLocationDetected} defaultLocation={watch("location")} />
+                                        {isAdmin && errors.location?.latitude?.message && (
+                                            <p className="mt-2 text-sm text-destructive" role="alert">{errors.location.latitude.message}</p>
+                                        )}
                                     </div>
                                 </div>
 

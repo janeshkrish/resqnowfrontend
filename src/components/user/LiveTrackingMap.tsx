@@ -10,7 +10,7 @@ import {
   type TrackingPlaybackPoint,
 } from "@/lib/liveTrackingPlayback";
 import { logLiveTrackingDiagnostic } from "@/lib/liveTrackingDiagnostics";
-import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import { PlatformMapSurface as MapplsMapSurface } from "@/lib/mapProvider/PlatformMapSurface";
 import type {
   MapCameraSpec,
   MapCircleSpec,
@@ -462,6 +462,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           id: `nearby-${nearby.id}`,
           position: { lat: nearby.lat, lng: nearby.lng },
           html: createNearbyMarkerHtml(nearbyGlyph),
+          visual: { kind: 'technician', accessibleLabel: 'Nearby technician', vehicle: technicianVehicle },
           anchor: "center",
           zIndex: 600,
           width: 32,
@@ -474,6 +475,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         id: "customer",
         position: userLocation,
         html: createPlaceMarkerHtml(userLabel, "customer", isSearching),
+        visual: { kind: 'pickup', accessibleLabel: userLabel, label: userLabel, color: '#283048' },
         anchor: "center",
         zIndex: 640,
         width: 86,
@@ -486,6 +488,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         id: "destination",
         position: dropLocation,
         html: createPlaceMarkerHtml(dropLabel, "drop"),
+        visual: { kind: 'drop', accessibleLabel: dropLabel, label: dropLabel, color: '#B01F2A' },
         anchor: "center",
         zIndex: 620,
         width: 86,
@@ -503,6 +506,7 @@ const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           stale: technicianIsStale,
         }),
         heading: playback.bearing,
+        visual: { kind: 'technician', accessibleLabel: technicianIsStale ? 'Technician, location update delayed' : 'Technician live location', label: etaLabel, vehicle: technicianVehicle, color: technicianIsStale ? '#64748b' : '#283048' },
         anchor: "center",
         zIndex: 720,
         width: 108,

@@ -50,7 +50,7 @@ export default function Modal({
   }[size];
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
+    <div data-native-map-modal="true" className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
       <div
         className={`flex max-h-[94vh] w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl ${sizeClass}`}
         onClick={(event) => event.stopPropagation()}

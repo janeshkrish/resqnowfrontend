@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import { PlatformMapSurface as MapplsMapSurface } from "@/lib/mapProvider/PlatformMapSurface";
 import type { MapCameraSpec, MapCircleSpec, MapMarkerSpec, MapPoint } from "@/lib/mapProvider/types";
 
 type Position = [number, number];
@@ -10,6 +10,7 @@ export type RadarPin = {
   lat: number;
   lng: number;
   html: string;
+  visual?: MapMarkerSpec['visual'];
   width: number;
   height: number;
   anchor?: "center" | "bottom";
@@ -47,11 +48,12 @@ export function NearbyMapCanvas({
   useEffect(() => () => clearTimeout(tapTimer.current), []);
 
   const markers = useMemo<MapMarkerSpec[]>(() => [
-    ...(userPosition ? [{ id: "user", position: point(userPosition), html: userHtml, width: 22, height: 22, zIndex: 600 }] : []),
+    ...(userPosition ? [{ id: "user", position: point(userPosition), html: userHtml, visual: { kind: 'user' as const, accessibleLabel: 'Your location', color: '#283048' }, width: 22, height: 22, zIndex: 600 }] : []),
     ...pins.map((pin) => ({
       id: pin.id,
       position: { lat: pin.lat, lng: pin.lng },
       html: pin.html,
+      visual: pin.visual,
       width: pin.width,
       height: pin.height,
       anchor: pin.anchor ?? "center",

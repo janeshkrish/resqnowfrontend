@@ -2,6 +2,7 @@ import DynamicPricingStep from "./technician/DynamicPricingStep";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiFetch } from "@/lib/api";
 
 const env = vi.hoisted(() => ({ mobile: true, token: "token" as string | null }));
 
@@ -11,9 +12,9 @@ vi.mock("@/lib/api", () => ({
   apiUrl: (url: string) => url,
   apiFetch: vi.fn(async () => ({ ok: true, json: async () => signupPricingProps })),
 }));
-vi.mock("./technician/LocationDetector", () => ({
-  default: ({ onLocationDetected }: { onLocationDetected: (location: Record<string, string | number>) => void }) =>
-    <button type="button" onClick={() => onLocationDetected({ latitude: 11.025, longitude: 77.005, accuracy: 10, address: '14 Avinashi Road, Coimbatore', locality: 'Peelamedu', city: 'Coimbatore', district: 'Coimbatore', state: 'Tamil Nadu', pincode: '641001' })}>Choose workshop location</button>,
+vi.mock("@/lib/mapProvider/PlatformLegacyMap", () => ({
+  PlatformLegacyMap: () => null,
+  useLegacyMapCamera: () => undefined,
 }));
 
 import VehicleServiceSelector from "./VehicleServiceSelector";
@@ -199,9 +200,32 @@ describe('technician application preview', () => {
   beforeEach(() => {
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   });
-  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-  it.each(['public', 'admin'] as const)('%s registration reviews all six sections, validates edits, and returns to its portal after submission', async variant => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'geolocation');
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  it.each([
+    { variant: 'public', locationEntry: 'manual' },
+    { variant: 'public', locationEntry: 'GPS autofill' },
+    { variant: 'public', locationEntry: 'manual after failed address lookup' },
+    { variant: 'admin', locationEntry: 'GPS autofill' },
+  ])('$variant registration supports $locationEntry through preview and submission', async ({ variant, locationEntry }) => {
     const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    vi.mocked(apiFetch).mockClear();
+    const point = { latitude: 11.025, longitude: 77.005 };
+    const getCurrentPosition = vi.fn((onSuccess: PositionCallback) => onSuccess({ coords: point } as GeolocationPosition));
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition } });
+    const gpsAddress = '14 Avinashi Road, Coimbatore';
+    const manualAddress = '20 Trichy Road, Singanallur, 641005';
+    const addressLookupFailed = locationEntry === 'manual after failed address lookup';
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: !addressLookupFailed,
+      json: async () => ({
+        display_name: gpsAddress,
+        address: { suburb: 'Peelamedu', city: 'Coimbatore', county: 'Coimbatore', state: 'Tamil Nadu', postcode: '641001' },
+      }),
+    })));
     render(<MemoryRouter initialEntries={[variant === 'admin' ? '/admin/technicians/add' : '/technician/signup']}>
       <Routes>
         <Route path="/admin/technicians/add" element={<AdminAddTechnicianWizard />} />
@@ -212,8 +236,27 @@ describe('technician application preview', () => {
     fireEvent.change(screen.getByLabelText(/Your Name/), { target: { value: 'Arun Kumar' } });
     fireEvent.change(screen.getByLabelText(/Shop Name/), { target: { value: 'Arun Auto Care' } });
     fireEvent.change(screen.getByLabelText(/Mobile Number/), { target: { value: '9876543210' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Choose workshop location' }));
     const next = () => fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    const address = screen.getByLabelText(/Full Address/);
+    const city = screen.getByLabelText('City/Town');
+    const state = screen.getByLabelText(/State/);
+    if (locationEntry !== 'GPS autofill') {
+      next();
+      expect(await screen.findByText('Address required')).toBeInTheDocument();
+      fireEvent.change(address, { target: { value: manualAddress } });
+      fireEvent.change(city, { target: { value: 'Coimbatore' } });
+      fireEvent.change(state, { target: { value: 'Tamil Nadu' } });
+    }
+    if (locationEntry !== 'manual') {
+      fireEvent.click(screen.getByRole('button', { name: 'Detect My Location (GPS)' }));
+      if (addressLookupFailed) await screen.findByText(/could not fill in the address/);
+      else await screen.findByDisplayValue(gpsAddress);
+    }
+    const expectedAddress = locationEntry === 'GPS autofill' ? gpsAddress : manualAddress;
+    expect(address).toHaveValue(expectedAddress);
+    expect(city).toHaveValue('Coimbatore');
+    expect(state).toHaveValue('Tamil Nadu');
+    expect(getCurrentPosition).toHaveBeenCalledTimes(locationEntry === 'manual' ? 0 : 1);
     next();
     await screen.findByRole('heading', { name: 'What do you work on?' });
     fireEvent.click(screen.getByRole('button', { name: 'Car' }));
@@ -231,6 +274,7 @@ describe('technician application preview', () => {
     fireEvent.change(await screen.findByLabelText('UPI ID'), { target: { value: 'arun@upi' } });
     next();
     await screen.findByRole('heading', { name: 'Review your application.' });
+    expect(screen.getByText(expectedAddress)).toBeInTheDocument();
     expect(within(screen.getByRole('navigation', { name: 'Registration progress' })).getAllByRole('button')).toHaveLength(8);
     for (const section of ['Personal details', 'Services', 'Verification', 'Operations', 'Pricing', 'Banking']) expect(screen.getByRole('button', { name: `Edit ${section}` })).toBeInTheDocument();
     expect(screen.getByText('Arun Kumar')).toBeInTheDocument();
@@ -261,6 +305,14 @@ describe('technician application preview', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and agree to the ResQNow Technician Agreement *' }));
     fireEvent.click(screen.getByRole('button', { name: submitName }));
     expect(await screen.findByTestId('location')).toHaveTextContent(variant === 'admin' ? '/admin/technicians' : '/technician/login');
+    const endpoint = variant === 'admin' ? '/api/technicians/create' : '/api/technicians/register';
+    const request = vi.mocked(apiFetch).mock.calls.find(([path]) => path === endpoint)?.[1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      address: expectedAddress,
+      region: 'Coimbatore',
+      state: 'Tamil Nadu',
+      ...(locationEntry === 'manual' ? { latitude: null, longitude: null } : point),
+    });
     scrollSpy.mockRestore();
   }, 15_000);
 });

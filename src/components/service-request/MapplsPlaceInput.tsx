@@ -6,9 +6,9 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
 import {
-  searchMapplsPlaces,
   type MapplsPlaceSearchResult,
 } from "@/lib/mapProvider/mapplsSdk";
+import { searchMapPlaces as searchMapplsPlaces } from '@/lib/mapProvider/placeSearch';
 
 type MapplsPlaceInputProps = {
   id: string;
@@ -43,6 +43,8 @@ export default function MapplsPlaceInput({
 }: MapplsPlaceInputProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestRevisionRef = useRef(0);
+  const pendingSearchRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { requestRevisionRef.current += 1; pendingSearchRef.current?.abort(); }, []);
   const selectedValueRef = useRef<string | null>(null);
   // Only what the customer types is searched; an address filled in from their location isn't.
   const typedRef = useRef(false);
@@ -65,6 +67,7 @@ export default function MapplsPlaceInput({
     useCache = true,
     requestRevision = ++requestRevisionRef.current,
   ) => {
+    pendingSearchRef.current?.abort();
     if (disabled || query.length < 2) {
       if (requestRevision === requestRevisionRef.current) {
         setResults([]);
@@ -88,10 +91,13 @@ export default function MapplsPlaceInput({
     setIsLoading(true);
     setError(null);
     setIsOpen(true);
+    const abort = new AbortController();
+    pendingSearchRef.current = abort;
     try {
       const nextResults = await searchMapplsPlaces(query, {
         limit: 7,
         location: locationBias,
+        signal: abort.signal,
       });
       searchCache.set(cacheKey, nextResults);
       if (requestRevision === requestRevisionRef.current) {
@@ -105,6 +111,7 @@ export default function MapplsPlaceInput({
         setActiveIndex(-1);
       }
     } finally {
+      if (pendingSearchRef.current === abort) pendingSearchRef.current = null;
       if (requestRevision === requestRevisionRef.current) setIsLoading(false);
     }
   }, [cacheKey, disabled, locationBias, query]);
@@ -136,6 +143,7 @@ export default function MapplsPlaceInput({
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      pendingSearchRef.current?.abort();
     };
   }, [cacheKey, disabled, query, runSearch]);
 
@@ -148,6 +156,7 @@ export default function MapplsPlaceInput({
   }, []);
 
   const selectResult = (result: MapplsPlaceSearchResult) => {
+    pendingSearchRef.current?.abort();
     typedRef.current = false;
     selectedValueRef.current = result.address;
     requestRevisionRef.current += 1;

@@ -12,7 +12,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
-import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import { PlatformMapSurface as MapplsMapSurface } from "@/lib/mapProvider/PlatformMapSurface";
 import type {
   MapCameraSpec,
   MapMarkerSpec,
@@ -403,6 +403,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         id: "technician",
         position: validTechnicianLocation,
         html: technicianMarker(markerHeading),
+        visual: { kind: 'technician', accessibleLabel: 'Technician live location', vehicle: 'bike', color: '#2563eb' },
         anchor: "center",
         zIndex: 30,
         heading: markerHeading,
@@ -413,6 +414,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         id: "pickup",
         position: customerLocation,
         html: pinMarker("Pickup", "#ef4444"),
+        visual: { kind: 'pickup', accessibleLabel: 'Pickup', label: 'Pickup', color: '#ef4444' },
         anchor: "bottom",
         zIndex: 20,
       });
@@ -422,6 +424,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         id: "destination",
         position: destinationLocation,
         html: pinMarker("Destination", "#0f172a"),
+        visual: { kind: 'drop', accessibleLabel: 'Destination', label: 'Destination', color: '#0f172a' },
         anchor: "bottom",
         zIndex: 20,
       });
@@ -430,6 +433,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
         id: "navigation-destination",
         position: validNavigationDestination,
         html: pinMarker("Destination", "#0f172a"),
+        visual: { kind: 'drop', accessibleLabel: 'Destination', label: 'Destination', color: '#0f172a' },
         anchor: "bottom",
         zIndex: 20,
       });
@@ -526,7 +530,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
       </div>
 
       {showRouteInterruption && (
-        <div className="absolute inset-0 z-30 grid place-items-center bg-slate-950/35 p-5 backdrop-blur-[2px]">
+        <div data-native-map-overlay className="absolute inset-0 z-30 grid place-items-center bg-slate-950/35 p-5 backdrop-blur-[2px]">
           <div role="status" aria-live="polite" className="max-w-xs rounded-2xl bg-white/95 p-5 text-center shadow-2xl">
             {routeStatus === "error" ? (
               <>
@@ -597,6 +601,7 @@ const ActiveJobMap: React.FC<ActiveJobMapProps> = ({
           <div
             ref={footerRef}
             data-testid="navigation-footer"
+            data-native-map-overlay
             className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur"
           >
             {navigationPanel}

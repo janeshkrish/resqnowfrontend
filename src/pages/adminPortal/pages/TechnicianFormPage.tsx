@@ -8,8 +8,8 @@ import { canonicalizeServiceKey, canonicalizeVehicleKey, normalizeSpecialtiesFor
 import { apiFetch, apiUrl } from "@/lib/api";
 import { recordId, type RecordId } from "@/lib/recordId";
 import { searchLocations, type LocationSearchResult } from "@/lib/geo";
-import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
-import { technicianSchema } from "@/services/technicianAuthService";
+import { PlatformMapSurface as MapplsMapSurface } from "@/lib/mapProvider/PlatformMapSurface";
+import { technicianSchema, technicianWithShopPinSchema } from "@/services/technicianAuthService";
 import { buildTechnicianSignupPayload } from "@/utils/technicianSignupPayload";
 import { filterSignupPricing, getSelectedSignupVehicleTypes, getSignupPricingError, SIGNUP_EV_CONNECTORS, SIGNUP_SERVICES, SIGNUP_SUBTYPES, SIGNUP_VEHICLES, signupCsvTokens, type SignupVehicle } from "@/utils/technicianSignupPricing";
 import { createTechnician, getPriceMedians, getPricingTemplate, getTechnicianProfile, getTechnicianServicePricing, updateTechnicianProfile } from "../api/portalApi";
@@ -124,7 +124,8 @@ function fromProfile(profile: Record<string, unknown>, rows: unknown[]): FormSta
 
 /** The app's own checks for the fields of one step, as messages by field. */
 function problemsFor(form: FormState, fields: string[], editing: boolean) {
-  const result = technicianSchema.safeParse({ ...form, consent: editing ? { agreed: true } : form.consent });
+  const schema = editing ? technicianSchema : technicianWithShopPinSchema;
+  const result = schema.safeParse({ ...form, consent: editing ? { agreed: true } : form.consent });
   const out: Record<string, string> = {};
   if (result.success) return out;
   for (const issue of result.error.issues) {
@@ -341,7 +342,7 @@ function Personal({ form, set, err, editing }: StepProps & { editing: boolean })
       set("location", { ...loc, ...point, address: loc.address || label || "" });
     }
   };
-  const markers = useMemo(() => (loc.latitude != null && loc.longitude != null ? [{ id: "shop", position: { lat: loc.latitude, lng: loc.longitude }, html: '<span class="cm-pin is-hot"><span class="rq-symbol" aria-hidden="true">storefront</span></span>', width: 30, height: 30 }] : []), [loc.latitude, loc.longitude]);
+  const markers = useMemo(() => (loc.latitude != null && loc.longitude != null ? [{ id: "shop", position: { lat: loc.latitude, lng: loc.longitude }, html: '<span class="cm-pin is-hot"><span class="rq-symbol" aria-hidden="true">storefront</span></span>', visual: { kind: 'shop' as const, accessibleLabel: 'Shop location' }, width: 30, height: 30 }] : []), [loc.latitude, loc.longitude]);
   const camera = useMemo(() => ({ mode: "fit" as const, points: loc.latitude != null && loc.longitude != null ? [{ lat: loc.latitude, lng: loc.longitude }] : [{ lat: 11.0168, lng: 76.9558 }], padding: { top: 40, right: 40, bottom: 40, left: 40 }, maxZoom: 15, revision: (loc.latitude || 0) + (loc.longitude || 0) }), [loc.latitude, loc.longitude]);
   return (
     <>
@@ -360,7 +361,7 @@ function Personal({ form, set, err, editing }: StepProps & { editing: boolean })
           </div>
           <p className="ad-hint"><Icon name="info" />{editing ? "Leave the password blank to keep the current one." : "An email is optional. Once one is entered, a password of 8 or more characters is needed."}</p>
         </Card>
-        <Card icon="location_on" title="Operating area *" sub="The shop's pin is needed. Locality, district and pincode fill in from it.">
+        <Card icon="location_on" title="Operating area *" sub={editing ? "Search for the shop or tap the map to add a pin." : "The shop's pin is needed. Locality, district and pincode fill in from it."}>
           <div className="ad-field">
             <label htmlFor="t-where">Find the shop</label>
             <input id="t-where" className="ad-in" value={query} placeholder="Search the shop's address or area" onChange={(event) => setQuery(event.target.value)} />

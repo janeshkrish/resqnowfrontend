@@ -27,8 +27,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VoiceThozhanPlugin.class);
         registerPlugin(AppInstallationPlugin.class);
         registerPlugin(AppUpdaterPlugin.class);
+        registerPlugin(com.resqnow1.app.maps.ResqnowMapplsPlugin.class);
         bridgeBuilder.addWebViewListener(new com.resqnow1.app.updates.NativeCodeRefresh(this));
         super.onCreate(savedInstanceState);
+        if (nativeMaps() != null) nativeMaps().restoreMaps(savedInstanceState);
         ensureFirebaseInitialized();
         NotificationChannels.ensureAll(this);
     }
@@ -68,5 +70,20 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception exception) {
             Log.e(TAG, "Firebase initialization error", exception);
         }
+    }
+
+    private com.resqnow1.app.maps.ResqnowMapplsPlugin nativeMaps() {
+        if (getBridge() == null || getBridge().getPlugin("ResqnowMappls") == null) return null;
+        return (com.resqnow1.app.maps.ResqnowMapplsPlugin) getBridge().getPlugin("ResqnowMappls").getInstance();
+    }
+
+    @Override public void onSaveInstanceState(Bundle state) {
+        if (nativeMaps() != null) nativeMaps().saveMaps(state);
+        super.onSaveInstanceState(state);
+    }
+
+    @Override public void onLowMemory() {
+        super.onLowMemory();
+        if (nativeMaps() != null) nativeMaps().lowMemory();
     }
 }

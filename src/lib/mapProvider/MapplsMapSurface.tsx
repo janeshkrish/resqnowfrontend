@@ -30,7 +30,9 @@ import type {
   MapPolylineSpec,
 } from "./types";
 
-type MapplsMapSurfaceProps = {
+export type MapplsMapSurfaceProps = {
+  /** Used by the Android adapter for formerly Leaflet-backed views. */
+  zoomControls?: boolean;
   ariaLabel: string;
   markers: MapMarkerSpec[];
   polylines: MapPolylineSpec[];

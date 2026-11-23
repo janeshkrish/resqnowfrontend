@@ -41,6 +41,8 @@ export interface MapplsRuntime {
 }
 
 export type MapMarkerSpec = {
+  /** Native presentation; web continues rendering html unchanged. */
+  visual?: import('./nativeMapTypes').NativeMapMarker['visual'];
   onClick?: () => void;
   onDragEnd?: (position: MapPoint) => void;
   id: string;

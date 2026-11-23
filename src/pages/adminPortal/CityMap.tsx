@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import { PlatformMapSurface as MapplsMapSurface } from "@/lib/mapProvider/PlatformMapSurface";
 import type { MapCameraSpec, MapMarkerSpec } from "@/lib/mapProvider/types";
 
 export type CityPin = { id: string; lat: number; lng: number; tone: "" | "warn" | "hot" | "ok" | "soft"; icon: string; tag?: string | null; tagWarn?: boolean; label: string; onClick?: () => void };
@@ -11,12 +11,13 @@ const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.ch
 /** One map for the whole city: every live job and every free technician. It re-frames only when the set of jobs changes. */
 export function CityMap({ pins, dots, onUnavailable }: { pins: CityPin[]; dots: CityDot[]; onUnavailable?: () => void }) {
   const markers = useMemo<MapMarkerSpec[]>(() => [
-    ...dots.map((dot) => ({ id: dot.id, position: { lat: dot.lat, lng: dot.lng }, html: `<span class="cm-dot" title="${escape(dot.label)}"></span>`, width: 12, height: 12, zIndex: 100 })),
+    ...dots.map((dot) => ({ id: dot.id, position: { lat: dot.lat, lng: dot.lng }, html: `<span class="cm-dot" title="${escape(dot.label)}"></span>`, visual: { kind: 'dot' as const, accessibleLabel: dot.label }, width: 12, height: 12, zIndex: 100 })),
     ...pins.map((pin) => ({
       id: pin.id,
       position: { lat: pin.lat, lng: pin.lng },
       html: `<span class="cm-pin${pin.tone ? ` is-${pin.tone}` : ""}" role="button" aria-label="${escape(pin.label)}"><span class="rq-symbol" aria-hidden="true">${pin.icon}</span>${pin.tag ? `<span class="cm-tag${pin.tagWarn ? " is-warn" : ""}">${escape(pin.tag)}</span>` : ""}</span>`,
       width: 30, height: 30, zIndex: pin.tone === "warn" ? 400 : 300,
+      visual: { kind: 'pickup' as const, accessibleLabel: pin.label, label: pin.tag || undefined, color: pin.tone === 'warn' || pin.tone === 'hot' ? '#B01F2A' : '#283048' },
       onClick: pin.onClick,
     })),
   ], [pins, dots]);

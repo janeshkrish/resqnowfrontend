@@ -11,6 +11,7 @@ import { approachDistance, homeTrackingHeadline, phaseForStage, tripProgress } f
 import { lazyWithReload } from "@/lib/lazyWithReload";
 import { usableLiveEta } from "@/lib/liveEta";
 import { cn } from "@/lib/utils";
+import { usesNativeMap } from '@/lib/mapProvider/platform';
 import ActiveRequestTrip from "./ActiveRequestTrip";
 import MaterialSymbol from "./MaterialSymbol";
 
@@ -139,7 +140,8 @@ function ActiveRequestTracker({ summary, requestId }: { summary: RequestSummary 
   const towing = Boolean(live?.isTowing) || /tow/i.test(String(live?.service_type ?? summary.service_type ?? ""));
   const vehicle = towing ? "tow" : "bike";
   const hasTechnician = phase !== "search";
-  const showRealMap = Boolean(requestId) && Boolean(customer) && !mapFailed;
+  const nativeMap = usesNativeMap();
+  const showRealMap = Boolean(requestId) && Boolean(customer) && (nativeMap || !mapFailed);
   const trackingPath = `/service-tracking/${requestId}`;
   const drawnMap = (
     <DrawnMap
@@ -152,11 +154,11 @@ function ActiveRequestTracker({ summary, requestId }: { summary: RequestSummary 
 
   return (
     <section className="rq-h-card rq-h-track" aria-label="Your active request" data-phase={phase}>
-      <div className="rq-h-map" data-testid="home-request-map" data-map={showRealMap ? "live" : "drawn"} aria-hidden="true">
+      <div className="rq-h-map" data-native-map-pass-through data-testid="home-request-map" data-map={showRealMap ? "live" : "drawn"} aria-hidden="true">
         {showRealMap && customer ? (
           <div className="rq-h-map-live">
             {/* The drawing stands in while the real map's code is fetched. */}
-            <Suspense fallback={drawnMap}>
+            <Suspense fallback={nativeMap ? <div role="status">Loading map…</div> : drawnMap}>
               <ActiveRequestMap
                 requestId={requestId}
                 customer={customer}
@@ -170,7 +172,7 @@ function ActiveRequestTracker({ summary, requestId }: { summary: RequestSummary 
             </Suspense>
           </div>
         ) : (
-          drawnMap
+          nativeMap ? <div role="status">Location is not available yet.</div> : drawnMap
         )}
         {showRealMap ? (
           // On the real map the chip says what the technician's position is doing, and only

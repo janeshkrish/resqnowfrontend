@@ -1260,7 +1260,7 @@ const RequestTracking = () => {
           />
         </motion.div>
 
-        <div className="lt-top" ref={sheet.topBarRef}>
+        <div className="lt-top" ref={sheet.topBarRef} data-native-map-overlay>
           <button type="button" className="lt-round lt-press" aria-label="Back to home" onClick={goHome}>
             <MaterialSymbol name="arrow_back" />
           </button>
@@ -1288,6 +1288,7 @@ const RequestTracking = () => {
           onDragEnd={sheet.onDragEnd}
         >
           <section
+            data-native-map-overlay
             className="lt-sheet"
             data-testid="tracking-sheet"
             data-size={sheet.snap}
@@ -1382,7 +1383,7 @@ const RequestTracking = () => {
         </Card>
 
         {/* Beside the map the card does not move, so its details are always open */}
-        <section className="lt-panel" data-testid="tracking-sheet" data-size="open" aria-label="Live tracking">
+        <section className="lt-panel" data-native-map-overlay data-testid="tracking-sheet" data-size="open" aria-label="Live tracking">
           <div className="lt-peek">
             <TrackingCard {...cardProps} />
           </div>

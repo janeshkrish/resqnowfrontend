@@ -6,7 +6,7 @@ import MapplsPlaceInput from "./MapplsPlaceInput";
 import TowingEstimateCard from "./TowingEstimateCard";
 import { fetchRoute, reverseGeocode, routePolylineFromMetadata } from "@/lib/geo";
 import { reverseGeocodeWithGoogle } from "@/lib/googlePlaces";
-import { MapplsMapSurface } from "@/lib/mapProvider/MapplsMapSurface";
+import { PlatformMapSurface as MapplsMapSurface } from "@/lib/mapProvider/PlatformMapSurface";
 import type { MapCameraSpec, MapMarkerSpec, MapPolylineSpec, MapPoint } from "@/lib/mapProvider/types";
 
 interface LocationStepProps {
@@ -237,6 +237,7 @@ const LocationStep = ({
         id: "pickup",
         position: markerPosition,
         html: emergency ? SOS_MARKER_HTML : PICKUP_MARKER_HTML,
+        visual: { kind: emergency ? 'sos' : 'pickup', accessibleLabel: emergency ? 'Emergency location' : 'Pickup location', color: '#B01F2A' },
         anchor: "center",
         draggable: true,
         onDragEnd: ({ lat, lng }) => void handleMarkerDragEnd(lat, lng, "pickup"),
@@ -247,6 +248,7 @@ const LocationStep = ({
         id: "drop",
         position: dropPosition,
         html: DROP_MARKER_HTML,
+        visual: { kind: 'drop', accessibleLabel: 'Drop location', color: '#B01F2A' },
         anchor: "center",
         draggable: true,
         onDragEnd: ({ lat, lng }) => void handleMarkerDragEnd(lat, lng, "drop"),
@@ -317,12 +319,12 @@ const LocationStep = ({
           onMapClick={handleMapClick}
           fallbackDescription="You can still use your current location or search for the address."
         />
-        <span className="rqf-map-hint" aria-hidden="true">
+        <span className="rqf-map-hint" aria-hidden="true" data-native-map-overlay>
           <MaterialSymbol name="pan_tool" />
           {requiresDropLocation ? `Tap the map to move the ${activePin === "pickup" ? "pick up" : "drop"} pin` : "Drag the pin to the exact spot"}
         </span>
         {requiresDropLocation ? (
-          <div className="rqf-pin-toggle" role="radiogroup" aria-label="Which pin the map moves">
+          <div className="rqf-pin-toggle" role="radiogroup" aria-label="Which pin the map moves" data-native-map-overlay>
             <button type="button" role="radio" aria-checked={activePin === "pickup"} className={cn(activePin === "pickup" && "is-on")} onClick={() => setActivePin("pickup")}>Pick up</button>
             <button type="button" role="radio" aria-checked={activePin === "drop"} className={cn(activePin === "drop" && "is-on")} onClick={() => setActivePin("drop")}>Drop</button>
           </div>

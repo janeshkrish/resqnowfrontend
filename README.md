@@ -129,6 +129,10 @@ Never place backend secrets, database credentials, JWT secrets, Razorpay secrets
 
 `VITE_MAPPLS_MAP_SDK_KEY` is embedded by Vite at build time. After adding or changing it, restart the dev server and rebuild the web/Capacitor bundle.
 
+The Android APK also uses the **Web Maps SDK** inside Capacitor at `https://localhost`. Use the Static Key from the Mappls **Web** application with Web Maps access. Creating a separate Android application in Mappls does not switch this integration to the native Android SDK; a Backend/Cloud application's key is not a replacement for the Web Maps key.
+
+The signed GitHub Actions build reads `vars.VITE_MAPPLS_MAP_SDK_KEY` from the repository's **Settings → Secrets and variables → Actions → Variables**. Keep that variable aligned with the Web Maps key used by the working website. Editing a local `.env` or changing hosting settings does not update an APK that has already been built. Build Android web assets with `VITE_NATIVE_BUILD=true`, run Capacitor sync, then build and sign an APK with an increased version code.
+
 In the Mappls console, add each actual app origin to the key's IP/domain restrictions. For this repository, that normally includes:
 
 ```text
@@ -145,7 +149,7 @@ Add any custom production or preview domain that is used as well. Mappls returns
 
 The service-request location step, `/map`, and job tracking use Mappls. The pinned `mappls-web-maps@3.8.1` package uses `initialize(token, { map: true, version: "3.0" }, callback)`, followed by uppercase `Map(...)`. Old lowercase `map({key}, callback)` examples are incompatible with this package. Service-request autocomplete separately initializes the official `search` plugin, so the same key must also have Search plugin access.
 
-From the frontend directory, run `node scripts/diagnose-mappls.cjs` to check the local key against the official SDK endpoints without printing it. A 401 requires a Mappls configuration fix; changing frontend code cannot bypass it. After fixing configuration, rebuild/redeploy Vercel with `VITE_MAPPLS_MAP_SDK_KEY` in the Production environment. Mappls authorization scripts use NetworkOnly caching so old authorization responses are not reused.
+From the frontend directory, run `node scripts/diagnose-mappls.cjs` to inspect direct requests to the official SDK endpoints without printing the local key. Confirm authorization in the actual browser or Android WebView as well: a direct-request `401` such as `Required String parameter 'domain' is not present` alone does not establish that the browser map fails. An APK can contain a different key from both the local environment and the deployed website, so inspect the artifact being installed. After fixing configuration, rebuild/redeploy Vercel with `VITE_MAPPLS_MAP_SDK_KEY` in the Production environment and rebuild Android separately. Mappls authorization scripts use NetworkOnly caching so old authorization responses are not reused.
 
 ## API Configuration
 

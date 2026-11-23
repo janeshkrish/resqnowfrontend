@@ -1,5 +1,6 @@
 apply plugin: 'com.android.application'
 import groovy.json.JsonSlurper
+apply from: 'mappls.gradle'
 
 def updatesEnabled = (project.findProperty('RESQNOW_APP_UPDATES_ENABLED') ?: 'false').toString()
 if (!(updatesEnabled in ['true', 'false'])) {
@@ -32,10 +33,12 @@ def signingValues = ['RESQNOW_ANDROID_KEYSTORE_PATH', 'RESQNOW_ANDROID_KEY_ALIAS
 def hasOwnerSigning = signingValues.values().every { value -> value != null && !value.isEmpty() }
 
 android {
+    buildFeatures { buildConfig true }
     if (acceptanceEnabled == 'true') testBuildType 'updaterAcceptance'
     namespace = "com.resqnow1.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
+        buildConfigField 'boolean', 'MAPPLS_CONFIGURED', mapplsConfigurationPresent.toString()
         manifestPlaceholders += [resqnowAppUpdatesEnabled: updatesEnabled]
         applicationId "com.resqnow1.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -106,6 +109,9 @@ repositories {
 }
 
 dependencies {
+    implementation platform('com.mappls.sdk:mappls-bom:2.0.4')
+    implementation 'com.mappls.sdk:mappls-android-sdk'
+    implementation 'com.mappls.sdk:annotation-plugin'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"

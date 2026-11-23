@@ -225,10 +225,10 @@ export const technicianSchema = z.object({
     phone: z.string().min(10, "Min 10 digits"),
     alternate_phone: z.string().optional(),
     location: z.object({
-        address: z.string().min(5, "Address required"),
-        latitude: z.number().nullable().refine(val => val !== null, "GPS Location required"),
+        address: z.string().trim().min(5, "Address required"),
+        latitude: z.number().nullable(),
         longitude: z.number().nullable(),
-        state: z.string().min(2, "State required"),
+        state: z.string().trim().min(2, "State required"),
         locality: z.string().optional(),
         city: z.string().optional(),
         district: z.string().optional(),
@@ -308,6 +308,11 @@ export const technicianSchema = z.object({
         });
     }
 });
+
+export const technicianWithShopPinSchema = technicianSchema.refine(
+    ({ location }) => location.latitude !== null && location.longitude !== null,
+    { path: ["location", "latitude"], message: "GPS Location required" }
+);
 
 export type TechnicianFormValues = z.infer<typeof technicianSchema>;
 export type TechnicianFormInput = z.input<typeof technicianSchema>;

@@ -1,0 +1,29 @@
+// Android registration files only. Never read Vite env or Web SDK credentials.
+def confFiles = fileTree(projectDir) { include '*.a.conf' }.files
+def licenseFiles = fileTree(projectDir) { include '*.a.olf' }.files
+if (confFiles.size() > 1 || licenseFiles.size() > 1) {
+    throw new GradleException('Use exactly one approved Mappls Android configuration/license pair in android/app; the Mappls plugin selects files by directory.')
+}
+def detectedId = confFiles.size() == 1 ? confFiles.first().name.replaceFirst(/\.a\.conf$/, '') : ''
+def appId = (project.findProperty('RESQNOW_MAPPLS_APP_ID') ?: detectedId).toString()
+if (appId && !(appId ==~ /[A-Za-z0-9_-]{1,120}/)) {
+    throw new GradleException('Invalid RESQNOW_MAPPLS_APP_ID filename')
+}
+ext.mapplsConfigurationPresent = !appId.isEmpty() && file("${appId}.a.conf").isFile() && file("${appId}.a.olf").isFile()
+if ((!confFiles.isEmpty() || !licenseFiles.isEmpty()) && !mapplsConfigurationPresent) {
+    throw new GradleException('BLOCKED: Mappls Android configuration and license filenames must match the selected app ID.')
+}
+if (mapplsConfigurationPresent && (file("${appId}.a.conf").length() == 0 || file("${appId}.a.olf").length() == 0)) {
+    throw new GradleException('BLOCKED: empty Mappls Android configuration/license file')
+}
+if (mapplsConfigurationPresent) apply plugin: 'com.mappls.services.android'
+
+tasks.register('verifyMapplsConfiguration') {
+    group = 'verification'
+    doLast {
+        if (!mapplsConfigurationPresent) {
+            throw new GradleException('BLOCKED: supply approved matching <appId>.a.conf/.a.olf in android/app. Package must be com.resqnow1.app; authorize the owner signing certificate in Mappls. No Web key is accepted.')
+        }
+        logger.lifecycle('Mappls Android files present; installed certificate and provider license still require runtime validation.')
+    }
+}

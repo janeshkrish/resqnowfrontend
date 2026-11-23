@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { noSideScroll, openPortal, shot } from "./fixtures/adminPortal";
+import { noSideScroll, openPortal, portalWorld, shot } from "./fixtures/adminPortal";
 
 // Add technician and Edit technician: the app sign-up's steps, fields, checks and saved body, in the admin portal.
 
@@ -160,6 +160,20 @@ test("edit a technician: loads the saved record, keeps the same rules, and saves
   expect(body).toMatchObject({ name: "Squad Recovery", email: "selvam@example.test", password: "", specialties: ["towing"], vehicle_types: { car: true }, towing_fleet_types: ["flatbed", "wheel-lift"], aadhaar_number: "123456784410" });
   expect(body.dynamic_pricing_config).toHaveLength(2);
   expect(errors).toEqual([]);
+});
+
+test("edit a technician who applied with a manual address", async ({ page }) => {
+  const world = portalWorld();
+  Object.assign(world.profile, { latitude: null, longitude: null, specialties: ["towing"], vehicle_types: { car: true } });
+  const { w } = await openPortal(page, "/admin/technicians/42/edit", { world });
+  const f = form(page);
+  await expect(f.getByTestId("pin-found")).toContainText("No pin yet");
+  await f.getByLabel("Full address").fill("16, Mettupalayam Road");
+  await f.getByRole("button", { name: /Preview/ }).first().click();
+  await f.getByRole("button", { name: "Save changes" }).click();
+  await expect(page).toHaveURL(/\/admin\/technicians\/42\?tab=profile$/);
+  const update = w.calls.find((call) => call.method === "PUT" && call.path === "/api/technicians/42/profile");
+  expect(update?.body).toMatchObject({ address: "16, Mettupalayam Road", latitude: null, longitude: null });
 });
 
 test("EV charging asks for the supported connectors, and brands for a brand's own plug, as the app sign-up does", async ({ page }) => {

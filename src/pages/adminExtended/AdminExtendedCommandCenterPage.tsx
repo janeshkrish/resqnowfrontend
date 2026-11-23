@@ -4,6 +4,8 @@ import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
 import { AlertTriangle, BellRing, PhoneCall, RefreshCcw, Route, Siren } from "lucide-react";
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { PlatformLegacyMap, useLegacyMapCamera } from '@/lib/mapProvider/PlatformLegacyMap';
+import type { MapMarkerSpec } from '@/lib/mapProvider/types';
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getAdminToken, getRequiredApiBaseUrl } from "@/lib/api";
@@ -108,6 +110,12 @@ function CommandCenterTrackMap({ job, trackLimit }: { job: CommandCenterJob; tra
   const viewportPoints = (trackPath.length >= 2
     ? trackPath
     : [technicianPoint, customerPoint].filter(Boolean)) as [number, number][];
+  const nativeCamera=useLegacyMapCamera(viewportPoints.map(([lat,lng])=>({lat,lng})),20,viewportPoints.length>1 ? 15 : 13);
+  const nativeMarkers:MapMarkerSpec[]=[
+    ...(customerPoint ? [{id:'customer',position:{lat:customerPoint[0],lng:customerPoint[1]},html:'',visual:{kind:'pickup' as const,accessibleLabel:'Customer',color:'#2563eb'}}]:[]),
+    ...(technicianPoint ? [{id:'technician',position:{lat:technicianPoint[0],lng:technicianPoint[1]},html:'',visual:{kind:'technician' as const,accessibleLabel:'Technician',color:'#0f766e'}}]:[]),
+  ];
+  const nativePath=trackPath.length>=2 ? trackPath : technicianPoint && customerPoint ? [technicianPoint,customerPoint] : [];
 
   if (!queryEnabled) {
     return <div className="h-44 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">No GPS location available.</div>;
@@ -115,6 +123,8 @@ function CommandCenterTrackMap({ job, trackLimit }: { job: CommandCenterJob; tra
 
   return (
     <div className="h-44 overflow-hidden rounded-xl border border-slate-200">
+      <PlatformLegacyMap ariaLabel="Command center job track" markers={nativeMarkers} camera={nativeCamera}
+        polylines={nativePath.length>1 ? [{id:'track',points:nativePath.map(([lat,lng])=>({lat,lng})),color:'#0f766e',width:trackPath.length>=2 ? 3 : 2,opacity:1}] : []}>
       <MapContainer center={fallbackCenter} zoom={12} scrollWheelZoom={false} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -133,6 +143,7 @@ function CommandCenterTrackMap({ job, trackLimit }: { job: CommandCenterJob; tra
           <Polyline positions={[technicianPoint, customerPoint]} color="#0f766e" weight={2} />
         ) : null}
       </MapContainer>
+      </PlatformLegacyMap>
     </div>
   );
 }

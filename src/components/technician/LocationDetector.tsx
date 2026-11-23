@@ -2,10 +2,12 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button";
 import { MapPin, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { apiUrl } from "@/lib/api";
+import { PlatformLegacyMap, useLegacyMapCamera } from '@/lib/mapProvider/PlatformLegacyMap';
+import type { MapMarkerSpec } from '@/lib/mapProvider/types';
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -32,7 +34,7 @@ export interface LocationState {
 }
 
 interface LocationDetectorProps {
-    onLocationDetected: (location: LocationState) => void;
+    onLocationDetected: (location: Partial<LocationState>) => void;
     defaultLocation?: Partial<LocationState>;
 }
 
@@ -77,89 +79,72 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [location, setLocation] = useState<Partial<LocationState>>(defaultLocation || {});
+    const locationRequest = useRef<AbortController | null>(null);
+    const { latitude, longitude } = defaultLocation ?? {};
 
     const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(
-        defaultLocation?.latitude && defaultLocation?.longitude
-            ? { lat: defaultLocation.latitude, lng: defaultLocation.longitude }
-            : null
+        latitude != null && longitude != null ? { lat: latitude, lng: longitude } : null
     );
 
-    useEffect(() => {
-        if (defaultLocation?.latitude && defaultLocation?.longitude) {
-            setMarkerPosition({ lat: defaultLocation.latitude, lng: defaultLocation.longitude });
-        }
-    }, [defaultLocation]);
+    useEffect(() => () => locationRequest.current?.abort(), []);
 
-    const geocodePosition = async (lat: number, lng: number) => {
+    const startLocationRequest = () => {
+        locationRequest.current?.abort();
+        const request = new AbortController();
+        locationRequest.current = request;
+        setLoading(true);
+        setError(null);
+        return request.signal;
+    };
+
+    const geocodePosition = async (lat: number, lng: number, signal: AbortSignal) => {
+        setMarkerPosition({ lat, lng });
+        const coordinates = { latitude: lat, longitude: lng, accuracy: 10 };
+        let detected: Partial<LocationState> = coordinates;
         try {
-            const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`));
+            const res = await fetch(apiUrl(`/api/public/reverse-geocode?lat=${lat}&lng=${lng}`), { signal });
             const data = await res.json();
+            if (!res.ok || !data?.address || !data.display_name) throw new Error("No address found");
 
-            if (data && data.address) {
-                const addr = data.address;
-                const locality = addr.suburb || addr.neighbourhood || addr.village || '';
-                const city = addr.city || addr.town || addr.municipality || '';
-                const district = addr.county || addr.district || '';
-                const state = addr.state || '';
-                const pincode = addr.postcode || '';
-
-                const detected: LocationState = {
-                    latitude: lat,
-                    longitude: lng,
-                    accuracy: 10,
-                    locality,
-                    city,
-                    district,
-                    state,
-                    pincode,
-                    address: data.display_name || ''
-                };
-                setLocation(detected);
-                onLocationDetected(detected);
-            } else {
-                throw new Error("No results found");
-            }
-
-        } catch (e) {
-            console.error("Geocoding failed", e);
-            // Fallback
-            const fallback: LocationState = {
-                latitude: lat,
-                longitude: lng,
-                accuracy: 10,
-                locality: "",
-                city: "",
-                district: "",
-                state: "",
-                pincode: "",
-                address: `Lat: ${lat.toFixed(6)}, Lon: ${lng.toFixed(6)}`
+            const addr = data.address;
+            detected = {
+                ...coordinates,
+                locality: addr.suburb || addr.neighbourhood || addr.village || '',
+                city: addr.city || addr.town || addr.municipality || '',
+                district: addr.county || addr.district || '',
+                state: addr.state || '',
+                pincode: addr.postcode || '',
+                address: data.display_name,
             };
-            setLocation(fallback);
-            onLocationDetected(fallback);
+        } catch {
+            if (signal.aborted) return;
+            setError("We found your GPS position but could not fill in the address. You can enter it manually.");
         }
+
+        if (signal.aborted) return;
+        setLocation(current => ({ ...current, ...detected }));
+        onLocationDetected(detected);
+        setLoading(false);
     };
 
     const detectLocation = () => {
-        setLoading(true);
-        setError(null);
-
         if (!navigator.geolocation) {
             setError("Geolocation is not supported by your browser");
-            setLoading(false);
             return;
         }
 
+        const signal = startLocationRequest();
         navigator.geolocation.getCurrentPosition(
-            async (position) => {
+            (position) => {
+                if (signal.aborted) return;
                 const { latitude, longitude } = position.coords;
-                setMarkerPosition({ lat: latitude, lng: longitude });
-                await geocodePosition(latitude, longitude);
-                setLoading(false);
+                void geocodePosition(latitude, longitude, signal);
             },
             (err) => {
+                if (signal.aborted) return;
                 setLoading(false);
                 let msg = "Failed to detect location.";
-                if (err.code === 1) msg = "Permission denied. Please enable GPS.";
+                if (err.code === 1) msg = "Location permission was denied.";
                 if (err.code === 2) msg = "Location unavailable.";
                 if (err.code === 3) msg = "Request timed out.";
                 setError(msg);
@@ -168,10 +153,12 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
         );
     };
 
-    const handleMarkerDragEnd = async (lat: number, lng: number) => {
-        setMarkerPosition({ lat, lng });
-        await geocodePosition(lat, lng);
+    const handleMarkerDragEnd = (lat: number, lng: number) => {
+        void geocodePosition(lat, lng, startLocationRequest());
     };
+    const nativeMarkers: MapMarkerSpec[] = markerPosition ? [{id:'shop',position:markerPosition,html:'',draggable:true,
+        visual:{kind:'shop',accessibleLabel:'Your Location'},onDragEnd:({lat,lng})=>void handleMarkerDragEnd(lat,lng)}] : [];
+    const nativeCamera=useLegacyMapCamera([markerPosition ?? {lat:12.9716,lng:77.5946}],0,markerPosition ? 16 : 13);
 
     return (
         <div className="space-y-4">
@@ -180,7 +167,7 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
                     type="button"
                     onClick={detectLocation}
                     disabled={loading}
-                    variant={location.latitude ? "outline" : "default"}
+                    variant="outline"
                     className="w-full flex gap-2 items-center justify-center"
                 >
                     {loading ? (
@@ -188,12 +175,12 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
                     ) : (
                         <MapPin className="h-4 w-4" />
                     )}
-                    {location.latitude ? "Update My Location (GPS)" : "Detect My Location (GPS)"}
+                    {markerPosition ? "Update My Location (GPS)" : "Detect My Location (GPS)"}
                 </Button>
 
-                {location.latitude && (
+                {location.accuracy != null && (
                     <p className="text-xs text-muted-foreground text-center">
-                        Accuracy: ±{Math.round(location.accuracy || 0)} meters
+                        Accuracy: ±{Math.round(location.accuracy)} meters
                     </p>
                 )}
             </div>
@@ -208,6 +195,7 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
 
             <div className="rounded-md border overflow-hidden mt-4 bg-muted relative z-0">
                 <div className="h-[300px] w-full">
+                    <PlatformLegacyMap ariaLabel="Shop location selection" markers={nativeMarkers} camera={nativeCamera}>
                     <MapContainer
                         center={markerPosition || [20.5937, 78.9629]}
                         zoom={markerPosition ? 16 : 4}
@@ -219,6 +207,7 @@ const LocationDetector: React.FC<LocationDetectorProps> = ({ onLocationDetected,
                         />
                         <LocationMarker position={markerPosition} onDragEnd={handleMarkerDragEnd} />
                     </MapContainer>
+                    </PlatformLegacyMap>
                 </div>
 
                 {location.address && (

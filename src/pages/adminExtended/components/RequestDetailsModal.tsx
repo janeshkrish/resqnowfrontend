@@ -7,6 +7,8 @@ import Modal from "./Modal";
 import TechnicianAssignmentModal from "./TechnicianAssignmentModal";
 import { getAdminRequestDetails } from "@/services/adminDetailsService";
 import { routePolylineFromMetadata } from "@/lib/geo";
+import { PlatformLegacyMap, useLegacyMapCamera } from '@/lib/mapProvider/PlatformLegacyMap';
+import type { MapMarkerSpec } from '@/lib/mapProvider/types';
 import {
   closeAdminRequest,
   escalateAdminRequest,
@@ -109,6 +111,11 @@ export default function RequestDetailsModal({
       ? ([details.location.destination.lat, details.location.destination.lng] as [number, number])
       : routePath[routePath.length - 1] || null;
   const center = pickup || destination || ([11.0168, 76.9558] as [number, number]);
+  const nativeMarkers:MapMarkerSpec[]=[
+    ...(pickup ? [{id:'pickup',position:{lat:pickup[0],lng:pickup[1]},html:'',visual:{kind:'pickup' as const,accessibleLabel:'Pickup'}}]:[]),
+    ...(destination ? [{id:'drop',position:{lat:destination[0],lng:destination[1]},html:'',visual:{kind:'drop' as const,accessibleLabel:'Destination'}}]:[]),
+  ];
+  const nativeCamera=useLegacyMapCamera(nativeMarkers.map(m=>m.position),24,12);
 
   const openAction = (nextAction: ActionType) => {
     setAction(nextAction);
@@ -202,12 +209,15 @@ export default function RequestDetailsModal({
               </div>
               {(pickup || destination) ? (
                 <div className="h-72 overflow-hidden rounded-xl border">
+                  <PlatformLegacyMap ariaLabel="Request pickup and destination" markers={nativeMarkers} camera={nativeCamera}
+                    polylines={routePath.length>1 ? [{id:'route',points:routePath.map(([lat,lng])=>({lat,lng})),color:'#2563eb',width:4,opacity:1}]:[]}>
                   <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }}>
                     <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     {pickup ? <Marker position={pickup} /> : null}
                     {destination ? <Marker position={destination} /> : null}
                     {routePath.length > 1 ? <Polyline positions={routePath} color="#2563eb" weight={4} /> : null}
                   </MapContainer>
+                  </PlatformLegacyMap>
                 </div>
               ) : <p className="text-sm text-slate-500">Coordinates are not available.</p>}
               <p className="mt-3 text-sm text-slate-600">Distance: {details.location.distanceKm == null ? "-" : `${details.location.distanceKm} km`} | Estimated duration: {details.location.estimatedDurationMinutes == null ? "-" : `${details.location.estimatedDurationMinutes} min`}</p>

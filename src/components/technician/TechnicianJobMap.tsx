@@ -4,6 +4,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Card, CardContent } from "../ui/card";
 import { fetchRoute, routePolylineFromMetadata } from "@/lib/geo";
+import { PlatformLegacyMap, useLegacyMapCamera } from '@/lib/mapProvider/PlatformLegacyMap';
+import type { MapMarkerSpec } from '@/lib/mapProvider/types';
 
 // Fix Leaflet icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -98,11 +100,19 @@ const TechnicianJobMap: React.FC<TechnicianJobMapProps> = ({ techLocation, jobLo
         : jobLocation
             ? [jobLocation.lat, jobLocation.lng]
             : [12.9716, 77.5946];
+    const nativeMarkers: MapMarkerSpec[] = [
+        ...(techLocation ? [{id:'technician',position:techLocation,html:'',visual:{kind:'technician' as const,accessibleLabel:'You (Technician)',color:'#3B82F6'}}] : []),
+        ...(jobLocation ? [{id:'pickup',position:jobLocation,html:'',visual:{kind:'pickup' as const,accessibleLabel:'Customer Location',color:'#EF4444'}}] : []),
+        ...(destinationLocation ? [{id:'drop',position:destinationLocation,html:'',visual:{kind:'drop' as const,accessibleLabel:'Drop Location',color:'#EF4444'}}] : []),
+    ];
+    const nativeCamera=useLegacyMapCamera(nativeMarkers.length ? nativeMarkers.map(m=>m.position) : [{lat:center[0],lng:center[1]}],50,nativeMarkers.length>1 ? 18 : 13);
 
     return (
         <Card className="overflow-hidden border-0 shadow-none h-full">
             <CardContent className="p-0 h-full">
                 <div className="h-full w-full relative z-0 min-h-[300px]">
+                    <PlatformLegacyMap ariaLabel="Technician job preview" markers={nativeMarkers} camera={nativeCamera} zoomControls={false}
+                        polylines={routePath.length>1 ? [{id:'route',points:routePath.map(([lat,lng])=>({lat,lng})),color:'#2563eb',width:4,opacity:0.7}] : []}>
                     <MapContainer
                         center={center}
                         zoom={13}
@@ -138,6 +148,7 @@ const TechnicianJobMap: React.FC<TechnicianJobMapProps> = ({ techLocation, jobLo
                             <Polyline positions={routePath} color="#2563eb" weight={4} opacity={0.7} />
                         )}
                     </MapContainer>
+                    </PlatformLegacyMap>
                 </div>
             </CardContent>
         </Card>

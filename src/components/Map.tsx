@@ -265,6 +265,7 @@ const RadarMap = () => {
         return {
           id: `tech-${t.id}`, lat: t.latitude, lng: t.longitude, anchor: "bottom" as const, zIndex: on ? 400 : 150,
           html: technicianPinHtml({ name: t.name, photo: view.photo, initials: view.initials, selected: on }),
+          visual: { kind: 'technician' as const, accessibleLabel: t.name, label: view.initials, selected: on },
           ...technicianPinSize(on),
           onClick: () => select("tech", t.id, true),
         };
@@ -280,6 +281,7 @@ const RadarMap = () => {
       return [{
         id: `${layer}-${station.id}`, lat: station.latitude, lng: station.longitude, zIndex: on ? 400 : 140,
         html: placePinHtml({ name: station.name, logo: view.logo, initials: view.initials, label, selected: on }),
+        visual: { kind: layer === 'ev' ? 'ev' as const : 'fuel' as const, accessibleLabel: station.name, label, selected: on },
         ...placePinSize(label, on),
         onClick: () => select(layer, station.id, true),
       }];
@@ -407,7 +409,7 @@ const RadarMap = () => {
         />
       </div>
 
-      <header className="rqr-hdr">
+      <header className="rqr-hdr" data-native-map-overlay>
         <span className="rqr-hdr__pin" aria-hidden="true"><MaterialSymbol name={coordinates ? "near_me" : "location_off"} /></span>
         <button type="button" className="rqr-hdr__loc rq-press" onClick={requestLocation} aria-label={`Your location: ${placeTitle}. Tap to refresh.`}>
           <span className="rqr-hdr__place">{placeTitle}<MaterialSymbol name="keyboard_arrow_down" /></span>
@@ -417,7 +419,7 @@ const RadarMap = () => {
         <img className="rqr-hdr__logo" src="/images/resqnow-wordmark.png" alt="ResQNow" />
       </header>
 
-      <div className="rqr-legend" role="tablist" aria-label="Show on the map">
+      <div className="rqr-legend" role="tablist" aria-label="Show on the map" data-native-map-overlay>
         {LAYERS.map((entry) => (
           <button
             key={entry.id}
@@ -448,6 +450,7 @@ const RadarMap = () => {
       ) : null}
 
       <motion.section
+        data-native-map-overlay
         className={cn("rqr-sheet", !draggable && "is-panel")}
         aria-label={LAYERS.find((entry) => entry.id === layer)?.label}
         ref={sheetRef}

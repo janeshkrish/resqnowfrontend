@@ -9,20 +9,26 @@ const CUSTOMER_SPOT = { lat: 11.0168, lng: 76.9558 };
 const DROP_SPOT = { lat: 11.0401, lng: 76.9903 };
 
 test("a Mappls initialization failure keeps tracking usable and can retry", async ({ page }) => {
-  const { seen } = await openTracking(page);
   const healthy = "export const initializeMapplsSdk = () => Promise.resolve(runtime);";
   expect(fakeMappls).toContain(healthy);
-  const unavailable = fakeMappls.replace(healthy, 'export const initializeMapplsSdk = () => { if (!window.__e2eAllowMapSdk) throw new Error("Controlled Mappls initialization failure"); return Promise.resolve(runtime); };');
-  await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, route => route.fulfill({ contentType: "application/javascript", body: unavailable }));
-  await page.reload();
+  // Keep the SDK down through both initializations in React Strict Mode.
+  const recoveringSdk = fakeMappls.replace(healthy, `
+    export const initializeMapplsSdk = () => {
+      if (document.documentElement.dataset.mapplsAvailable !== "true") {
+        throw new Error("Controlled Mappls initialization failure");
+      }
+      return Promise.resolve(runtime);
+    };
+  `);
+  const { seen } = await openTracking(page, request(), recoveringSdk);
   await expect(page.getByText("Map is temporarily unavailable", { exact: true })).toBeVisible();
   await expect(page.getByTestId("tracking-card")).toBeVisible();
   await expect(page.getByText("Something went wrong", { exact: true })).toHaveCount(0);
-  // Restore only the controlled SDK boundary; recovery still needs the real retry tap.
-  await page.evaluate(() => { Object.assign(window, { __e2eAllowMapSdk: true }); });
+  await page.evaluate(() => { document.documentElement.dataset.mapplsAvailable = "true"; });
   await page.getByRole("button", { name: "Retry map" }).click();
   await expect(page.getByText("Map is temporarily unavailable", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("application")).toBeVisible();
+  await expect(technicianMarker(page)).toBeVisible();
   expect(seen.errors).toEqual([]);
 });
 
@@ -79,7 +85,7 @@ async function fakeSocket(page: Page) {
   return { send: (event: string, data: unknown) => sockets.forEach((ws) => ws.send(`42${JSON.stringify([event, data])}`)) };
 }
 
-async function openTracking(page: Page, initial: TrackedRequest = request()) {
+async function openTracking(page: Page, initial: TrackedRequest = request(), mapSdk = fakeMappls) {
   const state = {
     request: initial,
     /** What the server says to a cancellation; "late" is the technician setting off first. */
@@ -92,7 +98,7 @@ async function openTracking(page: Page, initial: TrackedRequest = request()) {
 
   // A signed-in customer: the test token only ever reaches the mocked API below.
   await page.addInitScript(() => localStorage.setItem("resqnow_user_token", "e2e-customer-token"));
-  await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, (route) => route.fulfill({ contentType: "application/javascript", body: fakeMappls }));
+  await page.route(/\/src\/lib\/mapProvider\/mapplsSdk\.ts(\?.*)?$/, (route) => route.fulfill({ contentType: "application/javascript", body: mapSdk }));
   const socket = await fakeSocket(page);
   await page.route((url) => url.hostname === "api.e2e.test", async (route) => {
     const call = route.request();

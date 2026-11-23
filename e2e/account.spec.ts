@@ -117,7 +117,7 @@ test("Account: who you are, the three shortcuts, the plan and the settings list"
   }
   await shot(page, "main");
 
-  // Opening the page changes no account data (navigation telemetry is separate).
+  // Opening the page is read-only for account data; navigation telemetry is separate.
   expect(calls).toEqual([]);
   expect(errors).toEqual([]);
 });

@@ -19,10 +19,13 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
     const foreground=[...focus.split('\n'),...activities.split('\n')].filter(line=>/mCurrentFocus|mFocusedApp|topResumedActivity|mResumedActivity/.test(line)).join('\n');
     return `foreground=${foreground.slice(0,2000)}; ui=${tree.slice(0,6000)}`;
   }
-  async function tapSystem(packages,selectors){return until(async()=>{
-    const focus=await call('shell','dumpsys','window');if(!packages.some(pkg=>new RegExp('mCurrentFocus=.*\\b'+pkg.replaceAll('.','\\.')+'/').test(focus)))return false;
-    const tree=await xml();for(const selector of selectors){try{const point=androidControl(tree,selector);await call('shell','input','tap',String(point.x),String(point.y));return true;}catch{/* This explicit control may use a different supported platform ID. */}}return false;
-  },{timeout:30000,label:'expected Android system control'});}
+  async function tapSystem(packages,selectors,label){
+    try{return await until(async()=>{
+      const focus=await call('shell','dumpsys','window');if(!packages.some(pkg=>new RegExp('mCurrentFocus=.*\\b'+pkg.replaceAll('.','\\.')+'/').test(focus)))return false;
+      const tree=await xml();for(const selector of selectors){try{const point=androidControl(tree,selector);await call('shell','input','tap',String(point.x),String(point.y));return true;}catch{/* This explicit control may use a different supported platform ID. */}}return false;
+    },{timeout:30000,label});}
+    catch(error){throw Error(error.message+'; '+await systemUiFailure());}
+  }
   return {version,
     async installSeed(apk){if(seeded||path.basename(apk)!=='1001.apk')throw Error('Only seed A may be installed once through ADB');seeded=true;await call('install','-t',apk);assert.equal(await version(),1001);},
     start:()=>call('shell','am','start','-n',APP+'/.MainActivity'),forceStop:()=>call('shell','am','force-stop',APP),
@@ -44,15 +47,15 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
     async allowSource(){
       const tree=await until(async()=>{const value=await xml();return value.includes('Allow from this source')&&value;},{timeout:30000,label:'unknown-app source settings'});
       if(!/checked="false"/.test(tree))throw Error('Install source permission was not initially denied');
-      await tapSystem(['com.android.settings'],[{resourceId:'android:id/switch_widget'},{resourceId:'com.android.settings:id/switch_widget'}]);await call('shell','input','keyevent','KEYCODE_BACK');
+      await tapSystem(['com.android.settings'],[{resourceId:'android:id/switch_widget'},{resourceId:'com.android.settings:id/switch_widget'},{resourceId:'com.android.settings:id/switchWidget'}],'install-source permission switch');await call('shell','input','keyevent','KEYCODE_BACK');
     },
     async returnFromDeniedSource(){
       try{await until(async()=>{const focus=await call('shell','dumpsys','window');return /mCurrentFocus=.*\bcom\.android\.settings\//.test(focus);},{timeout:30000,label:'install source settings'});}
       catch(error){throw Error(error.message+'; '+await systemUiFailure());}
       await call('shell','input','keyevent','KEYCODE_BACK');
     },
-    cancelInstaller:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:/^cancel$/i,resourceId:'android:id/button2'},{text:/^cancel$/i,resourceId:'com.android.packageinstaller:id/cancel_button'},{text:/^cancel$/i,resourceId:'com.google.android.packageinstaller:id/cancel_button'}]),
-    confirmUpdate:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:/^update$/i,resourceId:'android:id/button1'},{text:/^update$/i,resourceId:'com.android.packageinstaller:id/ok_button'},{text:/^update$/i,resourceId:'com.google.android.packageinstaller:id/ok_button'}]),
+    cancelInstaller:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:/^cancel$/i,resourceId:'android:id/button2'},{text:/^cancel$/i,resourceId:'com.android.packageinstaller:id/cancel_button'},{text:/^cancel$/i,resourceId:'com.google.android.packageinstaller:id/cancel_button'}],'Android installer Cancel'),
+    confirmUpdate:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:/^update$/i,resourceId:'android:id/button1'},{text:/^update$/i,resourceId:'com.android.packageinstaller:id/ok_button'},{text:/^update$/i,resourceId:'com.google.android.packageinstaller:id/ok_button'}],'Android installer Update'),
     async close(){for(const port of forwards)await call('forward','--remove','tcp:'+port).catch(()=>{});},
   };
 }

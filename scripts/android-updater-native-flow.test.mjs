@@ -52,6 +52,38 @@ test('Android 16 installer cancellation uses current display focus and the expli
   assert.ok(commands.every(args=>!args.includes('start')&&!args.includes('appops')));
   await driver.close();
 });
+
+test('Android 16 install-source switch uses its AndroidX resource ID through the real UI driver', {timeout:40000},async()=>{
+  const commands=[];
+  const driver=await api.createEmulatorDriver({env,run:async(_command,args)=>{
+    commands.push(args);
+    const command=args.slice(2).join(' ');
+    if(args.includes('emu'))return 'resqnow-updater-acceptance\nOK';
+    if(command==='shell dumpsys window')return 'mCurrentFocus=Window{123 u0 com.android.settings/.Settings}';
+    if(command.startsWith('shell cat '))return '<hierarchy><node text="Allow from this source" enabled="true" checked="false" resource-id="com.android.settings:id/switchWidget" bounds="[240,100][300,150]"/></hierarchy>';
+    return '';
+  }});
+  await driver.allowSource();
+  assert.deepEqual(commands.filter(args=>args.includes('tap')).map(args=>args.slice(2)),[['shell','input','tap','270','125']]);
+  assert.equal(commands.filter(args=>args.includes('KEYCODE_BACK')).length,1);
+  assert.ok(commands.every(args=>!args.includes('appops')&&!args.includes('start')));
+  await driver.close();
+});
+
+test('an unknown install-source switch stays a failure and includes foreground and hierarchy evidence', {timeout:40000},async()=>{
+  const commands=[];
+  const driver=await api.createEmulatorDriver({env,run:async(_command,args)=>{
+    commands.push(args);
+    const command=args.slice(2).join(' ');
+    if(args.includes('emu'))return 'resqnow-updater-acceptance\nOK';
+    if(command==='shell dumpsys window')return 'mCurrentFocus=Window{123 u0 com.android.settings/.Settings}';
+    if(command.startsWith('shell cat '))return '<hierarchy><node text="Allow from this source" enabled="true" checked="false" resource-id="com.android.settings:id/unknown_control" bounds="[240,100][300,150]"/></hierarchy>';
+    return '';
+  }});
+  await assert.rejects(()=>driver.allowSource(),error=>error.message.includes('mCurrentFocus=Window')&&error.message.includes('com.android.settings:id/unknown_control'));
+  assert.equal(commands.filter(args=>args.includes('tap')||args.includes('KEYCODE_BACK')||args.includes('appops')||args.includes('start')).length,0);
+  await driver.close();
+});
 test('an existing application is refused rather than uninstalled or replaced',async()=>{
   assert.equal(typeof api.createEmulatorDriver,'function');const commands=[];await assert.rejects(()=>api.createEmulatorDriver({env,run:async(_command,args)=>{commands.push(args);return args.includes('emu')?'resqnow-updater-acceptance\nOK':'Packages:\n versionCode=4 minSdk=24';}}),/already installed/);
   assert.equal(commands.length,2);assert.ok(commands.every(args=>args[0]==='-s'&&args[1]===env.ANDROID_SERIAL));assert.ok(commands.every(args=>!args.includes('install')&&!args.includes('uninstall')&&!args.includes('clear')));

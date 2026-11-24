@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimized from the disposable API36 SpaActivity failure hierarchy. Synthetic app only. -->
+<hierarchy rotation="0">
+  <node text="" resource-id="" class="android.widget.FrameLayout" package="com.android.settings" checkable="false" checked="false" clickable="false" enabled="true" bounds="[0,0][320,640]">
+    <node text="" resource-id="" class="androidx.compose.ui.platform.ComposeView" package="com.android.settings" checkable="false" checked="false" clickable="false" enabled="true" bounds="[0,0][320,640]">
+      <node text="" resource-id="" class="android.view.View" package="com.android.settings" checkable="true" checked="false" clickable="true" enabled="true" bounds="[0,380][320,440]">
+        <node text="Allow from this source" resource-id="" class="android.widget.TextView" package="com.android.settings" checkable="false" checked="false" clickable="false" enabled="true" bounds="[24,398][234,422]" />
+        <node text="" resource-id="" class="android.view.View" package="com.android.settings" checkable="false" checked="false" clickable="false" enabled="true" bounds="[0,380][320,440]" />
+      </node>
+    </node>
+  </node>
+</hierarchy>

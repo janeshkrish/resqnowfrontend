@@ -3,14 +3,36 @@ import http from 'node:http';import path from 'node:path';import {fileURLToPath}
 export function requireHostedEmulator({ci,github,serial,avd}){
   if(ci!==true||github!==true||!/^emulator-[0-9]+$/.test(serial??'')||avd!=='resqnow-updater-acceptance')throw Error('Acceptance requires the explicitly owned GitHub-hosted emulator; physical/local devices are refused');
 }
-export function androidControl(xml,{text,resourceId}){
+export function androidControl(xml,{text,resourceId,toggleLabel,packageName}){
   const decode=s=>s.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+  const attributes=raw=>Object.fromEntries([...raw.matchAll(/([\w-]+)="([^"]*)"/g)].map(m=>[m[1],decode(m[2])]));
+  const center=attrs=>{const bounds=/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/.exec(attrs.bounds??'');if(!bounds)return;const [x1,y1,x2,y2]=bounds.slice(1).map(Number);if(x2>x1&&y2>y1&&x2<=20000&&y2<=20000)return {x:Math.floor((x1+x2)/2),y:Math.floor((y1+y2)/2)};};
+  if(toggleLabel!==undefined){
+    if(typeof toggleLabel!=='string'||!toggleLabel||typeof packageName!=='string'||!packageName||text!==undefined||resourceId!==undefined)throw Error('An explicit system package and toggle label are required');
+    if(!/<hierarchy\b/.test(xml)||!xml.trimEnd().endsWith('</hierarchy>'))throw Error('Incomplete Android hierarchy');
+    const stack=[],controls=new Map();
+    for(const match of xml.matchAll(/<\/?node\b[^>]*>/g)){
+      const tag=match[0];
+      if(tag.startsWith('</')){if(!stack.length)throw Error('Malformed Android hierarchy');stack.pop();continue;}
+      const attrs=attributes(tag),frame={attrs,parent:stack.at(-1)};
+      if(attrs.text===toggleLabel&&attrs.enabled==='true'&&attrs.package===packageName){
+        let control=frame;while(control&&control.attrs.checkable!=='true')control=control.parent;
+        // Compose exposes the switch as a labelled checkable row, not a resource ID.
+        if(control&&control.attrs.package===packageName&&control.attrs.enabled==='true'&&control.attrs.clickable==='true'&&control.attrs.checked==='false'){
+          const point=center(control.attrs);if(point)controls.set(control,point);
+        }
+      }
+      if(!/\/\s*>$/.test(tag))stack.push(frame);
+    }
+    if(stack.length)throw Error('Incomplete Android hierarchy');
+    if(controls.size!==1)throw Error('A unique enabled, unchecked labelled system switch was not found');
+    return [...controls.values()][0];
+  }
   for(const match of xml.matchAll(/<node\b([^>]*)>/g)){
-    const attrs=Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(m=>[m[1],decode(m[2])]));
+    const attrs=attributes(match[1]);
     const wrongText=text!==undefined&&(text instanceof RegExp?!text.test(attrs.text??''):attrs.text!==text);
     if(attrs.enabled!=='true'||wrongText||resourceId!==undefined&&attrs['resource-id']!==resourceId)continue;
-    const bounds=/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/.exec(attrs.bounds??'');if(!bounds)continue;const [x1,y1,x2,y2]=bounds.slice(1).map(Number);
-    if(x2>x1&&y2>y1&&x2<=20000&&y2<=20000)return {x:Math.floor((x1+x2)/2),y:Math.floor((y1+y2)/2)};
+    const point=center(attrs);if(point)return point;
   }
   throw Error('The expected enabled Android confirmation control was not found');
 }

@@ -6,7 +6,16 @@ async function until(action,{timeout=120000,label='acceptance condition'}={}){co
 export async function createEmulatorDriver({env=process.env,run=command,connect}={}){
   requireHostedEmulator({ci:env.CI==='true',github:env.GITHUB_ACTIONS==='true',serial:env.ANDROID_SERIAL,avd:'resqnow-updater-acceptance'});
   const sdk=env.ANDROID_HOME??env.ANDROID_SDK_ROOT;if(!sdk)throw Error('Android SDK required');const adb=path.join(sdk,'platform-tools',process.platform==='win32'?'adb.exe':'adb'),serial=env.ANDROID_SERIAL;
-  const call=(...args)=>run(adb,['-s',serial,...args],{env:fixtureEnvironment(env)});const avd=(await call('emu','avd','name')).trim().split(/\r?\n/)[0];
+  const call=async(...args)=>{
+    try{return await run(adb,['-s',serial,...args],{env:fixtureEnvironment(env)});}
+    catch(error){
+      const message=typeof error?.message==='string'?error.message.slice(0,1500):'ADB command failed';
+      const code=typeof error?.code==='string'||Number.isInteger(error?.code)?String(error.code).slice(0,64):'unknown';
+      const signal=typeof error?.signal==='string'?error.signal.slice(0,64):'none';
+      const tail=key=>typeof error?.[key]==='string'?error[key].slice(-2000):'';
+      throw Error(`${message}; adb code=${code}, signal=${signal}, terminated=${error?.killed===true}; stdout=${tail('stdout')}; stderr=${tail('stderr')}`);
+    }
+  };const avd=(await call('emu','avd','name')).trim().split(/\r?\n/)[0];
   requireHostedEmulator({ci:true,github:true,serial,avd});
   const version=async()=>{const info=await call('shell','dumpsys','package',APP);const raw=/\bversionCode=(\d+)\b/.exec(info);return raw?Number(raw[1]):null;};
   if(await version()!==null)throw Error('ResQNow is already installed: refusing to uninstall, clear or replace it');
@@ -20,10 +29,14 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
     return `foreground=${foreground.slice(0,2000)}; ui=${tree.slice(0,6000)}`;
   }
   async function tapSystem(packages,selectors,label){
-    try{return await until(async()=>{
-      const focus=await call('shell','dumpsys','window');if(!packages.some(pkg=>new RegExp('mCurrentFocus=.*\\b'+pkg.replaceAll('.','\\.')+'/').test(focus)))return false;
-      const tree=await xml();for(const selector of selectors){try{const point=androidControl(tree,selector);await call('shell','input','tap',String(point.x),String(point.y));return true;}catch{/* This explicit control may use a different supported platform ID. */}}return false;
-    },{timeout:30000,label});}
+    try{
+      const point=await until(async()=>{
+        const focus=await call('shell','dumpsys','window');if(!packages.some(pkg=>new RegExp('mCurrentFocus=.*\\b'+pkg.replaceAll('.','\\.')+'/').test(focus)))return false;
+        const tree=await xml();for(const selector of selectors){try{return androidControl(tree,selector);}catch{/* This explicit control may use a different supported platform representation. */}}return false;
+      },{timeout:30000,label});
+      // Poll only observations. A delivery error must not repeat a state-changing tap.
+      await call('shell','input','tap',String(point.x),String(point.y));return true;
+    }
     catch(error){throw Error(error.message+'; '+await systemUiFailure());}
   }
   return {version,
@@ -47,7 +60,7 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
     async allowSource(){
       const tree=await until(async()=>{const value=await xml();return value.includes('Allow from this source')&&value;},{timeout:30000,label:'unknown-app source settings'});
       if(!/checked="false"/.test(tree))throw Error('Install source permission was not initially denied');
-      await tapSystem(['com.android.settings'],[{resourceId:'android:id/switch_widget'},{resourceId:'com.android.settings:id/switch_widget'},{resourceId:'com.android.settings:id/switchWidget'}],'install-source permission switch');await call('shell','input','keyevent','KEYCODE_BACK');
+      await tapSystem(['com.android.settings'],[{resourceId:'android:id/switch_widget'},{resourceId:'com.android.settings:id/switch_widget'},{resourceId:'com.android.settings:id/switchWidget'},{toggleLabel:'Allow from this source',packageName:'com.android.settings'}],'install-source permission switch');await call('shell','input','keyevent','KEYCODE_BACK');
     },
     async returnFromDeniedSource(){
       try{await until(async()=>{const focus=await call('shell','dumpsys','window');return /mCurrentFocus=.*\bcom\.android\.settings\//.test(focus);},{timeout:30000,label:'install source settings'});}

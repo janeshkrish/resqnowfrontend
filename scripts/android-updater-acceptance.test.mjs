@@ -9,6 +9,13 @@ test('system UI coordinates are selected from explicit enabled controls, never a
   assert.equal(typeof api.androidControl,'function');const xml='<hierarchy><node text="Update" enabled="false" resource-id="android:id/button1" bounds="[0,0][1,1]"/><node text="Update" enabled="true" resource-id="android:id/button1" bounds="[10,20][110,80]"/></hierarchy>';
   assert.deepEqual(api.androidControl(xml,{text:'Update',resourceId:'android:id/button1'}),{x:60,y:50});assert.throws(()=>api.androidControl(xml,{text:'Delete',resourceId:'android:id/button1'}));
 });
+
+test('system label casing does not hide the real Cancel button or select an install action',()=>{
+  const xml='<hierarchy><node text="INSTALL" enabled="true" resource-id="com.android.packageinstaller:id/ok_button" bounds="[233,584][312,632]"/><node text="CANCEL" enabled="true" resource-id="com.android.packageinstaller:id/cancel_button" bounds="[156,584][233,632]"/></hierarchy>';
+  assert.deepEqual(api.androidControl(xml,{text:/^cancel$/i,resourceId:'com.android.packageinstaller:id/cancel_button'}),{x:194,y:608});
+  assert.throws(()=>api.androidControl(xml,{text:/^cancel$/i,resourceId:'com.android.packageinstaller:id/ok_button'}));
+  assert.throws(()=>api.androidControl(xml.replace('text="CANCEL" enabled="true"','text="CANCEL" enabled="false"'),{text:/^cancel$/i,resourceId:'com.android.packageinstaller:id/cancel_button'}));
+});
 function release(code,bytes){return {schemaVersion:1,channel:'stable',applicationId:'com.resqnow1.app',versionCode:code,versionName:'ci.'+code,minSdk:24,targetSdk:36,sizeBytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),signingCertificateSha256:'b'.repeat(64),sourceCommit:'c'.repeat(40),publishedAt:'2026-10-30T12:00:00Z',apkUrl:`https://github.com/janeshkrish/resqnowfrontend/releases/download/android-v${code}/resqnow.apk`};}
 test('owned fixture service serves immutable metadata, resumable real bytes and no account headers',async()=>{
   assert.equal(typeof api.startFixtureService,'function');const bytes=Buffer.from('0123456789abcdef');const manifest=release(1006,bytes);const service=await api.startFixtureService({candidates:[{manifest,bytes}],port:0});

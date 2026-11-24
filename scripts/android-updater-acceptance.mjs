@@ -7,7 +7,8 @@ export function androidControl(xml,{text,resourceId}){
   const decode=s=>s.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
   for(const match of xml.matchAll(/<node\b([^>]*)>/g)){
     const attrs=Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(m=>[m[1],decode(m[2])]));
-    if(attrs.enabled!=='true'||text!==undefined&&attrs.text!==text||resourceId!==undefined&&attrs['resource-id']!==resourceId)continue;
+    const wrongText=text!==undefined&&(text instanceof RegExp?!text.test(attrs.text??''):attrs.text!==text);
+    if(attrs.enabled!=='true'||wrongText||resourceId!==undefined&&attrs['resource-id']!==resourceId)continue;
     const bounds=/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/.exec(attrs.bounds??'');if(!bounds)continue;const [x1,y1,x2,y2]=bounds.slice(1).map(Number);
     if(x2>x1&&y2>y1&&x2<=20000&&y2<=20000)return {x:Math.floor((x1+x2)/2),y:Math.floor((y1+y2)/2)};
   }

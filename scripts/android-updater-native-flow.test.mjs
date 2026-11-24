@@ -18,6 +18,40 @@ test('host driver performs no command outside an explicitly owned hosted emulato
   assert.equal(typeof api.createEmulatorDriver,'function');let calls=0;await assert.rejects(()=>api.createEmulatorDriver({env:{...env,GITHUB_ACTIONS:'false'},run:async()=>{calls++;}}));assert.equal(calls,0);
   await assert.rejects(()=>api.createEmulatorDriver({env,run:async()=>{calls++;return 'personal-avd\nOK';}}),/owned|hosted/i);assert.equal(calls,1);
 });
+
+test('Android 16 permission return uses the display focus dump rather than a window-only inventory', {timeout:40000},async()=>{
+  // Android 16 moved display focus outside dumpWindowsLocked's window-only inventory.
+  // A valid foreground Settings screen must lead to exactly one real Back action.
+  const commands=[];
+  const driver=await api.createEmulatorDriver({env,run:async(_command,args)=>{
+    commands.push(args);
+    if(args.includes('emu'))return 'resqnow-updater-acceptance\nOK';
+    if(args.slice(2).join(' ')==='shell dumpsys window')return 'WINDOW MANAGER DISPLAY CONTENTS\n  mCurrentFocus=Window{123 u0 com.android.settings/.Settings}';
+    if(args.slice(2).join(' ')==='shell dumpsys window windows')return 'WINDOW MANAGER WINDOWS\n Window #0 Window{123 u0 com.android.settings/.Settings}';
+    return '';
+  }});
+  await driver.returnFromDeniedSource();
+  assert.equal(commands.filter(args=>args.includes('KEYCODE_BACK')).length,1);
+  assert.ok(commands.every(args=>!args.includes('start')&&!args.includes('appops')));
+  await driver.close();
+});
+
+test('Android 16 installer cancellation uses current display focus and the explicit Cancel control', {timeout:40000},async()=>{
+  const commands=[];
+  const driver=await api.createEmulatorDriver({env,run:async(_command,args)=>{
+    commands.push(args);
+    const command=args.slice(2).join(' ');
+    if(args.includes('emu'))return 'resqnow-updater-acceptance\nOK';
+    if(command==='shell dumpsys window')return 'WINDOW MANAGER DISPLAY CONTENTS\n  mCurrentFocus=Window{123 u0 com.google.android.packageinstaller/.PackageInstallerActivity}';
+    if(command==='shell dumpsys window windows')return 'WINDOW MANAGER WINDOWS\n Window #0 Window{123 u0 com.google.android.packageinstaller/.PackageInstallerActivity}';
+    if(command.startsWith('shell cat '))return '<hierarchy><node text="INSTALL" enabled="true" resource-id="com.android.packageinstaller:id/ok_button" bounds="[233,584][312,632]"/><node text="CANCEL" enabled="true" resource-id="com.android.packageinstaller:id/cancel_button" bounds="[156,584][233,632]"/></hierarchy>';
+    return '';
+  }});
+  await driver.cancelInstaller();
+  assert.deepEqual(commands.filter(args=>args.includes('tap')).map(args=>args.slice(2)),[['shell','input','tap','194','608']]);
+  assert.ok(commands.every(args=>!args.includes('start')&&!args.includes('appops')));
+  await driver.close();
+});
 test('an existing application is refused rather than uninstalled or replaced',async()=>{
   assert.equal(typeof api.createEmulatorDriver,'function');const commands=[];await assert.rejects(()=>api.createEmulatorDriver({env,run:async(_command,args)=>{commands.push(args);return args.includes('emu')?'resqnow-updater-acceptance\nOK':'Packages:\n versionCode=4 minSdk=24';}}),/already installed/);
   assert.equal(commands.length,2);assert.ok(commands.every(args=>args[0]==='-s'&&args[1]===env.ANDROID_SERIAL));assert.ok(commands.every(args=>!args.includes('install')&&!args.includes('uninstall')&&!args.includes('clear')));

@@ -12,8 +12,15 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
   if(await version()!==null)throw Error('ResQNow is already installed: refusing to uninstall, clear or replace it');
   const forwards=new Set();let seeded=false;
   async function xml(){await call('shell','uiautomator','dump','/sdcard/resqnow-updater-acceptance.xml');return call('shell','cat','/sdcard/resqnow-updater-acceptance.xml');}
+  async function systemUiFailure(){
+    const focus=await call('shell','dumpsys','window').catch(()=> 'window diagnostics unavailable');
+    const activities=await call('shell','dumpsys','activity','activities').catch(()=> 'activity diagnostics unavailable');
+    const tree=await xml().catch(()=> 'hierarchy unavailable');
+    const foreground=[...focus.split('\n'),...activities.split('\n')].filter(line=>/mCurrentFocus|mFocusedApp|topResumedActivity|mResumedActivity/.test(line)).join('\n');
+    return `foreground=${foreground.slice(0,2000)}; ui=${tree.slice(0,6000)}`;
+  }
   async function tapSystem(packages,selectors){return until(async()=>{
-    const focus=await call('shell','dumpsys','window','windows');if(!packages.some(pkg=>new RegExp('mCurrentFocus=.*\\b'+pkg.replaceAll('.','\\.')+'/').test(focus)))return false;
+    const focus=await call('shell','dumpsys','window');if(!packages.some(pkg=>new RegExp('mCurrentFocus=.*\\b'+pkg.replaceAll('.','\\.')+'/').test(focus)))return false;
     const tree=await xml();for(const selector of selectors){try{const point=androidControl(tree,selector);await call('shell','input','tap',String(point.x),String(point.y));return true;}catch{/* This explicit control may use a different supported platform ID. */}}return false;
   },{timeout:30000,label:'expected Android system control'});}
   return {version,
@@ -40,11 +47,12 @@ export async function createEmulatorDriver({env=process.env,run=command,connect}
       await tapSystem(['com.android.settings'],[{resourceId:'android:id/switch_widget'},{resourceId:'com.android.settings:id/switch_widget'}]);await call('shell','input','keyevent','KEYCODE_BACK');
     },
     async returnFromDeniedSource(){
-      await until(async()=>{const focus=await call('shell','dumpsys','window','windows');return /mCurrentFocus=.*\bcom\.android\.settings\//.test(focus);},{timeout:30000,label:'install source settings'});
+      try{await until(async()=>{const focus=await call('shell','dumpsys','window');return /mCurrentFocus=.*\bcom\.android\.settings\//.test(focus);},{timeout:30000,label:'install source settings'});}
+      catch(error){throw Error(error.message+'; '+await systemUiFailure());}
       await call('shell','input','keyevent','KEYCODE_BACK');
     },
-    cancelInstaller:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:'Cancel',resourceId:'android:id/button2'},{text:'Cancel',resourceId:'com.android.packageinstaller:id/cancel_button'},{text:'Cancel',resourceId:'com.google.android.packageinstaller:id/cancel_button'}]),
-    confirmUpdate:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:'Update',resourceId:'android:id/button1'},{text:'Update',resourceId:'com.android.packageinstaller:id/ok_button'},{text:'Update',resourceId:'com.google.android.packageinstaller:id/ok_button'}]),
+    cancelInstaller:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:/^cancel$/i,resourceId:'android:id/button2'},{text:/^cancel$/i,resourceId:'com.android.packageinstaller:id/cancel_button'},{text:/^cancel$/i,resourceId:'com.google.android.packageinstaller:id/cancel_button'}]),
+    confirmUpdate:()=>tapSystem(['com.android.packageinstaller','com.google.android.packageinstaller'],[{text:/^update$/i,resourceId:'android:id/button1'},{text:/^update$/i,resourceId:'com.android.packageinstaller:id/ok_button'},{text:/^update$/i,resourceId:'com.google.android.packageinstaller:id/ok_button'}]),
     async close(){for(const port of forwards)await call('forward','--remove','tcp:'+port).catch(()=>{});},
   };
 }

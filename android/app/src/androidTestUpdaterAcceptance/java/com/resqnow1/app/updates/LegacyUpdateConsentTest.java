@@ -35,9 +35,14 @@ public final class LegacyUpdateConsentTest {
   settings(plugin,device);
   if(UpdateInstaller.permissionGranted(context)!=granted){
    if(Build.VERSION.SDK_INT<26){new UiScrollable(new UiSelector().scrollable(true)).scrollTextIntoView("Unknown sources");UiObject2 row=device.wait(Until.findObject(By.text("Unknown sources")),10000);assertNotNull(row);row.click();
-    if(granted){UiObject2 accept=device.wait(Until.findObject(By.res("android:id/button1").text("OK")),5000);if(accept!=null)accept.click();}
+    if(granted){UiObject2 accept=device.wait(Until.findObject(By.res("android:id/button1").text(Pattern.compile("OK",Pattern.CASE_INSENSITIVE))),5000);if(accept==null)fail("No explicit unknown-source confirmation; "+uiFailure(device));accept.click();
+     if(!device.wait(Until.gone(By.res("android:id/button1")),10000))fail("Unknown-source confirmation did not close; "+uiFailure(device));}
    }else{UiObject2 toggle=device.wait(Until.findObject(By.res(Pattern.compile("(android|com.android.settings):id/switch_widget"))),10000);assertNotNull(toggle);toggle.click();}
   }
+  // A system dialog click is asynchronous. Prove the grant and dismissal BEFORE Back,
+  // so Back cannot merely dismiss an unhandled dialog while leaving Settings foreground.
+  long end=System.currentTimeMillis()+10000;while(UpdateInstaller.permissionGranted(context)!=granted&&System.currentTimeMillis()<end)Thread.sleep(100);
+  if(UpdateInstaller.permissionGranted(context)!=granted)fail("Real source permission did not change before return; "+uiFailure(device));
   backToApp(device);assertEquals("Real source permission did not change",granted,UpdateInstaller.permissionGranted(context));
  }
  @Test public void deniedThenGrantedSettingsReturnAndInstallerCancelNeverInstallAutomatically()throws Exception {
@@ -58,7 +63,7 @@ public final class LegacyUpdateConsentTest {
    settings(plugin,device);backToApp(device);phase(plugin,"permission-required");assertFalse(UpdateInstaller.permissionGranted(context));assertEquals(1001,UpdateInstaller.installed(context).versionCode);
    setPermission(plugin,device,context,true);phase(plugin,"ready");assertEquals(APP,device.getCurrentPackageName());assertEquals(1001,UpdateInstaller.installed(context).versionCode);
    ResultCall installation=new ResultCall("requestInstall");plugin.requestInstall(installation);assertTrue("No real Android installer",device.wait(Until.hasObject(By.pkg(INSTALLER).depth(0)),20000));
-   UiObject2 cancel=device.wait(Until.findObject(By.pkg(INSTALLER).text("Cancel")),10000);if(cancel==null)fail("No explicit installer Cancel control; "+uiFailure(device));cancel.click();installation.await();phase(plugin,"ready");
+   UiObject2 cancel=device.wait(Until.findObject(By.pkg(INSTALLER).res(Pattern.compile("(android:id/button2|com\\.(android|google\\.android)\\.packageinstaller:id/cancel_button)")).text(Pattern.compile("Cancel",Pattern.CASE_INSENSITIVE)).enabled(true)),10000);if(cancel==null)fail("No explicit installer Cancel control; "+uiFailure(device));cancel.click();installation.await();phase(plugin,"ready");
    assertEquals(APP,device.getCurrentPackageName());assertEquals(1001,UpdateInstaller.installed(context).versionCode);phase(plugin,"ready");assertEquals(APP,device.getCurrentPackageName());
   }
  }

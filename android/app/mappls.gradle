@@ -1,15 +1,18 @@
 // Android registration files only. Never read Vite env or Web SDK credentials.
-def confFiles = fileTree(projectDir) { include '*.a.conf' }.files
-def licenseFiles = fileTree(projectDir) { include '*.a.olf' }.files
+def mapplsMode = project.hasProperty('RESQNOW_MAPPLS_ENABLED') ? project.property('RESQNOW_MAPPLS_ENABLED').toString() : 'true'
+if (!(mapplsMode in ['true', 'false'])) throw new GradleException('RESQNOW_MAPPLS_ENABLED must be true or false')
+ext.mapplsEnabled = mapplsMode == 'true'
+def confFiles = mapplsEnabled ? fileTree(projectDir) { include '*.a.conf' }.files : [] as Set
+def licenseFiles = mapplsEnabled ? fileTree(projectDir) { include '*.a.olf' }.files : [] as Set
 if (confFiles.size() > 1 || licenseFiles.size() > 1) {
     throw new GradleException('Use exactly one approved Mappls Android configuration/license pair in android/app; the Mappls plugin selects files by directory.')
 }
 def detectedId = confFiles.size() == 1 ? confFiles.first().name.replaceFirst(/\.a\.conf$/, '') : ''
-def appId = (project.findProperty('RESQNOW_MAPPLS_APP_ID') ?: detectedId).toString()
+def appId = mapplsEnabled ? (project.findProperty('RESQNOW_MAPPLS_APP_ID') ?: detectedId).toString() : ''
 if (appId && !(appId ==~ /[A-Za-z0-9_-]{1,120}/)) {
     throw new GradleException('Invalid RESQNOW_MAPPLS_APP_ID filename')
 }
-ext.mapplsConfigurationPresent = !appId.isEmpty() && file("${appId}.a.conf").isFile() && file("${appId}.a.olf").isFile()
+ext.mapplsConfigurationPresent = mapplsEnabled && !appId.isEmpty() && file("${appId}.a.conf").isFile() && file("${appId}.a.olf").isFile()
 if ((!confFiles.isEmpty() || !licenseFiles.isEmpty()) && !mapplsConfigurationPresent) {
     throw new GradleException('BLOCKED: Mappls Android configuration and license filenames must match the selected app ID.')
 }
@@ -21,6 +24,10 @@ if (mapplsConfigurationPresent) apply plugin: 'com.mappls.services.android'
 tasks.register('verifyMapplsConfiguration') {
     group = 'verification'
     doLast {
+        if (!mapplsEnabled) {
+            logger.lifecycle('Native Mappls is explicitly disabled in this build; provider files are not used.')
+            return
+        }
         if (!mapplsConfigurationPresent) {
             throw new GradleException('BLOCKED: supply approved matching <appId>.a.conf/.a.olf in android/app. Package must be com.resqnow1.app; authorize the owner signing certificate in Mappls. No Web key is accepted.')
         }

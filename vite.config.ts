@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { resolveApiConfiguration } from "./src/lib/apiConfig";
 import { verifyThozhanDist } from "./scripts/thozhan-artifacts.mjs";
+import { createNativeBuildModePlugin } from "./scripts/android-build-mode.mjs";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -44,6 +45,7 @@ export default defineConfig(({ mode, command }) => {
     },
     plugins: [
       react(),
+      createNativeBuildModePlugin(env),
       {
         name: "verify-thozhan-dist",
         apply: "build",

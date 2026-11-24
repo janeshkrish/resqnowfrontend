@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {spawn} from 'node:child_process';import {createHash,randomUUID} from 'node:crypto';import {fileURLToPath} from 'node:url';
 
 const OS=new Set(['PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','HOME','USERPROFILE','TEMP','TMP','TMPDIR','JAVA_HOME','ANDROID_HOME','ANDROID_SDK_ROOT','ANDROID_USER_HOME','GRADLE_USER_HOME','NPM_CONFIG_CACHE','LANG','LC_ALL']);
-export function fixtureEnvironment(env){return {...Object.fromEntries(Object.entries(env).filter(([k,v])=>OS.has(k.toUpperCase())&&typeof v==='string')),CI:'true',RESQNOW_UPDATER_ACCEPTANCE_ONLY:'true'};}
+export function fixtureEnvironment(env){return {...Object.fromEntries(Object.entries(env).filter(([k,v])=>OS.has(k.toUpperCase())&&typeof v==='string')),CI:'true',RESQNOW_UPDATER_ACCEPTANCE_ONLY:'true',VITE_NATIVE_MAPPLS_ENABLED:'false',ORG_GRADLE_PROJECT_RESQNOW_MAPPLS_ENABLED:'false'};}
 export function acceptanceWorker(files){
   if(!files.length||files.some(f=>typeof f!=='string'||!(f==='index.html'||/^assets\/[a-zA-Z0-9_.-]+$/.test(f))))throw Error('Invalid acceptance code asset');
   const paths=files.map(f=>'/'+f);

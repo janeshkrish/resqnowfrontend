@@ -16,7 +16,7 @@ function execute(command,args,options){
     child.once('close',code=>resolve({code,output}));
   });
 }
-/** Negative task-graph checks only: never execute a release/signing task. */
+/** Task-graph checks only: even the valid disabled-mode case uses --dry-run. */
 export async function verifyAndroidReleaseGuards({root,env=process.env,run=execute}){
   if(env.CI!=='true'||env.ANDROID_CHECKS_ONLY!=='true')throw Error('Release guard checks require explicit synthetic verification');
   root=await fs.realpath(root);
@@ -30,12 +30,22 @@ export async function verifyAndroidReleaseGuards({root,env=process.env,run=execu
   await fs.writeFile(key,'Not a keystore. Used only with --dry-run to verify rejection before release execution.',{flag:'wx',mode:0o600});
   try{
     const childEnv={...safe,VITE_NATIVE_BUILD:'true',VITE_APP_UPDATES_ENABLED:'true',RESQNOW_ANDROID_KEYSTORE_PATH:key,RESQNOW_ANDROID_KEY_ALIAS:'synthetic-alias',RESQNOW_ANDROID_STORE_PASSWORD:'synthetic-only',RESQNOW_ANDROID_KEY_PASSWORD:'synthetic-only'};
-    for(const task of producers){
-      const args=['-classpath',path.join(root,'android/gradle/wrapper/gradle-wrapper.jar'),'org.gradle.wrapper.GradleWrapperMain','-p','android',`:app:${task}`,'-PRESQNOW_ANDROID_VERSION_CODE=112','-PRESQNOW_ANDROID_VERSION_NAME=1.4.112','-PRESQNOW_APP_UPDATES_ENABLED=true','--dry-run','--offline','--no-daemon'];
-      const result=await run(path.join(env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java'),args,{cwd:root,env:childEnv});
-      if(result?.code!==1||typeof result.output!=='string'||!result.output.includes('Release requires approved matching Mappls Android configuration/license files'))throw Error(`Release guard not verified for ${task} (exit ${String(result?.code)})`);
+    const cases=producers.map(task=>({task,code:1,message:'Release requires approved matching Mappls Android configuration/license files'}));
+    cases.push(...producers.map(task=>({task,mode:'false',patch:{VITE_NATIVE_MAPPLS_ENABLED:'true'},code:1,message:'Release requires matching web/native Mappls mode'})));
+    cases.push(
+      {task:'assembleRelease',mode:'FALSE',code:1,message:'RESQNOW_MAPPLS_ENABLED must be true or false'},
+      {task:'assembleRelease',mode:'false',patch:{VITE_NATIVE_MAPPLS_ENABLED:'false',VITE_APP_UPDATES_ENABLED:'false'},code:1,message:'Release requires checked version overrides and enabled packaged/native updater build flags'},
+      {task:'assembleRelease',mode:'false',patch:{VITE_NATIVE_MAPPLS_ENABLED:'false'},withoutSigning:true,code:1,message:'Release requires the existing owner signing key through environment-only configuration'},
+      {task:'assembleRelease',mode:'false',patch:{VITE_NATIVE_MAPPLS_ENABLED:'false'},code:0,message:'BUILD SUCCESSFUL'},
+    );
+    for(const check of cases){
+      const args=['-classpath',path.join(root,'android/gradle/wrapper/gradle-wrapper.jar'),'org.gradle.wrapper.GradleWrapperMain','-p','android',`:app:${check.task}`,'-PRESQNOW_ANDROID_VERSION_CODE=112','-PRESQNOW_ANDROID_VERSION_NAME=1.4.112','-PRESQNOW_APP_UPDATES_ENABLED=true',...(check.mode===undefined?[]:[`-PRESQNOW_MAPPLS_ENABLED=${check.mode}`]),'--dry-run','--offline','--no-daemon'];
+      const scoped={...childEnv,...check.patch};
+      if(check.withoutSigning)for(const name of ['RESQNOW_ANDROID_KEYSTORE_PATH','RESQNOW_ANDROID_KEY_ALIAS','RESQNOW_ANDROID_STORE_PASSWORD','RESQNOW_ANDROID_KEY_PASSWORD'])delete scoped[name];
+      const result=await run(path.join(env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java'),args,{cwd:root,env:scoped});
+      if(result?.code!==check.code||typeof result.output!=='string'||!result.output.includes(check.message))throw Error(`Release guard not verified for ${check.task}/${check.mode??'default'} (exit ${String(result?.code)})`);
     }
-    return {checked:producers.length,apkBuilt:false,signing:false,install:false};
+    return {checked:cases.length,apkBuilt:false,signing:false,install:false};
   }finally{await fs.rm(key,{force:true});}
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

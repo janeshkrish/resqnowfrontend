@@ -339,14 +339,14 @@ export function useUnifiedServiceRequestFlow({
       locationLat: lat,
       locationLng: lng,
       locationCoordinates: { lat, lng },
-      locationPlaceId: placeId ?? prev.locationPlaceId ?? null,
+      locationPlaceId: placeId === undefined ? prev.locationPlaceId ?? null : placeId,
       locationPlace: addressValue
         ? {
             address: addressValue,
             formatted_address: addressValue,
             lat,
             lng,
-            placeId: placeId ?? prev.locationPlaceId ?? null,
+            placeId: placeId === undefined ? prev.locationPlaceId ?? null : placeId,
           }
         : prev.locationPlace ?? null,
     }));
@@ -369,14 +369,14 @@ export function useUnifiedServiceRequestFlow({
       dropLng: lng,
       dropLocation: addressValue || normalizeAddressValue(prev.dropLocation),
       dropLocationCoordinates: { lat, lng },
-      dropPlaceId: placeId ?? prev.dropPlaceId ?? null,
+      dropPlaceId: placeId === undefined ? prev.dropPlaceId ?? null : placeId,
       dropPlace: addressValue
         ? {
             address: addressValue,
             formatted_address: addressValue,
             lat,
             lng,
-            placeId: placeId ?? prev.dropPlaceId ?? null,
+            placeId: placeId === undefined ? prev.dropPlaceId ?? null : placeId,
           }
         : prev.dropPlace ?? null,
     }));

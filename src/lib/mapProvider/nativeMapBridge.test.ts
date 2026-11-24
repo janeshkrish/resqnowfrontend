@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const native = vi.hoisted(() => ({
   platform: 'android', installed: true,
@@ -11,6 +11,14 @@ vi.mock('@capacitor/core', () => ({
 import { nativeMapBridge, NativeMapError } from './nativeMapBridge';
 
 describe('native Mappls bridge', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('blocks map and search native operations in an explicitly map-disabled APK', async () => {
+    vi.stubEnv('VITE_NATIVE_MAPPLS_ENABLED', 'false');
+    expect(await nativeMapBridge.getAvailability()).toMatchObject({available: false, code: 'DISABLED'});
+    await expect(nativeMapBridge.create({mapId: 'map', generation: 1, ariaLabel: 'Map'})).rejects.toMatchObject({code: 'DISABLED'});
+    await expect(nativeMapBridge.searchPlaces({requestId: 'query', query: 'Garage', limit: 3})).rejects.toMatchObject({code: 'DISABLED'});
+    expect(native.getAvailability).not.toHaveBeenCalled(); expect(native.create).not.toHaveBeenCalled(); expect(native.searchPlaces).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.clearAllMocks(); native.platform = 'android'; native.installed = true;
     native.getAvailability.mockResolvedValue({ available: true, sdkVersion: '9.0.4', authentication: 'unverified' });

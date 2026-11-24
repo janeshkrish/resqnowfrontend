@@ -38,8 +38,9 @@ android {
     namespace = "com.resqnow1.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
+        buildConfigField 'boolean', 'MAPPLS_ENABLED', mapplsEnabled.toString()
         buildConfigField 'boolean', 'MAPPLS_CONFIGURED', mapplsConfigurationPresent.toString()
-        manifestPlaceholders += [resqnowAppUpdatesEnabled: updatesEnabled]
+        manifestPlaceholders += [resqnowAppUpdatesEnabled: updatesEnabled, resqnowNativeMapplsEnabled: mapplsEnabled.toString()]
         applicationId "com.resqnow1.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
@@ -93,7 +94,10 @@ gradle.taskGraph.whenReady { graph ->
     }
     if (graph.allTasks.any { task -> task.project == project && task.name in ['assembleRelease', 'bundleRelease', 'packageRelease', 'signReleaseBundle', 'packageReleaseBundle'] }) {
         if (acceptanceEnabled == 'true') throw new GradleException('Acceptance-only builds cannot be released')
-        if (!mapplsConfigurationPresent) throw new GradleException('Release requires approved matching Mappls Android configuration/license files')
+        if (mapplsEnabled && !mapplsConfigurationPresent) throw new GradleException('Release requires approved matching Mappls Android configuration/license files')
+        def webMapplsMode = System.getenv('VITE_NATIVE_MAPPLS_ENABLED')
+        if (webMapplsMode == null) webMapplsMode = 'true'
+        if (webMapplsMode != mapplsEnabled.toString()) throw new GradleException('Release requires matching web/native Mappls mode')
         if (suppliedCode == null || updatesEnabled != 'true' || System.getenv('VITE_NATIVE_BUILD') != 'true' || System.getenv('VITE_APP_UPDATES_ENABLED') != 'true') {
             throw new GradleException('Release requires checked version overrides and enabled packaged/native updater build flags')
         }
@@ -104,6 +108,15 @@ gradle.taskGraph.whenReady { graph ->
 }
 
 // Check the final APK even when the signed build is launched directly from Gradle.
+def verifyReleaseBuildMode = tasks.register('verifyReleaseBuildMode', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'node', 'scripts/android-build-mode.mjs', mapplsEnabled.toString()
+    setEnvironment(System.getenv().findAll { name, value ->
+        name.toUpperCase(Locale.ROOT) in ['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP']
+    })
+}
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach { dependsOn verifyReleaseBuildMode }
+
 def verifyReleaseThozhanAssets = tasks.register('verifyReleaseThozhanAssets', Exec) {
     workingDir rootProject.projectDir.parentFile
     commandLine 'node', 'scripts/thozhan-artifacts.mjs', 'android/app/build/outputs/apk/release/app-release.apk'

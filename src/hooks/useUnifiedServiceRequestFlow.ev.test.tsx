@@ -13,6 +13,18 @@ beforeEach(() => {
   apiFetch.mockReset().mockImplementation(async () => new Response(JSON.stringify({ quote: { distance_km: 10, estimated_duration: 20 } }), { status: 200 }));
 });
 
+it('clears both stale flat and nested place IDs when Photon replaces previously geocoded pickup and drop locations',async()=>{
+  const {result}=renderHook(()=>useUnifiedServiceRequestFlow({serviceId:'towing',vehicleType:'car',storageKey:'photon-place-replacement',navigate:vi.fn(),validateStep1:()=>true,buildVehicleModel:d=>d.vehicleModel,
+    createInitialFormData:()=>({name:'Asha',phone:'9999999999',vehicleType:'car',vehicleSubtype:'sedan',vehicleModel:'Swift',location:'Old GPS pickup',locationLat:11,locationLng:77,locationPlaceId:'old-google-pickup',locationPlace:{lat:11,lng:77,address:'Old GPS pickup',formatted_address:'Old GPS pickup',placeId:'old-google-pickup'},
+      dropLocation:'Old drop',dropLat:12,dropLng:78,dropPlaceId:'old-google-drop',dropPlace:{lat:12,lng:78,address:'Old drop',formatted_address:'Old drop',placeId:'old-google-drop'},details:'',selectedTechnicianId:null})}));
+  act(()=>{result.current.handleLocationSelect(11.02,77.02,'New Photon pickup',null);result.current.handleDropLocationSelect(11.04,77.04,'New Photon drop',null);});
+  expect(result.current.formData).toMatchObject({locationPlaceId:null,locationPlace:{placeId:null},dropPlaceId:null,dropPlace:{placeId:null}});
+  apiFetch.mockImplementation(async(path:string)=>new Response(JSON.stringify(path==='/api/service-requests'?{id:'synthetic-updated-location'}:{quote:{distance_km:8}})));
+  await act(async()=>{await result.current.submitRequest();});
+  const sent=apiFetch.mock.calls.find(([p])=>p==='/api/service-requests');
+  expect(JSON.parse(sent![1].body)).toMatchObject({pickupPlaceId:null,locationPlaceId:null,dropPlaceId:null,location_lat:11.02,location_lng:77.02,dropLat:11.04,dropLng:77.04});
+});
+
 it("refreshes towing route readiness when only structured EV body details change and sends those details", async () => {
   const { result } = renderHook(() => useUnifiedServiceRequestFlow({
     serviceId: "towing", vehicleType: "ev", storageKey: "ev-body-estimate-test", navigate: vi.fn(),

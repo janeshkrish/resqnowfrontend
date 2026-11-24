@@ -58,7 +58,11 @@ public final class LegacyUpdateConsentTest {
   store.update(generation,"downloading",release.sizeBytes,null);store.update(generation,"verifying",release.sizeBytes,null);store.update(generation,"ready",release.sizeBytes,null);
   UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());AtomicReference<AppUpdaterPlugin> reference=new AtomicReference<>();
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-   scenario.onActivity(activity->reference.set((AppUpdaterPlugin)activity.getBridge().getPlugin("AppUpdater").getInstance()));AppUpdaterPlugin plugin=reference.get();assertNotNull(plugin);
+   scenario.onActivity(activity->{
+    assertFalse("The approved bootstrap fixture must have native maps disabled",com.resqnow1.app.BuildConfig.MAPPLS_ENABLED);
+    assertNull("Disabled maps must not register the SDK plugin",activity.getBridge().getPlugin("ResqnowMappls"));
+    reference.set((AppUpdaterPlugin)activity.getBridge().getPlugin("AppUpdater").getInstance());
+   });AppUpdaterPlugin plugin=reference.get();assertNotNull(plugin);
    setPermission(plugin,device,context,false);ResultCall denied=new ResultCall("requestInstall");plugin.requestInstall(denied);assertEquals("permission-required",denied.await().optString("phase"));
    settings(plugin,device);backToApp(device);phase(plugin,"permission-required");assertFalse(UpdateInstaller.permissionGranted(context));assertEquals(1001,UpdateInstaller.installed(context).versionCode);
    setPermission(plugin,device,context,true);phase(plugin,"ready");assertEquals(APP,device.getCurrentPackageName());assertEquals(1001,UpdateInstaller.installed(context).versionCode);

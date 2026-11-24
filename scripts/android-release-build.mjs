@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';import {createAndroidTools} from './android-release.mjs';
 import {randomUUID} from 'node:crypto';
+import {verifyNativeBuildMode} from './android-build-mode.mjs';
 import {validateMapplsKey,verifyReviewedMapplsKey,verifyMapplsDist,verifyMapplsNativeAssets,verifyMapplsApk} from './mappls-artifacts.mjs';
 const SIGNING=['RESQNOW_ANDROID_KEYSTORE_PATH','RESQNOW_ANDROID_KEY_ALIAS','RESQNOW_ANDROID_STORE_PASSWORD','RESQNOW_ANDROID_KEY_PASSWORD'];
 const OS_KEYS=new Set(['PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','HOME','USERPROFILE','TEMP','TMP','TMPDIR','JAVA_HOME','ANDROID_HOME','ANDROID_SDK_ROOT','ANDROID_USER_HOME','GRADLE_USER_HOME','NPM_CONFIG_CACHE','LANG','LC_ALL']);
@@ -44,16 +45,21 @@ export function createAndroidBuildRunner({root,env=process.env,run=execute}){
   return {tools:createAndroidTools({sdk:env.ANDROID_HOME??env.ANDROID_SDK_ROOT,javaHome:env.JAVA_HOME}),
     async build({version,publicSettings,googleServices}){
       for(const key of SIGNING)if(typeof env[key]!=='string'||!env[key])throw Error('Owner signing credentials are not configured');
-      await verifyMapplsAndroidConfiguration({root});
+      const mapplsMode=publicSettings?.VITE_NATIVE_MAPPLS_ENABLED??'true';
+      if(!['true','false'].includes(mapplsMode))throw Error('VITE_NATIVE_MAPPLS_ENABLED must be true or false');
+      publicSettings={...publicSettings,VITE_NATIVE_MAPPLS_ENABLED:mapplsMode};
+      if(mapplsMode==='true')await verifyMapplsAndroidConfiguration({root});
       if(!(await fs.stat(env.RESQNOW_ANDROID_KEYSTORE_PATH)).isFile())throw Error('Owner signing file is unavailable');
       const file=path.join(root,'android/app/google-services.json');await fs.mkdir(path.dirname(file),{recursive:true});
       try{if(JSON.stringify(JSON.parse(await fs.readFile(file,'utf8')))!==JSON.stringify(googleServices))throw Error('Existing Android provider configuration differs from approved settings');}
       catch(error){if(error.code!=='ENOENT')throw error;await fs.writeFile(file,JSON.stringify(googleServices),{flag:'wx'});}
       const publicEnv=await prepareAndroidWebAssets({root,publicSettings,env,run});
+      await verifyNativeBuildMode({root,mapplsEnabled:mapplsMode==='true'});
       const java=path.join(env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java');
-      await run(java,['-classpath',path.join(root,'android/gradle/wrapper/gradle-wrapper.jar'),'org.gradle.wrapper.GradleWrapperMain','-p','android',':app:assembleRelease',`-PRESQNOW_ANDROID_VERSION_CODE=${version.versionCode}`,`-PRESQNOW_ANDROID_VERSION_NAME=${version.versionName}`,'-PRESQNOW_APP_UPDATES_ENABLED=true','--no-daemon'],{cwd:root,env:{...publicEnv,...Object.fromEntries(SIGNING.map(key=>[key,env[key]]))}});
+      await run(java,['-classpath',path.join(root,'android/gradle/wrapper/gradle-wrapper.jar'),'org.gradle.wrapper.GradleWrapperMain','-p','android',':app:assembleRelease',`-PRESQNOW_ANDROID_VERSION_CODE=${version.versionCode}`,`-PRESQNOW_ANDROID_VERSION_NAME=${version.versionName}`,'-PRESQNOW_APP_UPDATES_ENABLED=true',`-PRESQNOW_MAPPLS_ENABLED=${mapplsMode}`,'--no-daemon'],{cwd:root,env:{...publicEnv,...Object.fromEntries(SIGNING.map(key=>[key,env[key]]))}});
       const apk=path.join(root,'android/app/build/outputs/apk/release/app-release.apk');
       await verifyMapplsApk({root,apk,key:publicSettings.VITE_MAPPLS_MAP_SDK_KEY});
+      await verifyNativeBuildMode({root,mapplsEnabled:mapplsMode==='true',apk});
       return apk;
     }};
 }

@@ -66,14 +66,15 @@ export function routePolylineFromMetadata(value: unknown): Array<[number, number
   return [];
 }
 
-export async function searchLocations(query: string, limit = 6): Promise<LocationSearchResult[]> {
+export async function searchLocations(query: string, limit = 6, options: {provider?: 'photon';signal?: AbortSignal} = {}): Promise<LocationSearchResult[]> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 2) return [];
 
-  const queryString = `q=${encodeURIComponent(normalizedQuery)}&limit=${encodeURIComponent(String(limit))}`;
-  let response = await apiFetch(`/api/public/location-search?${queryString}`);
+  const queryString = `q=${encodeURIComponent(normalizedQuery)}&limit=${encodeURIComponent(String(limit))}${options.provider==='photon'?'&provider=photon':''}`;
+  const get=(url:string)=>options.signal?apiFetch(url,{signal:options.signal}):apiFetch(url);
+  let response = await get(`/api/public/location-search?${queryString}`);
   if (response.status === 404) {
-    response = await apiFetch(`/api/location-search?${queryString}`);
+    response = await get(`/api/location-search?${queryString}`);
   }
   const data = await readJsonSafely<{ results?: Array<Partial<LocationSearchResult>>; error?: string }>(response);
   if (!response.ok) {

@@ -10,20 +10,44 @@ async function fixture(body){
   finally{await fs.rm(root,{recursive:true,force:true});}
 }
 const rejection='Release requires approved matching Mappls Android configuration/license files';
+
+test('map-disabled producer checks cover native/web mismatch, typo, valid dry-run and preserved updater/signing gates',()=>fixture(async root=>{
+  const calls=[];
+  const result=await api.verifyAndroidReleaseGuards({root,env:{CI:'true',ANDROID_CHECKS_ONLY:'true',JAVA_HOME:root},run:async(_c,args,options)=>{
+    calls.push({args,env:options.env});
+    return graphResult(args,options.env);
+  }});
+  assert.equal(result.checked,14);
+  const disabled=calls.filter(c=>c.args.includes('-PRESQNOW_MAPPLS_ENABLED=false'));
+  assert.equal(disabled.filter(c=>c.env.VITE_NATIVE_MAPPLS_ENABLED==='true').length,5);
+  assert.ok(disabled.some(c=>c.env.VITE_APP_UPDATES_ENABLED==='false'));
+  assert.ok(disabled.some(c=>!c.env.RESQNOW_ANDROID_KEYSTORE_PATH));
+  assert.ok(disabled.some(c=>c.env.VITE_APP_UPDATES_ENABLED==='true'&&c.env.VITE_NATIVE_MAPPLS_ENABLED==='false'&&c.env.RESQNOW_ANDROID_KEYSTORE_PATH));
+  assert.ok(calls.every(c=>c.args.includes('--dry-run')));
+}));
+
+function graphResult(args,env){
+  const mode=args.find(a=>a.startsWith('-PRESQNOW_MAPPLS_ENABLED='))?.split('=')[1];
+  if(mode===undefined)return {code:1,output:rejection};
+  if(mode!=='false')return {code:1,output:'RESQNOW_MAPPLS_ENABLED must be true or false'};
+  if(env.VITE_NATIVE_MAPPLS_ENABLED!=='false')return {code:1,output:'Release requires matching web/native Mappls mode'};
+  if(env.VITE_APP_UPDATES_ENABLED!=='true')return {code:1,output:'Release requires checked version overrides and enabled packaged/native updater build flags'};
+  if(!env.RESQNOW_ANDROID_KEYSTORE_PATH)return {code:1,output:'Release requires the existing owner signing key through environment-only configuration'};
+  return {code:0,output:'BUILD SUCCESSFUL'};
+}
 test('negative release checks exercise every direct producer without real signing or credential propagation',()=>fixture(async root=>{
   assert.equal(typeof api.verifyAndroidReleaseGuards,'function');
   const tasks=[];let fixtureKey;
   const result=await api.verifyAndroidReleaseGuards({root,env:{CI:'true',ANDROID_CHECKS_ONLY:'true',JAVA_HOME:root,GITHUB_TOKEN:'do-not-forward',RESQNOW_ANDROID_STORE_PASSWORD:'owner-do-not-forward'},run:async(command,args,options)=>{
     assert.ok(command.startsWith(root+path.sep));assert.ok(args.includes('--dry-run'));
     assert.equal(options.env.GITHUB_TOKEN,undefined);assert.notEqual(options.env.RESQNOW_ANDROID_STORE_PASSWORD,'owner-do-not-forward');
-    fixtureKey=options.env.RESQNOW_ANDROID_KEYSTORE_PATH;
-    assert.ok((await fs.readFile(fixtureKey,'utf8')).startsWith('Not a keystore.'));
+    if(options.env.RESQNOW_ANDROID_KEYSTORE_PATH){fixtureKey=options.env.RESQNOW_ANDROID_KEYSTORE_PATH;assert.ok((await fs.readFile(fixtureKey,'utf8')).startsWith('Not a keystore.'));}
     assert.ok(!JSON.stringify(args).includes('password'));
-    tasks.push(args.find(arg=>arg.startsWith(':app:')));
-    return {code:1,output:rejection};
+    if(!args.some(arg=>arg.startsWith('-PRESQNOW_MAPPLS_ENABLED=')))tasks.push(args.find(arg=>arg.startsWith(':app:')));
+    return graphResult(args,options.env);
   }});
   assert.deepEqual(tasks,[':app:assembleRelease',':app:bundleRelease',':app:packageRelease',':app:signReleaseBundle',':app:packageReleaseBundle']);
-  assert.equal(result.checked,5);await assert.rejects(()=>fs.stat(fixtureKey));
+  assert.equal(result.checked,14);await assert.rejects(()=>fs.stat(fixtureKey));
 }));
 test('a successful graph or an unrelated failure never passes the release guard check and cleans its fixture',()=>fixture(async root=>{
   assert.equal(typeof api.verifyAndroidReleaseGuards,'function');

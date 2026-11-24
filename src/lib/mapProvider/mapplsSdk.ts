@@ -38,7 +38,7 @@ export type MapplsPlaceSearchResult = {
   address: string;
   lat: number;
   lng: number;
-  provider: "mappls";
+  provider: "mappls" | "photon";
   category: string | null;
 };
 

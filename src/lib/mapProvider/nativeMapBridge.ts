@@ -14,6 +14,7 @@ export class NativeMapError extends Error {
 }
 function unavailable(): NativeMapErrorCode | undefined {
   if (Capacitor.getPlatform() !== 'android') return 'PLATFORM_UNAVAILABLE';
+  if (import.meta.env.VITE_NATIVE_MAPPLS_ENABLED === 'false') return 'DISABLED';
   if (!Capacitor.isPluginAvailable('ResqnowMappls')) return 'PLUGIN_UNAVAILABLE';
 }
 async function invoke<T>(action: () => Promise<T>): Promise<T> {

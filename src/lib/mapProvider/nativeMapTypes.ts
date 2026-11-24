@@ -1,7 +1,7 @@
 import type { PluginListenerHandle } from '@capacitor/core';
 import type { MapCameraSpec, MapCircleSpec, MapPoint, MapPolylineSpec } from './types';
 
-export type NativeMapErrorCode = 'PLATFORM_UNAVAILABLE' | 'PLUGIN_UNAVAILABLE' | 'AUTH_CONFIG' |
+export type NativeMapErrorCode = 'DISABLED' | 'PLATFORM_UNAVAILABLE' | 'PLUGIN_UNAVAILABLE' | 'AUTH_CONFIG' |
   'CERTIFICATE' | 'LICENSE' | 'SDK_INIT' | 'STYLE_LOAD' | 'RENDER' | 'TIMEOUT' |
   'INVALID_ARGUMENT' | 'STALE_HANDLE' | 'NOT_READY' | 'LIMIT' | 'UNSUPPORTED' | 'UNTRUSTED_ORIGIN' |
   'CANCELLED' | 'SEARCH_FAILED' | 'SEARCH_COORDINATES';

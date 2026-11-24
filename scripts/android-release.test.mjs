@@ -10,6 +10,12 @@ test('production builds require explicit public settings and reject test/demo ov
   assert.equal(typeof api.validateProductionSettings,'function');assert.doesNotThrow(()=>api.validateProductionSettings(settings));
   for(const patch of [{VITE_API_URL:'http://localhost:5000'},{VITE_FRONTEND_ONLY:'true'},{VITE_FIREBASE_PROJECT_ID:'resqnow-e2e'},{VITE_FIREBASE_API_KEY:''},{VITE_NATIVE_BUILD:'false'},{VITE_RAZORPAY_KEY_ID:'rzp_test_example'}])assert.throws(()=>api.validateProductionSettings({...settings,...patch}));
 });
+
+test('native Mappls mode defaults enabled and accepts only an explicit reversible false setting',()=>{
+  assert.equal(api.validateProductionSettings(settings).VITE_NATIVE_MAPPLS_ENABLED,'true');
+  assert.equal(api.validateProductionSettings({...settings,VITE_NATIVE_MAPPLS_ENABLED:'false'}).VITE_NATIVE_MAPPLS_ENABLED,'false');
+  for(const value of ['', 'FALSE', 'disabled', '0'])assert.throws(()=>api.validateProductionSettings({...settings,VITE_NATIVE_MAPPLS_ENABLED:value}),/VITE_NATIVE_MAPPLS_ENABLED/);
+});
 test('the approved production release cannot enable automatic wake and carries its explicit off setting',()=>{
   const approved={...settings,VITE_NATIVE_WAKE_ENABLED:'false'};
   assert.equal(api.validateProductionSettings(approved).VITE_NATIVE_WAKE_ENABLED,'false');

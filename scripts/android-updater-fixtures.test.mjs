@@ -8,6 +8,8 @@ test('fixture builder refuses private dotenv configuration before generating key
 test('fixture build environments cannot inherit production signing credentials or API tokens',()=>{
   assert.equal(typeof api.fixtureEnvironment,'function');const result=api.fixtureEnvironment({PATH:'synthetic-path',JAVA_HOME:'jdk',ANDROID_HOME:'sdk',GITHUB_TOKEN:'never-forward',RESQNOW_ANDROID_STORE_PASSWORD:'never-forward',VITE_FIREBASE_API_KEY:'never-forward'});
   assert.equal(result.PATH,'synthetic-path');assert.equal(result.GITHUB_TOKEN,undefined);assert.equal(result.RESQNOW_ANDROID_STORE_PASSWORD,undefined);assert.equal(result.VITE_FIREBASE_API_KEY,undefined);assert.equal(result.RESQNOW_UPDATER_ACCEPTANCE_ONLY,'true');
+  assert.equal(result.VITE_NATIVE_MAPPLS_ENABLED,'false');
+  assert.equal(result.ORG_GRADLE_PROJECT_RESQNOW_MAPPLS_ENABLED,'false');
 });
 test('the seeded old worker serves cached A navigation/code but never API, images or cross-origin data',async()=>{
   assert.equal(typeof api.acceptanceWorker,'function');const listeners={},added=[];const cache={addAll:async paths=>added.push(...paths),match:async key=>'cached A '+key};

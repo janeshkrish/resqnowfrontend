@@ -14,10 +14,12 @@ export function prepareAndroidVersion({floor,runNumber,latestVersionCode}){
 const REQUIRED=['VITE_API_URL','VITE_FRONTEND_ONLY','VITE_APP_UPDATES_ENABLED','VITE_NATIVE_BUILD','VITE_NATIVE_WAKE_ENABLED','VITE_FIREBASE_API_KEY','VITE_FIREBASE_AUTH_DOMAIN','VITE_FIREBASE_PROJECT_ID','VITE_FIREBASE_MESSAGING_SENDER_ID','VITE_FIREBASE_APP_ID','VITE_MAPPLS_MAP_SDK_KEY','VITE_RAZORPAY_KEY_ID'];
 const OPTIONAL=['VITE_FIREBASE_STORAGE_BUCKET','VITE_FIREBASE_VAPID_KEY','VITE_GOOGLE_MAPS_API_KEY'];
 export function validateProductionSettings(settings){
+  const mapplsMode=settings?.VITE_NATIVE_MAPPLS_ENABLED??'true';
+  if(!['true','false'].includes(mapplsMode))throw Error('VITE_NATIVE_MAPPLS_ENABLED must be true or false');
   for(const name of REQUIRED){const v=settings?.[name];if(typeof v!=='string'||!v.trim()||v!==v.trim()||/[\r\n\u0000]/.test(v)||/e2e|synthetic|placeholder|example\.(?:test|com)|localhost|(?:^|[._-])demo(?:$|[._-])|rzp_test_/i.test(v))throw Error('Missing or non-production public setting: '+name);}
   if(settings.VITE_API_URL!=='https://resqnowbackend-production-c392.up.railway.app'||settings.VITE_FRONTEND_ONLY!=='false'||settings.VITE_NATIVE_BUILD!=='true'||settings.VITE_APP_UPDATES_ENABLED!=='true'||settings.VITE_NATIVE_WAKE_ENABLED!=='false')throw Error('Production Android build flags/origin are not approved');
   if(!/^\d{6,20}$/.test(settings.VITE_FIREBASE_MESSAGING_SENDER_ID)||!settings.VITE_FIREBASE_APP_ID.startsWith(`1:${settings.VITE_FIREBASE_MESSAGING_SENDER_ID}:web:`)||!settings.VITE_FIREBASE_AUTH_DOMAIN.endsWith('.firebaseapp.com')||!settings.VITE_RAZORPAY_KEY_ID.startsWith('rzp_live_'))throw Error('Public production provider configuration is inconsistent');
-  return Object.fromEntries([...REQUIRED,...OPTIONAL].map(name=>[name,settings[name]??'']));
+  return {...Object.fromEntries([...REQUIRED,...OPTIONAL].map(name=>[name,settings[name]??''])),VITE_NATIVE_MAPPLS_ENABLED:mapplsMode};
 }
 export function validateGoogleServices(value,settings){
   if(!value||typeof value!=='object'||JSON.stringify(value).includes('"private_key"')||value.project_info?.project_id!==settings.VITE_FIREBASE_PROJECT_ID||String(value.project_info?.project_number)!==settings.VITE_FIREBASE_MESSAGING_SENDER_ID||!(value.client??[]).some(c=>c.client_info?.android_client_info?.package_name===APPLICATION&&c.api_key?.some(k=>typeof k.current_key==='string'&&k.current_key.startsWith('AIza'))))throw Error('Android Firebase public configuration does not match the approved project/package');

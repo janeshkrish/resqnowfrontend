@@ -44,6 +44,7 @@
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
         <meta-data android:name="com.resqnow.app_updates_enabled" android:value="${resqnowAppUpdatesEnabled}" />
+        <meta-data android:name="com.resqnow.native_mappls_enabled" android:value="${resqnowNativeMapplsEnabled}" />
         <!-- Channel for pushes Android shows by itself: the quiet "Other updates", never the job ring. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"

@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: true,
+    // No server.cleartext: shipped builds are HTTPS-only (scripts/android-network-policy.mjs).
     // Keep backend callback navigation scoped to the current production host.
     allowNavigation: ['resqnowbackend-production-c392.up.railway.app']
   },

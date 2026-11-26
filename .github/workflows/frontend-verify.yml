@@ -290,7 +290,7 @@ jobs:
           VITE_API_URL: https://resqnowbackend-production-c392.up.railway.app
           VITE_FRONTEND_ONLY: 'false'
           VITE_NATIVE_BUILD: 'true'
-          VITE_NATIVE_WAKE_ENABLED: 'false'
+          VITE_NATIVE_WAKE_ENABLED: 'true'
           VITE_APP_UPDATES_ENABLED: 'true'
           VITE_NATIVE_MAPPLS_ENABLED: ${{ vars.VITE_NATIVE_MAPPLS_ENABLED || 'true' }}
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}

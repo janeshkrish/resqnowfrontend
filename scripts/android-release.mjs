@@ -17,7 +17,9 @@ export function validateProductionSettings(settings){
   const mapplsMode=settings?.VITE_NATIVE_MAPPLS_ENABLED??'true';
   if(!['true','false'].includes(mapplsMode))throw Error('VITE_NATIVE_MAPPLS_ENABLED must be true or false');
   for(const name of REQUIRED){const v=settings?.[name];if(typeof v!=='string'||!v.trim()||v!==v.trim()||/[\r\n\u0000]/.test(v)||/e2e|synthetic|placeholder|example\.(?:test|com)|localhost|(?:^|[._-])demo(?:$|[._-])|rzp_test_/i.test(v))throw Error('Missing or non-production public setting: '+name);}
-  if(settings.VITE_API_URL!=='https://resqnowbackend-production-c392.up.railway.app'||settings.VITE_FRONTEND_ONLY!=='false'||settings.VITE_NATIVE_BUILD!=='true'||settings.VITE_APP_UPDATES_ENABLED!=='true'||settings.VITE_NATIVE_WAKE_ENABLED!=='false')throw Error('Production Android build flags/origin are not approved');
+  if(settings.VITE_API_URL!=='https://resqnowbackend-production-c392.up.railway.app'||settings.VITE_FRONTEND_ONLY!=='false'||settings.VITE_NATIVE_BUILD!=='true'||settings.VITE_APP_UPDATES_ENABLED!=='true')throw Error('Production Android build flags/origin are not approved');
+  // "Hey ResQNow" in the app: on since 26 Nov 2026 (owner-approved); 'false' stays an explicit, reversible off switch.
+  if(!['true','false'].includes(settings.VITE_NATIVE_WAKE_ENABLED))throw Error('VITE_NATIVE_WAKE_ENABLED must be true or false');
   if(!/^\d{6,20}$/.test(settings.VITE_FIREBASE_MESSAGING_SENDER_ID)||!settings.VITE_FIREBASE_APP_ID.startsWith(`1:${settings.VITE_FIREBASE_MESSAGING_SENDER_ID}:web:`)||!settings.VITE_FIREBASE_AUTH_DOMAIN.endsWith('.firebaseapp.com')||!settings.VITE_RAZORPAY_KEY_ID.startsWith('rzp_live_'))throw Error('Public production provider configuration is inconsistent');
   return {...Object.fromEntries([...REQUIRED,...OPTIONAL].map(name=>[name,settings[name]??''])),VITE_NATIVE_MAPPLS_ENABLED:mapplsMode};
 }

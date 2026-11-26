@@ -17,7 +17,7 @@ test("saying “Hey ResQNow” on the home screen opens Thozhan, which starts li
   // "Hey ResQNow" let go of the microphone when Thozhan opened.
   expect(await micLive(page)).toBe(0);
   await expect(badge(page)).toHaveCount(0);
-  expect(spotterFiles).toEqual(expect.arrayContaining(["/hey-resqnow/worker.js", "/hey-resqnow/sherpa-onnx-wasm-kws-main.wasm", "/hey-resqnow/sherpa-onnx-wasm-kws-main.data"]));
+  expect(spotterFiles).toEqual(expect.arrayContaining(["/hey-resqnow/worker.js", "/hey-resqnow/ort-wasm.wasm", "/hey-resqnow/embedding_model.onnx", "/hey-resqnow/hey-resqnow.bin"]));
   expect(errors).toEqual([]);
 });
 

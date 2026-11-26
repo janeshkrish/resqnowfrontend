@@ -1,83 +1,61 @@
 /*
  * "Hey ResQNow" listener (src/lib/voice/wake.ts). The page sends the microphone's audio here at
- * 16 kHz; sherpa-onnx's keyword spotter (Apache-2.0, built for the browser with its model packed in
- * sherpa-onnx-wasm-kws-main.data) listens for the phrase. Nothing leaves the device.
+ * 16 kHz and detector.js scores it with ResQNow's own wake-word model (hey-resqnow.bin), run by
+ * onnxruntime-web (MIT). Nothing leaves the device.
  */
-/* global createKws, importScripts */
+/* global ort, createWakeDetector, importScripts */
 
-// "Hey / Hi / Hai ResQNow", said "rescue now", as the model's word pieces (U+2581 starts a word).
-var W = "\u2581";
-var KEYWORDS = [
-  W + "HE Y " + W + "RE S C U E " + W + "NOW @HEY_RESQNOW",
-  W + "HI " + W + "RE S C U E " + W + "NOW @HEY_RESQNOW",
-  W + "HA I " + W + "RE S C U E " + W + "NOW @HEY_RESQNOW",
-].join("\n");
+// Tuned on real recordings of customers saying "Hey ResQNow" and hours of Tamil and English talk.
+var THRESHOLD = 0.95;
+var CONFIRM = 0.5;
 
-var kws = null;
-var stream = null;
+var detector = null;
 var session = null;
+var queue = Promise.resolve();
 
-self.Module = {
-  locateFile: function (path) { return path; },
-  onRuntimeInitialized: function () {
-    try {
-      kws = createKws(self.Module, {
-        featConfig: { samplingRate: 16000, featureDim: 80 },
-        modelConfig: {
-          transducer: {
-            encoder: "./encoder-epoch-12-avg-2-chunk-16-left-64.onnx",
-            decoder: "./decoder-epoch-12-avg-2-chunk-16-left-64.onnx",
-            joiner: "./joiner-epoch-12-avg-2-chunk-16-left-64.onnx",
-          },
-          tokens: "./tokens.txt",
-          provider: "cpu",
-          modelType: "",
-          numThreads: 1,
-          debug: 0,
-          modelingUnit: "bpe",
-          bpeVocab: "",
-        },
-        maxActivePaths: 4,
-        numTrailingBlanks: 1,
-        keywordsScore: 2.5,
-        keywordsThreshold: 0.08,
-        keywords: KEYWORDS,
-      });
-      stream = kws.createStream();
-      self.postMessage({ type: "ready" });
-    } catch (error) {
-      self.postMessage({ type: "error", message: String((error && error.message) || error) });
-    }
-  },
-};
+function here(file) {
+  return new URL(file, self.location.href).href;
+}
 
 try {
-  importScripts("sherpa-onnx-kws.js", "sherpa-onnx-wasm-kws-main.js");
+  importScripts("ort.wasm.min.js", "detector.js");
+  // One thread: the page is not cross-origin isolated, so no shared memory for worker threads.
+  ort.env.wasm.numThreads = 1;
+  ort.env.wasm.wasmPaths = { mjs: here("ort-wasm.js"), wasm: here("ort-wasm.wasm") };
+  createWakeDetector(ort, {
+    mel: here("melspectrogram.onnx"),
+    embedding: here("embedding_model.onnx"),
+    classifier: here("hey-resqnow.bin"),
+  }, { threshold: THRESHOLD, confirm: CONFIRM }).then(function (made) {
+    detector = made;
+    self.postMessage({ type: "ready" });
+  }, function (error) {
+    self.postMessage({ type: "error", message: String((error && error.message) || error) });
+  });
 } catch (error) {
   self.postMessage({ type: "error", message: String((error && error.message) || error) });
 }
 
 self.onmessage = function (event) {
   var data = event.data || {};
-  if (!kws || !stream) return;
+  if (!detector) return;
   if (data.type === "reset") {
-    kws.reset(stream);
+    queue = queue.then(function () { detector.reset(); });
     return;
   }
   if (data.type !== "audio") return;
-  // Never combine the previous microphone session's partial keyword with new audio.
-  if (session !== data.session) {
-    kws.reset(stream);
-    session = data.session;
-  }
-  stream.acceptWaveform(16000, data.samples);
-  while (kws.isReady(stream)) {
-    kws.decode(stream);
-    var result = kws.getResult(stream);
-    if (result && result.keyword) {
-      kws.reset(stream);
-      self.postMessage({ type: "heard", keyword: result.keyword, session: session });
+  // Audio is scored in the order it arrived; each piece is acknowledged once it has been heard.
+  queue = queue.then(function () {
+    // Never combine the previous microphone session's audio with new audio.
+    if (session !== data.session) {
+      detector.reset();
+      session = data.session;
     }
-  }
-  self.postMessage({ type: "processed", session: session });
+    return detector.accept(data.samples).then(function (score) {
+      if (score != null) self.postMessage({ type: "heard", keyword: "HEY_RESQNOW", score: score, session: data.session });
+      self.postMessage({ type: "processed", session: data.session });
+    });
+  }).catch(function (error) {
+    self.postMessage({ type: "error", message: String((error && error.message) || error) });
+  });
 };

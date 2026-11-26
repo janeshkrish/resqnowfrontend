@@ -5,13 +5,15 @@ import {fileURLToPath} from 'node:url';
 import {unzipSync} from 'fflate';
 
 const wakeFiles = [
-  'worker.js', 'sherpa-onnx-kws.js', 'sherpa-onnx-wasm-kws-main.js',
-  'sherpa-onnx-wasm-kws-main.wasm', 'sherpa-onnx-wasm-kws-main.data', 'THIRD_PARTY_LICENSES.txt',
+  'worker.js', 'detector.js', 'ort.wasm.min.js', 'ort-wasm.js', 'ort-wasm.wasm',
+  'melspectrogram.onnx', 'embedding_model.onnx', 'hey-resqnow.bin', 'THIRD_PARTY_LICENSES.txt',
 ];
-// These two files ship as a pair with the vendored sherpa-onnx 1.13.8 loader.
+// The ONNX Runtime Web 1.31.1 binary pairs with its loader; the models pair with detector.js.
 const binaryDigests = {
-  'sherpa-onnx-wasm-kws-main.wasm': '2b2f64fcf58f3a143754f5b4e8347425eb6ce856715f5136254b13b03cc684a0',
-  'sherpa-onnx-wasm-kws-main.data': 'abac2cd839175424fc4a5091c20d1ae4a2248ffbfc616ac6357e5d74cf6c3933',
+  'ort-wasm.wasm': '4b884c203b0fa48d057be3332c65513ff85aa3c5bddd6946acc0fab7ecda001d',
+  'melspectrogram.onnx': 'ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f',
+  'embedding_model.onnx': '70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f',
+  'hey-resqnow.bin': '7df1278de4955138d36091022cd98aae4cf27db9a9f55cb33ae48bb29a82b0d1',
 };
 
 /** Return the files actually loaded by this build, including the lazy voice route. */
@@ -50,7 +52,7 @@ export async function verifyThozhanDist({dist, publicDir}) {
     const emitted = await fs.readFile(path.join(dist, relative));
     if (!source.length || !source.equals(emitted)) throw Error('Missing or changed Thozhan asset ' + relative);
     if (binaryDigests[name] && createHash('sha256').update(emitted).digest('hex') !== binaryDigests[name]) {
-      throw Error('Incorrect sherpa-onnx binary ' + relative);
+      throw Error('Incorrect Hey ResQNow binary ' + relative);
     }
     files.add(relative);
   }

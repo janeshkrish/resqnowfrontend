@@ -7,7 +7,8 @@ understanding, interruptions, overload handling, and Android packaging.
 
 1. The React/TypeScript application runs in a browser/PWA or an Android Capacitor WebView.
    An opted-in customer page captures microphone audio, resamples it to 16 kHz, and sends
-   frames to the local sherpa-onnx WebAssembly keyword spotter in a Web Worker.
+   frames to ResQNow's own on-device wake-word model in a Web Worker (see
+   wake-word-training/README.md; it replaced the sherpa-onnx spotter on 2026-11-26).
 2. A detected wake phrase releases keyword capture before navigating to Thozhan. The
    conversation opens recognition through browser SpeechRecognition or the Android Java
    VoiceThozhan plugin and SpeechRecognizer. Tamil starts with ta-IN; English and Tanglish

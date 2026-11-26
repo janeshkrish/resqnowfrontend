@@ -373,7 +373,7 @@ const SettingsPage = () => {
         <div className="rq-ac-group rq-ac-first">
           <Switch name="Say “Hey ResQNow”" say={micRefused ? "Allow the microphone for ResQNow first" : "Opens Thozhan from any ResQNow screen"} on={heyOn} disabled={heyBusy} onFlip={flipHey} />
         </div>
-        <p className="rq-ac-note">It listens only while ResQNow is open on your screen, and only on this phone: nothing is recorded or sent until Thozhan opens. Turning it on downloads about 15 MB once. A small “Hey ResQNow” badge shows whenever it is listening.</p>
+        <p className="rq-ac-note">It listens only while ResQNow is open on your screen, and only on this phone: nothing is recorded or sent until Thozhan opens. Turning it on downloads about 18 MB once. A small “Hey ResQNow” badge shows whenever it is listening.</p>
       </Inner>
     );
   } else if (view === "security") {

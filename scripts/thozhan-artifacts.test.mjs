@@ -9,7 +9,7 @@ import {verifyThozhanApk} from './thozhan-artifacts.mjs';
 
 const frontend = fileURLToPath(new URL('../', import.meta.url));
 const worker = 'hey-resqnow/worker.js';
-const model = 'hey-resqnow/sherpa-onnx-wasm-kws-main.data';
+const model = 'hey-resqnow/hey-resqnow.bin';
 // Use a real production-mode Vite build without depending on a developer's dotenv.
 process.env.VITE_API_URL = 'https://resqnowbackend-production-c392.up.railway.app';
 process.env.VITE_NATIVE_BUILD = 'true';
@@ -63,7 +63,7 @@ test('APK verification rejects a stale model, missing voice chunk or missing nat
   await writeApk(files);
   await run();
   await writeApk({...files, ['assets/public/' + model]: Buffer.from('old model')});
-  await assert.rejects(run(), /sherpa-onnx-wasm-kws-main\.data/);
+  await assert.rejects(run(), /hey-resqnow\.bin/);
   const missingPage = {...files};
   delete missingPage[archivedPage];
   await writeApk(missingPage);

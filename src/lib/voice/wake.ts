@@ -1,12 +1,12 @@
 /**
  * "Hey ResQNow": while the app is open, the phone listens for the phrase and opens ResQNow-Thozhan.
- * The listening runs on the phone (an open-source keyword spotter, sherpa-onnx, in public/hey-resqnow);
+ * The listening runs on the phone (ResQNow's own wake-word model, in public/hey-resqnow);
  * no sound leaves the device. It is off until the customer turns it on in Account.
  */
 
 const KEY = "resqnow_hey_resqnow";
 const CHANGED = "resqnow:hey-resqnow";
-/** The spotter and its model, about 15 MB, fetched only once the customer turns this on. */
+/** The listener and its model, about 18 MB, fetched only once the customer turns this on. */
 export const WAKE_FILES = "/hey-resqnow/";
 
 export function wakeWordOn(): boolean {
@@ -72,8 +72,8 @@ const frameTimeout = 6_000;
 /** The spotter runs in its own worker, kept between pauses so turning back to the app is instant. */
 function startSpotter(): Spotter {
   if (spotter) return spotter;
-  // The service worker caches script URLs. This version speaks the frame-acknowledgement protocol.
-  const worker = new Worker(`${WAKE_FILES}worker.js?v=2`);
+  // The service worker caches script URLs. Version 3 is ResQNow's own wake-word model.
+  const worker = new Worker(`${WAKE_FILES}worker.js?v=3`);
   let rejectReady!: (error: Error) => void;
   const ready = new Promise<void>((resolve, reject) => {
     rejectReady = reject;

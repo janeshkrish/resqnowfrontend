@@ -217,9 +217,10 @@ const TechnicianProfile = () => {
             const formData = new FormData();
             formData.append("file", file);
 
-            const uploadRes = await fetch(apiUrl("/api/upload"), {
+            const uploadRes = await apiFetch("/api/upload", {
                 method: "POST",
                 body: formData,
+                technician: true,
             });
             const uploadPayload = await uploadRes.json().catch(() => ({}));
             if (!uploadRes.ok || !uploadPayload?.url) {

@@ -455,7 +455,8 @@ function Upload({ value, label, onChange, onUploading }: { value: string; label:
     try {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch(apiUrl("/api/upload"), { method: "POST", body });
+      // Signed in, so uploads count against the admin's own allowance, not the office IP's.
+      const response = await apiFetch("/api/upload", { method: "POST", body, admin: true });
       const data = await response.json();
       if (!response.ok || typeof data.url !== "string" || !data.url) throw new Error("Upload failed");
       onChange(data.url);

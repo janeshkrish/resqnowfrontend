@@ -10,6 +10,7 @@ import VehicleShowcase from "@/components/home/VehicleShowcase";
 import LiveNetwork from "@/components/home/LiveNetwork";
 import ActiveRequestCard from "@/components/home/ActiveRequestCard";
 import { ThozhanHomeCard } from "@/components/voice/ThozhanEntry";
+import { AppUpdateBanner } from "@/components/AppUpdateBanner";
 
 const EnterpriseDesktopHome = lazyWithReload(() => import("@/components/desktop/EnterpriseDesktopHome"));
 
@@ -19,6 +20,7 @@ const MobileDashboard = () => (
     <div aria-hidden="true" className="rq-home-backdrop" />
 
     <div className="rq-home-stack">
+      <AppUpdateBanner />
       <HomeSearch />
       <ActiveRequestCard />
       <ThozhanHomeCard />

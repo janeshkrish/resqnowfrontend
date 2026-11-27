@@ -15,4 +15,7 @@ export interface AppUpdater {
   requestInstall():Promise<UpdateSnapshot>;
   openInstallPermissionSettings():Promise<void>;
   addListener(event:'updateStateChange',callback:(state:UpdateSnapshot)=>void):Promise<PluginListenerHandle>;
+  addListener(event:'updateAlertOpened',callback:()=>void):Promise<PluginListenerHandle>;
+  /** Unfinished request or job: the phone notification waits. Older native builds may lack it. */
+  setAlertsQuiet?(options:{quiet:boolean}):Promise<void>;
 }

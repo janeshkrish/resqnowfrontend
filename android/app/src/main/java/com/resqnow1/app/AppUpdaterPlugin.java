@@ -16,7 +16,10 @@ public class AppUpdaterPlugin extends Plugin {
  @Override public void load(){
   store=UpdateStorage.open(getContext());
   if(UpdateNativeGate.enabled(getContext())){observer=ignored->publishSoon();getActivity().runOnUiThread(()->WorkManager.getInstance(getContext()).getWorkInfosForUniqueWorkLiveData(UpdateDownloadWorker.WORK_NAME).observe(getActivity(),observer));}
+  openedFromAlert(getActivity().getIntent());
  }
+ /** Tapping the update notification opens App updates; the event waits until the app listens. */
+ private void openedFromAlert(Intent intent){if(intent==null||!intent.getBooleanExtra(UpdateAlert.EXTRA_OPEN_UPDATES,false))return;intent.removeExtra(UpdateAlert.EXTRA_OPEN_UPDATES);UpdateAlert.cancel(getContext());notifyListeners("updateAlertOpened",new JSObject(),true);}
  private void enabled(){if(!UpdateNativeGate.enabled(getContext()))throw new IllegalStateException("updates_disabled");}
  private JSObject object(UpdateManifest release){JSObject result=new JSObject();for(Map.Entry<String,Object> e:release.toMap().entrySet())result.put(e.getKey(),e.getValue());return result;}
  private UpdateManifest input(PluginCall call)throws Exception {JSObject value=call.getObject("release");if(value==null)throw new IllegalArgumentException("update_manifest");Map<String,Object> map=new HashMap<>();Iterator<String> keys=value.keys();while(keys.hasNext()){String key=keys.next();map.put(key,value.get(key));}return UpdateManifest.parse(map);}
@@ -97,7 +100,10 @@ public class AppUpdaterPlugin extends Plugin {
   installerOpen.set(false);if(grantedUri!=null){getContext().revokeUriPermission(grantedUri,Intent.FLAG_GRANT_READ_URI_PERMISSION);grantedUri=null;}
   if(tasks.isShutdown())return;tasks.execute(()->{try{JSObject result=snapshot();emit(result);if(call!=null)call.resolve(result);}catch(Exception unavailable){if(call!=null)call.reject("Could not confirm the installed version","INSTALL_UNAVAILABLE");}});
  }
- @Override protected void handleOnResume(){publishSoon();}
+ @PluginMethod public void setAlertsQuiet(PluginCall call){Boolean quiet=call.getBoolean("quiet");if(quiet==null){call.reject("quiet is required","INVALID_ARGUMENT");return;}UpdateAlert.setQuiet(getContext(),quiet);call.resolve();}
+ @Override protected void handleOnNewIntent(Intent intent){openedFromAlert(intent);}
+ // On screen, the app's own banner speaks for the update; the notification would only repeat it.
+ @Override protected void handleOnResume(){UpdateAlert.cancel(getContext());publishSoon();}
  @Override protected void handleOnPause(){installGuard.cancel();}
  @Override protected void handleOnDestroy(){installGuard.cancel();if(observer!=null&&getActivity()!=null)getActivity().runOnUiThread(()->WorkManager.getInstance(getContext()).getWorkInfosForUniqueWorkLiveData(UpdateDownloadWorker.WORK_NAME).removeObserver(observer));tasks.shutdownNow();}
 }

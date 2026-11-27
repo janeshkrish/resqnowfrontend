@@ -108,6 +108,9 @@
             </intent-filter>
         </activity>
 
+        <!-- "Later" on the app update notification. -->
+        <receiver android:name=".updates.UpdateAlertReceiver" android:exported="false" />
+
         <provider
             android:name=".updates.UpdateFileProvider"
             android:authorities="${applicationId}.appupdates"

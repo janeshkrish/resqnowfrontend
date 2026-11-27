@@ -13,6 +13,7 @@ vi.mock('@/lib/api', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { AuthProvider, useAuth } from './AuthContext';
+import { setAdminToken } from '@/lib/api';
 const wrapper = ({ children }: { children: React.ReactNode }) => <AuthProvider>{children}</AuthProvider>;
 const profile = (subscription = 'premium', id = 'user-a') => ({ id, name: 'Customer', email: `${id}@example.test`,
   subscription, isVerified: true, phone: '9000000001' });
@@ -134,11 +135,15 @@ describe('authoritative subscription profiles', () => {
     expect(result.current.user).toBeNull(); expect(api.token).toBeNull();
   });
 
-  it('admin sign-in does not load or grant customer subscription state', async () => {
+  it('an admin response on the customer login is refused and never stored as any session', async () => {
     const { result } = renderHook(useAuth, { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     api.fetch.mockResolvedValue(json({ role: 'admin', token: 'admin-token', user: { id: 'admin', name: 'Admin' } }));
-    await act(async () => { await result.current.login('admin@example.test', 'password'); });
+    await act(async () => {
+      await expect(result.current.login('admin@example.test', 'password')).rejects.toThrow(/admin login page/);
+    });
+    expect(vi.mocked(setAdminToken)).not.toHaveBeenCalledWith('admin-token');
+    expect(localStorage.getItem('resqnow_admin_user')).toBeNull();
     expect(result.current.user).toBeNull(); expect(api.token).toBeNull();
     expect(api.fetch.mock.calls.map(call => call[0])).not.toContain('/api/auth/me');
   });

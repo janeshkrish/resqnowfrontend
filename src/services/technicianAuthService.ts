@@ -125,10 +125,10 @@ export const technicianAuthService = {
       const body = await res.json().catch(() => ({} as Record<string, unknown>));
       const responseStatus = String(body.status || "").trim().toLowerCase();
       let msg = String(body.error || "").trim();
-      if (res.status === 404) {
-        msg = "User not found.";
-      } else if (res.status === 401) {
-        msg = "Incorrect password. Please try again.";
+      // One message for unknown email and wrong password: the server no longer
+      // reveals which technician emails exist. 429 keeps the server's wait message.
+      if (res.status === 401 || res.status === 404) {
+        msg = "Incorrect email or password. Please try again.";
       } else if (res.status === 403 && responseStatus === "pending_approval") {
         msg = "Your account is pending admin approval.";
       }

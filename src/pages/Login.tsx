@@ -317,12 +317,6 @@ const Login = () => {
     try {
       const result = await login(cleanEmail, password, { signal: controller.signal });
       if (result.user) {
-        const role = String(result?.role || result?.user?.role || "").trim().toLowerCase();
-        if (role === "admin") {
-          toast.success("Admin login successful!");
-          navigate("/admin/dashboard");
-          return;
-        }
         toast.success("Login successful!");
         finish();
       }

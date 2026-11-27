@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release network policy: HTTPS only, system CAs only.
+  Debug and updaterAcceptance builds override this file from their own source
+  sets so emulators can reach local servers. Do not relax it here:
+  scripts/android-network-policy.test.mjs fails the release check if you do.
+-->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <!-- For physical device local testing, add IP here if needed, e.g. 192.168.1.100 -->
-    </domain-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

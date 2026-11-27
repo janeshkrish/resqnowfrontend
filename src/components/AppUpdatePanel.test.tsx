@@ -29,8 +29,8 @@ it('does not open the installer when source settings are opened or returned from
   await act(async()=>{fireEvent(document,new Event('visibilitychange'));await new Promise(resolve=>setTimeout(resolve,0));});expect(bridge.requestInstall).not.toHaveBeenCalled();
 });
 it('offers explicit mobile data and cancel while waiting for Wi-Fi',async()=>{
-  const bridge=setup('queued');fireEvent.click(await screen.findByRole('button',{name:'Download using mobile data'}));await waitFor(()=>expect(bridge.scheduleDownload).toHaveBeenCalledWith({release:fixture,allowMetered:true}));
-  fireEvent.click(screen.getByRole('button',{name:'Cancel download'}));await waitFor(()=>expect(bridge.cancelDownload).toHaveBeenCalledTimes(1));
+  const bridge=setup('queued');fireEvent.click(await screen.findByRole('button',{name:'Use mobile data now'}));await waitFor(()=>expect(bridge.scheduleDownload).toHaveBeenCalledWith({release:fixture,allowMetered:true}));
+  fireEvent.click(screen.getByRole('button',{name:'Stop download'}));await waitFor(()=>expect(bridge.cancelDownload).toHaveBeenCalledTimes(1));
 });
 it('defers installation during an accepted technician job',async()=>{
   mock.tech=true;mock.busy=true;const bridge=setup('ready','/technician/profile');expect(await screen.findByRole('button',{name:'Update now'})).toBeDisabled();expect(bridge.requestInstall).not.toHaveBeenCalled();
@@ -38,11 +38,11 @@ it('defers installation during an accepted technician job',async()=>{
 it('keeps staged version A and its ready/install message distinct from newer offer B',async()=>{
   const newer={...fixture,versionCode:fixture.versionCode+1,versionName:'newer-B',apkUrl:`https://github.com/janeshkrish/resqnowfrontend/releases/download/android-v${fixture.versionCode+1}/resqnow.apk`};
   const bridge=setup('downloading','/settings',newer);
-  await screen.findByText(`Version ${fixture.versionName} is downloading.`);
-  expect(await screen.findByText(/A newer version newer-B is also available/)).toBeInTheDocument();
+  await screen.findByText(`Version ${fixture.versionName} is downloading`);
+  expect(await screen.findByText(/Version newer-B is also out/)).toBeInTheDocument();
   const staged={...await bridge.getState(),phase:'ready'};bridge.getState.mockResolvedValue(staged);bridge.requestInstall.mockResolvedValue(staged);
   await act(async()=>{bridge.addListener.mock.calls[0][1](staged);});
-  expect(screen.getByText(`Version ${fixture.versionName} is ready to install.`)).toBeInTheDocument();
-  expect(screen.queryByText('Version newer-B is ready to install.')).not.toBeInTheDocument();
+  expect(screen.getByText(`Version ${fixture.versionName} is ready`)).toBeInTheDocument();
+  expect(screen.queryByText('Version newer-B is ready')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Update now'}));await waitFor(()=>expect(bridge.requestInstall).toHaveBeenCalledTimes(1));expect(bridge.scheduleDownload).not.toHaveBeenCalled();
 });

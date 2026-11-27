@@ -48,6 +48,8 @@ public final class UpdateDownloadWorker extends Worker {
    });
    // Hash verified only. The plugin must also inspect APK package/SDK/certificate
    // before promoting this state to ready or exposing an installer action.
+   // The alert only opens the app, where that inspection runs before "Update now" appears.
+   UpdateAlert.maybeNotify(context,release);
    return Result.success();
   }catch(UpdateDownloader.InvalidApkException|IllegalArgumentException invalid){fail(store,generation,"integrity");return failure("integrity");}
   catch(Exception unavailable){

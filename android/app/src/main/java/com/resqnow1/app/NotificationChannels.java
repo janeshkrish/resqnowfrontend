@@ -24,6 +24,8 @@ public final class NotificationChannels {
     public static final String TRIP_ALERTS = "trip_alerts";
     /** Everything else: receipts, ratings, messages from the team. */
     public static final String UPDATES = "updates";
+    /** Once per version: a new ResQNow has downloaded and is ready to install. */
+    public static final String APP_UPDATES = "app_updates";
 
     /** The single alarm channel earlier versions used for every message. */
     static final String LEGACY_ALARM_CHANNEL = "high_priority_alarms";
@@ -91,6 +93,14 @@ public final class NotificationChannels {
             NotificationChannel updates = new NotificationChannel(UPDATES, "Other updates", NotificationManager.IMPORTANCE_DEFAULT);
             updates.setDescription("Receipts, ratings and messages from ResQNow.");
             manager.createNotificationChannel(updates);
+        }
+
+        if (manager.getNotificationChannel(APP_UPDATES) == null) {
+            NotificationChannel appUpdates = new NotificationChannel(APP_UPDATES, "App updates", NotificationManager.IMPORTANCE_HIGH);
+            appUpdates.setDescription("Once per version, when a new ResQNow has downloaded and is ready to install.");
+            appUpdates.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            appUpdates.enableVibration(false);
+            manager.createNotificationChannel(appUpdates);
         }
     }
 }

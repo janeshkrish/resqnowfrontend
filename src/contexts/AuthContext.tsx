@@ -156,11 +156,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log("[Auth] login response", data);
       if (version !== sessionVersion.current) throw new Error("This sign-in was replaced by another session.");
-      // Customer sign-in only: admins sign in at /admin/login. An older server may still
-      // answer with an admin token here; never store it as a customer session.
       const resolvedRole = String(data?.role || data?.user?.role || "").trim().toLowerCase();
       if (resolvedRole === "admin") {
-        throw new Error("Admins sign in at the admin login page.");
+        const adminProfile = {
+          id: String(data?.user?.id || "admin"),
+          name: String(data?.user?.name || "Admin"),
+          email: String(data?.user?.email || email),
+          role: "admin",
+        };
+
+        setAdminToken(data.token || null);
+        localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(adminProfile));
+        clearCustomerSession();
+
+        return {
+          ...data,
+          role: "admin",
+          user: adminProfile,
+        };
       }
 
       // Ensure stale admin auth doesn't leak into user sessions.
